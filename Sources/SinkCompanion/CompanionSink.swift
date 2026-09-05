@@ -1,0 +1,112 @@
+import CompanionWire
+import CoreDomain
+import EnginePorts
+import Foundation
+import WireFormat
+
+public protocol CompanionBytePipe: Sendable {
+    func send(_ data: Data) async throws
+    func receive(max: Int) async throws -> Data
+}
+
+public enum CompanionError: Error, Equatable {
+    case truncated
+    case rejected(errorClass: String, detail: String, retryable: Bool)
+    case unexpected
+    case digestMismatch
+}
+
+public struct CompanionSink: DestinationSink, Sendable {
+    public var pipe: any CompanionBytePipe
+    public var installationID: String
+    public var chunkSize: Int
+
+    public init(pipe: any CompanionBytePipe, installationID: String, chunkSize: Int = 16_384) {
+        self.pipe = pipe
+        self.installationID = installationID
+        self.chunkSize = max(1, min(chunkSize, CompanionFrame.maxPayload - 4))
+    }
+
+    public func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt {
+        let file = URL(fileURLWithPath: fileHandle)
+        let payload = try Data(contentsOf: file)
+        let count = NativeWire.countRecords(in: String(decoding: payload, as: UTF8.self))
+        let digest = ContentSHA256.digest(payload)
+        let offer = CompanionOffer(
+            batchID: idempotencyKey.rawValue,
+            idempotencyKey: idempotencyKey.rawValue,
+            byteCount: UInt64(payload.count),
+            digest: digest
+        )
+        let session = CompanionSession(pipe: pipe)
+        try await session.send(.hello(
+            protocolVersion: CompanionReceiver.protocolVersion,
+            installationID: installationID,
+            capabilities: CompanionReceiver.capabilities
+        ))
+        let hello = try await session.receive()
+        switch hello {
+        case .hello(let version, _, _):
+            if version != CompanionReceiver.protocolVersion { throw CompanionCodecError.protocolVersion }
+        case .reject(let errorClass, let detail, let retryable):
+            throw CompanionError.rejected(errorClass: errorClass, detail: detail, retryable: retryable)
+        default:
+            throw CompanionError.unexpected
+        }
+        try await session.send(.offer(offer))
+        switch try await session.receive() {
+        case .receipt(let batchID, let ackedDigest):
+            guard batchID == offer.batchID, ackedDigest == digest else { throw CompanionError.digestMismatch }
+            return DeliveryReceipt(batchID: idempotencyKey, accepted: count, statusOnly: false)
+        case .resume(let fromChunk):
+            let parts = CompanionChunks.split(payload, size: chunkSize)
+            var seq = fromChunk
+            while seq < UInt32(parts.count) {
+                try await session.send(.chunk(seq: seq, bytes: parts[Int(seq)]))
+                guard case .chunkAck(let acked) = try await session.receive(), acked == seq else {
+                    throw CompanionError.unexpected
+                }
+                seq += 1
+            }
+            try await session.send(.commit(digest: digest))
+            switch try await session.receive() {
+            case .receipt(let batchID, let ackedDigest):
+                guard batchID == offer.batchID, ackedDigest == digest else { throw CompanionError.digestMismatch }
+                return DeliveryReceipt(batchID: idempotencyKey, accepted: count, statusOnly: false)
+            case .reject(let errorClass, let detail, let retryable):
+                throw CompanionError.rejected(errorClass: errorClass, detail: detail, retryable: retryable)
+            default:
+                throw CompanionError.unexpected
+            }
+        case .reject(let errorClass, let detail, let retryable):
+            throw CompanionError.rejected(errorClass: errorClass, detail: detail, retryable: retryable)
+        default:
+            throw CompanionError.unexpected
+        }
+    }
+}
+
+public actor CompanionSession {
+    private let pipe: any CompanionBytePipe
+    private var inbound = Data()
+
+    public init(pipe: any CompanionBytePipe) {
+        self.pipe = pipe
+    }
+
+    public func send(_ message: CompanionMessage) async throws {
+        try await pipe.send(try message.encodedFrame())
+    }
+
+    public func receive() async throws -> CompanionMessage {
+        while true {
+            if let decoded = try CompanionFrame.decodePrefix(inbound) {
+                inbound.removeFirst(decoded.consumed)
+                return try CompanionMessage.decode(decoded.frame)
+            }
+            let chunk = try await pipe.receive(max: 4096)
+            if chunk.isEmpty { throw CompanionError.truncated }
+            inbound.append(chunk)
+        }
+    }
+}

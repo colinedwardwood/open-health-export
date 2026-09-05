@@ -1,0 +1,30 @@
+# COPYING
+
+This project's first-party source code is licensed under the GNU Affero General
+Public License version 3. The full licence text is in LICENSE.
+
+Documentation under `docs/` is licensed under Creative Commons Attribution 4.0
+International (CC BY 4.0), unless a file says otherwise.
+
+The wire-format specification and its fixtures under `spec/` are dedicated to
+the public domain under CC0-1.0.
+
+HAE compatibility fixtures (if present) are **not** under CC0; they remain
+All Rights Reserved / source-available pending a legal opinion (R-112, O-8).
+
+---
+
+## Additional permission under GNU AGPL version 3 section 7
+
+If you modify this Program, or any covered work, by linking or combining it
+with Apple's proprietary operating-system libraries, SDKs, or App Store
+distribution tooling (or a modified version of those libraries), containing
+parts covered by the terms of Apple's software licence agreements, the
+licensors of this Program grant you additional permission to convey the
+resulting work through Apple's App Store, TestFlight, and related Apple
+distribution channels, even if those channels' terms would otherwise conflict
+with GNU AGPL version 3 section 6, provided that you also convey complete
+corresponding source of the covered work under GNU AGPL version 3.
+
+This additional permission is granted by every contributor via Developer
+Certificate of Origin sign-off, as described in CONTRIBUTING.md.

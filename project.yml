@@ -1,0 +1,77 @@
+name: OpenHealthExporter
+options:
+  bundleIdPrefix: app.openhealthexporter
+  deploymentTarget:
+    iOS: "18.0"
+    macOS: "15.0"
+  createIntermediateGroups: true
+configFiles:
+  Debug: Brand.xcconfig
+  Release: Brand.xcconfig
+settings:
+  base:
+    IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    SWIFT_VERSION: "6.0"
+packages:
+  open-health-exporter:
+    path: .
+targets:
+  ExporteriOS:
+    type: application
+    platform: iOS
+    deploymentTarget: "18.0"
+    configFiles:
+      Debug: Brand.xcconfig
+      Release: Brand.xcconfig
+    sources:
+      - path: Apps/Exporter-iOS
+        excludes:
+          - Info.plist
+          - "*.entitlements"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(PRODUCT_BUNDLE_IDENTIFIER_ROOT).ios
+        PRODUCT_NAME: $(PRODUCT_NAME)
+        INFOPLIST_FILE: Apps/Exporter-iOS/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Apps/Exporter-iOS/Exporter.entitlements
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: NO
+        GENERATE_INFOPLIST_FILE: NO
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 0.1.0
+    dependencies:
+      - package: open-health-exporter
+        product: ExportCore
+      - package: open-health-exporter
+        product: HealthKitSource
+      - sdk: VisionKit.framework
+    scheme:
+      testTargets: []
+  CompanionMac:
+    type: application
+    platform: macOS
+    deploymentTarget: "15.0"
+    configFiles:
+      Debug: Brand.xcconfig
+      Release: Brand.xcconfig
+    sources:
+      - path: Apps/Companion-macOS
+        excludes:
+          - Info.plist
+          - "*.entitlements"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(PRODUCT_BUNDLE_IDENTIFIER_ROOT).mac
+        PRODUCT_NAME: $(PRODUCT_NAME)Companion
+        INFOPLIST_FILE: Apps/Companion-macOS/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Apps/Companion-macOS/Companion.entitlements
+        MACOSX_DEPLOYMENT_TARGET: "15.0"
+        GENERATE_INFOPLIST_FILE: NO
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 0.1.0
+    dependencies:
+      - package: open-health-exporter
+        product: ExportCore
+    scheme:
+      testTargets: []

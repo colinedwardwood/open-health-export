@@ -1,0 +1,4 @@
+// D-06 is open. This is the only file that may contain a user-visible product name.
+PRODUCT_NAME = OpenHealthExporter
+PRODUCT_BUNDLE_IDENTIFIER_ROOT = app.openhealthexporter
+DISPLAY_NAME = Open Health Exporter

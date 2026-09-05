@@ -1,0 +1,23 @@
+name: linux-core
+on:
+  push:
+  pull_request:
+jobs:
+  export-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.3.3"
+      - name: Build Linux core
+        run: swift build --target CoreDomain && swift build --target CorrectnessEngine
+      - name: Test
+        run: swift test
+      - name: Import policy
+        run: swift run policycheck
+      - name: Fuzz the wire decoders
+        run: |
+          swift run wirefuzz --iterations 200000
+          swift run wirefuzz --seed 0x1 --iterations 200000
+          swift run wirefuzz --seed $(date +%s) --iterations 200000

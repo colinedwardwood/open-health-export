@@ -1,0 +1,12 @@
+.build/
+.build-*/
+.swiftpm/
+*.xcodeproj
+*.xcworkspace
+DerivedData/
+.DS_Store
+xcuserdata/
+*.pif
+.env
+*.xcuserstate
+Apps/**/Info.plist.bak
