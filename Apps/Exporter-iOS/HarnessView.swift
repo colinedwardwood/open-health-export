@@ -27,6 +27,8 @@ struct HarnessView: View {
     @State private var diagnosticPayload: Data?
     @State private var diagnosticGate = DiagnosticPreviewGate()
     @State private var diagnosticShareURL: URL?
+    @State private var destinationStatusLines: [String] = []
+    @State private var ledgerLines: [String] = []
 
     var body: some View {
         NavigationStack {
@@ -61,6 +63,7 @@ struct HarnessView: View {
         }
         .onAppear {
             timeToFirstFrameMS = LaunchMark.millisecondsToNow()
+            destinationStatusLines = HarnessExport.destinationStatusLines()
             Task { await restorePairing() }
         }
         .sheet(isPresented: $showScanner) {
@@ -112,6 +115,27 @@ struct HarnessView: View {
             }
             .disabled(phase == .working)
             .accessibilityHint("Asks for notification permission and posts one R-40 notice with copy from the registry.")
+
+            Text("Where your data goes")
+                .font(.headline)
+            Button("Refresh destination status") {
+                destinationStatusLines = HarnessExport.destinationStatusLines()
+            }
+            ForEach(Array(destinationStatusLines.enumerated()), id: \.offset) { _, line in
+                Text(line)
+                    .font(.footnote)
+                    .textSelection(.enabled)
+            }
+            Button("Verify and show egress ledger") {
+                Task { await loadLedger() }
+            }
+            .disabled(phase == .working)
+            .accessibilityHint("Verifies the append-only hash chain and shows up to 50 recent transmission records.")
+            ForEach(Array(ledgerLines.enumerated()), id: \.offset) { _, line in
+                Text(line)
+                    .font(.system(.footnote, design: .monospaced))
+                    .textSelection(.enabled)
+            }
 
             Text("Diagnostics")
                 .font(.headline)
@@ -204,6 +228,20 @@ struct HarnessView: View {
     }
 
     @MainActor
+    private func loadLedger() async {
+        phase = .working
+        status = "Working: verifying egress ledger."
+        do {
+            ledgerLines = try await HarnessExport.ledgerLines()
+            status = "Ready. The ledger includes attempts and failures; it contains counts, not health values."
+        } catch {
+            ledgerLines = []
+            status = "Failed: \(error.localizedDescription)"
+        }
+        phase = .ready
+    }
+
+    @MainActor
     private func requestAccess() async {
         phase = .working
         status = "Working: Health authorisation."
@@ -251,6 +289,7 @@ struct HarnessView: View {
         results = []
         do {
             results = try await HarnessExport.runOnePageEachMetric()
+            destinationStatusLines = HarnessExport.destinationStatusLines()
             status = "Ready. Local export finished. Outcome kinds are engine-derived, not assigned by this screen."
         } catch {
             status = "Failed: \(error.localizedDescription)"
@@ -307,6 +346,7 @@ struct HarnessView: View {
         results = []
         do {
             results = try await HarnessExport.runCompanion(session: pairing)
+            destinationStatusLines = HarnessExport.destinationStatusLines()
             status = "Ready. Companion export finished. Compare confirmation \(sas) with the Mac."
         } catch {
             status = "Failed: \(error.localizedDescription)"

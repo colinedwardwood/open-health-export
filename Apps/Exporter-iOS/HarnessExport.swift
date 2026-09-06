@@ -8,10 +8,12 @@ import Foundation
 import HealthKitSource
 import MetricCatalog
 import NetEgress
+import RunJournal
 import SinkCompanion
 import SinkLocalFile
 import StorageSQLite
 import UIKit
+import Watchdog
 import WidgetKit
 import WireFormat
 
@@ -138,6 +140,7 @@ enum HarnessExport {
         return root
     }
 
+    @MainActor
     static func diagnosticBundle() throws -> (preview: String, payload: Data) {
         let assembler = BundleAssembler()
         let payload = try assembler.assemble(
@@ -155,6 +158,39 @@ enum HarnessExport {
         let lines = assembler.previewLines(events: [])
         let preview = lines.isEmpty ? text : lines.joined(separator: "\n") + "\n\n" + text
         return (preview, payload)
+    }
+
+    static func destinationStatusLines() -> [String] {
+        let snapshots = StatusSnapshotLocation.readAll()
+        guard !snapshots.isEmpty else { return ["No destination snapshots yet."] }
+        return snapshots.map { snapshot in
+            let last = snapshot.lastSuccessEpoch.map {
+                Date(timeIntervalSince1970: $0).formatted(date: .abbreviated, time: .shortened)
+            } ?? "never"
+            return "\(snapshot.destinationLabel): \(snapshot.state.rawValue) · last success \(last)"
+        }
+    }
+
+    static func ledgerLines() async throws -> [String] {
+        let root = try applicationSupportRoot()
+        let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+        let entries = try await store.transact { tx in
+            try tx.loadLedger()
+        }
+        var lines: [String]
+        switch LedgerChain.verify(entries) {
+        case .valid(let head, let count):
+            let shortHead = head == LedgerChain.genesisHash ? "genesis" : String(head.prefix(12))
+            lines = ["Chain valid · \(count) entries · head \(shortHead)"]
+        case .invalid(let sequence):
+            lines = ["WARNING: chain verification failed at sequence \(sequence)"]
+        }
+        lines.append(contentsOf: entries.suffix(50).reversed().map { entry in
+            let date = Date(timeIntervalSince1970: entry.wallTimeEpoch)
+                .formatted(date: .abbreviated, time: .shortened)
+            return "\(date) · \(entry.destination) · \(entry.outcomeKind) · \(entry.sampleCount) records · \(entry.byteCount) bytes"
+        })
+        return lines
     }
 
     static func vault() throws -> PairingVault {

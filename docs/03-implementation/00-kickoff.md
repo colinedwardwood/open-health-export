@@ -148,3 +148,8 @@ Group. Timelines precompute stale/overdue transitions without inventing an
 R-71 threshold, and every status uses a distinct glyph and text label with no
 health values.
 
+The harness's fixed `Where your data goes` section renders those same
+destination snapshots and provides an egress-ledger view. Opening the ledger
+verifies the SHA-256 chain first and shows an explicit warning on a broken
+sequence; the visible rows are bounded to the latest 50 attempts.
+
