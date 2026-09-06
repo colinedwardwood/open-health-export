@@ -69,3 +69,6 @@ and a free foreground real-batch half-open probe. It contains no in-wake retry l
 
 The watchdog has no invented default N before R-71. Local p95 becomes eligible after 100 samples
 spanning 14 days; the alarm threshold is `clamp(2 × p95, 6 h, 48 h)`.
+
+SQLite metadata defaults to Darwin Class C file protection, WAL + `synchronous=FULL`, and a 4 MB
+journal/recovery budget.

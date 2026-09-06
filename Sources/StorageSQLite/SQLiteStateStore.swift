@@ -7,7 +7,16 @@ import SQLite3
 
 public struct SQLiteOpenPolicy: Sendable {
     public var protectionClassFlag: Int32?
-    public init(protectionClassFlag: Int32? = nil) {
+
+    public init(
+        protectionClassFlag: Int32? = {
+            #if os(iOS) || os(macOS)
+            SQLITE_OPEN_FILEPROTECTION_COMPLETEUNTILFIRSTUSERAUTHENTICATION
+            #else
+            nil
+            #endif
+        }()
+    ) {
         self.protectionClassFlag = protectionClassFlag
     }
 }
@@ -37,7 +46,10 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
         }
         db = handle
         try exec("PRAGMA journal_mode=WAL;")
+        try exec("PRAGMA synchronous=FULL;")
         try exec("PRAGMA busy_timeout=5000;")
+        try exec("PRAGMA journal_size_limit=4194304;")
+        try exec("PRAGMA wal_autocheckpoint=1000;")
         try migrate()
     }
 
