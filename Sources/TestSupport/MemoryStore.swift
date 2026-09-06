@@ -95,6 +95,13 @@ public final class MemoryTransaction: StateTransaction {
         Array(dirty[metric] ?? []).sorted()
     }
 
+    public func clearDirty(metric: MetricID, day: String) throws {
+        dirty[metric]?.remove(day)
+        if dirty[metric]?.isEmpty == true {
+            dirty.removeValue(forKey: metric)
+        }
+    }
+
     public func upsertEmittedIndex(_ row: EmittedIndexRow) throws {
         emittedIndex[row.uuid] = row
     }

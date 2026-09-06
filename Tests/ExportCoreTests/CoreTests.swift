@@ -959,3 +959,102 @@ private struct OneExportFault: ExportFaultInjector {
     let observed = ReconcileCompare.fold(uuids: ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"])
     #expect(ReconcileCompare.compare(stored: stored, observed: observed) == .digestMismatch)
 }
+
+@Test func reconcilePlannerIsCleanWhenCellMatches() {
+    let metric = MetricID(rawValue: "heartRate")
+    let uuid = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    let observed = [heartSample(uuid)]
+    let fold = ReconcileCompare.fold(uuids: [uuid])
+    let stored = CensusRow(
+        metric: metric,
+        day: "2024-01-01",
+        sampleCount: fold.count,
+        digest: String(fold.digestXor, radix: 16)
+    )
+    let plan = ReconcilePlanner.planDay(
+        metric: metric,
+        day: "2024-01-01",
+        stored: stored,
+        indexed: [
+            EmittedIndexRow(
+                uuid: uuid,
+                metric: metric,
+                day: "2024-01-01",
+                digest: "x",
+                batchID: BatchID(rawValue: "b")
+            )
+        ],
+        observed: observed
+    )
+    #expect(plan.isClean)
+    #expect(plan.outcome == .identical)
+}
+
+@Test func reconcilePlannerReemitsWhenHealthKitHasMoreSamples() {
+    let metric = MetricID(rawValue: "heartRate")
+    let stored = CensusRow(metric: metric, day: "2024-01-01", sampleCount: 0, digest: "0")
+    let plan = ReconcilePlanner.planDay(
+        metric: metric,
+        day: "2024-01-01",
+        stored: stored,
+        indexed: [],
+        observed: [heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")]
+    )
+    #expect(plan.outcome == .countGreater)
+    #expect(plan.repairs == [.reemitDay])
+}
+
+@Test func reconcilePlannerEmitsAbsenceTombstonesWhenSamplesDisappear() {
+    let metric = MetricID(rawValue: "heartRate")
+    let gone = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    let keep = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    let fold = ReconcileCompare.fold(uuids: [keep])
+    // Store claims two samples; observation has one.
+    let stored = CensusRow(metric: metric, day: "2024-01-01", sampleCount: 2, digest: "1")
+    let indexed = [
+        EmittedIndexRow(uuid: keep, metric: metric, day: "2024-01-01", digest: "a", batchID: BatchID(rawValue: "b")),
+        EmittedIndexRow(uuid: gone, metric: metric, day: "2024-01-01", digest: "b", batchID: BatchID(rawValue: "b")),
+    ]
+    let plan = ReconcilePlanner.planDay(
+        metric: metric,
+        day: "2024-01-01",
+        stored: stored,
+        indexed: indexed,
+        observed: [heartSample(keep)]
+    )
+    #expect(plan.outcome == .countSmaller)
+    #expect(plan.repairs.contains(.reemitDay))
+    guard case .emitAbsenceTombstones(let tombs) = plan.repairs.first(where: {
+        if case .emitAbsenceTombstones = $0 { return true }
+        return false
+    }) else {
+        Issue.record("expected absence tombstones")
+        return
+    }
+    #expect(tombs.map(\.key.uuid) == [gone])
+}
+
+@Test func reconcilePlannerTrailingDaysCoversSevenDayWindow() {
+    #expect(
+        ReconcilePlanner.trailingDays(throughDay: "2024-03-01", count: 7) == [
+            "2024-02-24",
+            "2024-02-25",
+            "2024-02-26",
+            "2024-02-27",
+            "2024-02-28",
+            "2024-02-29",
+            "2024-03-01",
+        ]
+    )
+}
+
+@Test func clearDirtyRemovesOnlyTheNamedDay() async throws {
+    let store = MemoryStateStore()
+    let metric = MetricID(rawValue: "heartRate")
+    try await store.transact { tx in
+        try tx.markDirty(metric: metric, day: "2024-01-01")
+        try tx.markDirty(metric: metric, day: "2024-01-02")
+        try tx.clearDirty(metric: metric, day: "2024-01-01")
+    }
+    #expect(try await store.transact { try $0.dirtyDays(metric: metric) } == ["2024-01-02"])
+}

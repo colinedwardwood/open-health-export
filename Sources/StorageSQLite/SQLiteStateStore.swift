@@ -352,6 +352,14 @@ private final class SQLiteTransaction: StateTransaction {
         return days
     }
 
+    func clearDirty(metric: MetricID, day: String) throws {
+        let stmt = try store.prepare("DELETE FROM dirty WHERE metric = ? AND day = ?;")
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, metric.rawValue)
+        bindText(stmt, 2, day)
+        try stepDone(stmt)
+    }
+
     func upsertEmittedIndex(_ row: EmittedIndexRow) throws {
         let stmt = try store.prepare(
             "INSERT INTO emitted_index (uuid, metric, day, digest, batch_id) VALUES (?, ?, ?, ?, ?) ON CONFLICT(uuid) DO UPDATE SET metric = excluded.metric, day = excluded.day, digest = excluded.digest, batch_id = excluded.batch_id;"

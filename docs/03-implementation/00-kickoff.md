@@ -93,3 +93,7 @@ Census rows accumulate across pages with an XOR digest; tombstones decrement the
 census and drop the UUID from `emitted_index` when known. Unknown deletions journal
 `deletion_undatable`. `ReconcileCompare` classifies cell mismatches and absence
 tombstones; the bounded sweep still does not run.
+
+`ReconcilePlanner` turns a cell compare into concrete repairs for a day, including
+absence tombstones from the emitted index. Dirty days can be cleared after a drain.
+The HealthKit-backed trailing sweep is not wired yet.

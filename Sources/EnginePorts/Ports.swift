@@ -160,6 +160,7 @@ public protocol StateTransaction: AnyObject {
     func loadCensus(metric: MetricID, day: String) throws -> CensusRow?
     func markDirty(metric: MetricID, day: String) throws
     func dirtyDays(metric: MetricID) throws -> [String]
+    func clearDirty(metric: MetricID, day: String) throws
     func upsertEmittedIndex(_ row: EmittedIndexRow) throws
     func loadEmittedIndex(uuid: String) throws -> EmittedIndexRow?
     func removeEmittedIndex(uuid: String) throws
