@@ -66,3 +66,6 @@ egress ledger row.
 Retry/circuit-breaking is a pure one-result transition: exponential full jitter (15 s / 6 h),
 `Retry-After` capped at 24 h, five transient failures or three unknown acknowledgements to open,
 and a free foreground real-batch half-open probe. It contains no in-wake retry loop.
+
+The watchdog has no invented default N before R-71. Local p95 becomes eligible after 100 samples
+spanning 14 days; the alarm threshold is `clamp(2 × p95, 6 h, 48 h)`.

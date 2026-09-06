@@ -244,6 +244,33 @@ import Watchdog
     let last = Date(timeIntervalSince1970: 100)
     #expect(policy.shouldEscalate(lastSuccess: last, now: now))
     #expect(!policy.shouldEscalate(lastSuccess: now, now: now))
+    #expect(!StalenessPolicy().shouldEscalate(lastSuccess: nil, now: now))
+}
+
+@Test func freshnessTargetRequiresFourteenDaysAndOneHundredObservations() {
+    let start = Date(timeIntervalSince1970: 0)
+    let tooShort = (0..<100).map { index in
+        FreshnessObservation(
+            observedAt: start.addingTimeInterval(Double(index) * 60),
+            latency: Double(index + 1)
+        )
+    }
+    #expect(FreshnessTarget.localP95(observations: tooShort) == nil)
+
+    let qualifying = (0..<100).map { index in
+        FreshnessObservation(
+            observedAt: start.addingTimeInterval(
+                Double(index) * FreshnessTarget.minimumSpan / 99
+            ),
+            latency: Double(index + 1)
+        )
+    }
+    #expect(FreshnessTarget.localP95(observations: qualifying) == 95)
+    #expect(FreshnessTarget.alarmThreshold(p95: 95) == FreshnessTarget.alarmFloor)
+    #expect(
+        FreshnessTarget.alarmThreshold(p95: 100 * 60 * 60)
+            == FreshnessTarget.alarmCap
+    )
 }
 
 @Test func retryPolicyUsesFullJitterAndOpensAfterFiveFailures() {
