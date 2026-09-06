@@ -370,6 +370,42 @@ func testEnvelope() -> WireEnvelope {
     )
 }
 
+func statisticsRecord(
+    metric: MetricID = MetricCatalog.stepCount.id,
+    day: String = "2024-01-01",
+    value: Double = 123
+) -> AggregateRecord {
+    let bounds = BucketKey.boundsP1D(day: day, context: .utc)!
+    let declaration = MetricCatalog.declaration(for: metric)!
+    return AggregateRecord(
+        bucketKey: BucketKey.render(
+            metricWireId: declaration.wireId,
+            statistic: AggregateStatistic.sum.rawValue,
+            granularity: "P1D",
+            bucketStart: bounds.bucketStart,
+            timeZoneIdentifier: "UTC",
+            sourceScope: AggregateSourceScope.all.rawValue
+        ),
+        metric: metric,
+        statistic: .sum,
+        computation: .healthKitStatisticsCollectionQuery,
+        sourceScope: .all,
+        granularity: "P1D",
+        bucketStart: bounds.bucketStart,
+        bucketEnd: bounds.bucketEnd,
+        bucketDurationSeconds: bounds.bucketDurationSeconds,
+        timeZoneIdentifier: "UTC",
+        localStart: bounds.localStart,
+        value: value,
+        unit: declaration.canonicalUnit,
+        sampleCount: 0,
+        state: .open,
+        emitSeq: 1,
+        computedAt: "ignored",
+        observedAt: "ignored"
+    )
+}
+
 @Test func writeAheadCursorPreventsRereadAfterCommit() async throws {
     let metric = MetricID(rawValue: "heartRate")
     let page = SamplePage(
@@ -1374,6 +1410,103 @@ private struct OneExportFault: ExportFaultInjector {
     let texts = try files.map { try String(contentsOf: $0, encoding: .utf8) }
     #expect(texts.contains { $0.contains("\"state\":\"revised\"") })
     #expect(texts.contains { $0.contains("\"supersedes\":1") })
+}
+
+@Test func exportRunUsesCanonicalStatisticsForCumulativeMetric() async throws {
+    let metric = MetricCatalog.stepCount.id
+    var sample = heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+    sample.metric = metric
+    sample.unit = CanonicalUnit(symbol: "count")
+    sample.value = 100
+    let page = SamplePage(
+        samples: [sample],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0x41]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let dest = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-statistics-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+    let store = MemoryStateStore()
+    let run = ExportRun(
+        source: FixtureSource(pages: [page]),
+        destination: .testing(LocalFileSink(directory: dest)),
+        store: store,
+        metric: metric,
+        scratchDirectory: dest.appendingPathComponent("scratch"),
+        envelope: testEnvelope(),
+        statistics: FixtureStatistics(
+            byDay: ["2024-01-01": statisticsRecord(value: 123)]
+        )
+    )
+    #expect(try await run.run().kind == .success)
+    #expect(try store.transaction.dirtyDays(metric: metric).isEmpty)
+    let texts = try FileManager.default.contentsOfDirectory(
+        at: dest,
+        includingPropertiesForKeys: nil
+    )
+    .filter { $0.pathExtension == "ndjson" }
+    .map { try String(contentsOf: $0, encoding: .utf8) }
+    #expect(texts.contains { $0.contains("\"healthKitStatisticsCollectionQuery\"") })
+    #expect(texts.contains { $0.contains("\"value\":123") })
+    #expect(!texts.contains { $0.contains("\"localSampleFold\"") })
+}
+
+@Test func exportRunDoesNotLocallyFoldCumulativeMetricWithoutStatisticsSource() async throws {
+    let metric = MetricCatalog.stepCount.id
+    var sample = heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+    sample.metric = metric
+    sample.unit = CanonicalUnit(symbol: "count")
+    let page = SamplePage(
+        samples: [sample],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0x42]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let dest = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-no-statistics-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+    let store = MemoryStateStore()
+    let run = ExportRun(
+        source: FixtureSource(pages: [page]),
+        destination: .testing(LocalFileSink(directory: dest)),
+        store: store,
+        metric: metric,
+        scratchDirectory: dest.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    )
+    #expect(try await run.run().kind == .success)
+    #expect(try store.transaction.dirtyDays(metric: metric) == ["2024-01-01"])
+    let texts = try FileManager.default.contentsOfDirectory(
+        at: dest,
+        includingPropertiesForKeys: nil
+    )
+    .filter { $0.pathExtension == "ndjson" }
+    .map { try String(contentsOf: $0, encoding: .utf8) }
+    #expect(!texts.contains { $0.contains("\"localSampleFold\"") })
+}
+
+@Test func statisticsAggregateRevisionGetsEngineSequenceAndSupersedes() throws {
+    let canonical = statisticsRecord(value: 456)
+    let plan = try #require(
+        AggregateDrain.planStatisticsDay(
+            metric: MetricCatalog.stepCount.id,
+            day: "2024-01-01",
+            canonical: canonical,
+            context: .utc,
+            emitSeq: 4,
+            computedAt: "2024-01-03T00:00:00Z",
+            observedAt: "2024-01-03T00:00:00Z",
+            now: Date(timeIntervalSince1970: 1_704_240_000),
+            priorEmitSeq: 3
+        )
+    )
+    #expect(plan.record.emitSeq == 4)
+    #expect(plan.record.supersedes == 3)
+    #expect(plan.record.state == .revised)
+    #expect(plan.record.computedAt == "2024-01-03T00:00:00Z")
 }
 
 @Test func wakeLedgerAppendsBeforeWorkAndRoundTrips() throws {

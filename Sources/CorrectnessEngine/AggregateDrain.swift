@@ -74,7 +74,44 @@ public enum AggregateDrain {
         return AggregateDayPlan(metric: metric, day: day, record: record)
     }
 
-    private static func bucketState(
+    public static func planStatisticsDay(
+        metric: MetricID,
+        day: String,
+        canonical: AggregateRecord,
+        context: TemporalContext,
+        emitSeq: Int,
+        computedAt: String,
+        observedAt: String,
+        now: Date,
+        priorEmitSeq: Int? = nil,
+        reconcileWindowDays: Int = 7
+    ) -> AggregateDayPlan? {
+        guard canonical.metric == metric,
+              canonical.computation == .healthKitStatisticsCollectionQuery,
+              let bounds = BucketKey.boundsP1D(day: day, context: context)
+        else { return nil }
+        var record = canonical
+        record.bucketStart = bounds.bucketStart
+        record.bucketEnd = bounds.bucketEnd
+        record.bucketDurationSeconds = bounds.bucketDurationSeconds
+        record.timeZoneIdentifier = context.timeZoneIdentifier
+        record.localStart = bounds.localStart
+        record.state = bucketState(
+            priorEmitSeq: priorEmitSeq,
+            bucketEnd: bounds.bucketEnd,
+            day: day,
+            now: now,
+            reconcileWindowDays: reconcileWindowDays,
+            context: context
+        )
+        record.emitSeq = emitSeq
+        record.computedAt = computedAt
+        record.observedAt = observedAt
+        record.supersedes = priorEmitSeq
+        return AggregateDayPlan(metric: metric, day: day, record: record)
+    }
+
+    static func bucketState(
         priorEmitSeq: Int?,
         bucketEnd: String,
         day: String,

@@ -213,3 +213,13 @@ public struct FixtureDays: DayObservationSource, Sendable {
         (byDay[day] ?? []).filter { $0.metric == metric }
     }
 }
+
+public struct FixtureStatistics: StatisticsSource, Sendable {
+    public var byDay: [String: AggregateRecord]
+    public init(byDay: [String: AggregateRecord]) { self.byDay = byDay }
+
+    public func dailyBucket(metric: MetricID, day: String) async throws -> AggregateRecord? {
+        guard let record = byDay[day], record.metric == metric else { return nil }
+        return record
+    }
+}

@@ -17,6 +17,7 @@ public struct ExportRun: Sendable {
     public var envelope: WireEnvelope
     public var clock: any Clock
     public var temporal: TemporalContext
+    public var statistics: (any StatisticsSource)?
     public var trigger: RunTrigger
     #if DEBUG
     public var faults: any ExportFaultInjector = NoExportFaults()
@@ -33,6 +34,7 @@ public struct ExportRun: Sendable {
         envelope: WireEnvelope,
         clock: any Clock = SystemClock(),
         temporal: TemporalContext = .utc,
+        statistics: (any StatisticsSource)? = nil,
         trigger: RunTrigger = .manual
     ) {
         self.source = source
@@ -45,6 +47,7 @@ public struct ExportRun: Sendable {
         self.envelope = envelope
         self.clock = clock
         self.temporal = temporal
+        self.statistics = statistics
         self.trigger = trigger
     }
 
@@ -181,36 +184,17 @@ public struct ExportRun: Sendable {
             return found
         }
         days.formUnion(tombDays)
-        let now = clock.now()
-        return try await store.transact { tx in
-            var plans: [AggregateDayPlan] = []
-            for day in days.sorted() {
-                guard let probe = AggregateDrain.planDay(
-                    metric: metric,
-                    day: day,
-                    samples: page.samples,
-                    context: temporal,
-                    emitSeq: 1,
-                    computedAt: envelope.emittedAt,
-                    observedAt: envelope.observedAt,
-                    now: now
-                ) else { continue }
-                let prior = try tx.loadAggregateEmitSeq(bucketKey: probe.record.bucketKey)
-                guard let plan = AggregateDrain.planDay(
-                    metric: metric,
-                    day: day,
-                    samples: page.samples,
-                    context: temporal,
-                    emitSeq: (prior ?? 0) + 1,
-                    computedAt: envelope.emittedAt,
-                    observedAt: envelope.observedAt,
-                    now: now,
-                    priorEmitSeq: prior
-                ) else { continue }
-                plans.append(plan)
-            }
-            return plans
-        }
+        return try await AggregateResolver.plans(
+            metric: metric,
+            days: days,
+            samples: page.samples,
+            statistics: statistics,
+            store: store,
+            context: temporal,
+            computedAt: envelope.emittedAt,
+            observedAt: envelope.observedAt,
+            now: clock.now()
+        )
     }
 
     private func record(outcome: RunOutcome, tally: RunTally, receipt: DeliveryReceipt?) async throws {

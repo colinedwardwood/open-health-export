@@ -117,5 +117,7 @@ wake and the two-tap UI are not wired.
 HealthKit) date-ranged observations and enqueues repairs without moving the
 cursor. `HealthKitDayObservationSource` now provides the date-ranged, throwaway-
 anchor adapter. `HealthKitStatisticsSource` produces canonical P1D totals for
-the catalogue's cumulative exception list; engine selection is not wired yet.
+the catalogue's cumulative exception list. `AggregateResolver` selects those
+statistics for cumulative metrics, never silently substitutes a local fold,
+and leaves the dirty day queued when no statistics source is available.
 
