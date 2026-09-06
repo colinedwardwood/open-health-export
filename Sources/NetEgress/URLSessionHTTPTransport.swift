@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// The only type in ExportCore allowed to talk to `URLSession` (R-32).
 public struct URLSessionHTTPTransport: HTTPTransport {
