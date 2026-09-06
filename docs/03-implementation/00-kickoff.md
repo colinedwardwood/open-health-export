@@ -133,3 +133,8 @@ redaction manifest; raw run IDs and free-form detail never enter the bundle.
 `DiagnosticPreviewGate` exposes no share payload until full-content review.
 The SwiftUI preview/share surface and corruption-salvage reader remain open.
 
+R-25 now has a named-step destination test. Local folder write/read/confirm
+must pass (or MQTT QoS 0 report `sentUnconfirmed`) before `enable`. A failed
+test cannot enable. Export runs write a JSON `DestinationStatusSnapshot` the
+widget and watchdog can read without SQLite. WidgetKit UI is still missing.
+

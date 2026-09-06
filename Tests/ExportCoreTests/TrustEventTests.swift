@@ -15,6 +15,7 @@ private func pinnedSetup(
     try setup.markCanarySent(code: "ABCD-EF01")
     try setup.confirmCanary("ABCD-EF01")
     try setup.recordPin(from: identity, at: "2024-01-01T00:00:00Z", policy: policy)
+    try setup.recordTest(.passedLocalFile)
     return setup
 }
 

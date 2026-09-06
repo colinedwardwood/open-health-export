@@ -16,6 +16,7 @@ public enum SetupError: Error, Equatable {
     case illegalTransition(from: DestinationState, to: DestinationState)
     case canaryMismatch
     case notEnabled
+    case verificationRequired
 }
 
 /// R-40: trust changes the user must be told about. Accumulated by the transitions
@@ -35,6 +36,7 @@ public struct DestinationSetup: Sendable {
     public private(set) var canaryCode: String?
     public private(set) var pin: PinRecord?
     public private(set) var displayedIdentity: TLSIdentity?
+    public private(set) var testReport: DestinationTestReport?
     private var pendingEvents: [TrustEvent] = []
 
     public init() {
@@ -130,10 +132,21 @@ public struct DestinationSetup: Sendable {
         }
     }
 
+    /// R-25: a destination cannot enable until a real-path test has a non-failure verdict.
+    public mutating func recordTest(_ report: DestinationTestReport) throws {
+        guard state == .pinned || state == .enabled else {
+            throw SetupError.illegalTransition(from: state, to: state)
+        }
+        testReport = report
+    }
+
     public mutating func enable(sink: any DestinationSink) throws -> VerifiedDestination {
         guard state != .halted else { throw SetupError.notEnabled }
         guard state == .pinned || state == .enabled else {
             throw SetupError.illegalTransition(from: state, to: .enabled)
+        }
+        guard let testReport, testReport.allowsEnablement else {
+            throw SetupError.verificationRequired
         }
         let wasEnabled = state == .enabled
         state = .enabled

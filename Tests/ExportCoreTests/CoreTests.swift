@@ -326,6 +326,58 @@ import Redaction
     #expect(!StalenessPolicy().shouldEscalate(lastSuccess: nil, now: now))
 }
 
+@Test func destinationSnapshotRoundTripsWithoutSqlite() throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-snap-\(UUID().uuidString)")
+        .appendingPathComponent("status.json")
+    let snapshot = DestinationStatusSnapshot(
+        destinationID: "local-file",
+        enabled: true,
+        lastOutcome: "success",
+        lastSuccessEpoch: 1_000,
+        writtenAtEpoch: 1_001
+    )
+    try DestinationSnapshotFile.write(snapshot, to: url)
+    #expect(try DestinationSnapshotFile.read(from: url) == snapshot)
+    let lastSuccess = Date(timeIntervalSince1970: snapshot.lastSuccessEpoch ?? 0)
+    #expect(
+        StalenessPolicy(defaultInterval: 60).shouldEscalate(
+            lastSuccess: lastSuccess,
+            now: Date(timeIntervalSince1970: 1_100)
+        )
+    )
+}
+
+@Test func exportRunWritesWidgetSnapshotAfterCommit() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let page = SamplePage(
+        samples: [heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0x51]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let dest = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-snap-run-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+    let snapshotURL = dest.appendingPathComponent("status.json")
+    let run = ExportRun(
+        source: FixtureSource(pages: [page]),
+        destination: .testing(LocalFileSink(directory: dest)),
+        store: MemoryStateStore(),
+        metric: metric,
+        scratchDirectory: dest.appendingPathComponent("scratch"),
+        envelope: testEnvelope(),
+        clock: FrozenClock(instant: Date(timeIntervalSince1970: 42)),
+        snapshotURL: snapshotURL
+    )
+    #expect(try await run.run().kind == .success)
+    let snapshot = try DestinationSnapshotFile.read(from: snapshotURL)
+    #expect(snapshot.lastOutcome == "success")
+    #expect(snapshot.lastSuccessEpoch == 42)
+    #expect(snapshot.writtenAtEpoch == 42)
+}
+
 @Test func freshnessTargetRequiresFourteenDaysAndOneHundredObservations() {
     let start = Date(timeIntervalSince1970: 0)
     let tooShort = (0..<100).map { index in

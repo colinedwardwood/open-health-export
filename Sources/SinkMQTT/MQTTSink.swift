@@ -40,6 +40,8 @@ public struct MQTTDestination: Sendable {
         self.username = username
         self.password = password
     }
+
+    public var confirmsDelivery: Bool { qos != .atMostOnce }
 }
 
 public actor MQTTSession {

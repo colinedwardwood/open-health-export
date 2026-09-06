@@ -154,6 +154,8 @@ import WireFormat
         topic: "ohe/health",
         qos: .atMostOnce
     )
+    #expect(!mqtt.confirmsDelivery)
+    #expect(DestinationTest.mqttVerdict(confirmsDelivery: mqtt.confirmsDelivery) == .sentUnconfirmed)
     let sink = MQTTSink(destination: mqtt, pipe: broker)
     let store = MemoryStateStore()
     let scratch = FileManager.default.temporaryDirectory.appendingPathComponent("ohe-mqtt-\(UUID().uuidString)")

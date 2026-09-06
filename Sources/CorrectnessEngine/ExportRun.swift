@@ -4,6 +4,7 @@ import DestinationTrust
 import EnginePorts
 import FileWriteKit
 import Foundation
+import Watchdog
 import WireFormat
 
 public struct ExportRun: Sendable {
@@ -19,6 +20,7 @@ public struct ExportRun: Sendable {
     public var temporal: TemporalContext
     public var statistics: (any StatisticsSource)?
     public var trigger: RunTrigger
+    public var snapshotURL: URL?
     #if DEBUG
     public var faults: any ExportFaultInjector = NoExportFaults()
     #endif
@@ -35,7 +37,8 @@ public struct ExportRun: Sendable {
         clock: any Clock = SystemClock(),
         temporal: TemporalContext = .utc,
         statistics: (any StatisticsSource)? = nil,
-        trigger: RunTrigger = .manual
+        trigger: RunTrigger = .manual,
+        snapshotURL: URL? = nil
     ) {
         self.source = source
         self.destination = destination
@@ -49,6 +52,7 @@ public struct ExportRun: Sendable {
         self.temporal = temporal
         self.statistics = statistics
         self.trigger = trigger
+        self.snapshotURL = snapshotURL
     }
 
     public func run() async throws -> RunOutcome {
@@ -216,5 +220,23 @@ public struct ExportRun: Sendable {
                 )
             )
         }
+        try writeSnapshot(outcome: outcome)
+    }
+
+    private func writeSnapshot(outcome: RunOutcome) throws {
+        guard let snapshotURL else { return }
+        let now = clock.now().timeIntervalSince1970
+        let prior = try? DestinationSnapshotFile.read(from: snapshotURL)
+        let succeeded = outcome.kind == .success || outcome.kind == .successNothingDue
+        try DestinationSnapshotFile.write(
+            DestinationStatusSnapshot(
+                destinationID: destinationName,
+                enabled: true,
+                lastOutcome: outcome.kind.rawValue,
+                lastSuccessEpoch: succeeded ? now : prior?.lastSuccessEpoch,
+                writtenAtEpoch: now
+            ),
+            to: snapshotURL
+        )
     }
 }

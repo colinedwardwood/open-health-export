@@ -22,11 +22,11 @@ let linuxCore: [Target] = [
         linkerSettings: [.linkedLibrary("sqlite3")]
     ),
     .target(name: "RunJournal", dependencies: ["EnginePorts", "CoreDomain", "Redaction", "WireFormat"]),
-    .target(name: "CorrectnessEngine", dependencies: ["EnginePorts", "MetricCatalog", "CoreDomain", "CoreTemporal", "WireFormat", "FileWriteKit", "DestinationTrust"]),
+    .target(name: "CorrectnessEngine", dependencies: ["EnginePorts", "MetricCatalog", "CoreDomain", "CoreTemporal", "WireFormat", "FileWriteKit", "DestinationTrust", "Watchdog"]),
     .target(name: "Watchdog", dependencies: ["EnginePorts", "CoreDomain", "CoreTemporal"]),
     .target(name: "DiagnosticBundle", dependencies: ["EnginePorts", "Redaction", "CoreDomain"]),
     .target(name: "FileWriteKit"),
-    .target(name: "SinkLocalFile", dependencies: ["EnginePorts", "FileWriteKit", "CoreDomain", "WireFormat"]),
+    .target(name: "SinkLocalFile", dependencies: ["EnginePorts", "FileWriteKit", "CoreDomain", "WireFormat", "DestinationTrust"]),
     .target(name: "NetEgress", dependencies: ["WireFormat", "EnginePorts"]),
     .target(name: "DestinationTrust", dependencies: ["EnginePorts", "NetEgress"]),
     .target(name: "SinkHTTP", dependencies: ["EnginePorts", "NetEgress", "WireFormat", "CoreDomain", "RequestTemplate", "FileWriteKit"]),

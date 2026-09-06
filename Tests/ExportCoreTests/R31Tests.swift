@@ -3,6 +3,7 @@ import DestinationTrust
 import EnginePorts
 import Foundation
 import NetEgress
+import SinkLocalFile
 import TestSupport
 import Testing
 import WireFormat
@@ -42,9 +43,55 @@ func sampleIdentity(leaf: String, issuer: String = "issuer00") -> TLSIdentity {
     }
     try setup.confirmCanary("ABCD-EF01")
     try setup.pinWithoutTLS()
+    try setup.recordTest(.passedLocalFile)
     let verified = try setup.enable(sink: LocalFileSinkStub())
     _ = verified.sink
     #expect(setup.state == .enabled)
+}
+
+@Test func destinationCannotEnableUntilPathTestPasses() throws {
+    var setup = DestinationSetup()
+    try setup.recordPreview(Data("preview".utf8))
+    try setup.markCanarySent(code: "ABCD-EF01")
+    try setup.confirmCanary("ABCD-EF01")
+    try setup.pinWithoutTLS()
+    #expect(throws: SetupError.verificationRequired) {
+        _ = try setup.enable(sink: LocalFileSinkStub())
+    }
+    try setup.recordTest(.failed(at: .openFolder))
+    #expect(throws: SetupError.verificationRequired) {
+        _ = try setup.enable(sink: LocalFileSinkStub())
+    }
+    try setup.recordTest(
+        DestinationTestReport(
+            verdict: .sentUnconfirmed,
+            steps: [
+                DestinationTestStepReport(name: .publishCanary, outcome: .sentUnconfirmed),
+            ]
+        )
+    )
+    _ = try setup.enable(sink: LocalFileSinkStub())
+    #expect(setup.state == .enabled)
+}
+
+@Test func localFileDestinationTestWritesAndReadsCanary() throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-dest-test-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let report = try LocalFileDestinationTest.run(directory: directory, canary: Data("canary-bytes\n".utf8))
+    #expect(report.verdict == .passed)
+    #expect(report.failingStep == nil)
+    #expect(try Data(contentsOf: directory.appendingPathComponent("ohe-canary.ndjson")) == Data("canary-bytes\n".utf8))
+    let missing = try LocalFileDestinationTest.run(
+        directory: directory.appendingPathComponent("no-such-folder")
+    )
+    #expect(missing.verdict == .failed)
+    #expect(missing.failingStep == .openFolder)
+}
+
+@Test func mqttQoS0TestIsNeverSuccess() {
+    #expect(DestinationTest.mqttVerdict(confirmsDelivery: false) == .sentUnconfirmed)
+    #expect(DestinationTest.mqttVerdict(confirmsDelivery: true) == .passed)
 }
 
 @Test func canaryPayloadIsNotHealthSamples() throws {
