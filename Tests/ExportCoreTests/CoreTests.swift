@@ -406,6 +406,11 @@ func testEnvelope() -> WireEnvelope {
     let census = try store.transaction.loadCensus(metric: metric, day: "2024-01-01")
     #expect(census?.sampleCount == 1)
     #expect(try store.transaction.dirtyDays(metric: metric) == ["2024-01-01"])
+    let indexed = try store.transaction.loadEmittedIndex(
+        uuid: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    )
+    #expect(indexed?.day == "2024-01-01")
+    #expect(indexed?.batchID == NativeWire.batchID(metric: metric, anchorBlob: Data([0xAA])))
 
     let second = try await run.run()
     #expect(second.kind == .successNothingDue)
@@ -464,9 +469,21 @@ private struct OneExportFault: ExportFaultInjector {
         if beforeCommit.contains(location) {
             #expect(cursor == nil, "cursor advanced at \(location.rawValue)")
             #expect(pending.isEmpty, "batch survived rollback at \(location.rawValue)")
+            #expect(
+                try await store.transact {
+                    try $0.loadEmittedIndex(uuid: "f0000000-0000-0000-0000-000000000001")
+                } == nil,
+                "emitted_index survived rollback at \(location.rawValue)"
+            )
         } else {
             #expect(cursor?.anchorBlob == Data([0xF0]))
             #expect(pending.count == 1, "batch was not replayable at \(location.rawValue)")
+            #expect(
+                try await store.transact {
+                    try $0.loadEmittedIndex(uuid: "f0000000-0000-0000-0000-000000000001")
+                } != nil,
+                "emitted_index missing after commit at \(location.rawValue)"
+            )
         }
 
         if location == .afterDestinationWriteBeforeAck || location == .afterAckBeforeRelease {
@@ -760,4 +777,30 @@ private struct OneExportFault: ExportFaultInjector {
             )
         }
     }
+}
+
+@Test func sqlitePersistsEmittedIndexOnCommit() async throws {
+    let path = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-index-\(UUID().uuidString).sqlite")
+        .path
+    let store = try SQLiteStateStore(path: path)
+    let metric = MetricID(rawValue: "heartRate")
+    let first = EmittedIndexRow(
+        uuid: "11111111-1111-1111-1111-111111111111",
+        metric: metric,
+        day: "2024-01-01",
+        digest: "aa",
+        batchID: BatchID(rawValue: "b1")
+    )
+    let updated = EmittedIndexRow(
+        uuid: first.uuid,
+        metric: metric,
+        day: "2024-01-02",
+        digest: "bb",
+        batchID: BatchID(rawValue: "b2")
+    )
+    try await store.transact { try $0.upsertEmittedIndex(first) }
+    #expect(try await store.transact { try $0.loadEmittedIndex(uuid: first.uuid) } == first)
+    try await store.transact { try $0.upsertEmittedIndex(updated) }
+    #expect(try await store.transact { try $0.loadEmittedIndex(uuid: first.uuid) } == updated)
 }

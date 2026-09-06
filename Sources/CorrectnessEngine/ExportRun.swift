@@ -92,6 +92,7 @@ public struct ExportRun: Sendable {
                 )
             )
             try Census.apply(page: page, to: tx)
+            try EmittedIndex.record(page: page, batchID: pending.id, on: tx)
             #if DEBUG
             try faults.hit(.duringAnchorPersist)
             #endif

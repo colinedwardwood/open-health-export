@@ -85,3 +85,6 @@ one, down toward a 230 MiB watermark, and records `queue_eviction:<bytes>` gaps.
 are unlinked after COMMIT. R-86 cursor rows are `OHEC` envelopes; corrupt or newer formats fail
 closed. Policycheck bans ambient clocks in `Sources/` except CoreTemporal and HealthKitSource.
 A DCO workflow requires `Signed-off-by` on every commit.
+
+Successful delta commits now upsert one `emitted_index` row per sample UUID in the
+same transaction as the cursor (R-08 write path). Reconcile still does not run.

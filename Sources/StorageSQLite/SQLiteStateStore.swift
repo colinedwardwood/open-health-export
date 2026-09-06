@@ -107,7 +107,15 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 batch_id TEXT PRIMARY KEY,
                 range_description TEXT NOT NULL
             );
-            PRAGMA user_version = 4;
+            CREATE TABLE IF NOT EXISTS emitted_index (
+                uuid TEXT PRIMARY KEY,
+                metric TEXT NOT NULL,
+                day TEXT NOT NULL,
+                digest TEXT NOT NULL,
+                batch_id TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_emitted_metric_day ON emitted_index (metric, day);
+            PRAGMA user_version = 5;
             """)
     }
 
@@ -342,6 +350,35 @@ private final class SQLiteTransaction: StateTransaction {
             days.append(String(cString: sqlite3_column_text(stmt, 0)))
         }
         return days
+    }
+
+    func upsertEmittedIndex(_ row: EmittedIndexRow) throws {
+        let stmt = try store.prepare(
+            "INSERT INTO emitted_index (uuid, metric, day, digest, batch_id) VALUES (?, ?, ?, ?, ?) ON CONFLICT(uuid) DO UPDATE SET metric = excluded.metric, day = excluded.day, digest = excluded.digest, batch_id = excluded.batch_id;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, row.uuid)
+        bindText(stmt, 2, row.metric.rawValue)
+        bindText(stmt, 3, row.day)
+        bindText(stmt, 4, row.digest)
+        bindText(stmt, 5, row.batchID.rawValue)
+        try stepDone(stmt)
+    }
+
+    func loadEmittedIndex(uuid: String) throws -> EmittedIndexRow? {
+        let stmt = try store.prepare(
+            "SELECT metric, day, digest, batch_id FROM emitted_index WHERE uuid = ? LIMIT 1;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, uuid)
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
+        return EmittedIndexRow(
+            uuid: uuid,
+            metric: MetricID(rawValue: text(stmt, 0)),
+            day: text(stmt, 1),
+            digest: text(stmt, 2),
+            batchID: BatchID(rawValue: text(stmt, 3))
+        )
     }
 
     private func bindText(_ stmt: OpaquePointer, _ index: Int32, _ value: String) {

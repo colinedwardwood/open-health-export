@@ -11,6 +11,7 @@ public final class MemoryTransaction: StateTransaction {
     public var dirty: [MetricID: Set<String>] = [:]
     public var deliveries: [BatchID: DeliveryReceipt] = [:]
     public var pending: [BatchID: PendingBatch] = [:]
+    public var emittedIndex: [String: EmittedIndexRow] = [:]
     private var pendingOrder: [BatchID] = []
 
     public init() {}
@@ -92,6 +93,14 @@ public final class MemoryTransaction: StateTransaction {
 
     public func dirtyDays(metric: MetricID) throws -> [String] {
         Array(dirty[metric] ?? []).sorted()
+    }
+
+    public func upsertEmittedIndex(_ row: EmittedIndexRow) throws {
+        emittedIndex[row.uuid] = row
+    }
+
+    public func loadEmittedIndex(uuid: String) throws -> EmittedIndexRow? {
+        emittedIndex[uuid]
     }
 }
 

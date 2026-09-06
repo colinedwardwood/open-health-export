@@ -129,6 +129,22 @@ public struct CensusRow: Sendable, Equatable {
     }
 }
 
+public struct EmittedIndexRow: Sendable, Equatable {
+    public var uuid: String
+    public var metric: MetricID
+    public var day: String
+    public var digest: String
+    public var batchID: BatchID
+
+    public init(uuid: String, metric: MetricID, day: String, digest: String, batchID: BatchID) {
+        self.uuid = uuid
+        self.metric = metric
+        self.day = day
+        self.digest = digest
+        self.batchID = batchID
+    }
+}
+
 public protocol StateTransaction: AnyObject {
     func loadCursor(metric: MetricID) throws -> CursorSnapshot?
     func commitBatch(_ batch: PendingBatch, advancing: CursorAdvance) throws
@@ -144,6 +160,8 @@ public protocol StateTransaction: AnyObject {
     func loadCensus(metric: MetricID, day: String) throws -> CensusRow?
     func markDirty(metric: MetricID, day: String) throws
     func dirtyDays(metric: MetricID) throws -> [String]
+    func upsertEmittedIndex(_ row: EmittedIndexRow) throws
+    func loadEmittedIndex(uuid: String) throws -> EmittedIndexRow?
 }
 
 public protocol StateStore: Sendable {
