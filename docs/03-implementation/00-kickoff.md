@@ -42,5 +42,11 @@ The phone can scan the QR (VisionKit) or paste. MQTT has a Darwin loopback-TCP t
 `NWListener` broker plus `NWByteStream`, not a packaged mosquitto.
 
 Error-class registry, HAE loss-gated encoder, MQTT retain-off, Keychain data-protection ACL (no
-biometry), and `os.Logger` are in tree. Next: MQTTS against a real broker, and camera scan plus
-SAS on a physical phone.
+biometry), and `os.Logger` are in tree. MQTTS is a pinned `NWByteStream` dial; loopback TLS
+covers the handshake without a packaged broker. Home Assistant MQTT discovery is generated from the
+catalogue (no guessed `device_class`; retain only for config and `online` status). The iOS harness
+asks for camera permission before scanning and always keeps paste as a fallback.
+
+**Physical phone (owner):** on the XR / REF-B, scan the Mac QR, confirm the SAS matches after HELLO,
+export one page, then forget pairing and pair again. Simulator has no camera and often an empty
+Health store.

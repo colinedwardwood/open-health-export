@@ -286,10 +286,13 @@ public actor NWByteStream: ByteStream {
             if let pin {
                 do {
                     try PinGate.requireMatch(observed: identity, stored: pin)
+                    // A matching pin is the trust decision (R-31). Home MQTTS brokers
+                    // are often self-signed; the system trust store must not override TOFU.
+                    complete(true)
                 } catch {
                     complete(false)
-                    return
                 }
+                return
             }
             var trustError: CFError?
             complete(SecTrustEvaluateWithError(trust, &trustError))

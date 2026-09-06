@@ -4,6 +4,7 @@ import DestinationTrust
 import EnginePorts
 import FileWriteKit
 import Foundation
+import MetricCatalog
 import MQTTCodec
 import NetEgress
 import SinkMQTT
@@ -60,6 +61,32 @@ import WireFormat
         try await session.publish(
             topic: "ohe/health",
             payload: Data(),
+            qos: .atMostOnce,
+            retain: true
+        )
+    }
+}
+
+@Test func mqttSessionAllowsRetainOnlyForDiscoveryAndStatus() async throws {
+    let broker = LoopbackMQTTBroker()
+    let session = MQTTSession(pipe: broker)
+    let topic = try HADiscovery.deviceConfigTopic(exporterId: "phone-1A7B")
+    let config = try HADiscovery.encodeDeviceConfig(
+        exporterId: "phone-1A7B",
+        metrics: [MetricCatalog.heartRate.id, MetricCatalog.stepCount.id]
+    )
+    try await session.publish(topic: topic, payload: config, qos: .atMostOnce, retain: true)
+    try await session.publish(
+        topic: try HADiscovery.statusTopic(exporterId: "phone-1A7B"),
+        payload: HADiscovery.statusPayload(),
+        qos: .atMostOnce,
+        retain: true
+    )
+    try await session.publish(topic: topic, payload: Data(), qos: .atMostOnce, retain: true)
+    await #expect(throws: MQTTError.retainForbidden) {
+        try await session.publish(
+            topic: topic,
+            payload: Data("{\"qty\":1}".utf8),
             qos: .atMostOnce,
             retain: true
         )

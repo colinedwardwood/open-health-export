@@ -9,6 +9,13 @@ public struct MetricDeclaration: Sendable {
     public var cumulative: Bool
     public var usesHealthKitStatistics: Bool
     public var sensitivity: SensitivityClass
+    /// Home Assistant `unit_of_measurement`. Omitted on the wire when nil (BMI).
+    public var haUnit: String?
+    /// Omitted when nil — never guessed (heart rate has no device class).
+    public var haDeviceClass: String?
+    /// Omitted when nil (enum / timestamp / unmapped). Never `measurement` with energy/volume.
+    public var haStateClass: String?
+    public var haRequiresAggregate: Bool
 
     public init(
         id: MetricID,
@@ -18,7 +25,11 @@ public struct MetricDeclaration: Sendable {
         wireUnit: String,
         cumulative: Bool,
         usesHealthKitStatistics: Bool,
-        sensitivity: SensitivityClass
+        sensitivity: SensitivityClass,
+        haUnit: String?,
+        haDeviceClass: String?,
+        haStateClass: String?,
+        haRequiresAggregate: Bool
     ) {
         self.id = id
         self.wireId = wireId
@@ -28,6 +39,10 @@ public struct MetricDeclaration: Sendable {
         self.cumulative = cumulative
         self.usesHealthKitStatistics = usesHealthKitStatistics
         self.sensitivity = sensitivity
+        self.haUnit = haUnit
+        self.haDeviceClass = haDeviceClass
+        self.haStateClass = haStateClass
+        self.haRequiresAggregate = haRequiresAggregate
     }
 }
 
@@ -40,7 +55,11 @@ public enum MetricCatalog {
         wireUnit: "count",
         cumulative: true,
         usesHealthKitStatistics: true,
-        sensitivity: .routine
+        sensitivity: .routine,
+        haUnit: "steps",
+        haDeviceClass: nil,
+        haStateClass: "total_increasing",
+        haRequiresAggregate: true
     )
 
     public static let heartRate = MetricDeclaration(
@@ -51,7 +70,11 @@ public enum MetricCatalog {
         wireUnit: "bpm",
         cumulative: false,
         usesHealthKitStatistics: false,
-        sensitivity: .routine
+        sensitivity: .routine,
+        haUnit: "bpm",
+        haDeviceClass: nil,
+        haStateClass: "measurement",
+        haRequiresAggregate: false
     )
 
     public static let all: [MetricDeclaration] = [stepCount, heartRate]

@@ -2,6 +2,7 @@
 import Foundation
 import MQTTCodec
 import Network
+import Security
 
 /// A localhost MQTT 3.1.1 broker for Darwin tests. Lives in Tests/, not Sources/, so it may
 /// use `NWListener` without becoming an iOS listening socket.
@@ -9,8 +10,16 @@ actor LocalMQTTBroker {
     private let listener: NWListener
     private let queue = DispatchQueue(label: "ohe.mqtt.loopback")
 
-    init() throws {
-        listener = try NWListener(using: .tcp, on: .any)
+    init(parameters: NWParameters = .tcp) throws {
+        listener = try NWListener(using: parameters, on: .any)
+    }
+
+    static func tlsParameters(identity: SecIdentity) -> NWParameters {
+        let tls = NWProtocolTLS.Options()
+        let security = tls.securityProtocolOptions
+        sec_protocol_options_set_min_tls_protocol_version(security, .TLSv12)
+        sec_protocol_options_set_local_identity(security, sec_identity_create(identity)!)
+        return NWParameters(tls: tls)
     }
 
     func start() async throws -> UInt16 {

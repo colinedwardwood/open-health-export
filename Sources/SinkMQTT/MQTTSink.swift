@@ -65,7 +65,9 @@ public actor MQTTSession {
     }
 
     public func publish(topic: String, payload: Data, qos: MQTTQoS, retain: Bool = false) async throws {
-        if retain { throw MQTTError.retainForbidden }
+        if retain, !HADiscovery.retainAllowed(topic: topic, payload: payload) {
+            throw MQTTError.retainForbidden
+        }
         let id = nextPacketID()
         let packet = try MQTTCodec.publish(
             topic: topic,
@@ -151,4 +153,34 @@ public struct MQTTSink: DestinationSink, Sendable {
         }
         return DeliveryReceipt(batchID: idempotencyKey, accepted: count, statusOnly: false)
     }
+
+    /// Host, port and TLS taken from the already-allowlisted destination URL.
+    public static func streamEndpoint(for destination: MQTTDestination) throws -> StreamEndpoint {
+        guard let host = destination.url.host, !host.isEmpty else { throw EgressError.invalidURL }
+        let scheme = destination.url.scheme?.lowercased() ?? ""
+        let usesTLS = scheme == "mqtts"
+        let fallback: UInt16 = usesTLS ? 8883 : 1883
+        let port: UInt16
+        if let explicit = destination.url.port {
+            guard let narrowed = UInt16(exactly: explicit), narrowed != 0 else { throw StreamError.badPort }
+            port = narrowed
+        } else {
+            port = fallback
+        }
+        return try StreamEndpoint(host: host, port: port, usesTLS: usesTLS)
+    }
 }
+
+#if canImport(Network)
+extension MQTTSink {
+    /// Dials with `NetEgress`'s byte stream. A pin is the trust decision for `mqtts`
+    /// (self-signed home brokers); plaintext `mqtt` ignores it.
+    public static func overNetwork(destination: MQTTDestination, pin: PinRecord?) throws -> MQTTSink {
+        let stream = NWByteStream(
+            endpoint: try streamEndpoint(for: destination),
+            options: NWByteStream.Options(pin: pin, failFastOnWaiting: true)
+        )
+        return MQTTSink(destination: destination, pipe: ByteStreamMQTTPipe(stream: stream))
+    }
+}
+#endif

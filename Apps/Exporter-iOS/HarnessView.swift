@@ -6,7 +6,6 @@ import EnginePorts
 import HealthKitSource
 import MetricCatalog
 import SwiftUI
-import VisionKit
 
 struct HarnessView: View {
     private enum Phase {
@@ -60,10 +59,15 @@ struct HarnessView: View {
             Task { await restorePairing() }
         }
         .sheet(isPresented: $showScanner) {
-            PairingScanner { text in
-                pairingPaste = text
-                parsePairing()
-            }
+            PairingScanner(
+                onPayload: { text in
+                    pairingPaste = text
+                    parsePairing()
+                },
+                onFailure: { message in
+                    status = "Failed: \(message). Paste the pairing payload instead."
+                }
+            )
         }
     }
 
@@ -106,11 +110,14 @@ struct HarnessView: View {
 
             Text("Companion pairing")
                 .font(.headline)
-            if DataScannerViewController.isSupported, DataScannerViewController.isAvailable {
+            if PairingCamera.canPresentScanner {
                 Button("Scan pairing QR") {
-                    showScanner = true
+                    Task { await openScanner() }
                 }
                 .disabled(phase == .working)
+            } else {
+                Text(PairingCamera.unavailableReason)
+                    .font(.footnote)
             }
             TextEditor(text: $pairingPaste)
                 .frame(minHeight: 88)
@@ -207,6 +214,16 @@ struct HarnessView: View {
             status = "Failed: \(error.localizedDescription)"
         }
         phase = .ready
+    }
+
+    @MainActor
+    private func openScanner() async {
+        let allowed = await PairingCamera.requestAccess()
+        guard allowed, PairingCamera.canPresentScanner else {
+            status = PairingCamera.unavailableReason
+            return
+        }
+        showScanner = true
     }
 
     private func parsePairing() {

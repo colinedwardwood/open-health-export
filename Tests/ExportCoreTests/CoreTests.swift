@@ -79,6 +79,42 @@ import Watchdog
     #expect(MetricCatalog.hkStatisticsExceptions.contains(MetricCatalog.stepCount.id))
 }
 
+@Test func homeAssistantMappingOmitsGuessedDeviceClassesAndForbidsSilentStatistics() throws {
+    let measurementForbidden: Set<String> = [
+        "date", "enum", "energy", "gas", "monetary", "timestamp", "volume", "water",
+    ]
+    for declaration in MetricCatalog.all {
+        if let deviceClass = declaration.haDeviceClass, measurementForbidden.contains(deviceClass) {
+            #expect(declaration.haStateClass != "measurement")
+        }
+        if declaration.haDeviceClass == "enum" {
+            #expect(declaration.haStateClass == nil)
+        }
+    }
+    #expect(MetricCatalog.stepCount.haUnit == "steps")
+    #expect(MetricCatalog.stepCount.haDeviceClass == nil)
+    #expect(MetricCatalog.stepCount.haStateClass == "total_increasing")
+    #expect(MetricCatalog.stepCount.haRequiresAggregate)
+    #expect(MetricCatalog.heartRate.haDeviceClass == nil)
+    #expect(MetricCatalog.heartRate.haStateClass == "measurement")
+    let json = try HADiscovery.encodeDeviceConfig(
+        exporterId: "6b1c2d3e",
+        metrics: [MetricCatalog.stepCount.id, MetricCatalog.heartRate.id]
+    )
+    let text = String(decoding: json, as: UTF8.self)
+    #expect(!text.contains("\"qty\""))
+    #expect(!text.contains("\"uuid\""))
+    #expect(!text.contains("\"device_class\""))
+    #expect(text.contains("\"state_class\":\"total_increasing\""))
+    #expect(text.contains("\"state_class\":\"measurement\""))
+    #expect(text.contains("\"unit_of_measurement\":\"steps\""))
+    #expect(HADiscovery.retainAllowed(
+        topic: try HADiscovery.deviceConfigTopic(exporterId: "6b1c2d3e"),
+        payload: json
+    ))
+    #expect(!HADiscovery.retainAllowed(topic: "ohe/health", payload: json))
+}
+
 @Test func dayBucketIsDeterministicUnderFrozenClock() {
     let date = Date(timeIntervalSince1970: 1_704_067_200) // 2024-01-01 00:00 UTC
     let context = TemporalContext(
