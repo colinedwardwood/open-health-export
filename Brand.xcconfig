@@ -2,3 +2,4 @@
 PRODUCT_NAME = OpenHealthExporter
 PRODUCT_BUNDLE_IDENTIFIER_ROOT = app.openhealthexporter
 DISPLAY_NAME = Open Health Exporter
+APP_GROUP_IDENTIFIER = group.app.openhealthexporter.shared

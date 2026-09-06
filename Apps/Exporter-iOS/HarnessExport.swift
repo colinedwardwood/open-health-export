@@ -12,6 +12,7 @@ import SinkCompanion
 import SinkLocalFile
 import StorageSQLite
 import UIKit
+import WidgetKit
 import WireFormat
 
 enum HarnessExport {
@@ -60,9 +61,11 @@ enum HarnessExport {
                     seq: 1,
                     emittedAt: now,
                     observedAt: now
-                )
+                ),
+                snapshotURL: StatusSnapshotLocation.url(destinationID: "local-file")
             )
             let outcome = try await run.run()
+            WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
             lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
         }
         lines.append("Files: \(dest.path)")
@@ -107,9 +110,11 @@ enum HarnessExport {
                     seq: 1,
                     emittedAt: now,
                     observedAt: now
-                )
+                ),
+                snapshotURL: StatusSnapshotLocation.url(destinationID: "companion")
             )
             let outcome = try await run.run()
+            WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
             lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
         }
         lines.append("Companion: \(session.serviceName)")

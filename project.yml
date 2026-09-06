@@ -29,6 +29,7 @@ targets:
         excludes:
           - Info.plist
           - "*.entitlements"
+      - path: Apps/AppShared
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(PRODUCT_BUNDLE_IDENTIFIER_ROOT).ios
@@ -47,8 +48,35 @@ targets:
         product: HealthKitSource
       - sdk: VisionKit.framework
       - sdk: AVFoundation.framework
+      - target: StatusWidget
     scheme:
       testTargets: []
+  StatusWidget:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "18.0"
+    configFiles:
+      Debug: Brand.xcconfig
+      Release: Brand.xcconfig
+    sources:
+      - path: Apps/StatusWidget
+        excludes:
+          - Info.plist
+          - "*.entitlements"
+      - path: Apps/AppShared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(PRODUCT_BUNDLE_IDENTIFIER_ROOT).widget
+        PRODUCT_NAME: $(PRODUCT_NAME)StatusWidget
+        INFOPLIST_FILE: Apps/StatusWidget/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Apps/StatusWidget/StatusWidget.entitlements
+        SKIP_INSTALL: YES
+        GENERATE_INFOPLIST_FILE: NO
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 0.1.0
+    dependencies:
+      - package: open-health-exporter
+        product: ExportCore
   CompanionMac:
     type: application
     platform: macOS

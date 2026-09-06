@@ -351,6 +351,55 @@ import Redaction
     )
 }
 
+@Test func destinationSnapshotReadsLegacySchemaAndInfersState() throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-snap-legacy-\(UUID().uuidString).json")
+    try Data(
+        """
+        {"destinationID":"companion","enabled":true,"lastOutcome":"unknown_ack","lastSuccessEpoch":10,"writtenAtEpoch":20}
+        """.utf8
+    ).write(to: url)
+    let snapshot = try DestinationSnapshotFile.read(from: url)
+    #expect(snapshot.schemaVersion == 0)
+    #expect(snapshot.destinationLabel == "companion")
+    #expect(snapshot.state == .sentUnconfirmed)
+}
+
+@Test func widgetTimelineTransitionsWithoutAnotherAppWake() {
+    let snapshot = DestinationStatusSnapshot(
+        destinationID: "home-assistant",
+        destinationLabel: "Home Assistant",
+        enabled: true,
+        state: .healthy,
+        lastOutcome: "success",
+        lastSuccessEpoch: 1_000,
+        staleThresholdSeconds: 100,
+        overdueThresholdSeconds: 200,
+        writtenAtEpoch: 1_000
+    )
+    let entries = DestinationTimelinePlanner.entries(
+        snapshots: [snapshot],
+        nowEpoch: 1_050
+    )
+    #expect(entries.map(\.dateEpoch) == [1_050, 1_100, 1_200, 87_600, 174_000])
+    #expect(snapshot.state(at: 1_050) == .healthy)
+    #expect(snapshot.state(at: 1_100) == .stale)
+    #expect(snapshot.state(at: 1_200) == .overdue)
+}
+
+@Test func widgetTimelineDoesNotInventThresholdsBeforeR71() {
+    let snapshot = DestinationStatusSnapshot(
+        destinationID: "manual",
+        enabled: true,
+        state: .manualOnly,
+        writtenAtEpoch: 1_000
+    )
+    #expect(
+        DestinationTimelinePlanner.entries(snapshots: [snapshot], nowEpoch: 2_000)
+            .map(\.dateEpoch) == [2_000]
+    )
+}
+
 @Test func exportRunWritesWidgetSnapshotAfterCommit() async throws {
     let metric = MetricID(rawValue: "heartRate")
     let page = SamplePage(

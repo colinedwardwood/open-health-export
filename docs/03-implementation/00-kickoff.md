@@ -141,5 +141,9 @@ must pass (or MQTT QoS 0 report `sentUnconfirmed`) before `enable`. A failed
 test cannot enable. HTTPS/HA tests cover TLS, pin mismatch, 401, bearer
 redaction, and entity attribute readback. Companion canary round-trips on the
 loopback broker. Export runs write a JSON `DestinationStatusSnapshot` the
-widget and watchdog can read without SQLite. WidgetKit UI is still missing.
+widget and watchdog can read without SQLite. The iOS app and small/medium
+WidgetKit extension share versioned, per-destination snapshots through an App
+Group. Timelines precompute stale/overdue transitions without inventing an
+R-71 threshold, and every status uses a distinct glyph and text label with no
+health values.
 
