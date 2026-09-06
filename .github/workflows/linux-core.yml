@@ -16,6 +16,11 @@ jobs:
         run: swift test
       - name: Import policy
         run: swift run policycheck
+      - name: Reproduce committed tier-zero corpus
+        run: |
+          swift run corpusgen --seed 1 --count 200 > /tmp/tier0.ndjson
+          cmp spec/v1.0.0/fixtures/tier0.ndjson /tmp/tier0.ndjson
+          echo "16814d177036a20d4b36e08fc7f028e238402b2b60c2b41904d3cf580759f41f  /tmp/tier0.ndjson" | sha256sum --check -
       - name: Fuzz the wire decoders
         run: |
           swift run wirefuzz --iterations 200000

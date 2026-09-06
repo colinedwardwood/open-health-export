@@ -59,7 +59,11 @@ let linuxCore: [Target] = [
             "CompanionReceive",
         ]
     ),
-    .executableTarget(name: "corpusgen", dependencies: ["CoreDomain", "MetricCatalog"], path: "Tools/corpusgen"),
+    .executableTarget(
+        name: "corpusgen",
+        dependencies: ["CoreDomain", "MetricCatalog", "WireFormat"],
+        path: "Tools/corpusgen"
+    ),
     .executableTarget(name: "policycheck", path: "Tools/policycheck"),
     .executableTarget(name: "m0harness", path: "Tools/m0harness"),
     .executableTarget(

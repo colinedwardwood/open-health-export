@@ -76,3 +76,6 @@ journal/recovery budget.
 R-83's six fault locations are reachable in debug builds. SQLite tests prove faults through the
 commit boundary either roll back both cursor and batch or leave a replayable batch; post-write
 replay remains idempotent. Release builds omit the injector surface.
+
+R-82 tier zero is a committed 200-record canonical NDJSON corpus generated from seed 1. Linux CI
+regenerates it and checks byte identity plus SHA-256.
