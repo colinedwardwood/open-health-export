@@ -1,9 +1,7 @@
 import CoreDomain
+import CSQLite
 import EnginePorts
 import Foundation
-#if canImport(SQLite3)
-import SQLite3
-#endif
 
 public struct SQLiteOpenPolicy: Sendable {
     public var protectionClassFlag: Int32?

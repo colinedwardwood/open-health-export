@@ -3,6 +3,11 @@
 import PackageDescription
 
 let linuxCore: [Target] = [
+    .systemLibrary(
+        name: "CSQLite",
+        pkgConfig: "sqlite3",
+        providers: [.apt(["libsqlite3-dev"])]
+    ),
     .target(name: "CoreDomain"),
     .target(name: "CoreTemporal", dependencies: ["CoreDomain"]),
     .target(name: "EnginePorts", dependencies: ["CoreDomain", "CoreTemporal"]),
@@ -13,7 +18,7 @@ let linuxCore: [Target] = [
     .target(name: "Redaction", dependencies: ["CoreDomain"]),
     .target(
         name: "StorageSQLite",
-        dependencies: ["EnginePorts", "CoreDomain"],
+        dependencies: ["EnginePorts", "CoreDomain", "CSQLite"],
         linkerSettings: [.linkedLibrary("sqlite3")]
     ),
     .target(name: "RunJournal", dependencies: ["EnginePorts", "CoreDomain", "Redaction"]),
