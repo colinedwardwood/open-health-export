@@ -174,6 +174,11 @@ public protocol StateStore: Sendable {
     ) async throws -> T
 }
 
+public protocol StatisticsSource: Sendable {
+    /// P1D bucket from HealthKit statistics. Unimplemented until the HealthKit wedge.
+    func dailyBucket(metric: MetricID, day: String) async throws -> AggregateRecord?
+}
+
 public protocol SampleSource: Sendable {
     func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage
 }

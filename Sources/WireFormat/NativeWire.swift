@@ -62,6 +62,7 @@ public enum NativeWire {
     public static func encode(
         samples: [SampleRecord],
         tombstones: [TombstoneRecord],
+        aggregates: [AggregateRecord] = [],
         metric: MetricID,
         batchID: BatchID,
         envelope: WireEnvelope
@@ -74,7 +75,12 @@ public enum NativeWire {
         let tombLines = try tombstones
             .sorted { $0.key.uuid.lowercased() < $1.key.uuid.lowercased() }
             .map { try encodeTombstone($0, metric: metric, envelope: envelope) }
-        let records = sampleLines + tombLines
+        let aggregateLines = try aggregates
+            .sorted { lhs, rhs in
+                (lhs.bucketStart, lhs.bucketKey) < (rhs.bucketStart, rhs.bucketKey)
+            }
+            .map { try encodeAggregate($0, envelope: envelope) }
+        let records = sampleLines + tombLines + aggregateLines
         var body = Data()
         for line in records {
             body.append(contentsOf: line.utf8)
@@ -92,7 +98,8 @@ public enum NativeWire {
             sampleCount: samples.count,
             tombstoneCount: tombstones.count,
             canaryCount: 0,
-            digest: digest
+            digest: digest,
+            aggregateCount: aggregates.count
         )
         var out = Data()
         out.append(contentsOf: header.utf8)
@@ -175,7 +182,8 @@ private extension NativeWire {
         sampleCount: Int,
         tombstoneCount: Int,
         canaryCount: Int,
-        digest: String
+        digest: String,
+        aggregateCount: Int = 0
     ) throws -> String {
         var counts: [String: CanonicalJSON] = [:]
         if sampleCount > 0 {
@@ -183,6 +191,9 @@ private extension NativeWire {
         }
         if tombstoneCount > 0 {
             counts["tombstone"] = .integer(tombstoneCount)
+        }
+        if aggregateCount > 0 {
+            counts["aggregate"] = .integer(aggregateCount)
         }
         if canaryCount > 0 {
             counts["canary"] = .integer(canaryCount)
@@ -232,6 +243,39 @@ private extension NativeWire {
             "v": .integer(1),
         ])
         return try json.serialized()
+    }
+
+    static func encodeAggregate(_ record: AggregateRecord, envelope: WireEnvelope) throws -> String {
+        let decl = MetricCatalog.declaration(for: record.metric)
+        var object: [String: CanonicalJSON] = [
+            "batchSeq": .integer(envelope.seq),
+            "bucketDurationSeconds": .integer(record.bucketDurationSeconds),
+            "bucketEnd": .string(record.bucketEnd),
+            "bucketKey": .string(record.bucketKey),
+            "bucketStart": .string(record.bucketStart),
+            "computation": .string(record.computation.rawValue),
+            "computedAt": .string(record.computedAt),
+            "emitSeq": .integer(record.emitSeq),
+            "granularity": .string(record.granularity),
+            "kind": .string("aggregate"),
+            "localStart": .string(record.localStart),
+            "metricId": .string(decl?.wireId ?? record.metric.rawValue),
+            "observedAt": .string(record.observedAt),
+            "sampleCount": .integer(record.sampleCount),
+            "sourceScope": .string(record.sourceScope.rawValue),
+            "state": .string(record.state.rawValue),
+            "statistic": .string(record.statistic.rawValue),
+            "tzId": .string(record.timeZoneIdentifier),
+            "unit": .string(decl?.wireUnit ?? record.unit.symbol),
+            "v": .integer(1),
+        ]
+        if let value = record.value {
+            object["value"] = .number(value)
+        }
+        if let supersedes = record.supersedes {
+            object["supersedes"] = .integer(supersedes)
+        }
+        return try CanonicalJSON.object(object).serialized()
     }
 
     static func encodeCanaryLine(code: String, envelope: WireEnvelope) throws -> String {

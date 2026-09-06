@@ -22,7 +22,7 @@ let linuxCore: [Target] = [
         linkerSettings: [.linkedLibrary("sqlite3")]
     ),
     .target(name: "RunJournal", dependencies: ["EnginePorts", "CoreDomain", "Redaction"]),
-    .target(name: "CorrectnessEngine", dependencies: ["EnginePorts", "MetricCatalog", "CoreDomain", "WireFormat", "FileWriteKit", "DestinationTrust"]),
+    .target(name: "CorrectnessEngine", dependencies: ["EnginePorts", "MetricCatalog", "CoreDomain", "CoreTemporal", "WireFormat", "FileWriteKit", "DestinationTrust"]),
     .target(name: "Watchdog", dependencies: ["EnginePorts", "CoreDomain", "CoreTemporal"]),
     .target(name: "DiagnosticBundle", dependencies: ["EnginePorts", "Redaction", "CoreDomain"]),
     .target(name: "FileWriteKit"),

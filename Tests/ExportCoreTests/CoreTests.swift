@@ -1058,3 +1058,151 @@ private struct OneExportFault: ExportFaultInjector {
     }
     #expect(try await store.transact { try $0.dirtyDays(metric: metric) } == ["2024-01-02"])
 }
+
+@Test func aggregateFoldMeansDiscreteSamplesForDay() {
+    let metric = MetricID(rawValue: "heartRate")
+    let samples = [
+        heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", start: "2024-01-01T01:00:00Z"),
+        heartSample("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", start: "2024-01-01T02:00:00Z"),
+        heartSample("cccccccc-cccc-cccc-cccc-cccccccccccc", start: "2024-01-02T01:00:00Z"),
+    ]
+    // Override values for a known mean.
+    var a = samples[0]; a.value = 60
+    var b = samples[1]; b.value = 80
+    let fold = AggregateFold.foldDay(metric: metric, day: "2024-01-01", samples: [a, b, samples[2]])
+    #expect(fold.statistic == .mean)
+    #expect(fold.sampleCount == 2)
+    #expect(fold.value == 70)
+}
+
+@Test func aggregateFoldSumsCumulativeSamplesForDay() {
+    let metric = MetricID(rawValue: "stepCount")
+    let samples = [
+        SampleRecord(
+            key: RecordKey(uuid: "11111111-1111-1111-1111-111111111111"),
+            metric: metric,
+            start: "2024-01-01T08:00:00Z",
+            end: "2024-01-01T08:00:00Z",
+            timeZoneOffsetMinutes: 0,
+            timeZoneSource: .unknown,
+            value: 100,
+            unit: CanonicalUnit(symbol: "count"),
+            observedAt: "2024-01-01T08:00:00Z"
+        ),
+        SampleRecord(
+            key: RecordKey(uuid: "22222222-2222-2222-2222-222222222222"),
+            metric: metric,
+            start: "2024-01-01T09:00:00Z",
+            end: "2024-01-01T09:00:00Z",
+            timeZoneOffsetMinutes: 0,
+            timeZoneSource: .unknown,
+            value: 50,
+            unit: CanonicalUnit(symbol: "count"),
+            observedAt: "2024-01-01T09:00:00Z"
+        ),
+    ]
+    let fold = AggregateFold.foldDay(metric: metric, day: "2024-01-01", samples: samples)
+    #expect(fold.statistic == .sum)
+    #expect(fold.value == 150)
+}
+
+@Test func bucketKeyIsStableAcrossRecomputation() {
+    let context = TemporalContext(
+        timeZoneIdentifier: "UTC",
+        localeIdentifier: "en_US_POSIX",
+        tzDatabaseVersion: "2024a"
+    )
+    let metric = MetricID(rawValue: "heartRate")
+    let samples = [heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")]
+    let first = AggregateDrain.planDay(
+        metric: metric,
+        day: "2024-01-01",
+        samples: samples,
+        context: context,
+        emitSeq: 1,
+        computedAt: "2024-01-02T00:00:00Z",
+        observedAt: "2024-01-02T00:00:00Z",
+        now: Date(timeIntervalSince1970: 1_704_067_200) // 2024-01-01
+    )
+    let second = AggregateDrain.planDay(
+        metric: metric,
+        day: "2024-01-01",
+        samples: samples,
+        context: context,
+        emitSeq: 2,
+        computedAt: "2024-01-03T00:00:00Z",
+        observedAt: "2024-01-03T00:00:00Z",
+        now: Date(timeIntervalSince1970: 1_704_240_000),
+        priorEmitSeq: 1
+    )
+    #expect(first?.record.bucketKey == second?.record.bucketKey)
+    #expect(second?.record.state == .revised)
+    #expect(second?.record.supersedes == 1)
+}
+
+@Test func nativeWireEncodesAggregateLineAndFooterCount() throws {
+    let context = TemporalContext(
+        timeZoneIdentifier: "UTC",
+        localeIdentifier: "en_US_POSIX",
+        tzDatabaseVersion: "2024a"
+    )
+    let metric = MetricID(rawValue: "heartRate")
+    let plan = AggregateDrain.planDay(
+        metric: metric,
+        day: "2024-01-01",
+        samples: [heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")],
+        context: context,
+        emitSeq: 1,
+        computedAt: "2024-01-02T00:00:00Z",
+        observedAt: "2024-01-02T00:00:00Z",
+        now: Date(timeIntervalSince1970: 1_704_153_600)
+    )!
+    let data = try NativeWire.encode(
+        samples: [],
+        tombstones: [],
+        aggregates: [plan.record],
+        metric: metric,
+        batchID: BatchID(rawValue: "agg-batch"),
+        envelope: testEnvelope()
+    )
+    let text = String(decoding: data, as: UTF8.self)
+    #expect(text.contains("\"kind\":\"aggregate\""))
+    #expect(text.contains("\"bucketKey\":\"\(plan.record.bucketKey)\""))
+    #expect(text.contains("\"aggregate\":1") || text.contains("\"aggregate\": 1"))
+}
+
+@Test func dirtyDayMarkedByCensusFeedsAggregateDrainPlan() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let store = MemoryStateStore()
+    let page = SamplePage(
+        samples: [heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([1]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    try await store.transact { tx in
+        try Census.apply(page: page, to: tx)
+        try EmittedIndex.record(page: page, batchID: BatchID(rawValue: "b1"), on: tx)
+    }
+    #expect(try await store.transact { try $0.dirtyDays(metric: metric) } == ["2024-01-01"])
+    let context = TemporalContext(
+        timeZoneIdentifier: "UTC",
+        localeIdentifier: "en_US_POSIX",
+        tzDatabaseVersion: "2024a"
+    )
+    let plan = AggregateDrain.planDay(
+        metric: metric,
+        day: "2024-01-01",
+        samples: page.samples,
+        context: context,
+        emitSeq: 1,
+        computedAt: "2024-01-02T00:00:00Z",
+        observedAt: "2024-01-02T00:00:00Z",
+        now: Date(timeIntervalSince1970: 1_704_153_600)
+    )
+    #expect(plan?.record.sampleCount == 1)
+    #expect(plan?.record.computation == .localSampleFold)
+    try await store.transact { try $0.clearDirty(metric: metric, day: "2024-01-01") }
+    #expect(try await store.transact { try $0.dirtyDays(metric: metric) }.isEmpty)
+}
