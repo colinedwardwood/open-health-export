@@ -13,6 +13,7 @@ public final class MemoryTransaction: StateTransaction {
     public var pending: [BatchID: PendingBatch] = [:]
     public var emittedIndex: [String: EmittedIndexRow] = [:]
     public var aggregateEmitSeq: [String: Int] = [:]
+    public var typeStatus: [MetricID: TypeStatus] = [:]
     private var pendingOrder: [BatchID] = []
 
     public init() {}
@@ -133,6 +134,14 @@ public final class MemoryTransaction: StateTransaction {
         journal
     }
 
+    public func loadTypeStatus(metric: MetricID) throws -> TypeStatus? {
+        typeStatus[metric]
+    }
+
+    public func upsertTypeStatus(_ status: TypeStatus) throws {
+        typeStatus[status.metric] = status
+    }
+
     public func wipe() throws -> [String] {
         let urls = pending.values.map(\.payloadURL)
         journal = []
@@ -146,6 +155,7 @@ public final class MemoryTransaction: StateTransaction {
         pendingOrder = []
         emittedIndex = [:]
         aggregateEmitSeq = [:]
+        typeStatus = [:]
         return urls
     }
 }

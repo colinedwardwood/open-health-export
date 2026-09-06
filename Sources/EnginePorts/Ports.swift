@@ -50,13 +50,39 @@ public struct PendingBatch: Sendable, Equatable {
     public var payloadURL: String
     public var expectedRecords: Int
     public var byteCount: Int
+    public var metric: MetricID
 
-    public init(id: BatchID, payloadURL: String, expectedRecords: Int = 0, byteCount: Int = 0) {
+    public init(
+        id: BatchID,
+        payloadURL: String,
+        expectedRecords: Int = 0,
+        byteCount: Int = 0,
+        metric: MetricID = MetricID(rawValue: "")
+    ) {
         self.id = id
         self.payloadURL = payloadURL
         self.expectedRecords = expectedRecords
         self.byteCount = byteCount
+        self.metric = metric
     }
+}
+
+public struct TypeStatus: Sendable, Equatable {
+    public var metric: MetricID
+    public var disabled: Bool
+    public var reason: String
+
+    public init(metric: MetricID, disabled: Bool, reason: String) {
+        self.metric = metric
+        self.disabled = disabled
+        self.reason = reason
+    }
+}
+
+public enum AuthGrant: String, Sendable, Equatable {
+    case unknown
+    case granted
+    case denied
 }
 
 public struct GapRecord: Sendable {
@@ -196,6 +222,8 @@ public protocol StateTransaction: AnyObject {
     func loadAggregateEmitSeq(bucketKey: String) throws -> Int?
     func upsertAggregateEmitSeq(bucketKey: String, emitSeq: Int) throws
     func loadJournal() throws -> [RunEvent]
+    func loadTypeStatus(metric: MetricID) throws -> TypeStatus?
+    func upsertTypeStatus(_ status: TypeStatus) throws
     /// Clears every table. Returns pending payload paths to unlink after COMMIT (R-43).
     func wipe() throws -> [String]
 }

@@ -49,6 +49,17 @@ public struct ExportRun: Sendable {
     }
 
     public func run() async throws -> RunOutcome {
+        if let status = try await store.transact({ try $0.loadTypeStatus(metric: metric) }),
+           status.disabled {
+            let tally = RunTally(
+                failed: 1,
+                terminalError: .internalFault,
+                partialCause: "types_purged"
+            )
+            let outcome = RunOutcome.derive(from: tally)
+            try await record(outcome: outcome, tally: tally, receipt: nil)
+            return outcome
+        }
         let prior: CursorSnapshot?
         do {
             prior = try await store.transact { tx in
@@ -91,7 +102,8 @@ public struct ExportRun: Sendable {
             id: batchID,
             payloadURL: payloadURL.path,
             expectedRecords: recordCount,
-            byteCount: payload.count
+            byteCount: payload.count,
+            metric: metric
         )
         let victims = try await store.transact { tx in
             let evicted = try QueueAdmission.makeRoom(for: pending.byteCount, on: tx)

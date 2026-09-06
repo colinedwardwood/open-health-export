@@ -106,5 +106,10 @@ commit. HealthKit statistics are still unused.
 Journal rows carry trigger and sample tallies. `WakeLedger` is an append-only
 wake file; `WakeAttribution` splits overdue scheduling from execution. Store
 wipe empties SQLite/memory tables and unlinks pending payloads after COMMIT.
-R-44 revocation purge is not wired.
+
+Pending batches are indexed by metric. `TypePurge` drops that type's queue,
+writes a ledger row, and disables further export for it on an observed
+grant→denied transition or an explicit stop — never on an empty read (R-60).
+The 60-second clock starts at observation. HealthKit observation at every
+wake and the two-tap UI are not wired.
 

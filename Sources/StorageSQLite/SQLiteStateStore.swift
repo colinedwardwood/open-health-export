@@ -49,12 +49,9 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
         try exec("PRAGMA journal_size_limit=4194304;")
         try exec("PRAGMA wal_autocheckpoint=1000;")
         try migrate()
-        do {
-            try exec("ALTER TABLE pending_batches ADD COLUMN byte_count INTEGER NOT NULL DEFAULT 0;")
-        } catch {
-            _ = error
-        }
         for sql in [
+            "ALTER TABLE pending_batches ADD COLUMN byte_count INTEGER NOT NULL DEFAULT 0;",
+            "ALTER TABLE pending_batches ADD COLUMN metric TEXT NOT NULL DEFAULT '';",
             "ALTER TABLE journal ADD COLUMN trigger TEXT NOT NULL DEFAULT 'manual';",
             "ALTER TABLE journal ADD COLUMN samples_read INTEGER NOT NULL DEFAULT 0;",
             "ALTER TABLE journal ADD COLUMN samples_committed INTEGER NOT NULL DEFAULT 0;",
@@ -109,8 +106,10 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 batch_id TEXT PRIMARY KEY,
                 payload_url TEXT NOT NULL,
                 expected_records INTEGER NOT NULL,
-                byte_count INTEGER NOT NULL DEFAULT 0
+                byte_count INTEGER NOT NULL DEFAULT 0,
+                metric TEXT NOT NULL DEFAULT ''
             );
+            CREATE INDEX IF NOT EXISTS idx_pending_metric ON pending_batches (metric);
             CREATE TABLE IF NOT EXISTS deliveries (
                 batch_id TEXT PRIMARY KEY,
                 accepted INTEGER NOT NULL
@@ -131,7 +130,12 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 bucket_key TEXT PRIMARY KEY,
                 emit_seq INTEGER NOT NULL
             );
-            PRAGMA user_version = 7;
+            CREATE TABLE IF NOT EXISTS type_status (
+                metric TEXT PRIMARY KEY,
+                disabled INTEGER NOT NULL,
+                reason TEXT NOT NULL
+            );
+            PRAGMA user_version = 8;
             """)
     }
 
@@ -205,13 +209,14 @@ private final class SQLiteTransaction: StateTransaction {
 
     func commitBatch(_ batch: PendingBatch, advancing: CursorAdvance) throws {
         let pending = try store.prepare(
-            "INSERT INTO pending_batches (batch_id, payload_url, expected_records, byte_count) VALUES (?, ?, ?, ?) ON CONFLICT(batch_id) DO UPDATE SET payload_url = excluded.payload_url, expected_records = excluded.expected_records, byte_count = excluded.byte_count;"
+            "INSERT INTO pending_batches (batch_id, payload_url, expected_records, byte_count, metric) VALUES (?, ?, ?, ?, ?) ON CONFLICT(batch_id) DO UPDATE SET payload_url = excluded.payload_url, expected_records = excluded.expected_records, byte_count = excluded.byte_count, metric = excluded.metric;"
         )
         defer { sqlite3_finalize(pending) }
         bindText(pending, 1, batch.id.rawValue)
         bindText(pending, 2, batch.payloadURL)
         sqlite3_bind_int64(pending, 3, sqlite3_int64(batch.expectedRecords))
         sqlite3_bind_int64(pending, 4, sqlite3_int64(batch.byteCount))
+        bindText(pending, 5, batch.metric.rawValue)
         try stepDone(pending)
 
         let snap = advancing.snapshot
@@ -232,7 +237,7 @@ private final class SQLiteTransaction: StateTransaction {
 
     func pendingBatches() throws -> [PendingBatch] {
         let stmt = try store.prepare(
-            "SELECT batch_id, payload_url, expected_records, byte_count FROM pending_batches ORDER BY rowid;"
+            "SELECT batch_id, payload_url, expected_records, byte_count, metric FROM pending_batches ORDER BY rowid;"
         )
         defer { sqlite3_finalize(stmt) }
         var batches: [PendingBatch] = []
@@ -242,7 +247,8 @@ private final class SQLiteTransaction: StateTransaction {
                     id: BatchID(rawValue: text(stmt, 0)),
                     payloadURL: text(stmt, 1),
                     expectedRecords: Int(sqlite3_column_int64(stmt, 2)),
-                    byteCount: Int(sqlite3_column_int64(stmt, 3))
+                    byteCount: Int(sqlite3_column_int64(stmt, 3)),
+                    metric: MetricID(rawValue: text(stmt, 4))
                 )
             )
         }
@@ -489,6 +495,31 @@ private final class SQLiteTransaction: StateTransaction {
         return events
     }
 
+    func loadTypeStatus(metric: MetricID) throws -> TypeStatus? {
+        let stmt = try store.prepare(
+            "SELECT disabled, reason FROM type_status WHERE metric = ? LIMIT 1;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, metric.rawValue)
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
+        return TypeStatus(
+            metric: metric,
+            disabled: sqlite3_column_int64(stmt, 0) != 0,
+            reason: text(stmt, 1)
+        )
+    }
+
+    func upsertTypeStatus(_ status: TypeStatus) throws {
+        let stmt = try store.prepare(
+            "INSERT INTO type_status (metric, disabled, reason) VALUES (?, ?, ?) ON CONFLICT(metric) DO UPDATE SET disabled = excluded.disabled, reason = excluded.reason;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, status.metric.rawValue)
+        sqlite3_bind_int64(stmt, 2, status.disabled ? 1 : 0)
+        bindText(stmt, 3, status.reason)
+        try stepDone(stmt)
+    }
+
     func wipe() throws -> [String] {
         let stmt = try store.prepare("SELECT payload_url FROM pending_batches;")
         defer { sqlite3_finalize(stmt) }
@@ -498,7 +529,7 @@ private final class SQLiteTransaction: StateTransaction {
         }
         for table in [
             "journal", "ledger", "cursors", "census", "dirty", "pending_batches",
-            "deliveries", "gaps", "emitted_index", "aggregate_emit",
+            "deliveries", "gaps", "emitted_index", "aggregate_emit", "type_status",
         ] {
             try store.exec("DELETE FROM \(table);")
         }

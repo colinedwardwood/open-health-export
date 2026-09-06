@@ -1394,3 +1394,120 @@ private struct OneExportFault: ExportFaultInjector {
     #expect(event?.samplesAcked == 2)
     #expect(event?.outcomeKind == "success")
 }
+
+@Test func typePurgeDueOnlyOnGrantToDeniedOrExplicitStop() {
+    #expect(
+        TypePurge.due(previous: .granted, observed: .denied, explicitStop: false)
+    )
+    #expect(
+        TypePurge.due(previous: .granted, observed: .granted, explicitStop: true)
+    )
+    #expect(
+        !TypePurge.due(previous: .unknown, observed: .denied, explicitStop: false)
+    )
+    #expect(
+        !TypePurge.due(previous: .granted, observed: .granted, explicitStop: false)
+    )
+    #expect(
+        !TypePurge.due(previous: .denied, observed: .denied, explicitStop: false)
+    )
+}
+
+@Test func typePurgeDropsOnlyThatMetricAndUnlinksPayload() async throws {
+    let heart = MetricID(rawValue: "heartRate")
+    let steps = MetricID(rawValue: "stepCount")
+    let heartPage = SamplePage(
+        samples: [heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")],
+        tombstones: [],
+        metric: heart,
+        anchorBlob: Data([0x11]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let stepPage = SamplePage(
+        samples: [heartSample("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")],
+        tombstones: [],
+        metric: steps,
+        anchorBlob: Data([0x22]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-purge-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let heartPayload = root.appendingPathComponent("heart.ndjson")
+    let stepPayload = root.appendingPathComponent("steps.ndjson")
+    try "heart\n".write(to: heartPayload, atomically: true, encoding: .utf8)
+    try "steps\n".write(to: stepPayload, atomically: true, encoding: .utf8)
+    let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+    try await store.transact { tx in
+        try tx.commitBatch(
+            PendingBatch(
+                id: BatchID(rawValue: "h"),
+                payloadURL: heartPayload.path,
+                expectedRecords: 1,
+                metric: heart
+            ),
+            advancing: CursorAdvance(page: heartPage, epoch: 1)
+        )
+        try tx.commitBatch(
+            PendingBatch(
+                id: BatchID(rawValue: "s"),
+                payloadURL: stepPayload.path,
+                expectedRecords: 1,
+                metric: steps
+            ),
+            advancing: CursorAdvance(page: stepPage, epoch: 1)
+        )
+    }
+    try await store.purgeType(metric: heart, reason: "revocation_observed", destination: "local-file")
+    let remaining = try await store.transact { try $0.pendingBatches() }
+    #expect(remaining.map(\.id.rawValue) == ["s"])
+    #expect(!FileManager.default.fileExists(atPath: heartPayload.path))
+    #expect(FileManager.default.fileExists(atPath: stepPayload.path))
+    let status = try await store.transact { try $0.loadTypeStatus(metric: heart) }
+    #expect(status?.disabled == true)
+    #expect(status?.reason == "revocation_observed")
+    let journal = try await store.transact { try $0.loadJournal() }
+    #expect(journal.last?.outcomeKind == "purged")
+    let gaps = try await store.transact { try $0.loadGaps() }
+    #expect(gaps.contains { $0.rangeDescription.hasPrefix("purged_by_revocation:") })
+}
+
+final class CountingSource: SampleSource, @unchecked Sendable {
+    var pages: Int = 0
+    func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage {
+        pages += 1
+        return SamplePage(
+            samples: [heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")],
+            tombstones: [],
+            metric: metric,
+            anchorBlob: Data([0x11]),
+            observedThrough: Date(timeIntervalSince1970: 0)
+        )
+    }
+}
+
+@Test func exportRunSkipsDisabledTypeWithoutReading() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let dest = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-disabled-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+    let store = MemoryStateStore()
+    try await store.transact {
+        try $0.upsertTypeStatus(
+            TypeStatus(metric: metric, disabled: true, reason: "explicit_stop")
+        )
+    }
+    let source = CountingSource()
+    let run = ExportRun(
+        source: source,
+        destination: .testing(LocalFileSink(directory: dest)),
+        store: store,
+        metric: metric,
+        scratchDirectory: dest.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    )
+    let outcome = try await run.run()
+    #expect(outcome.kind == .failed)
+    #expect(outcome.partialCause == "types_purged")
+    #expect(source.pages == 0)
+}
