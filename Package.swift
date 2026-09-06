@@ -81,6 +81,8 @@ let linuxCore: [Target] = [
             "WireFormat",
             "StorageSQLite",
             "RunJournal",
+            "DiagnosticBundle",
+            "Redaction",
             "CorrectnessEngine",
             "Watchdog",
             "TestSupport",

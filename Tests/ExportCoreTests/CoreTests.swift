@@ -1,5 +1,6 @@
 import CoreDomain
 import CoreTemporal
+import DiagnosticBundle
 import DestinationTrust
 import EnginePorts
 import Foundation
@@ -10,6 +11,7 @@ import TestSupport
 import Testing
 import Watchdog
 import RunJournal
+import Redaction
 @testable import CorrectnessEngine
 @testable import WireFormat
 
@@ -22,6 +24,82 @@ import RunJournal
     }
     #expect(!ErrorClassManifest.record(for: .deviceLocked).scheduleFailure)
     #expect(ErrorClassManifest.record(for: .budgetExhausted).scheduleFailure)
+}
+
+@Test func diagnosticBundleIsBoundedManifestDerivedAndRedacted() throws {
+    let canary = "clinic.example.org bearer-secret HKCategoryTypeIdentifierSexualActivity"
+    let events = [
+        RunEvent(
+            runID: RunID(rawValue: canary),
+            outcomeKind: "failed",
+            detail: canary,
+            trigger: .manual,
+            samplesRead: 1
+        ),
+        RunEvent(
+            runID: RunID(rawValue: "raw-health-type-heartRate"),
+            outcomeKind: "success",
+            detail: canary,
+            trigger: .observerQuery,
+            samplesRead: 2,
+            samplesCommitted: 2,
+            samplesAcked: 2
+        ),
+    ]
+    let data = try BundleAssembler(maxRuns: 1).assemble(
+        header: DiagnosticHeader(
+            appVersion: "0.1.0",
+            osVersion: "test",
+            deviceModel: "test-device",
+            localeIdentifier: "en_US",
+            utcOffsetMinutes: 0,
+            generatedAt: "2024-01-01T00:00:00Z"
+        ),
+        events: events
+    )
+    let text = try #require(String(data: data, encoding: .utf8))
+    #expect(text.contains("\"schema\":\"ohe.diagnostic/1\""))
+    #expect(text.contains("\"runID\":\"bundle-run-1\""))
+    #expect(text.contains("\"samplesAcked\":2"))
+    #expect(!text.contains(canary))
+    #expect(!text.contains("heartRate"))
+    #expect(!text.contains("\"detail\""))
+    #expect(!text.contains("\"destination\""))
+}
+
+@Test func diagnosticSharePayloadDoesNotExistBeforeFullPreview() {
+    let payload = Data("{\"schema\":\"ohe.diagnostic/1\"}".utf8)
+    var gate = DiagnosticPreviewGate()
+    #expect(gate.sharePayload == nil)
+    gate.reachedEnd(of: payload)
+    #expect(gate.sharePayload == payload)
+}
+
+@Test func diagnosticBundleRejectsContentAboveHardCap() {
+    let event = RunEvent(
+        runID: RunID(rawValue: "r"),
+        outcomeKind: String(repeating: "x", count: 200),
+        detail: ""
+    )
+    #expect(throws: DiagnosticBundleError.self) {
+        _ = try BundleAssembler(maxRuns: 1, maxBytes: 10).assemble(
+            header: DiagnosticHeader(
+                appVersion: "0.1.0",
+                osVersion: "test",
+                deviceModel: "test",
+                localeIdentifier: "en_US",
+                utcOffsetMinutes: 0,
+                generatedAt: "2024-01-01T00:00:00Z"
+            ),
+            events: [event]
+        )
+    }
+}
+
+@Test func redactionManifestKeysAreUnique() {
+    #expect(Set(Allowlist.manifest.map(\.key)).count == Allowlist.manifest.count)
+    #expect(!Allowlist.permitted("metric", in: .bundle))
+    #expect(Allowlist.permitted("outcome", in: .bundle))
 }
 
 @Test func haeEncoderDropsUuidAndRefusesTombstones() throws {

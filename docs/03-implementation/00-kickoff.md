@@ -127,3 +127,9 @@ sealed; verification detects edits and reordering. Delete-all starts a successor
 chain with a genesis marker naming the destroyed count and prior head. The
 Secure Enclave chain-head signature and ledger UI remain unimplemented.
 
+The diagnostic core now emits a sorted UTF-8 `ohe.diagnostic/1` document,
+bounded to 200 runs and 200 KiB. Run fields are emitted by the per-sink
+redaction manifest; raw run IDs and free-form detail never enter the bundle.
+`DiagnosticPreviewGate` exposes no share payload until full-content review.
+The SwiftUI preview/share surface and corruption-salvage reader remain open.
+
