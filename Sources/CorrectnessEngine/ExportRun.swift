@@ -153,33 +153,3 @@ public struct ExportRun: Sendable {
         }
     }
 }
-
-enum Census {
-    static func apply(page: SamplePage, to tx: any StateTransaction) throws {
-        var grouped: [String: [String]] = [:]
-        for sample in page.samples {
-            let day = String(sample.start.prefix(10))
-            grouped[day, default: []].append(sample.key.uuid)
-        }
-        for (day, uuids) in grouped {
-            let digest = digestUUIDs(uuids)
-            try tx.upsertCensus(
-                CensusRow(
-                    metric: page.metric,
-                    day: day,
-                    sampleCount: uuids.count,
-                    digest: digest
-                )
-            )
-            try tx.markDirty(metric: page.metric, day: day)
-        }
-    }
-
-    static func digestUUIDs(_ uuids: [String]) -> String {
-        var hash: UInt64 = 5381
-        for byte in uuids.sorted().joined(separator: ",").utf8 {
-            hash = ((hash &<< 5) &+ hash) &+ UInt64(byte)
-        }
-        return String(hash, radix: 16)
-    }
-}

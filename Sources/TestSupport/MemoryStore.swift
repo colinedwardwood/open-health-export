@@ -102,6 +102,16 @@ public final class MemoryTransaction: StateTransaction {
     public func loadEmittedIndex(uuid: String) throws -> EmittedIndexRow? {
         emittedIndex[uuid]
     }
+
+    public func removeEmittedIndex(uuid: String) throws {
+        emittedIndex.removeValue(forKey: uuid)
+    }
+
+    public func loadEmittedIndex(metric: MetricID, day: String) throws -> [EmittedIndexRow] {
+        emittedIndex.values
+            .filter { $0.metric == metric && $0.day == day }
+            .sorted { $0.uuid < $1.uuid }
+    }
 }
 
 public final class MemoryStateStore: StateStore, @unchecked Sendable {

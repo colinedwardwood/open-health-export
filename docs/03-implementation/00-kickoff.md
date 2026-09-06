@@ -88,3 +88,8 @@ A DCO workflow requires `Signed-off-by` on every commit.
 
 Successful delta commits now upsert one `emitted_index` row per sample UUID in the
 same transaction as the cursor (R-08 write path). Reconcile still does not run.
+
+Census rows accumulate across pages with an XOR digest; tombstones decrement the
+census and drop the UUID from `emitted_index` when known. Unknown deletions journal
+`deletion_undatable`. `ReconcileCompare` classifies cell mismatches and absence
+tombstones; the bounded sweep still does not run.

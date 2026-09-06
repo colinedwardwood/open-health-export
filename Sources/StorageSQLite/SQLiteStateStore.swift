@@ -381,6 +381,35 @@ private final class SQLiteTransaction: StateTransaction {
         )
     }
 
+    func removeEmittedIndex(uuid: String) throws {
+        let stmt = try store.prepare("DELETE FROM emitted_index WHERE uuid = ?;")
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, uuid)
+        try stepDone(stmt)
+    }
+
+    func loadEmittedIndex(metric: MetricID, day: String) throws -> [EmittedIndexRow] {
+        let stmt = try store.prepare(
+            "SELECT uuid, digest, batch_id FROM emitted_index WHERE metric = ? AND day = ? ORDER BY uuid;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, metric.rawValue)
+        bindText(stmt, 2, day)
+        var rows: [EmittedIndexRow] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            rows.append(
+                EmittedIndexRow(
+                    uuid: text(stmt, 0),
+                    metric: metric,
+                    day: day,
+                    digest: text(stmt, 1),
+                    batchID: BatchID(rawValue: text(stmt, 2))
+                )
+            )
+        }
+        return rows
+    }
+
     private func bindText(_ stmt: OpaquePointer, _ index: Int32, _ value: String) {
         sqlite3_bind_text(stmt, index, value, -1, sqliteTransient)
     }

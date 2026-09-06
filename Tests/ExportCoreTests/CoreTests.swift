@@ -1,6 +1,5 @@
 import CoreDomain
 import CoreTemporal
-import CorrectnessEngine
 import DestinationTrust
 import EnginePorts
 import Foundation
@@ -10,6 +9,7 @@ import StorageSQLite
 import TestSupport
 import Testing
 import Watchdog
+@testable import CorrectnessEngine
 @testable import WireFormat
 
 @Test func errorClassManifestIsInBijectionWithTheEnum() {
@@ -803,4 +803,159 @@ private struct OneExportFault: ExportFaultInjector {
     #expect(try await store.transact { try $0.loadEmittedIndex(uuid: first.uuid) } == first)
     try await store.transact { try $0.upsertEmittedIndex(updated) }
     #expect(try await store.transact { try $0.loadEmittedIndex(uuid: first.uuid) } == updated)
+}
+
+@Test func censusAccumulatesAcrossTwoPagesSameDay() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let store = MemoryStateStore()
+    let a = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    let b = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    let page1 = SamplePage(
+        samples: [heartSample(a)],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([1]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let page2 = SamplePage(
+        samples: [heartSample(b)],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([2]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    try await store.transact { tx in
+        try Census.apply(page: page1, to: tx)
+        try EmittedIndex.record(page: page1, batchID: BatchID(rawValue: "b1"), on: tx)
+        try Census.apply(page: page2, to: tx)
+        try EmittedIndex.record(page: page2, batchID: BatchID(rawValue: "b2"), on: tx)
+    }
+    let row = try await store.transact { try $0.loadCensus(metric: metric, day: "2024-01-01") }
+    #expect(row?.sampleCount == 2)
+    #expect(row?.digest == Census.digestUUIDs([a, b]))
+    #expect(Census.digestUUIDs([a, b]) == Census.digestUUIDs([b, a]))
+}
+
+@Test func censusApplyDecrementsOnTombstoneWhenUuidInEmittedIndex() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let store = MemoryStateStore()
+    let uuid = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    let page = SamplePage(
+        samples: [heartSample(uuid)],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([1]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let deletion = SamplePage(
+        samples: [],
+        tombstones: [TombstoneRecord(key: RecordKey(uuid: uuid), metric: metric)],
+        metric: metric,
+        anchorBlob: Data([2]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    try await store.transact { tx in
+        try Census.apply(page: page, to: tx)
+        try EmittedIndex.record(page: page, batchID: BatchID(rawValue: "b1"), on: tx)
+        try Census.apply(page: deletion, to: tx)
+    }
+    let row = try await store.transact { try $0.loadCensus(metric: metric, day: "2024-01-01") }
+    #expect(row?.sampleCount == 0)
+    #expect(row?.digest == "0")
+    #expect(try await store.transact { try $0.loadEmittedIndex(uuid: uuid) } == nil)
+    #expect(try await store.transact { try $0.dirtyDays(metric: metric) } == ["2024-01-01"])
+}
+
+@Test func censusTombstoneWithoutEmittedIndexJournalsUndatable() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let store = MemoryStateStore()
+    let page = SamplePage(
+        samples: [],
+        tombstones: [
+            TombstoneRecord(
+                key: RecordKey(uuid: "deadbeef-dead-beef-dead-beefdeadbeef"),
+                metric: metric
+            )
+        ],
+        metric: metric,
+        anchorBlob: Data([1]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    try await store.transact { tx in
+        try Census.apply(page: page, to: tx)
+    }
+    #expect(store.transaction.journal.contains { $0.detail == "deletion_undatable" })
+    #expect(try await store.transact { try $0.loadCensus(metric: metric, day: "2024-01-01") } == nil)
+}
+
+@Test func cellCensusFoldIsOrderIndependent() {
+    let left = ReconcileCompare.fold(uuids: ["a", "b", "c"])
+    let right = ReconcileCompare.fold(uuids: ["c", "a", "b"])
+    #expect(left == right)
+}
+
+@Test func reconcileCompareDetectsIdenticalCell() {
+    let uuids = ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]
+    let observed = ReconcileCompare.fold(uuids: uuids)
+    let stored = CensusRow(
+        metric: MetricID(rawValue: "heartRate"),
+        day: "2024-01-01",
+        sampleCount: observed.count,
+        digest: String(observed.digestXor, radix: 16)
+    )
+    #expect(ReconcileCompare.compare(stored: stored, observed: observed) == .identical)
+}
+
+@Test func reconcileCompareDetectsCountGreater() {
+    let stored = CensusRow(
+        metric: MetricID(rawValue: "heartRate"),
+        day: "2024-01-01",
+        sampleCount: 1,
+        digest: "1"
+    )
+    let observed = ReconcileCompare.fold(uuids: ["a", "b"])
+    #expect(ReconcileCompare.compare(stored: stored, observed: observed) == .countGreater)
+}
+
+@Test func reconcileCompareDetectsCountSmallerAndYieldsTombstoneUUIDs() {
+    let metric = MetricID(rawValue: "heartRate")
+    let stored = CensusRow(metric: metric, day: "2024-01-01", sampleCount: 2, digest: "1")
+    let observed = ReconcileCompare.fold(uuids: ["keep"])
+    #expect(ReconcileCompare.compare(stored: stored, observed: observed) == .countSmaller)
+    let indexed = [
+        EmittedIndexRow(
+            uuid: "gone",
+            metric: metric,
+            day: "2024-01-01",
+            digest: "x",
+            batchID: BatchID(rawValue: "b")
+        ),
+        EmittedIndexRow(
+            uuid: "keep",
+            metric: metric,
+            day: "2024-01-01",
+            digest: "y",
+            batchID: BatchID(rawValue: "b")
+        ),
+    ]
+    #expect(
+        ReconcileCompare.absentUUIDs(indexed: indexed, observedUUIDs: ["keep"]) == ["gone"]
+    )
+    let tombs = ReconcileCompare.tombstonesForAbsence(
+        indexed: indexed,
+        observedUUIDs: ["keep"],
+        metric: metric
+    )
+    #expect(tombs.map(\.key.uuid) == ["gone"])
+}
+
+@Test func reconcileCompareDetectsDigestMismatchWithEqualCount() {
+    let stored = CensusRow(
+        metric: MetricID(rawValue: "heartRate"),
+        day: "2024-01-01",
+        sampleCount: 1,
+        digest: "deadbeef"
+    )
+    let observed = ReconcileCompare.fold(uuids: ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"])
+    #expect(ReconcileCompare.compare(stored: stored, observed: observed) == .digestMismatch)
 }

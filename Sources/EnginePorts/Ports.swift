@@ -162,6 +162,8 @@ public protocol StateTransaction: AnyObject {
     func dirtyDays(metric: MetricID) throws -> [String]
     func upsertEmittedIndex(_ row: EmittedIndexRow) throws
     func loadEmittedIndex(uuid: String) throws -> EmittedIndexRow?
+    func removeEmittedIndex(uuid: String) throws
+    func loadEmittedIndex(metric: MetricID, day: String) throws -> [EmittedIndexRow]
 }
 
 public protocol StateStore: Sendable {
