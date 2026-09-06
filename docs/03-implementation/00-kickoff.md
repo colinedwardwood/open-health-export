@@ -72,3 +72,7 @@ spanning 14 days; the alarm threshold is `clamp(2 × p95, 6 h, 48 h)`.
 
 SQLite metadata defaults to Darwin Class C file protection, WAL + `synchronous=FULL`, and a 4 MB
 journal/recovery budget.
+
+R-83's six fault locations are reachable in debug builds. SQLite tests prove faults through the
+commit boundary either roll back both cursor and batch or leave a replayable batch; post-write
+replay remains idempotent. Release builds omit the injector surface.

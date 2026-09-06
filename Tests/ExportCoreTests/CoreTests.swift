@@ -411,6 +411,80 @@ func testEnvelope() -> WireEnvelope {
     #expect(store.transaction.ledger.count == 2)
 }
 
+#if DEBUG
+private enum InjectedExportFault: Error {
+    case stop
+}
+
+private struct OneExportFault: ExportFaultInjector {
+    var location: ExportFaultLocation
+
+    func hit(_ location: ExportFaultLocation) throws {
+        if location == self.location {
+            throw InjectedExportFault.stop
+        }
+    }
+}
+
+@Test func everyR83FaultLocationIsReachableAndPreservesWriteAheadOrdering() async throws {
+    let beforeCommit: Set<ExportFaultLocation> = [.afterRead, .afterTransform, .duringAnchorPersist]
+    for location in ExportFaultLocation.allCases {
+        let metric = MetricID(rawValue: "heartRate")
+        let page = SamplePage(
+            samples: [heartSample("f0000000-0000-0000-0000-000000000001")],
+            tombstones: [],
+            metric: metric,
+            anchorBlob: Data([0xF0]),
+            observedThrough: Date(timeIntervalSince1970: 0)
+        )
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ohe-fi-\(location.rawValue)-\(UUID().uuidString)")
+        let destinationURL = root.appendingPathComponent("destination")
+        try FileManager.default.createDirectory(
+            at: destinationURL,
+            withIntermediateDirectories: true
+        )
+        let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+        var run = ExportRun(
+            source: FixtureSource(pages: [page]),
+            destination: .testing(LocalFileSink(directory: destinationURL)),
+            store: store,
+            metric: metric,
+            scratchDirectory: root.appendingPathComponent("scratch"),
+            envelope: testEnvelope()
+        )
+        run.faults = OneExportFault(location: location)
+
+        await #expect(throws: InjectedExportFault.stop) {
+            _ = try await run.run()
+        }
+        let cursor = try await store.transact { try $0.loadCursor(metric: metric) }
+        let pending = try await store.transact { try $0.pendingBatches() }
+        if beforeCommit.contains(location) {
+            #expect(cursor == nil, "cursor advanced at \(location.rawValue)")
+            #expect(pending.isEmpty, "batch survived rollback at \(location.rawValue)")
+        } else {
+            #expect(cursor?.anchorBlob == Data([0xF0]))
+            #expect(pending.count == 1, "batch was not replayable at \(location.rawValue)")
+        }
+
+        if location == .afterDestinationWriteBeforeAck || location == .afterAckBeforeRelease {
+            let replay = PendingDeliveryRunner(
+                destination: .testing(LocalFileSink(directory: destinationURL)),
+                store: store
+            )
+            _ = try await replay.runOnce()
+            #expect(try await store.transact { try $0.pendingBatches() }.isEmpty)
+            let delivered = try FileManager.default.contentsOfDirectory(
+                at: destinationURL,
+                includingPropertiesForKeys: nil
+            ).filter { $0.pathExtension == "ndjson" }
+            #expect(delivered.count == 1, "idempotent replay duplicated \(location.rawValue)")
+        }
+    }
+}
+#endif
+
 @Test func pendingDeliveryRunnerReplaysACommittedBatchAfterRestart() async throws {
     let metric = MetricID(rawValue: "heartRate")
     let page = SamplePage(
@@ -530,6 +604,21 @@ func testEnvelope() -> WireEnvelope {
     let files = try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
         .filter { $0.pathExtension == "ndjson" && $0.lastPathComponent != "src.ndjson" }
     #expect(files.count == 1)
+}
+
+@Test func localFileSinkRejectsDifferentBytesForTheSameKey() async throws {
+    let dir = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-sink-conflict-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let payload = dir.appendingPathComponent("src.ndjson")
+    try "one\n".write(to: payload, atomically: true, encoding: .utf8)
+    let sink = LocalFileSink(directory: dir)
+    let key = BatchID(rawValue: "same-key")
+    _ = try await sink.send(fileHandle: payload.path, idempotencyKey: key)
+    try "different\n".write(to: payload, atomically: true, encoding: .utf8)
+    await #expect(throws: LocalFileSinkError.idempotencyConflict) {
+        _ = try await sink.send(fileHandle: payload.path, idempotencyKey: key)
+    }
 }
 
 @Test func sqlitePersistsCursorAndCensus() async throws {

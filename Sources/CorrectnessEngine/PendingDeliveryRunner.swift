@@ -8,6 +8,9 @@ public struct PendingDeliveryRunner: Sendable {
     public var destination: VerifiedDestination
     public var store: any StateStore
     public var destinationName: String
+    #if DEBUG
+    public var faults: any ExportFaultInjector = NoExportFaults()
+    #endif
 
     public init(
         destination: VerifiedDestination,
@@ -23,12 +26,25 @@ public struct PendingDeliveryRunner: Sendable {
     public func runOnce() async throws -> [DeliveryReceipt] {
         let batches = try await store.transact { try $0.pendingBatches() }
         guard let batch = batches.first else { return [] }
+        #if DEBUG
+        let receipt = try await DeliveryExecutor.send(
+            batch: batch,
+            destination: destination,
+            destinationName: destinationName,
+            store: store,
+            faults: faults
+        )
+        #else
         let receipt = try await DeliveryExecutor.send(
             batch: batch,
             destination: destination,
             destinationName: destinationName,
             store: store
         )
+        #endif
+        #if DEBUG
+        try faults.hit(.afterAckBeforeRelease)
+        #endif
         try await store.transact { try $0.recordDelivery(receipt) }
         return [receipt]
     }

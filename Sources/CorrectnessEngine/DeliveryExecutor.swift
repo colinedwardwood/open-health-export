@@ -12,6 +12,40 @@ enum DeliveryExecutor {
         destinationName: String,
         store: any StateStore
     ) async throws -> DeliveryReceipt {
+        try await sendImpl(
+            batch: batch,
+            destination: destination,
+            destinationName: destinationName,
+            store: store,
+            beforeAckObservation: {}
+        )
+    }
+
+    #if DEBUG
+    static func send(
+        batch: PendingBatch,
+        destination: VerifiedDestination,
+        destinationName: String,
+        store: any StateStore,
+        faults: any ExportFaultInjector
+    ) async throws -> DeliveryReceipt {
+        try await sendImpl(
+            batch: batch,
+            destination: destination,
+            destinationName: destinationName,
+            store: store,
+            beforeAckObservation: { try faults.hit(.afterDestinationWriteBeforeAck) }
+        )
+    }
+    #endif
+
+    private static func sendImpl(
+        batch: PendingBatch,
+        destination: VerifiedDestination,
+        destinationName: String,
+        store: any StateStore,
+        beforeAckObservation: () throws -> Void
+    ) async throws -> DeliveryReceipt {
         let attemptID = UUID().uuidString.lowercased()
         try await append(
             phase: "attempt",
@@ -25,6 +59,7 @@ enum DeliveryExecutor {
                 fileHandle: batch.payloadURL,
                 idempotencyKey: batch.id
             )
+            try beforeAckObservation()
             let phase: String
             if receipt.unconfirmed > 0 {
                 phase = "unknown_ack"

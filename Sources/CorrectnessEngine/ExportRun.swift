@@ -14,6 +14,9 @@ public struct ExportRun: Sendable {
     public var scratchDirectory: URL
     public var destinationName: String
     public var envelope: WireEnvelope
+    #if DEBUG
+    public var faults: any ExportFaultInjector = NoExportFaults()
+    #endif
 
     public init(
         source: any SampleSource,
@@ -40,6 +43,9 @@ public struct ExportRun: Sendable {
             try tx.loadCursor(metric: metric)
         }
         let page = try await source.page(metric: metric, afterAnchor: prior?.anchorBlob)
+        #if DEBUG
+        try faults.hit(.afterRead)
+        #endif
         if page.samples.isEmpty, page.tombstones.isEmpty {
             let outcome = RunOutcome.derive(from: RunTally(nothingDue: true))
             try await record(outcome: outcome, tally: RunTally(nothingDue: true), receipt: nil)
@@ -54,6 +60,9 @@ public struct ExportRun: Sendable {
             batchID: batchID,
             envelope: envelope
         )
+        #if DEBUG
+        try faults.hit(.afterTransform)
+        #endif
         let payloadURL = scratchDirectory.appendingPathComponent("\(batchID.rawValue).ndjson")
         try FileWriteKit.writeAtomically(payload, to: payloadURL)
 
@@ -67,7 +76,13 @@ public struct ExportRun: Sendable {
                 advancing: CursorAdvance(page: page, epoch: epoch)
             )
             try Census.apply(page: page, to: tx)
+            #if DEBUG
+            try faults.hit(.duringAnchorPersist)
+            #endif
         }
+        #if DEBUG
+        try faults.hit(.afterEnqueueBeforeDestinationWrite)
+        #endif
 
         let recordCount = page.samples.count + page.tombstones.count
         let pending = PendingBatch(
@@ -75,12 +90,25 @@ public struct ExportRun: Sendable {
             payloadURL: payloadURL.path,
             expectedRecords: recordCount
         )
+        #if DEBUG
+        let receipt = try await DeliveryExecutor.send(
+            batch: pending,
+            destination: destination,
+            destinationName: destinationName,
+            store: store,
+            faults: faults
+        )
+        #else
         let receipt = try await DeliveryExecutor.send(
             batch: pending,
             destination: destination,
             destinationName: destinationName,
             store: store
         )
+        #endif
+        #if DEBUG
+        try faults.hit(.afterAckBeforeRelease)
+        #endif
         var tally = RunTally(
             read: recordCount,
             committed: recordCount,

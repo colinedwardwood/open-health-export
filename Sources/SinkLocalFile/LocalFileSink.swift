@@ -4,6 +4,10 @@ import FileWriteKit
 import Foundation
 import WireFormat
 
+public enum LocalFileSinkError: Error, Equatable {
+    case idempotencyConflict
+}
+
 public struct LocalFileSink: DestinationSink, Sendable {
     public var directory: URL
 
@@ -14,8 +18,15 @@ public struct LocalFileSink: DestinationSink, Sendable {
     public func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt {
         let source = URL(fileURLWithPath: fileHandle)
         let destination = directory.appendingPathComponent("\(idempotencyKey.rawValue).ndjson")
-        try FileWriteKit.copyAtomically(from: source, to: destination)
-        let text = try String(contentsOf: destination, encoding: .utf8)
+        let sourceData = try Data(contentsOf: source)
+        if FileManager.default.fileExists(atPath: destination.path) {
+            guard try Data(contentsOf: destination) == sourceData else {
+                throw LocalFileSinkError.idempotencyConflict
+            }
+        } else {
+            try FileWriteKit.writeAtomically(sourceData, to: destination)
+        }
+        let text = String(decoding: sourceData, as: UTF8.self)
         return DeliveryReceipt(
             batchID: idempotencyKey,
             accepted: NativeWire.countRecords(in: text),
