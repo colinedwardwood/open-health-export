@@ -50,3 +50,7 @@ asks for camera permission before scanning and always keeps paste as a fallback.
 **Physical phone (owner):** on the XR / REF-B, scan the Mac QR, confirm the SAS matches after HELLO,
 export one page, then forget pairing and pair again. Simulator has no camera and often an empty
 Health store.
+
+The catalogue has seven quantity types (steps, heart rate, active energy, walking distance, body
+mass, SpO₂, respiratory rate). HA state JSON is encoded separately from discovery and is not
+eligible for retain.

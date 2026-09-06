@@ -33,17 +33,36 @@ enum SampleConversion {
     }
 
     static func quantityType(for metric: MetricID) -> HKQuantityType? {
-        switch metric.rawValue {
-        case "stepCount": return HKQuantityType(.stepCount)
-        case "heartRate": return HKQuantityType(.heartRate)
-        default: return nil
-        }
+        guard let declaration = MetricCatalog.declaration(for: metric) else { return nil }
+        let identifier = HKQuantityTypeIdentifier(rawValue: declaration.hkIdentifier)
+        return HKQuantityType.quantityType(forIdentifier: identifier)
     }
 
     static func unit(for metric: MetricID) -> HKUnit {
-        switch metric.rawValue {
-        case "heartRate": return HKUnit.count().unitDivided(by: .minute())
-        default: return .count()
+        switch metric {
+        case MetricCatalog.heartRate.id, MetricCatalog.respiratoryRate.id:
+            return HKUnit.count().unitDivided(by: .minute())
+        case MetricCatalog.activeEnergy.id:
+            return .kilocalorie()
+        case MetricCatalog.bodyMass.id:
+            return .gramUnit(with: .kilo)
+        case MetricCatalog.oxygenSaturation.id:
+            return .percent()
+        case MetricCatalog.walkingRunningDistance.id:
+            return .meter()
+        default:
+            return .count()
+        }
+    }
+
+    static func canonicalValue(_ hkValue: Double, metric: MetricID) -> Double {
+        switch metric {
+        case MetricCatalog.oxygenSaturation.id:
+            return hkValue * 100
+        case MetricCatalog.walkingRunningDistance.id:
+            return hkValue / 1000
+        default:
+            return hkValue
         }
     }
 
@@ -55,6 +74,8 @@ enum SampleConversion {
     ) -> SampleRecord {
         let unit = unit(for: metric)
         let offset = context.timeZone().secondsFromGMT(for: sample.startDate) / 60
+        let canonical = MetricCatalog.declaration(for: metric)?.canonicalUnit
+            ?? CanonicalUnit(symbol: unit.unitString)
         return SampleRecord(
             key: RecordKey(uuid: sample.uuid.uuidString),
             metric: metric,
@@ -62,8 +83,8 @@ enum SampleConversion {
             end: formatUTC(sample.endDate),
             timeZoneOffsetMinutes: offset,
             timeZoneSource: .deviceCurrent,
-            value: sample.quantity.doubleValue(for: unit),
-            unit: CanonicalUnit(symbol: unit.unitString),
+            value: canonicalValue(sample.quantity.doubleValue(for: unit), metric: metric),
+            unit: canonical,
             observedAt: formatUTC(Date())
         )
     }
@@ -82,8 +103,8 @@ public enum HealthKitSourceError: Error, Sendable {
 public enum HealthKitAuthorization {
     public static func readTypes() -> Set<HKObjectType> {
         var types: Set<HKObjectType> = []
-        for metric in [MetricCatalog.heartRate.id, MetricCatalog.stepCount.id] {
-            if let type = SampleConversion.quantityType(for: metric) {
+        for declaration in MetricCatalog.all {
+            if let type = SampleConversion.quantityType(for: declaration.id) {
                 types.insert(type)
             }
         }

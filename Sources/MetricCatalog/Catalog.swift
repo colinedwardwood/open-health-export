@@ -77,7 +77,90 @@ public enum MetricCatalog {
         haRequiresAggregate: false
     )
 
-    public static let all: [MetricDeclaration] = [stepCount, heartRate]
+    public static let activeEnergy = MetricDeclaration(
+        id: MetricID(rawValue: "activeEnergy"),
+        wireId: "active_energy",
+        hkIdentifier: "HKQuantityTypeIdentifierActiveEnergyBurned",
+        canonicalUnit: CanonicalUnit(symbol: "kcal"),
+        wireUnit: "kcal",
+        cumulative: true,
+        usesHealthKitStatistics: true,
+        sensitivity: .routine,
+        haUnit: "kcal",
+        haDeviceClass: "energy",
+        haStateClass: "total_increasing",
+        haRequiresAggregate: true
+    )
+
+    public static let walkingRunningDistance = MetricDeclaration(
+        id: MetricID(rawValue: "walkingRunningDistance"),
+        wireId: "walking_running_distance",
+        hkIdentifier: "HKQuantityTypeIdentifierDistanceWalkingRunning",
+        canonicalUnit: CanonicalUnit(symbol: "km"),
+        wireUnit: "km",
+        cumulative: true,
+        usesHealthKitStatistics: true,
+        sensitivity: .routine,
+        haUnit: "km",
+        haDeviceClass: "distance",
+        haStateClass: "total_increasing",
+        haRequiresAggregate: true
+    )
+
+    public static let bodyMass = MetricDeclaration(
+        id: MetricID(rawValue: "bodyMass"),
+        wireId: "body_mass",
+        hkIdentifier: "HKQuantityTypeIdentifierBodyMass",
+        canonicalUnit: CanonicalUnit(symbol: "kg"),
+        wireUnit: "kg",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .sensitive,
+        haUnit: "kg",
+        haDeviceClass: "weight",
+        haStateClass: "measurement",
+        haRequiresAggregate: false
+    )
+
+    public static let oxygenSaturation = MetricDeclaration(
+        id: MetricID(rawValue: "oxygenSaturation"),
+        wireId: "oxygen_saturation",
+        hkIdentifier: "HKQuantityTypeIdentifierOxygenSaturation",
+        canonicalUnit: CanonicalUnit(symbol: "%"),
+        wireUnit: "%",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .sensitive,
+        haUnit: "%",
+        haDeviceClass: nil,
+        haStateClass: "measurement",
+        haRequiresAggregate: false
+    )
+
+    public static let respiratoryRate = MetricDeclaration(
+        id: MetricID(rawValue: "respiratoryRate"),
+        wireId: "respiratory_rate",
+        hkIdentifier: "HKQuantityTypeIdentifierRespiratoryRate",
+        canonicalUnit: CanonicalUnit(symbol: "count/min"),
+        wireUnit: "count/min",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .sensitive,
+        haUnit: "breaths/min",
+        haDeviceClass: nil,
+        haStateClass: "measurement",
+        haRequiresAggregate: false
+    )
+
+    public static let all: [MetricDeclaration] = [
+        stepCount,
+        heartRate,
+        activeEnergy,
+        walkingRunningDistance,
+        bodyMass,
+        oxygenSaturation,
+        respiratoryRate,
+    ]
 
     public static func declaration(for id: MetricID) -> MetricDeclaration? {
         all.first { $0.id == id }

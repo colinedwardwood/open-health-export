@@ -97,6 +97,10 @@ import Watchdog
     #expect(MetricCatalog.stepCount.haRequiresAggregate)
     #expect(MetricCatalog.heartRate.haDeviceClass == nil)
     #expect(MetricCatalog.heartRate.haStateClass == "measurement")
+    #expect(MetricCatalog.activeEnergy.haDeviceClass == "energy")
+    #expect(MetricCatalog.activeEnergy.haStateClass == "total_increasing")
+    #expect(MetricCatalog.oxygenSaturation.haDeviceClass == nil)
+    #expect(MetricCatalog.bodyMass.sensitivity == .sensitive)
     let json = try HADiscovery.encodeDeviceConfig(
         exporterId: "6b1c2d3e",
         metrics: [MetricCatalog.stepCount.id, MetricCatalog.heartRate.id]
@@ -113,6 +117,26 @@ import Watchdog
         payload: json
     ))
     #expect(!HADiscovery.retainAllowed(topic: "ohe/health", payload: json))
+    let state = try HAState.encode(
+        HAStatePoint(
+            value: 72,
+            timeZoneIdentifier: "UTC",
+            sampleCount: 4,
+            state: "open",
+            computation: "mean"
+        )
+    )
+    let stateText = String(decoding: state, as: UTF8.self)
+    #expect(stateText.contains("\"value\":72"))
+    #expect(!stateText.contains("uuid"))
+    #expect(!stateText.contains("qty"))
+    let stateTopic = try HAState.topic(
+        exporterId: "6b1c2d3e",
+        wireId: "heart_rate",
+        statistic: "mean",
+        granularity: "PT1H"
+    )
+    #expect(!HADiscovery.retainAllowed(topic: stateTopic, payload: state))
 }
 
 @Test func dayBucketIsDeterministicUnderFrozenClock() {
