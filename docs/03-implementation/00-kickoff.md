@@ -58,3 +58,7 @@ eligible for retain.
 Committed payloads are now durable queue rows in the same transaction as cursor advancement.
 `PendingDeliveryRunner` replays each queued batch at most once per invocation after a process
 restart; only a receipt covering every expected record removes it.
+
+Each live or replayed transport call durably records an egress attempt before calling the sink and
+one terminal attempt outcome afterwards. Failed attempts remain pending; empty reads produce no
+egress ledger row.

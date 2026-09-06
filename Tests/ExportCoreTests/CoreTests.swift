@@ -301,12 +301,18 @@ func testEnvelope() -> WireEnvelope {
     #expect(first.kind == .success)
     #expect(store.transaction.cursors[metric]?.anchorBlob == Data([0xAA]))
     #expect(try store.transaction.pendingBatches().isEmpty)
+    #expect(store.transaction.ledger.count == 2)
+    let phases = store.transaction.ledger.map(\.outcomeKind)
+    #expect(phases[0].split(separator: ":").last == "attempt")
+    #expect(phases[1].split(separator: ":").last == "acknowledged")
+    #expect(phases[0].split(separator: ":").first == phases[1].split(separator: ":").first)
     let census = try store.transaction.loadCensus(metric: metric, day: "2024-01-01")
     #expect(census?.sampleCount == 1)
     #expect(try store.transaction.dirtyDays(metric: metric) == ["2024-01-01"])
 
     let second = try await run.run()
     #expect(second.kind == .successNothingDue)
+    #expect(store.transaction.ledger.count == 2)
 }
 
 @Test func pendingDeliveryRunnerReplaysACommittedBatchAfterRestart() async throws {
@@ -343,6 +349,44 @@ func testEnvelope() -> WireEnvelope {
     let receipts = try await runner.runOnce()
     #expect(receipts.map(\.accepted) == [1])
     #expect(try store.transaction.pendingBatches().isEmpty)
+    #expect(store.transaction.ledger.count == 2)
+}
+
+@Test func failedPendingDeliveryStillRecordsItsOutcomeAndStaysQueued() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let page = SamplePage(
+        samples: [heartSample("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0xEE]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-replay-fail-\(UUID().uuidString)")
+    let destination = root.appendingPathComponent("destination")
+    try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+    let store = MemoryStateStore()
+    try await store.transact {
+        try $0.commitBatch(
+            PendingBatch(
+                id: BatchID(rawValue: "failed-replay"),
+                payloadURL: root.appendingPathComponent("missing.ndjson").path,
+                expectedRecords: 1
+            ),
+            advancing: CursorAdvance(page: page, epoch: 1)
+        )
+    }
+    let runner = PendingDeliveryRunner(
+        destination: .testing(LocalFileSink(directory: destination)),
+        store: store
+    )
+    await #expect(throws: Error.self) {
+        _ = try await runner.runOnce()
+    }
+    #expect(try store.transaction.pendingBatches().count == 1)
+    #expect(store.transaction.ledger.count == 2)
+    #expect(store.transaction.ledger[0].outcomeKind.hasSuffix(":attempt"))
+    #expect(store.transaction.ledger[1].outcomeKind.hasSuffix(":failed"))
 }
 
 @Test func skipCommitLeavesCursorUnmovedSoPageIsReread() async throws {

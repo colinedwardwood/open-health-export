@@ -69,8 +69,18 @@ public struct ExportRun: Sendable {
             try Census.apply(page: page, to: tx)
         }
 
-        let receipt = try await destination.sink.send(fileHandle: payloadURL.path, idempotencyKey: batchID)
         let recordCount = page.samples.count + page.tombstones.count
+        let pending = PendingBatch(
+            id: batchID,
+            payloadURL: payloadURL.path,
+            expectedRecords: recordCount
+        )
+        let receipt = try await DeliveryExecutor.send(
+            batch: pending,
+            destination: destination,
+            destinationName: destinationName,
+            store: store
+        )
         var tally = RunTally(
             read: recordCount,
             committed: recordCount,
@@ -96,13 +106,6 @@ public struct ExportRun: Sendable {
                     runID: RunID(rawValue: "run-\(metric.rawValue)"),
                     outcomeKind: outcome.kind.rawValue,
                     detail: outcome.partialCause ?? ""
-                )
-            )
-            try tx.appendLedger(
-                EgressEntry(
-                    destination: destinationName,
-                    sampleCount: tally.acked,
-                    outcomeKind: outcome.kind.rawValue
                 )
             )
         }

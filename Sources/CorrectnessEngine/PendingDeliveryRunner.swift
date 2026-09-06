@@ -7,10 +7,16 @@ import EnginePorts
 public struct PendingDeliveryRunner: Sendable {
     public var destination: VerifiedDestination
     public var store: any StateStore
+    public var destinationName: String
 
-    public init(destination: VerifiedDestination, store: any StateStore) {
+    public init(
+        destination: VerifiedDestination,
+        store: any StateStore,
+        destinationName: String = "destination"
+    ) {
         self.destination = destination
         self.store = store
+        self.destinationName = destinationName
     }
 
     @discardableResult
@@ -18,9 +24,11 @@ public struct PendingDeliveryRunner: Sendable {
         let batches = try await store.transact { try $0.pendingBatches() }
         var receipts: [DeliveryReceipt] = []
         for batch in batches {
-            let receipt = try await destination.sink.send(
-                fileHandle: batch.payloadURL,
-                idempotencyKey: batch.id
+            let receipt = try await DeliveryExecutor.send(
+                batch: batch,
+                destination: destination,
+                destinationName: destinationName,
+                store: store
             )
             try await store.transact { try $0.recordDelivery(receipt) }
             receipts.append(receipt)
