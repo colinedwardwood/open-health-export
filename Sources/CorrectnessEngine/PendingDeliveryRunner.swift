@@ -1,4 +1,5 @@
 import CoreDomain
+import CoreTemporal
 import DestinationTrust
 import EnginePorts
 
@@ -8,6 +9,7 @@ public struct PendingDeliveryRunner: Sendable {
     public var destination: VerifiedDestination
     public var store: any StateStore
     public var destinationName: String
+    public var clock: any Clock
     #if DEBUG
     public var faults: any ExportFaultInjector = NoExportFaults()
     #endif
@@ -15,11 +17,13 @@ public struct PendingDeliveryRunner: Sendable {
     public init(
         destination: VerifiedDestination,
         store: any StateStore,
-        destinationName: String = "destination"
+        destinationName: String = "destination",
+        clock: any Clock = SystemClock()
     ) {
         self.destination = destination
         self.store = store
         self.destinationName = destinationName
+        self.clock = clock
     }
 
     @discardableResult
@@ -32,14 +36,16 @@ public struct PendingDeliveryRunner: Sendable {
             destination: destination,
             destinationName: destinationName,
             store: store,
-            faults: faults
+            faults: faults,
+            clock: clock
         )
         #else
         let receipt = try await DeliveryExecutor.send(
             batch: batch,
             destination: destination,
             destinationName: destinationName,
-            store: store
+            store: store,
+            clock: clock
         )
         #endif
         #if DEBUG

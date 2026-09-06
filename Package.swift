@@ -18,10 +18,10 @@ let linuxCore: [Target] = [
     .target(name: "Redaction", dependencies: ["CoreDomain"]),
     .target(
         name: "StorageSQLite",
-        dependencies: ["EnginePorts", "CoreDomain", "CSQLite"],
+        dependencies: ["EnginePorts", "CoreDomain", "CSQLite", "RunJournal"],
         linkerSettings: [.linkedLibrary("sqlite3")]
     ),
-    .target(name: "RunJournal", dependencies: ["EnginePorts", "CoreDomain", "Redaction"]),
+    .target(name: "RunJournal", dependencies: ["EnginePorts", "CoreDomain", "Redaction", "WireFormat"]),
     .target(name: "CorrectnessEngine", dependencies: ["EnginePorts", "MetricCatalog", "CoreDomain", "CoreTemporal", "WireFormat", "FileWriteKit", "DestinationTrust"]),
     .target(name: "Watchdog", dependencies: ["EnginePorts", "CoreDomain", "CoreTemporal"]),
     .target(name: "DiagnosticBundle", dependencies: ["EnginePorts", "Redaction", "CoreDomain"]),

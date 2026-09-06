@@ -1,6 +1,7 @@
 import CoreDomain
 import EnginePorts
 import Foundation
+import RunJournal
 
 public final class MemoryTransaction: StateTransaction {
     public var journal: [RunEvent] = []
@@ -82,7 +83,17 @@ public final class MemoryTransaction: StateTransaction {
     }
 
     public func appendLedger(_ entry: EgressEntry) throws {
-        ledger.append(entry)
+        ledger.append(
+            LedgerChain.seal(
+                entry,
+                sequence: ledger.count + 1,
+                previousHash: ledger.last?.entryHash ?? LedgerChain.genesisHash
+            )
+        )
+    }
+
+    public func loadLedger() throws -> [EgressEntry] {
+        ledger
     }
 
     public func upsertCensus(_ row: CensusRow) throws {
@@ -146,8 +157,10 @@ public final class MemoryTransaction: StateTransaction {
         typeStatus[status.metric] = status
     }
 
-    public func wipe() throws -> [String] {
+    public func wipe(atEpoch: TimeInterval) throws -> [String] {
         let urls = pending.values.map(\.payloadURL)
+        let destroyedCount = ledger.count
+        let previousHead = ledger.last?.entryHash ?? LedgerChain.genesisHash
         journal = []
         ledger = []
         cursors = [:]
@@ -160,6 +173,15 @@ public final class MemoryTransaction: StateTransaction {
         emittedIndex = [:]
         aggregateEmitSeq = [:]
         typeStatus = [:]
+        try appendLedger(
+            EgressEntry(
+                destination: "local-device",
+                sampleCount: 0,
+                outcomeKind: "genesis_after_wipe",
+                detail: "destroyed_count=\(destroyedCount) previous_head=\(previousHead)",
+                wallTimeEpoch: atEpoch
+            )
+        )
         return urls
     }
 }
@@ -175,8 +197,8 @@ public final class MemoryStateStore: StateStore, @unchecked Sendable {
         try body(transaction)
     }
 
-    public func wipe() async throws {
-        let urls = try await transact { try $0.wipe() }
+    public func wipe(atEpoch: TimeInterval) async throws {
+        let urls = try await transact { try $0.wipe(atEpoch: atEpoch) }
         for path in urls {
             try? FileManager.default.removeItem(atPath: path)
         }

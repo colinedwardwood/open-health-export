@@ -585,7 +585,8 @@ private struct OneExportFault: ExportFaultInjector {
 
     let runner = PendingDeliveryRunner(
         destination: .testing(LocalFileSink(directory: destination)),
-        store: store
+        store: store,
+        clock: FrozenClock(instant: Date(timeIntervalSince1970: 123))
     )
     let receipts = try await runner.runOnce()
     #expect(receipts.map(\.accepted) == [1])
@@ -622,7 +623,8 @@ private struct OneExportFault: ExportFaultInjector {
     }
     let runner = PendingDeliveryRunner(
         destination: .testing(LocalFileSink(directory: destination)),
-        store: store
+        store: store,
+        clock: FrozenClock(instant: Date(timeIntervalSince1970: 123))
     )
     await #expect(throws: Error.self) {
         _ = try await runner.runOnce()
@@ -631,6 +633,11 @@ private struct OneExportFault: ExportFaultInjector {
     #expect(store.transaction.ledger.count == 2)
     #expect(store.transaction.ledger[0].outcomeKind.hasSuffix(":attempt"))
     #expect(store.transaction.ledger[1].outcomeKind.hasSuffix(":failed"))
+    #expect(store.transaction.ledger.allSatisfy { $0.wallTimeEpoch == 123 })
+    #expect(
+        LedgerChain.verify(store.transaction.ledger)
+            == .valid(head: store.transaction.ledger[1].entryHash, count: 2)
+    )
 }
 
 @Test func skipCommitLeavesCursorUnmovedSoPageIsReread() async throws {
@@ -1522,6 +1529,60 @@ private struct OneExportFault: ExportFaultInjector {
     ])
 }
 
+@Test func ledgerChainDetectsInteriorMutationAndReordering() {
+    let first = LedgerChain.seal(
+        EgressEntry(destination: "one", sampleCount: 2, outcomeKind: "attempt"),
+        sequence: 1,
+        previousHash: LedgerChain.genesisHash
+    )
+    let second = LedgerChain.seal(
+        EgressEntry(destination: "one", sampleCount: 2, outcomeKind: "success"),
+        sequence: 2,
+        previousHash: first.entryHash
+    )
+    #expect(
+        LedgerChain.verify([first, second])
+            == .valid(head: second.entryHash, count: 2)
+    )
+    var changed = first
+    changed.sampleCount = 3
+    #expect(LedgerChain.verify([changed, second]) == .invalid(sequence: 1))
+    #expect(LedgerChain.verify([second, first]) == .invalid(sequence: 2))
+}
+
+@Test func sqliteLedgerPersistsAndVerifiesHashChain() async throws {
+    let path = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-ledger-\(UUID().uuidString).sqlite")
+    let store = try SQLiteStateStore(path: path.path)
+    try await store.transact { tx in
+        try tx.appendLedger(
+            EgressEntry(
+                destination: "local-file",
+                sampleCount: 2,
+                outcomeKind: "attempt",
+                byteCount: 100,
+                wallTimeEpoch: 10
+            )
+        )
+        try tx.appendLedger(
+            EgressEntry(
+                destination: "local-file",
+                sampleCount: 2,
+                outcomeKind: "success",
+                byteCount: 100,
+                wallTimeEpoch: 11
+            )
+        )
+    }
+    let entries = try await store.transact { try $0.loadLedger() }
+    #expect(entries.map(\.sequence) == [1, 2])
+    #expect(entries[1].previousHash == entries[0].entryHash)
+    #expect(
+        LedgerChain.verify(entries)
+            == .valid(head: entries[1].entryHash, count: 2)
+    )
+}
+
 @Test func wakeAttributionSeparatesSchedulingFromExecution() {
     let expected: TimeInterval = 1_000
     #expect(
@@ -1610,11 +1671,15 @@ private struct OneExportFault: ExportFaultInjector {
         try tx.appendJournal(event)
     }
     #expect(try await store.transact { try $0.loadJournal() } == [event])
-    try await store.wipe()
+    try await store.wipe(atEpoch: 1_234)
     #expect(try await store.transact { try $0.loadCursor(metric: metric) } == nil)
     #expect(try await store.transact { try $0.pendingBatches() }.isEmpty)
     #expect(try await store.transact { try $0.loadJournal() }.isEmpty)
     #expect(!FileManager.default.fileExists(atPath: payload.path))
+    let successor = try await store.transact { try $0.loadLedger() }
+    #expect(LedgerChain.verify(successor) == .valid(head: successor[0].entryHash, count: 1))
+    #expect(successor[0].outcomeKind == "genesis_after_wipe")
+    #expect(successor[0].wallTimeEpoch == 1_234)
 }
 
 @Test func exportRunJournalRecordsTriggerAndCounts() async throws {
@@ -1710,7 +1775,12 @@ private struct OneExportFault: ExportFaultInjector {
             advancing: CursorAdvance(page: stepPage, epoch: 1)
         )
     }
-    try await store.purgeType(metric: heart, reason: "revocation_observed", destination: "local-file")
+    try await store.purgeType(
+        metric: heart,
+        reason: "revocation_observed",
+        destination: "local-file",
+        atEpoch: 1_234
+    )
     let remaining = try await store.transact { try $0.pendingBatches() }
     #expect(remaining.map(\.id.rawValue) == ["s"])
     #expect(!FileManager.default.fileExists(atPath: heartPayload.path))

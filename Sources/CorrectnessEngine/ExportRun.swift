@@ -144,14 +144,16 @@ public struct ExportRun: Sendable {
             destination: destination,
             destinationName: destinationName,
             store: store,
-            faults: faults
+            faults: faults,
+            clock: clock
         )
         #else
         let receipt = try await DeliveryExecutor.send(
             batch: pending,
             destination: destination,
             destinationName: destinationName,
-            store: store
+            store: store,
+            clock: clock
         )
         #endif
         #if DEBUG

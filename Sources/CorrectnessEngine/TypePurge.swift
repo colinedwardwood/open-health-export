@@ -21,6 +21,7 @@ public enum TypePurge {
         metric: MetricID,
         reason: String,
         destination: String,
+        atEpoch: TimeInterval,
         on tx: any StateTransaction
     ) throws -> [String] {
         let victims = try tx.pendingBatches().filter { $0.metric == metric }
@@ -40,7 +41,8 @@ public enum TypePurge {
             EgressEntry(
                 destination: destination,
                 sampleCount: 0,
-                outcomeKind: "types_purged"
+                outcomeKind: "types_purged",
+                wallTimeEpoch: atEpoch
             )
         )
         try tx.appendJournal(
@@ -59,13 +61,15 @@ extension StateStore {
     public func purgeType(
         metric: MetricID,
         reason: String,
-        destination: String
+        destination: String,
+        atEpoch: TimeInterval
     ) async throws {
         let urls = try await transact { tx in
             try TypePurge.apply(
                 metric: metric,
                 reason: reason,
                 destination: destination,
+                atEpoch: atEpoch,
                 on: tx
             )
         }

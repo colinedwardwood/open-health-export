@@ -141,7 +141,8 @@ public struct ReconcileSweep: Sendable {
             batch: pending,
             destination: destination,
             destinationName: destinationName,
-            store: store
+            store: store,
+            clock: clock
         )
         var tally = RunTally(
             read: recordCount,

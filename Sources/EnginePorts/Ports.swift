@@ -146,14 +146,37 @@ public struct RunEvent: Sendable, Equatable {
     }
 }
 
-public struct EgressEntry: Sendable {
+public struct EgressEntry: Sendable, Equatable {
     public var destination: String
     public var sampleCount: Int
     public var outcomeKind: String
-    public init(destination: String, sampleCount: Int, outcomeKind: String) {
+    public var byteCount: Int
+    public var detail: String
+    public var wallTimeEpoch: TimeInterval
+    public var sequence: Int
+    public var previousHash: String
+    public var entryHash: String
+
+    public init(
+        destination: String,
+        sampleCount: Int,
+        outcomeKind: String,
+        byteCount: Int = 0,
+        detail: String = "",
+        wallTimeEpoch: TimeInterval = 0,
+        sequence: Int = 0,
+        previousHash: String = "",
+        entryHash: String = ""
+    ) {
         self.destination = destination
         self.sampleCount = sampleCount
         self.outcomeKind = outcomeKind
+        self.byteCount = byteCount
+        self.detail = detail
+        self.wallTimeEpoch = wallTimeEpoch
+        self.sequence = sequence
+        self.previousHash = previousHash
+        self.entryHash = entryHash
     }
 }
 
@@ -211,6 +234,7 @@ public protocol StateTransaction: AnyObject {
     func recordDelivery(_ receipt: DeliveryReceipt) throws
     func appendJournal(_ event: RunEvent) throws
     func appendLedger(_ entry: EgressEntry) throws
+    func loadLedger() throws -> [EgressEntry]
     func upsertCensus(_ row: CensusRow) throws
     func loadCensus(metric: MetricID, day: String) throws -> CensusRow?
     func markDirty(metric: MetricID, day: String) throws
@@ -226,7 +250,7 @@ public protocol StateTransaction: AnyObject {
     func loadTypeStatus(metric: MetricID) throws -> TypeStatus?
     func upsertTypeStatus(_ status: TypeStatus) throws
     /// Clears every table. Returns pending payload paths to unlink after COMMIT (R-43).
-    func wipe() throws -> [String]
+    func wipe(atEpoch: TimeInterval) throws -> [String]
 }
 
 public protocol StateStore: Sendable {
@@ -235,7 +259,7 @@ public protocol StateStore: Sendable {
         _ body: (any StateTransaction) throws -> T
     ) async throws -> T
     /// R-43: drop durable state. Payload files named by wipe() are unlinked after COMMIT.
-    func wipe() async throws
+    func wipe(atEpoch: TimeInterval) async throws
 }
 
 public protocol StatisticsSource: Sendable {

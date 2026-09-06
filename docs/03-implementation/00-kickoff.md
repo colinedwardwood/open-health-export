@@ -121,3 +121,9 @@ the catalogue's cumulative exception list. `AggregateResolver` selects those
 statistics for cumulative metrics, never silently substitutes a local fold,
 and leaves the dirty day queued when no statistics source is available.
 
+Egress entries are now a SHA-256 chain with sequence, previous hash, canonical
+fields, byte count, and wall time. Delivery attempts and outcomes are separately
+sealed; verification detects edits and reordering. Delete-all starts a successor
+chain with a genesis marker naming the destroyed count and prior head. The
+Secure Enclave chain-head signature and ledger UI remain unimplemented.
+

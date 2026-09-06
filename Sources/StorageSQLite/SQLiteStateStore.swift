@@ -2,6 +2,7 @@ import CoreDomain
 import CSQLite
 import EnginePorts
 import Foundation
+import RunJournal
 
 public struct SQLiteOpenPolicy: Sendable {
     public var protectionClassFlag: Int32?
@@ -56,9 +57,16 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
             "ALTER TABLE journal ADD COLUMN samples_read INTEGER NOT NULL DEFAULT 0;",
             "ALTER TABLE journal ADD COLUMN samples_committed INTEGER NOT NULL DEFAULT 0;",
             "ALTER TABLE journal ADD COLUMN samples_acked INTEGER NOT NULL DEFAULT 0;",
+            "ALTER TABLE ledger ADD COLUMN sequence INTEGER NOT NULL DEFAULT 0;",
+            "ALTER TABLE ledger ADD COLUMN previous_hash TEXT NOT NULL DEFAULT '';",
+            "ALTER TABLE ledger ADD COLUMN entry_hash TEXT NOT NULL DEFAULT '';",
+            "ALTER TABLE ledger ADD COLUMN byte_count INTEGER NOT NULL DEFAULT 0;",
+            "ALTER TABLE ledger ADD COLUMN detail TEXT NOT NULL DEFAULT '';",
+            "ALTER TABLE ledger ADD COLUMN wall_time_epoch REAL NOT NULL DEFAULT 0;",
         ] {
             do { try exec(sql) } catch { _ = error }
         }
+        try migrateLedgerChain()
     }
 
     deinit {
@@ -83,7 +91,13 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 destination TEXT NOT NULL,
                 sample_count INTEGER NOT NULL,
-                outcome TEXT NOT NULL
+                outcome TEXT NOT NULL,
+                sequence INTEGER NOT NULL DEFAULT 0,
+                previous_hash TEXT NOT NULL DEFAULT '',
+                entry_hash TEXT NOT NULL DEFAULT '',
+                byte_count INTEGER NOT NULL DEFAULT 0,
+                detail TEXT NOT NULL DEFAULT '',
+                wall_time_epoch REAL NOT NULL DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS cursors (
                 metric TEXT PRIMARY KEY,
@@ -135,7 +149,7 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 disabled INTEGER NOT NULL,
                 reason TEXT NOT NULL
             );
-            PRAGMA user_version = 8;
+            PRAGMA user_version = 9;
             """)
     }
 
@@ -154,8 +168,8 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
         }
     }
 
-    public func wipe() async throws {
-        let urls = try await transact { try $0.wipe() }
+    public func wipe(atEpoch: TimeInterval) async throws {
+        let urls = try await transact { try $0.wipe(atEpoch: atEpoch) }
         for path in urls {
             try? FileManager.default.removeItem(atPath: path)
         }
@@ -182,6 +196,27 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
             throw StorageError.execFailed(String(cString: sqlite3_errmsg(db)))
         }
         return stmt
+    }
+
+    private func migrateLedgerChain() throws {
+        let tx = SQLiteTransaction(store: self)
+        let entries = try tx.loadLedger()
+        guard entries.contains(where: { $0.sequence == 0 || $0.entryHash.isEmpty }) else {
+            return
+        }
+        try exec("DELETE FROM ledger;")
+        for entry in entries {
+            try tx.appendLedger(
+                EgressEntry(
+                    destination: entry.destination,
+                    sampleCount: entry.sampleCount,
+                    outcomeKind: entry.outcomeKind,
+                    byteCount: entry.byteCount,
+                    detail: entry.detail,
+                    wallTimeEpoch: entry.wallTimeEpoch
+                )
+            )
+        }
     }
 }
 
@@ -334,12 +369,61 @@ private final class SQLiteTransaction: StateTransaction {
     }
 
     func appendLedger(_ entry: EgressEntry) throws {
-        let stmt = try store.prepare("INSERT INTO ledger (destination, sample_count, outcome) VALUES (?, ?, ?);")
+        let head = try ledgerHead()
+        let sealed = LedgerChain.seal(
+            entry,
+            sequence: head.sequence + 1,
+            previousHash: head.hash
+        )
+        let stmt = try store.prepare(
+            "INSERT INTO ledger (destination, sample_count, outcome, sequence, previous_hash, entry_hash, byte_count, detail, wall_time_epoch) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);"
+        )
         defer { sqlite3_finalize(stmt) }
-        bindText(stmt, 1, entry.destination)
-        sqlite3_bind_int64(stmt, 2, sqlite3_int64(entry.sampleCount))
-        bindText(stmt, 3, entry.outcomeKind)
+        bindText(stmt, 1, sealed.destination)
+        sqlite3_bind_int64(stmt, 2, sqlite3_int64(sealed.sampleCount))
+        bindText(stmt, 3, sealed.outcomeKind)
+        sqlite3_bind_int64(stmt, 4, sqlite3_int64(sealed.sequence))
+        bindText(stmt, 5, sealed.previousHash)
+        bindText(stmt, 6, sealed.entryHash)
+        sqlite3_bind_int64(stmt, 7, sqlite3_int64(sealed.byteCount))
+        bindText(stmt, 8, sealed.detail)
+        sqlite3_bind_double(stmt, 9, sealed.wallTimeEpoch)
         try stepDone(stmt)
+    }
+
+    private func ledgerHead() throws -> (sequence: Int, hash: String) {
+        let stmt = try store.prepare(
+            "SELECT sequence, entry_hash FROM ledger ORDER BY id DESC LIMIT 1;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_step(stmt) == SQLITE_ROW else {
+            return (0, LedgerChain.genesisHash)
+        }
+        return (Int(sqlite3_column_int64(stmt, 0)), text(stmt, 1))
+    }
+
+    func loadLedger() throws -> [EgressEntry] {
+        let stmt = try store.prepare(
+            "SELECT destination, sample_count, outcome, sequence, previous_hash, entry_hash, byte_count, detail, wall_time_epoch FROM ledger ORDER BY id;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        var entries: [EgressEntry] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            entries.append(
+                EgressEntry(
+                    destination: text(stmt, 0),
+                    sampleCount: Int(sqlite3_column_int64(stmt, 1)),
+                    outcomeKind: text(stmt, 2),
+                    byteCount: Int(sqlite3_column_int64(stmt, 6)),
+                    detail: text(stmt, 7),
+                    wallTimeEpoch: sqlite3_column_double(stmt, 8),
+                    sequence: Int(sqlite3_column_int64(stmt, 3)),
+                    previousHash: text(stmt, 4),
+                    entryHash: text(stmt, 5)
+                )
+            )
+        }
+        return entries
     }
 
     func upsertCensus(_ row: CensusRow) throws {
@@ -524,19 +608,31 @@ private final class SQLiteTransaction: StateTransaction {
         try stepDone(stmt)
     }
 
-    func wipe() throws -> [String] {
+    func wipe(atEpoch: TimeInterval) throws -> [String] {
         let stmt = try store.prepare("SELECT payload_url FROM pending_batches;")
         defer { sqlite3_finalize(stmt) }
         var urls: [String] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
             urls.append(text(stmt, 0))
         }
+        let ledger = try loadLedger()
+        let destroyedCount = ledger.count
+        let previousHead = ledger.last?.entryHash ?? LedgerChain.genesisHash
         for table in [
             "journal", "ledger", "cursors", "census", "dirty", "pending_batches",
             "deliveries", "gaps", "emitted_index", "aggregate_emit", "type_status",
         ] {
             try store.exec("DELETE FROM \(table);")
         }
+        try appendLedger(
+            EgressEntry(
+                destination: "local-device",
+                sampleCount: 0,
+                outcomeKind: "genesis_after_wipe",
+                detail: "destroyed_count=\(destroyedCount) previous_head=\(previousHead)",
+                wallTimeEpoch: atEpoch
+            )
+        )
         return urls
     }
 

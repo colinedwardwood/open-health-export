@@ -1,4 +1,5 @@
 import CoreDomain
+import CoreTemporal
 import DestinationTrust
 import EnginePorts
 import Foundation
@@ -10,13 +11,15 @@ enum DeliveryExecutor {
         batch: PendingBatch,
         destination: VerifiedDestination,
         destinationName: String,
-        store: any StateStore
+        store: any StateStore,
+        clock: any Clock = SystemClock()
     ) async throws -> DeliveryReceipt {
         try await sendImpl(
             batch: batch,
             destination: destination,
             destinationName: destinationName,
             store: store,
+            clock: clock,
             beforeAckObservation: {}
         )
     }
@@ -27,13 +30,15 @@ enum DeliveryExecutor {
         destination: VerifiedDestination,
         destinationName: String,
         store: any StateStore,
-        faults: any ExportFaultInjector
+        faults: any ExportFaultInjector,
+        clock: any Clock = SystemClock()
     ) async throws -> DeliveryReceipt {
         try await sendImpl(
             batch: batch,
             destination: destination,
             destinationName: destinationName,
             store: store,
+            clock: clock,
             beforeAckObservation: { try faults.hit(.afterDestinationWriteBeforeAck) }
         )
     }
@@ -44,6 +49,7 @@ enum DeliveryExecutor {
         destination: VerifiedDestination,
         destinationName: String,
         store: any StateStore,
+        clock: any Clock,
         beforeAckObservation: () throws -> Void
     ) async throws -> DeliveryReceipt {
         let attemptID = UUID().uuidString.lowercased()
@@ -52,7 +58,8 @@ enum DeliveryExecutor {
             attemptID: attemptID,
             batch: batch,
             destinationName: destinationName,
-            store: store
+            store: store,
+            atEpoch: clock.now().timeIntervalSince1970
         )
         do {
             let receipt = try await destination.sink.send(
@@ -73,7 +80,8 @@ enum DeliveryExecutor {
                 attemptID: attemptID,
                 batch: batch,
                 destinationName: destinationName,
-                store: store
+                store: store,
+                atEpoch: clock.now().timeIntervalSince1970
             )
             return receipt
         } catch {
@@ -82,7 +90,8 @@ enum DeliveryExecutor {
                 attemptID: attemptID,
                 batch: batch,
                 destinationName: destinationName,
-                store: store
+                store: store,
+                atEpoch: clock.now().timeIntervalSince1970
             )
             throw error
         }
@@ -93,14 +102,17 @@ enum DeliveryExecutor {
         attemptID: String,
         batch: PendingBatch,
         destinationName: String,
-        store: any StateStore
+        store: any StateStore,
+        atEpoch: TimeInterval
     ) async throws {
         try await store.transact {
             try $0.appendLedger(
                 EgressEntry(
                     destination: destinationName,
                     sampleCount: batch.expectedRecords,
-                    outcomeKind: "\(attemptID):\(phase)"
+                    outcomeKind: "\(attemptID):\(phase)",
+                    byteCount: batch.byteCount,
+                    wallTimeEpoch: atEpoch
                 )
             )
         }
