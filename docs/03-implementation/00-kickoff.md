@@ -113,3 +113,7 @@ grant→denied transition or an explicit stop — never on an empty read (R-60).
 The 60-second clock starts at observation. HealthKit observation at every
 wake and the two-tap UI are not wired.
 
+`ReconcileSweep` applies the seven-day trailing plan from fixture (or later
+HealthKit) date-ranged observations and enqueues repairs without moving the
+cursor. HealthKit statistics remain unused.
+

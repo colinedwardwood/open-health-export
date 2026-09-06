@@ -207,7 +207,7 @@ private final class SQLiteTransaction: StateTransaction {
         )
     }
 
-    func commitBatch(_ batch: PendingBatch, advancing: CursorAdvance) throws {
+    func enqueuePending(_ batch: PendingBatch) throws {
         let pending = try store.prepare(
             "INSERT INTO pending_batches (batch_id, payload_url, expected_records, byte_count, metric) VALUES (?, ?, ?, ?, ?) ON CONFLICT(batch_id) DO UPDATE SET payload_url = excluded.payload_url, expected_records = excluded.expected_records, byte_count = excluded.byte_count, metric = excluded.metric;"
         )
@@ -218,6 +218,10 @@ private final class SQLiteTransaction: StateTransaction {
         sqlite3_bind_int64(pending, 4, sqlite3_int64(batch.byteCount))
         bindText(pending, 5, batch.metric.rawValue)
         try stepDone(pending)
+    }
+
+    func commitBatch(_ batch: PendingBatch, advancing: CursorAdvance) throws {
+        try enqueuePending(batch)
 
         let snap = advancing.snapshot
         let envelope = CheckpointEnvelope(

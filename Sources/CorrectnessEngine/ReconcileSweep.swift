@@ -1,0 +1,220 @@
+import CoreDomain
+import CoreTemporal
+import DestinationTrust
+import EnginePorts
+import FileWriteKit
+import Foundation
+import WireFormat
+
+/// R-08 trailing-window apply. Plans from stored census vs date-ranged observations, then
+/// enqueues a repair batch without advancing the HealthKit cursor.
+public struct ReconcileSweep: Sendable {
+    public var observations: any DayObservationSource
+    public var destination: VerifiedDestination
+    public var store: any StateStore
+    public var metric: MetricID
+    public var scratchDirectory: URL
+    public var destinationName: String
+    public var envelope: WireEnvelope
+    public var clock: any Clock
+    public var temporal: TemporalContext
+    public var trigger: RunTrigger
+
+    public init(
+        observations: any DayObservationSource,
+        destination: VerifiedDestination,
+        store: any StateStore,
+        metric: MetricID,
+        scratchDirectory: URL,
+        destinationName: String = "local-file",
+        envelope: WireEnvelope,
+        clock: any Clock = SystemClock(),
+        temporal: TemporalContext = .utc,
+        trigger: RunTrigger = .manual
+    ) {
+        self.observations = observations
+        self.destination = destination
+        self.store = store
+        self.metric = metric
+        self.scratchDirectory = scratchDirectory
+        self.destinationName = destinationName
+        self.envelope = envelope
+        self.clock = clock
+        self.temporal = temporal
+        self.trigger = trigger
+    }
+
+    public func run(throughDay: String) async throws -> RunOutcome {
+        if let status = try await store.transact({ try $0.loadTypeStatus(metric: metric) }),
+           status.disabled {
+            let tally = RunTally(
+                failed: 1,
+                terminalError: .internalFault,
+                partialCause: "types_purged"
+            )
+            let outcome = RunOutcome.derive(from: tally)
+            try await record(outcome: outcome, tally: tally, receipt: nil)
+            return outcome
+        }
+
+        let days = ReconcilePlanner.trailingDays(throughDay: throughDay)
+        var samples: [SampleRecord] = []
+        var tombstones: [TombstoneRecord] = []
+        for day in days {
+            let observed = try await observations.samples(metric: metric, day: day)
+            let plan = try await store.transact { tx in
+                ReconcilePlanner.planDay(
+                    metric: metric,
+                    day: day,
+                    stored: try tx.loadCensus(metric: metric, day: day),
+                    indexed: try tx.loadEmittedIndex(metric: metric, day: day),
+                    observed: observed
+                )
+            }
+            for repair in plan.repairs {
+                switch repair {
+                case .reemitDay:
+                    samples.append(contentsOf: observed)
+                case .emitAbsenceTombstones(let tombs):
+                    tombstones.append(contentsOf: tombs)
+                }
+            }
+        }
+
+        if samples.isEmpty, tombstones.isEmpty {
+            let tally = RunTally(nothingDue: true)
+            let outcome = RunOutcome.derive(from: tally)
+            try await record(outcome: outcome, tally: tally, receipt: nil)
+            return outcome
+        }
+
+        let page = SamplePage(
+            samples: samples,
+            tombstones: tombstones,
+            metric: metric,
+            anchorBlob: Data("reconcile:\(throughDay)".utf8),
+            observedThrough: clock.now()
+        )
+        var wire = envelope
+        wire.reason = "reconcile"
+        let aggregates = try await drainPlans(for: page)
+        let batchID = NativeWire.batchID(metric: metric, anchorBlob: page.anchorBlob)
+        let payload = try NativeWire.encode(
+            samples: page.samples,
+            tombstones: page.tombstones,
+            aggregates: aggregates.map(\.record),
+            metric: metric,
+            batchID: batchID,
+            envelope: wire
+        )
+        let payloadURL = scratchDirectory.appendingPathComponent("\(batchID.rawValue).ndjson")
+        try FileWriteKit.writeAtomically(payload, to: payloadURL)
+        let recordCount = page.samples.count + page.tombstones.count + aggregates.count
+        let pending = PendingBatch(
+            id: batchID,
+            payloadURL: payloadURL.path,
+            expectedRecords: recordCount,
+            byteCount: payload.count,
+            metric: metric
+        )
+        let victims = try await store.transact { tx in
+            let evicted = try QueueAdmission.makeRoom(for: pending.byteCount, on: tx)
+            try tx.enqueuePending(pending)
+            try Census.apply(page: page, to: tx)
+            try EmittedIndex.record(page: page, batchID: pending.id, on: tx)
+            for plan in aggregates {
+                try tx.upsertAggregateEmitSeq(
+                    bucketKey: plan.record.bucketKey,
+                    emitSeq: plan.record.emitSeq
+                )
+                try tx.clearDirty(metric: metric, day: plan.day)
+            }
+            return evicted
+        }
+        for victim in victims {
+            try? FileManager.default.removeItem(atPath: victim.payloadURL)
+        }
+        let receipt = try await DeliveryExecutor.send(
+            batch: pending,
+            destination: destination,
+            destinationName: destinationName,
+            store: store
+        )
+        var tally = RunTally(
+            read: recordCount,
+            committed: recordCount,
+            acked: receipt.accepted,
+            unconfirmed: receipt.unconfirmed,
+            ackEvidenceStatusOnly: receipt.statusOnly
+        )
+        if receipt.accepted < recordCount, receipt.unconfirmed == 0 {
+            tally.partialCause = "receipt_short"
+        }
+        let outcome = RunOutcome.derive(from: tally)
+        try await record(outcome: outcome, tally: tally, receipt: receipt)
+        return outcome
+    }
+
+    private func drainPlans(for page: SamplePage) async throws -> [AggregateDayPlan] {
+        var days = Set(page.samples.map { String($0.start.prefix(10)) })
+        let tombDays = try await store.transact { tx -> Set<String> in
+            var found: Set<String> = []
+            for tomb in page.tombstones {
+                if let row = try tx.loadEmittedIndex(uuid: tomb.key.uuid) {
+                    found.insert(row.day)
+                }
+            }
+            return found
+        }
+        days.formUnion(tombDays)
+        let now = clock.now()
+        return try await store.transact { tx in
+            var plans: [AggregateDayPlan] = []
+            for day in days.sorted() {
+                guard let probe = AggregateDrain.planDay(
+                    metric: metric,
+                    day: day,
+                    samples: page.samples,
+                    context: temporal,
+                    emitSeq: 1,
+                    computedAt: envelope.emittedAt,
+                    observedAt: envelope.observedAt,
+                    now: now
+                ) else { continue }
+                let prior = try tx.loadAggregateEmitSeq(bucketKey: probe.record.bucketKey)
+                guard let plan = AggregateDrain.planDay(
+                    metric: metric,
+                    day: day,
+                    samples: page.samples,
+                    context: temporal,
+                    emitSeq: (prior ?? 0) + 1,
+                    computedAt: envelope.emittedAt,
+                    observedAt: envelope.observedAt,
+                    now: now,
+                    priorEmitSeq: prior
+                ) else { continue }
+                plans.append(plan)
+            }
+            return plans
+        }
+    }
+
+    private func record(outcome: RunOutcome, tally: RunTally, receipt: DeliveryReceipt?) async throws {
+        try await store.transact { tx in
+            if let receipt {
+                try tx.recordDelivery(receipt)
+            }
+            try tx.appendJournal(
+                RunEvent(
+                    runID: RunID(rawValue: "reconcile-\(metric.rawValue)"),
+                    outcomeKind: outcome.kind.rawValue,
+                    detail: outcome.partialCause ?? "",
+                    trigger: trigger,
+                    samplesRead: tally.read,
+                    samplesCommitted: tally.committed,
+                    samplesAcked: tally.acked
+                )
+            )
+        }
+    }
+}

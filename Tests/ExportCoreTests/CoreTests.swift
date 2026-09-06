@@ -1015,7 +1015,6 @@ private struct OneExportFault: ExportFaultInjector {
     let metric = MetricID(rawValue: "heartRate")
     let gone = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
     let keep = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    let fold = ReconcileCompare.fold(uuids: [keep])
     // Store claims two samples; observation has one.
     let stored = CensusRow(metric: metric, day: "2024-01-01", sampleCount: 2, digest: "1")
     let indexed = [
@@ -1053,6 +1052,126 @@ private struct OneExportFault: ExportFaultInjector {
             "2024-03-01",
         ]
     )
+}
+
+@Test func reconcileSweepRepairsAbsenceWithoutAdvancingCursor() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let keep = heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+    let gone = heartSample("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+    let page = SamplePage(
+        samples: [keep, gone],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0xAA]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let dest = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-sweep-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+    let store = MemoryStateStore()
+    let first = ExportRun(
+        source: FixtureSource(pages: [page]),
+        destination: .testing(LocalFileSink(directory: dest)),
+        store: store,
+        metric: metric,
+        scratchDirectory: dest.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    )
+    _ = try await first.run()
+    let cursor = try store.transaction.loadCursor(metric: metric)
+    let sweep = ReconcileSweep(
+        observations: FixtureDays(byDay: ["2024-01-01": [keep]]),
+        destination: .testing(LocalFileSink(directory: dest)),
+        store: store,
+        metric: metric,
+        scratchDirectory: dest.appendingPathComponent("scratch-sweep"),
+        envelope: testEnvelope()
+    )
+    let outcome = try await sweep.run(throughDay: "2024-01-01")
+    #expect(outcome.kind == .success)
+    #expect(try store.transaction.loadCursor(metric: metric) == cursor)
+    #expect(try store.transaction.loadEmittedIndex(uuid: gone.key.uuid) == nil)
+    #expect(try store.transaction.loadEmittedIndex(uuid: keep.key.uuid) != nil)
+    #expect(try store.transaction.loadCensus(metric: metric, day: "2024-01-01")?.sampleCount == 1)
+    let texts = try FileManager.default.contentsOfDirectory(atPath: dest.path)
+        .filter { $0.hasSuffix(".ndjson") }
+        .map { try String(contentsOfFile: dest.appendingPathComponent($0).path, encoding: .utf8) }
+        .joined()
+    #expect(texts.contains(gone.key.uuid))
+    #expect(texts.contains("\"kind\":\"tombstone\""))
+}
+
+@Test func reconcileSweepReemitsNewSamplesAndLeavesCursor() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let keep = heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+    let extra = heartSample("cccccccc-cccc-cccc-cccc-cccccccccccc")
+    let page = SamplePage(
+        samples: [keep],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0xBB]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let dest = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-sweep-more-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+    let store = MemoryStateStore()
+    _ = try await ExportRun(
+        source: FixtureSource(pages: [page]),
+        destination: .testing(LocalFileSink(directory: dest)),
+        store: store,
+        metric: metric,
+        scratchDirectory: dest.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    ).run()
+    let cursor = try store.transaction.loadCursor(metric: metric)
+    let outcome = try await ReconcileSweep(
+        observations: FixtureDays(byDay: ["2024-01-01": [keep, extra]]),
+        destination: .testing(LocalFileSink(directory: dest)),
+        store: store,
+        metric: metric,
+        scratchDirectory: dest.appendingPathComponent("scratch-sweep"),
+        envelope: testEnvelope()
+    ).run(throughDay: "2024-01-01")
+    #expect(outcome.kind == .success)
+    #expect(try store.transaction.loadCursor(metric: metric) == cursor)
+    #expect(try store.transaction.loadEmittedIndex(uuid: extra.key.uuid) != nil)
+    #expect(try store.transaction.loadCensus(metric: metric, day: "2024-01-01")?.sampleCount == 2)
+}
+
+@Test func reconcileSweepIsNothingDueWhenTheWindowMatches() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let keep = heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+    let page = SamplePage(
+        samples: [keep],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0xCC]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let dest = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-sweep-clean-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+    let store = MemoryStateStore()
+    _ = try await ExportRun(
+        source: FixtureSource(pages: [page]),
+        destination: .testing(LocalFileSink(directory: dest)),
+        store: store,
+        metric: metric,
+        scratchDirectory: dest.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    ).run()
+    let pendingBefore = try store.transaction.pendingBatches().count
+    let outcome = try await ReconcileSweep(
+        observations: FixtureDays(byDay: ["2024-01-01": [keep]]),
+        destination: .testing(LocalFileSink(directory: dest)),
+        store: store,
+        metric: metric,
+        scratchDirectory: dest.appendingPathComponent("scratch-sweep"),
+        envelope: testEnvelope()
+    ).run(throughDay: "2024-01-01")
+    #expect(outcome.kind == .successNothingDue)
+    #expect(try store.transaction.pendingBatches().count == pendingBefore)
 }
 
 @Test func clearDirtyRemovesOnlyTheNamedDay() async throws {

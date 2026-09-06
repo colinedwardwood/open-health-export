@@ -28,11 +28,15 @@ public final class MemoryTransaction: StateTransaction {
         )
     }
 
-    public func commitBatch(_ batch: PendingBatch, advancing: CursorAdvance) throws {
+    public func enqueuePending(_ batch: PendingBatch) throws {
         if pending[batch.id] == nil {
             pendingOrder.append(batch.id)
         }
         pending[batch.id] = batch
+    }
+
+    public func commitBatch(_ batch: PendingBatch, advancing: CursorAdvance) throws {
+        try enqueuePending(batch)
         let envelope = CheckpointEnvelope(
             tzDatabaseVersion: advancing.tzDatabaseVersion,
             epoch: advancing.epoch,
@@ -198,5 +202,14 @@ public struct FixtureSource: SampleSource {
             return next < matching.endIndex ? matching[next] : empty
         }
         return matching[0]
+    }
+}
+
+public struct FixtureDays: DayObservationSource, Sendable {
+    public var byDay: [String: [SampleRecord]]
+    public init(byDay: [String: [SampleRecord]]) { self.byDay = byDay }
+
+    public func samples(metric: MetricID, day: String) async throws -> [SampleRecord] {
+        (byDay[day] ?? []).filter { $0.metric == metric }
     }
 }

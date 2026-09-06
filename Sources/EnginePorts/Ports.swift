@@ -201,6 +201,7 @@ public struct EmittedIndexRow: Sendable, Equatable {
 
 public protocol StateTransaction: AnyObject {
     func loadCursor(metric: MetricID) throws -> CursorSnapshot?
+    func enqueuePending(_ batch: PendingBatch) throws
     func commitBatch(_ batch: PendingBatch, advancing: CursorAdvance) throws
     /// Batches survive process death until a receipt confirms every expected record.
     func pendingBatches() throws -> [PendingBatch]
@@ -244,6 +245,11 @@ public protocol StatisticsSource: Sendable {
 
 public protocol SampleSource: Sendable {
     func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage
+}
+
+/// Date-ranged observations for R-08. Does not use the HealthKit anchored query.
+public protocol DayObservationSource: Sendable {
+    func samples(metric: MetricID, day: String) async throws -> [SampleRecord]
 }
 
 public protocol DestinationSink: Sendable {
