@@ -56,7 +56,7 @@ mass, SpO₂, respiratory rate). HA state JSON is encoded separately from discov
 eligible for retain.
 
 Committed payloads are now durable queue rows in the same transaction as cursor advancement.
-`PendingDeliveryRunner` replays each queued batch at most once per invocation after a process
+`PendingDeliveryRunner` replays only the oldest queued batch per sink invocation after a process
 restart; only a receipt covering every expected record removes it.
 
 Each live or replayed transport call durably records an egress attempt before calling the sink and

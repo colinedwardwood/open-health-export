@@ -426,12 +426,22 @@ func testEnvelope() -> WireEnvelope {
     try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
     let payload = root.appendingPathComponent("batch.ndjson")
     try "one\n".write(to: payload, atomically: true, encoding: .utf8)
+    let secondPayload = root.appendingPathComponent("batch-2.ndjson")
+    try "two\n".write(to: secondPayload, atomically: true, encoding: .utf8)
     let store = MemoryStateStore()
     try await store.transact {
         try $0.commitBatch(
             PendingBatch(
-                id: BatchID(rawValue: "replay-batch"),
+                id: BatchID(rawValue: "z-oldest"),
                 payloadURL: payload.path,
+                expectedRecords: 1
+            ),
+            advancing: CursorAdvance(page: page, epoch: 1)
+        )
+        try $0.commitBatch(
+            PendingBatch(
+                id: BatchID(rawValue: "a-newest"),
+                payloadURL: secondPayload.path,
                 expectedRecords: 1
             ),
             advancing: CursorAdvance(page: page, epoch: 1)
@@ -444,8 +454,11 @@ func testEnvelope() -> WireEnvelope {
     )
     let receipts = try await runner.runOnce()
     #expect(receipts.map(\.accepted) == [1])
-    #expect(try store.transaction.pendingBatches().isEmpty)
+    #expect(try store.transaction.pendingBatches().map(\.id.rawValue) == ["a-newest"])
     #expect(store.transaction.ledger.count == 2)
+    _ = try await runner.runOnce()
+    #expect(try store.transaction.pendingBatches().isEmpty)
+    #expect(store.transaction.ledger.count == 4)
 }
 
 @Test func failedPendingDeliveryStillRecordsItsOutcomeAndStaysQueued() async throws {

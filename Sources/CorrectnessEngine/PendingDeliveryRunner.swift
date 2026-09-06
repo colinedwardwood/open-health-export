@@ -2,8 +2,8 @@ import CoreDomain
 import DestinationTrust
 import EnginePorts
 
-/// Replays committed batches after a crash. Each call performs at most one attempt per batch;
-/// scheduling and backoff decide when to call it again.
+/// Replays committed batches after a crash. Each call performs at most one transport attempt for
+/// this sink, using the oldest batch; scheduling and backoff decide when to call it again.
 public struct PendingDeliveryRunner: Sendable {
     public var destination: VerifiedDestination
     public var store: any StateStore
@@ -22,17 +22,14 @@ public struct PendingDeliveryRunner: Sendable {
     @discardableResult
     public func runOnce() async throws -> [DeliveryReceipt] {
         let batches = try await store.transact { try $0.pendingBatches() }
-        var receipts: [DeliveryReceipt] = []
-        for batch in batches {
-            let receipt = try await DeliveryExecutor.send(
-                batch: batch,
-                destination: destination,
-                destinationName: destinationName,
-                store: store
-            )
-            try await store.transact { try $0.recordDelivery(receipt) }
-            receipts.append(receipt)
-        }
-        return receipts
+        guard let batch = batches.first else { return [] }
+        let receipt = try await DeliveryExecutor.send(
+            batch: batch,
+            destination: destination,
+            destinationName: destinationName,
+            store: store
+        )
+        try await store.transact { try $0.recordDelivery(receipt) }
+        return [receipt]
     }
 }

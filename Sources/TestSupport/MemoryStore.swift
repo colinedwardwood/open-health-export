@@ -11,6 +11,7 @@ public final class MemoryTransaction: StateTransaction {
     public var dirty: [MetricID: Set<String>] = [:]
     public var deliveries: [BatchID: DeliveryReceipt] = [:]
     public var pending: [BatchID: PendingBatch] = [:]
+    private var pendingOrder: [BatchID] = []
 
     public init() {}
 
@@ -19,16 +20,20 @@ public final class MemoryTransaction: StateTransaction {
     }
 
     public func commitBatch(_ batch: PendingBatch, advancing: CursorAdvance) throws {
+        if pending[batch.id] == nil {
+            pendingOrder.append(batch.id)
+        }
         pending[batch.id] = batch
         cursors[advancing.metric] = advancing.snapshot
     }
 
     public func pendingBatches() throws -> [PendingBatch] {
-        pending.values.sorted { $0.id.rawValue < $1.id.rawValue }
+        pendingOrder.compactMap { pending[$0] }
     }
 
     public func evict(_ batchID: BatchID, recording: GapRecord) throws {
         pending.removeValue(forKey: batchID)
+        pendingOrder.removeAll { $0 == batchID }
         gaps.append(recording)
     }
 
@@ -38,6 +43,7 @@ public final class MemoryTransaction: StateTransaction {
            receipt.unconfirmed == 0,
            receipt.accepted >= batch.expectedRecords {
             pending.removeValue(forKey: receipt.batchID)
+            pendingOrder.removeAll { $0 == receipt.batchID }
         }
     }
 
