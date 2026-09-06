@@ -162,6 +162,9 @@ import Redaction
     let measurementForbidden: Set<String> = [
         "date", "enum", "energy", "gas", "monetary", "timestamp", "volume", "water",
     ]
+    #expect(MetricCatalog.all.count == 10)
+    #expect(MetricCatalog.bloodGlucose.haDeviceClass == nil)
+    #expect(MetricCatalog.vo2Max.sensitivity == .sensitive)
     for declaration in MetricCatalog.all {
         if let deviceClass = declaration.haDeviceClass, measurementForbidden.contains(deviceClass) {
             #expect(declaration.haStateClass != "measurement")

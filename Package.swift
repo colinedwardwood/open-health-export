@@ -27,10 +27,10 @@ let linuxCore: [Target] = [
     .target(name: "DiagnosticBundle", dependencies: ["EnginePorts", "Redaction", "CoreDomain"]),
     .target(name: "FileWriteKit"),
     .target(name: "SinkLocalFile", dependencies: ["EnginePorts", "FileWriteKit", "CoreDomain", "WireFormat", "DestinationTrust"]),
-    .target(name: "NetEgress", dependencies: ["WireFormat", "EnginePorts"]),
+    .target(name: "NetEgress", dependencies: ["WireFormat", "EnginePorts", "RunJournal"]),
     .target(name: "DestinationTrust", dependencies: ["EnginePorts", "NetEgress"]),
-    .target(name: "SinkHTTP", dependencies: ["EnginePorts", "NetEgress", "WireFormat", "CoreDomain", "RequestTemplate", "FileWriteKit"]),
-    .target(name: "SinkCompanion", dependencies: ["CompanionWire", "EnginePorts", "NetEgress", "WireFormat", "CoreDomain", "FileWriteKit"]),
+    .target(name: "SinkHTTP", dependencies: ["EnginePorts", "NetEgress", "WireFormat", "CoreDomain", "MetricCatalog", "RequestTemplate", "FileWriteKit", "DestinationTrust"]),
+    .target(name: "SinkCompanion", dependencies: ["CompanionWire", "EnginePorts", "NetEgress", "WireFormat", "CoreDomain", "FileWriteKit", "DestinationTrust"]),
     .target(name: "CompanionReceive", dependencies: ["CompanionWire", "FileWriteKit", "NetEgress", "WireFormat"]),
     .target(name: "MQTTCodec"),
     .target(name: "SinkMQTT", dependencies: ["MQTTCodec", "EnginePorts", "NetEgress", "WireFormat", "CoreDomain"]),
@@ -112,7 +112,7 @@ targets.append(contentsOf: [
     ),
     .testTarget(
         name: "HealthKitSourceTests",
-        dependencies: ["HealthKitSource", "EnginePorts", "CoreDomain", "CoreTemporal"]
+        dependencies: ["HealthKitSource", "EnginePorts", "CoreDomain", "CoreTemporal", "MetricCatalog"]
     ),
 ])
 #endif

@@ -40,7 +40,7 @@ enum SampleConversion {
 
     static func unit(for metric: MetricID) -> HKUnit {
         switch metric {
-        case MetricCatalog.heartRate.id, MetricCatalog.respiratoryRate.id:
+        case MetricCatalog.heartRate.id, MetricCatalog.respiratoryRate.id, MetricCatalog.restingHeartRate.id:
             return HKUnit.count().unitDivided(by: .minute())
         case MetricCatalog.activeEnergy.id:
             return .kilocalorie()
@@ -50,6 +50,10 @@ enum SampleConversion {
             return .percent()
         case MetricCatalog.walkingRunningDistance.id:
             return .meter()
+        case MetricCatalog.vo2Max.id:
+            return HKUnit.literUnit(with: .milli).unitDivided(by: .gramUnit(with: .kilo).unitMultiplied(by: .minute()))
+        case MetricCatalog.bloodGlucose.id:
+            return HKUnit.moleUnit(with: .milli, molarMass: HKUnitMolarMassBloodGlucose).unitDivided(by: .liter())
         default:
             return .count()
         }

@@ -75,6 +75,63 @@ import Testing
     #expect(record.unit.symbol == "km")
 }
 
+@Test func restingHeartRateUsesCountPerMinute() {
+    let start = Date(timeIntervalSince1970: 1_704_067_200)
+    let quantity = HKQuantity(unit: HKUnit.count().unitDivided(by: .minute()), doubleValue: 58)
+    let sample = HKQuantitySample(
+        type: HKQuantityType(.restingHeartRate),
+        quantity: quantity,
+        start: start,
+        end: start
+    )
+    let record = SampleConversion.record(
+        from: sample,
+        metric: MetricCatalog.restingHeartRate.id,
+        context: .utc
+    )
+    #expect(record.value == 58)
+    #expect(record.unit.symbol == "count/min")
+}
+
+@Test func vo2MaxUsesMillilitresPerKilogramMinute() {
+    let start = Date(timeIntervalSince1970: 1_704_067_200)
+    let unit = HKUnit.literUnit(with: .milli)
+        .unitDivided(by: HKUnit.gramUnit(with: .kilo).unitMultiplied(by: .minute()))
+    let quantity = HKQuantity(unit: unit, doubleValue: 42)
+    let sample = HKQuantitySample(
+        type: HKQuantityType(.vo2Max),
+        quantity: quantity,
+        start: start,
+        end: start
+    )
+    let record = SampleConversion.record(
+        from: sample,
+        metric: MetricCatalog.vo2Max.id,
+        context: .utc
+    )
+    #expect(record.value == 42)
+    #expect(record.unit.symbol == "mL/kg/min")
+}
+
+@Test func bloodGlucoseUsesMillimolesPerLitre() {
+    let start = Date(timeIntervalSince1970: 1_704_067_200)
+    let unit = HKUnit.moleUnit(with: .milli, molarMass: HKUnitMolarMassBloodGlucose).unitDivided(by: .liter())
+    let quantity = HKQuantity(unit: unit, doubleValue: 5.5)
+    let sample = HKQuantitySample(
+        type: HKQuantityType(.bloodGlucose),
+        quantity: quantity,
+        start: start,
+        end: start
+    )
+    let record = SampleConversion.record(
+        from: sample,
+        metric: MetricCatalog.bloodGlucose.id,
+        context: .utc
+    )
+    #expect(record.value == 5.5)
+    #expect(record.unit.symbol == "mmol/L")
+}
+
 @Test func queryAnchorRoundTripsThroughOpaqueEnvelope() throws {
     let anchor = HKQueryAnchor(fromValue: 7)
     let data = try AnchorCoding.encode(anchor)

@@ -6,6 +6,7 @@ import FileWriteKit
 import Foundation
 import NetEgress
 import RequestTemplate
+import MetricCatalog
 import SinkHTTP
 import TestSupport
 import Testing
@@ -217,4 +218,131 @@ private func writeHTTPSPayload() throws -> (URL, BatchID) {
     let file = dir.appendingPathComponent("batch.ndjson")
     try FileWriteKit.writeAtomically(data, to: file)
     return (file, batchID)
+}
+
+@Test func httpsDestinationTestFailsOnUnauthorized() async throws {
+    let destination = try HTTPSDestination(
+        urlString: "https://ha.example/hook",
+        allowedHosts: ["ha.example"],
+        authorizationBearer: "super-secret-token"
+    )
+    let transport = RecordingHTTPTransport(
+        response: OutboundHTTPResponse(status: 401, body: Data()),
+        tls: sampleIdentity(leaf: "aaaabbbbccccdddd")
+    )
+    let report = await HTTPSDestinationTest.run(
+        destination: destination,
+        transport: transport,
+        canary: Data("canary\n".utf8)
+    )
+    #expect(report.verdict == .failed)
+    #expect(report.failingStep == .authenticate)
+}
+
+@Test func httpsDestinationTestRejectsPinChange() async throws {
+    let destination = try HTTPSDestination(
+        urlString: "https://ha.example/hook",
+        allowedHosts: ["ha.example"]
+    )
+    let observed = sampleIdentity(leaf: "eeeeffff00001111")
+    let stored = PinRecord(
+        leafSPKISha256: "aaaabbbbccccdddd",
+        issuerSPKISha256: "issuer00",
+        firstSeen: "2024-01-01T00:00:00Z",
+        policy: .leaf
+    )
+    let transport = RecordingHTTPTransport(
+        response: OutboundHTTPResponse(status: 204, body: Data()),
+        tls: observed
+    )
+    let report = await HTTPSDestinationTest.run(
+        destination: destination,
+        transport: transport,
+        pin: stored,
+        canary: Data("canary\n".utf8)
+    )
+    #expect(report.verdict == .failed)
+    #expect(report.failingStep == .confirmCertificate)
+}
+
+@Test func haEntityReadbackRequiresDeclaredUnitAndStateClass() async throws {
+    let destination = try HTTPSDestination(
+        urlString: "https://ha.example/api/states/sensor.ohe_steps",
+        allowedHosts: ["ha.example"]
+    )
+    let transport = RecordingHTTPTransport(
+        response: OutboundHTTPResponse(status: 200, body: Data()),
+        tls: sampleIdentity(leaf: "aaaabbbbccccdddd")
+    )
+    await transport.enqueue(OutboundHTTPResponse(status: 201, body: Data()))
+    await transport.enqueue(
+        OutboundHTTPResponse(
+            status: 200,
+            body: Data(
+                """
+                {"attributes":{"unit_of_measurement":"steps","state_class":"total_increasing"}}
+                """.utf8
+            )
+        )
+    )
+    let report = await HTTPSDestinationTest.run(
+        destination: destination,
+        transport: transport,
+        canary: Data("canary\n".utf8),
+        entityURL: destination.url,
+        expected: MetricCatalog.stepCount
+    )
+    #expect(report.verdict == .passed)
+    #expect(
+        !HAEntityReadback.matches(
+            declaration: MetricCatalog.stepCount,
+            json: Data("{\"attributes\":{\"unit_of_measurement\":\"kcal\"}}".utf8)
+        )
+    )
+}
+
+@Test func httpsDestinationTestPassesAndDoesNotLeakBearer() async throws {
+    let destination = try HTTPSDestination(
+        urlString: "https://ha.example/hook",
+        allowedHosts: ["ha.example"],
+        authorizationBearer: "super-secret-token"
+    )
+    let transport = RecordingHTTPTransport(
+        response: OutboundHTTPResponse(status: 204, body: Data()),
+        tls: sampleIdentity(leaf: "aaaabbbbccccdddd")
+    )
+    let report = await HTTPSDestinationTest.run(
+        destination: destination,
+        transport: transport,
+        canary: Data("canary\n".utf8)
+    )
+    #expect(report.verdict == .passed)
+    #expect(report.failingStep == nil)
+}
+
+@Test func haEntityReadbackFailsOnWrongStateClass() async throws {
+    let destination = try HTTPSDestination(
+        urlString: "https://ha.example/api/states/sensor.ohe_steps",
+        allowedHosts: ["ha.example"]
+    )
+    let transport = RecordingHTTPTransport(
+        response: OutboundHTTPResponse(status: 200, body: Data()),
+        tls: sampleIdentity(leaf: "aaaabbbbccccdddd")
+    )
+    await transport.enqueue(OutboundHTTPResponse(status: 201, body: Data()))
+    await transport.enqueue(
+        OutboundHTTPResponse(
+            status: 200,
+            body: Data("{\"attributes\":{\"unit_of_measurement\":\"steps\",\"state_class\":\"measurement\"}}".utf8)
+        )
+    )
+    let report = await HTTPSDestinationTest.run(
+        destination: destination,
+        transport: transport,
+        canary: Data("canary\n".utf8),
+        entityURL: destination.url,
+        expected: MetricCatalog.stepCount
+    )
+    #expect(report.verdict == .failed)
+    #expect(report.failingStep == .readResponse)
 }

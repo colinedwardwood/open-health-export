@@ -154,3 +154,14 @@ private func writeCompanionPayload() throws -> (URL, BatchID, String) {
     try FileWriteKit.writeAtomically(data, to: file)
     return (file, batchID, ContentSHA256.digest(data))
 }
+
+@Test func companionDestinationTestRoundTripsACanary() async throws {
+    let broker = LoopbackCompanionBroker()
+    let report = await CompanionDestinationTest.run(
+        pipe: broker,
+        installationID: "phone",
+        canary: Data("companion-canary".utf8)
+    )
+    #expect(report.verdict == .passed)
+    #expect(report.failingStep == nil)
+}

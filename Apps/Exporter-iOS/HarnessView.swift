@@ -2,6 +2,7 @@ import CompanionWire
 import CoreDomain
 import CoreTemporal
 import DestinationTrust
+import DiagnosticBundle
 import EnginePorts
 import HealthKitSource
 import MetricCatalog
@@ -22,6 +23,10 @@ struct HarnessView: View {
     @State private var pairing: PairingSession?
     @State private var sas = ""
     @State private var showScanner = false
+    @State private var diagnosticPreview = ""
+    @State private var diagnosticPayload: Data?
+    @State private var diagnosticGate = DiagnosticPreviewGate()
+    @State private var diagnosticShareURL: URL?
 
     var body: some View {
         NavigationStack {
@@ -108,6 +113,29 @@ struct HarnessView: View {
             .disabled(phase == .working)
             .accessibilityHint("Asks for notification permission and posts one R-40 notice with copy from the registry.")
 
+            Text("Diagnostics")
+                .font(.headline)
+            Button("Build diagnostic bundle") {
+                buildDiagnostic()
+            }
+            .disabled(phase == .working)
+            .accessibilityHint("Assembles a redacted ohe.diagnostic/1 JSON preview. Share does not exist until you confirm you read it.")
+            if !diagnosticPreview.isEmpty {
+                Text(diagnosticPreview)
+                    .font(.system(.footnote, design: .monospaced))
+                    .textSelection(.enabled)
+                Button("I have read this diagnostic") {
+                    confirmDiagnosticRead()
+                }
+                .disabled(diagnosticPayload == nil)
+            }
+            if let diagnosticShareURL {
+                ShareLink(item: diagnosticShareURL) {
+                    Text("Share diagnostic")
+                }
+                .accessibilityIdentifier("diagnostic-share")
+            }
+
             Text("Companion pairing")
                 .font(.headline)
             if PairingCamera.canPresentScanner {
@@ -143,6 +171,35 @@ struct HarnessView: View {
                 Task { await forgetPairing() }
             }
             .disabled(phase == .working)
+        }
+    }
+
+    private func buildDiagnostic() {
+        diagnosticShareURL = nil
+        diagnosticGate = DiagnosticPreviewGate()
+        do {
+            let built = try HarnessExport.diagnosticBundle()
+            diagnosticPreview = built.preview
+            diagnosticPayload = built.payload
+            status = "Ready. Read the diagnostic JSON. Share appears only after you confirm."
+        } catch {
+            diagnosticPreview = ""
+            diagnosticPayload = nil
+            status = "Failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func confirmDiagnosticRead() {
+        guard let diagnosticPayload else { return }
+        diagnosticGate.reachedEnd(of: diagnosticPayload)
+        guard let payload = diagnosticGate.sharePayload else { return }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("ohe-diagnostic.json")
+        do {
+            try payload.write(to: url, options: .atomic)
+            diagnosticShareURL = url
+            status = "Ready. Share is available because you confirmed the full preview."
+        } catch {
+            status = "Failed: \(error.localizedDescription)"
         }
     }
 

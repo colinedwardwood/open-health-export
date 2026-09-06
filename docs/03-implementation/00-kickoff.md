@@ -51,9 +51,10 @@ asks for camera permission before scanning and always keeps paste as a fallback.
 export one page, then forget pairing and pair again. Simulator has no camera and often an empty
 Health store.
 
-The catalogue has seven quantity types (steps, heart rate, active energy, walking distance, body
-mass, SpO₂, respiratory rate). HA state JSON is encoded separately from discovery and is not
-eligible for retain.
+The catalogue has ten quantity types (steps, heart rate, resting heart rate, active
+energy, walking distance, body mass, SpO₂, respiratory rate, VO₂ max, blood glucose).
+HA state JSON is encoded separately from discovery and is not eligible for retain.
+Blood glucose has no guessed `device_class`.
 
 Committed payloads are now durable queue rows in the same transaction as cursor advancement.
 `PendingDeliveryRunner` replays only the oldest queued batch per sink invocation after a process
@@ -124,17 +125,21 @@ and leaves the dirty day queued when no statistics source is available.
 Egress entries are now a SHA-256 chain with sequence, previous hash, canonical
 fields, byte count, and wall time. Delivery attempts and outcomes are separately
 sealed; verification detects edits and reordering. Delete-all starts a successor
-chain with a genesis marker naming the destroyed count and prior head. The
-Secure Enclave chain-head signature and ledger UI remain unimplemented.
+chain with a genesis marker naming the destroyed count and prior head.
+Ledger-head identity can be sealed with `HashLedgerSeal` (and a Keychain-backed
+secret on Darwin). Secure Enclave signatures and ledger UI remain unimplemented.
 
 The diagnostic core now emits a sorted UTF-8 `ohe.diagnostic/1` document,
 bounded to 200 runs and 200 KiB. Run fields are emitted by the per-sink
 redaction manifest; raw run IDs and free-form detail never enter the bundle.
 `DiagnosticPreviewGate` exposes no share payload until full-content review.
-The SwiftUI preview/share surface and corruption-salvage reader remain open.
+The iOS harness now builds a redacted bundle, shows the JSON, and only then
+exposes Share. Corruption-salvage reader remains open.
 
 R-25 now has a named-step destination test. Local folder write/read/confirm
 must pass (or MQTT QoS 0 report `sentUnconfirmed`) before `enable`. A failed
-test cannot enable. Export runs write a JSON `DestinationStatusSnapshot` the
+test cannot enable. HTTPS/HA tests cover TLS, pin mismatch, 401, bearer
+redaction, and entity attribute readback. Companion canary round-trips on the
+loopback broker. Export runs write a JSON `DestinationStatusSnapshot` the
 widget and watchdog can read without SQLite. WidgetKit UI is still missing.
 

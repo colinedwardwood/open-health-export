@@ -3,6 +3,7 @@ import CoreDomain
 import CoreTemporal
 import CorrectnessEngine
 import DestinationTrust
+import DiagnosticBundle
 import Foundation
 import HealthKitSource
 import MetricCatalog
@@ -10,6 +11,7 @@ import NetEgress
 import SinkCompanion
 import SinkLocalFile
 import StorageSQLite
+import UIKit
 import WireFormat
 
 enum HarnessExport {
@@ -129,6 +131,25 @@ enum HarnessExport {
             attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
         )
         return root
+    }
+
+    static func diagnosticBundle() throws -> (preview: String, payload: Data) {
+        let assembler = BundleAssembler()
+        let payload = try assembler.assemble(
+            header: DiagnosticHeader(
+                appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0",
+                osVersion: UIDevice.current.systemVersion,
+                deviceModel: UIDevice.current.model,
+                localeIdentifier: Locale.current.identifier,
+                utcOffsetMinutes: TimeZone.current.secondsFromGMT() / 60,
+                generatedAt: Date().ISO8601Format()
+            ),
+            events: []
+        )
+        let text = String(decoding: payload, as: UTF8.self)
+        let lines = assembler.previewLines(events: [])
+        let preview = lines.isEmpty ? text : lines.joined(separator: "\n") + "\n\n" + text
+        return (preview, payload)
     }
 
     static func vault() throws -> PairingVault {

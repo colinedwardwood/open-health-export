@@ -152,6 +152,51 @@ public enum MetricCatalog {
         haRequiresAggregate: false
     )
 
+    public static let restingHeartRate = MetricDeclaration(
+        id: MetricID(rawValue: "restingHeartRate"),
+        wireId: "resting_heart_rate",
+        hkIdentifier: "HKQuantityTypeIdentifierRestingHeartRate",
+        canonicalUnit: CanonicalUnit(symbol: "count/min"),
+        wireUnit: "bpm",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .routine,
+        haUnit: "bpm",
+        haDeviceClass: nil,
+        haStateClass: "measurement",
+        haRequiresAggregate: false
+    )
+
+    public static let vo2Max = MetricDeclaration(
+        id: MetricID(rawValue: "vo2Max"),
+        wireId: "vo2_max",
+        hkIdentifier: "HKQuantityTypeIdentifierVO2Max",
+        canonicalUnit: CanonicalUnit(symbol: "mL/kg/min"),
+        wireUnit: "mL/kg/min",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .sensitive,
+        haUnit: "mL/kg/min",
+        haDeviceClass: nil,
+        haStateClass: "measurement",
+        haRequiresAggregate: false
+    )
+
+    public static let bloodGlucose = MetricDeclaration(
+        id: MetricID(rawValue: "bloodGlucose"),
+        wireId: "blood_glucose",
+        hkIdentifier: "HKQuantityTypeIdentifierBloodGlucose",
+        canonicalUnit: CanonicalUnit(symbol: "mmol/L"),
+        wireUnit: "mmol/L",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .sensitive,
+        haUnit: "mmol/L",
+        haDeviceClass: nil,
+        haStateClass: "measurement",
+        haRequiresAggregate: false
+    )
+
     public static let all: [MetricDeclaration] = [
         stepCount,
         heartRate,
@@ -160,6 +205,9 @@ public enum MetricCatalog {
         bodyMass,
         oxygenSaturation,
         respiratoryRate,
+        restingHeartRate,
+        vo2Max,
+        bloodGlucose,
     ]
 
     public static func declaration(for id: MetricID) -> MetricDeclaration? {
