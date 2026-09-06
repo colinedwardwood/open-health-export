@@ -16,6 +16,12 @@ public struct TemporalContext: Sendable {
         self.tzDatabaseVersion = tzDatabaseVersion
     }
 
+    public static let utc = TemporalContext(
+        timeZoneIdentifier: "UTC",
+        localeIdentifier: "en_US_POSIX",
+        tzDatabaseVersion: "unknown"
+    )
+
     public func timeZone() -> TimeZone {
         TimeZone(identifier: timeZoneIdentifier) ?? TimeZone(secondsFromGMT: 0)!
     }

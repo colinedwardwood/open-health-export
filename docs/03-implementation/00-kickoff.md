@@ -99,6 +99,7 @@ absence tombstones from the emitted index. Dirty days can be cleared after a dra
 The HealthKit-backed trailing sweep is not wired yet.
 
 Dirty days can feed `AggregateDrain.planDay` for a localSampleFold P1D bucket with
-a stable `bucketKey`. Aggregates encode on the wire. HealthKit statistics and the
-ExportRun drain loop are not wired yet.
+a stable `bucketKey`. Aggregates encode on the wire. `ExportRun` now drains those
+buckets into the same NDJSON batch as the delta page and clears the dirty days on
+commit. HealthKit statistics are still unused.
 

@@ -12,6 +12,7 @@ public final class MemoryTransaction: StateTransaction {
     public var deliveries: [BatchID: DeliveryReceipt] = [:]
     public var pending: [BatchID: PendingBatch] = [:]
     public var emittedIndex: [String: EmittedIndexRow] = [:]
+    public var aggregateEmitSeq: [String: Int] = [:]
     private var pendingOrder: [BatchID] = []
 
     public init() {}
@@ -119,6 +120,14 @@ public final class MemoryTransaction: StateTransaction {
             .filter { $0.metric == metric && $0.day == day }
             .sorted { $0.uuid < $1.uuid }
     }
+
+    public func loadAggregateEmitSeq(bucketKey: String) throws -> Int? {
+        aggregateEmitSeq[bucketKey]
+    }
+
+    public func upsertAggregateEmitSeq(bucketKey: String, emitSeq: Int) throws {
+        aggregateEmitSeq[bucketKey] = emitSeq
+    }
 }
 
 public final class MemoryStateStore: StateStore, @unchecked Sendable {
@@ -145,10 +154,12 @@ public struct FixtureSource: SampleSource {
             anchorBlob: afterAnchor ?? Data(),
             observedThrough: Date(timeIntervalSince1970: 0)
         )
-        guard let page = pages.first(where: { $0.metric == metric }) else { return empty }
-        if let afterAnchor, afterAnchor == page.anchorBlob {
-            return empty
+        let matching = pages.filter { $0.metric == metric }
+        guard !matching.isEmpty else { return empty }
+        if let afterAnchor, let idx = matching.firstIndex(where: { $0.anchorBlob == afterAnchor }) {
+            let next = matching.index(after: idx)
+            return next < matching.endIndex ? matching[next] : empty
         }
-        return page
+        return matching[0]
     }
 }

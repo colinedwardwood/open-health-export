@@ -405,7 +405,13 @@ func testEnvelope() -> WireEnvelope {
     #expect(phases[0].split(separator: ":").first == phases[1].split(separator: ":").first)
     let census = try store.transaction.loadCensus(metric: metric, day: "2024-01-01")
     #expect(census?.sampleCount == 1)
-    #expect(try store.transaction.dirtyDays(metric: metric) == ["2024-01-01"])
+    #expect(try store.transaction.dirtyDays(metric: metric).isEmpty)
+    let delivered = try FileManager.default.contentsOfDirectory(
+        at: dest,
+        includingPropertiesForKeys: nil
+    ).filter { $0.pathExtension == "ndjson" }
+    let payloadText = try String(contentsOf: delivered[0], encoding: .utf8)
+    #expect(payloadText.contains("\"kind\":\"aggregate\""))
     let indexed = try store.transaction.loadEmittedIndex(
         uuid: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     )
@@ -1205,4 +1211,47 @@ private struct OneExportFault: ExportFaultInjector {
     #expect(plan?.record.computation == .localSampleFold)
     try await store.transact { try $0.clearDirty(metric: metric, day: "2024-01-01") }
     #expect(try await store.transact { try $0.dirtyDays(metric: metric) }.isEmpty)
+}
+
+@Test func exportRunRevisesAggregateOnSecondPageSameDay() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let firstPage = SamplePage(
+        samples: [heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0x01]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    var later = heartSample("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+    later.value = 80
+    let secondPage = SamplePage(
+        samples: [later],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0x02]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let dest = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-drain-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+    let store = MemoryStateStore()
+    let run = ExportRun(
+        source: FixtureSource(pages: [firstPage, secondPage]),
+        destination: .testing(LocalFileSink(directory: dest)),
+        store: store,
+        metric: metric,
+        scratchDirectory: dest.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    )
+    #expect(try await run.run().kind == .success)
+    #expect(try store.transaction.dirtyDays(metric: metric).isEmpty)
+    #expect(try await run.run().kind == .success)
+    #expect(try store.transaction.loadCensus(metric: metric, day: "2024-01-01")?.sampleCount == 2)
+    let files = try FileManager.default.contentsOfDirectory(
+        at: dest,
+        includingPropertiesForKeys: nil
+    ).filter { $0.pathExtension == "ndjson" }
+    let texts = try files.map { try String(contentsOf: $0, encoding: .utf8) }
+    #expect(texts.contains { $0.contains("\"state\":\"revised\"") })
+    #expect(texts.contains { $0.contains("\"supersedes\":1") })
 }

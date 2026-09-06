@@ -115,7 +115,11 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 batch_id TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_emitted_metric_day ON emitted_index (metric, day);
-            PRAGMA user_version = 5;
+            CREATE TABLE IF NOT EXISTS aggregate_emit (
+                bucket_key TEXT PRIMARY KEY,
+                emit_seq INTEGER NOT NULL
+            );
+            PRAGMA user_version = 6;
             """)
     }
 
@@ -416,6 +420,26 @@ private final class SQLiteTransaction: StateTransaction {
             )
         }
         return rows
+    }
+
+    func loadAggregateEmitSeq(bucketKey: String) throws -> Int? {
+        let stmt = try store.prepare(
+            "SELECT emit_seq FROM aggregate_emit WHERE bucket_key = ? LIMIT 1;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, bucketKey)
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
+        return Int(sqlite3_column_int64(stmt, 0))
+    }
+
+    func upsertAggregateEmitSeq(bucketKey: String, emitSeq: Int) throws {
+        let stmt = try store.prepare(
+            "INSERT INTO aggregate_emit (bucket_key, emit_seq) VALUES (?, ?) ON CONFLICT(bucket_key) DO UPDATE SET emit_seq = excluded.emit_seq;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, bucketKey)
+        sqlite3_bind_int64(stmt, 2, sqlite3_int64(emitSeq))
+        try stepDone(stmt)
     }
 
     private func bindText(_ stmt: OpaquePointer, _ index: Int32, _ value: String) {

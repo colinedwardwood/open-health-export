@@ -1,4 +1,5 @@
 import CoreDomain
+import CoreTemporal
 import DestinationTrust
 import EnginePorts
 import FileWriteKit
@@ -14,6 +15,8 @@ public struct ExportRun: Sendable {
     public var scratchDirectory: URL
     public var destinationName: String
     public var envelope: WireEnvelope
+    public var clock: any Clock
+    public var temporal: TemporalContext
     #if DEBUG
     public var faults: any ExportFaultInjector = NoExportFaults()
     #endif
@@ -26,7 +29,9 @@ public struct ExportRun: Sendable {
         epoch: UInt32 = 1,
         scratchDirectory: URL,
         destinationName: String = "local-file",
-        envelope: WireEnvelope
+        envelope: WireEnvelope,
+        clock: any Clock = SystemClock(),
+        temporal: TemporalContext = .utc
     ) {
         self.source = source
         self.destination = destination
@@ -36,6 +41,8 @@ public struct ExportRun: Sendable {
         self.scratchDirectory = scratchDirectory
         self.destinationName = destinationName
         self.envelope = envelope
+        self.clock = clock
+        self.temporal = temporal
     }
 
     public func run() async throws -> RunOutcome {
@@ -60,10 +67,12 @@ public struct ExportRun: Sendable {
             return outcome
         }
 
+        let aggregates = try await drainPlans(for: page)
         let batchID = NativeWire.batchID(metric: metric, anchorBlob: page.anchorBlob)
         let payload = try NativeWire.encode(
             samples: page.samples,
             tombstones: page.tombstones,
+            aggregates: aggregates.map(\.record),
             metric: metric,
             batchID: batchID,
             envelope: envelope
@@ -74,7 +83,7 @@ public struct ExportRun: Sendable {
         let payloadURL = scratchDirectory.appendingPathComponent("\(batchID.rawValue).ndjson")
         try FileWriteKit.writeAtomically(payload, to: payloadURL)
 
-        let recordCount = page.samples.count + page.tombstones.count
+        let recordCount = page.samples.count + page.tombstones.count + aggregates.count
         let pending = PendingBatch(
             id: batchID,
             payloadURL: payloadURL.path,
@@ -93,6 +102,13 @@ public struct ExportRun: Sendable {
             )
             try Census.apply(page: page, to: tx)
             try EmittedIndex.record(page: page, batchID: pending.id, on: tx)
+            for plan in aggregates {
+                try tx.upsertAggregateEmitSeq(
+                    bucketKey: plan.record.bucketKey,
+                    emitSeq: plan.record.emitSeq
+                )
+                try tx.clearDirty(metric: metric, day: plan.day)
+            }
             #if DEBUG
             try faults.hit(.duringAnchorPersist)
             #endif
@@ -136,6 +152,50 @@ public struct ExportRun: Sendable {
         let outcome = RunOutcome.derive(from: tally)
         try await record(outcome: outcome, tally: tally, receipt: receipt)
         return outcome
+    }
+
+    private func drainPlans(for page: SamplePage) async throws -> [AggregateDayPlan] {
+        var days = Set(page.samples.map { String($0.start.prefix(10)) })
+        let tombDays = try await store.transact { tx -> Set<String> in
+            var found: Set<String> = []
+            for tomb in page.tombstones {
+                if let row = try tx.loadEmittedIndex(uuid: tomb.key.uuid) {
+                    found.insert(row.day)
+                }
+            }
+            return found
+        }
+        days.formUnion(tombDays)
+        let now = clock.now()
+        return try await store.transact { tx in
+            var plans: [AggregateDayPlan] = []
+            for day in days.sorted() {
+                guard let probe = AggregateDrain.planDay(
+                    metric: metric,
+                    day: day,
+                    samples: page.samples,
+                    context: temporal,
+                    emitSeq: 1,
+                    computedAt: envelope.emittedAt,
+                    observedAt: envelope.observedAt,
+                    now: now
+                ) else { continue }
+                let prior = try tx.loadAggregateEmitSeq(bucketKey: probe.record.bucketKey)
+                guard let plan = AggregateDrain.planDay(
+                    metric: metric,
+                    day: day,
+                    samples: page.samples,
+                    context: temporal,
+                    emitSeq: (prior ?? 0) + 1,
+                    computedAt: envelope.emittedAt,
+                    observedAt: envelope.observedAt,
+                    now: now,
+                    priorEmitSeq: prior
+                ) else { continue }
+                plans.append(plan)
+            }
+            return plans
+        }
     }
 
     private func record(outcome: RunOutcome, tally: RunTally, receipt: DeliveryReceipt?) async throws {

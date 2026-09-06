@@ -165,6 +165,8 @@ public protocol StateTransaction: AnyObject {
     func loadEmittedIndex(uuid: String) throws -> EmittedIndexRow?
     func removeEmittedIndex(uuid: String) throws
     func loadEmittedIndex(metric: MetricID, day: String) throws -> [EmittedIndexRow]
+    func loadAggregateEmitSeq(bucketKey: String) throws -> Int?
+    func upsertAggregateEmitSeq(bucketKey: String, emitSeq: Int) throws
 }
 
 public protocol StateStore: Sendable {
