@@ -246,6 +246,75 @@ import Watchdog
     #expect(!policy.shouldEscalate(lastSuccess: now, now: now))
 }
 
+@Test func retryPolicyUsesFullJitterAndOpensAfterFiveFailures() {
+    let now = Date(timeIntervalSince1970: 1_000)
+    var snapshot = BreakerSnapshot()
+    for failure in 1...5 {
+        snapshot = RetryPolicy.record(
+            .failed(.transientNetwork),
+            snapshot: snapshot,
+            now: now,
+            jitter: 0.5
+        )
+        #expect(snapshot.consecutiveFailures == failure)
+    }
+    #expect(snapshot.state == .open)
+    // n=5: uniform(0, min(6h, 15*2^5)); injected midpoint is 240 seconds.
+    #expect(snapshot.nextEarliestAttempt == now.addingTimeInterval(240))
+    #expect(!RetryPolicy.mayAttempt(snapshot: snapshot, now: now, foreground: false))
+    #expect(RetryPolicy.mayAttempt(snapshot: snapshot, now: now, foreground: true))
+    #expect(RetryPolicy.beginProbe(snapshot: snapshot, now: now, foreground: true).state == .halfOpen)
+}
+
+@Test func retryPolicyHandlesUnknownAckImmediateBlocksAndRetryAfter() {
+    let now = Date(timeIntervalSince1970: 2_000)
+    var unknown = BreakerSnapshot()
+    for _ in 0..<3 {
+        unknown = RetryPolicy.record(.unknownAck, snapshot: unknown, now: now, jitter: 0)
+    }
+    #expect(unknown.state == .open)
+    #expect(unknown.consecutiveUnknownAcks == 3)
+
+    let auth = RetryPolicy.record(
+        .failed(.auth),
+        snapshot: BreakerSnapshot(),
+        now: now,
+        jitter: 0
+    )
+    #expect(auth.state == .blockedNeedsUser)
+    #expect(!RetryPolicy.mayAttempt(snapshot: auth, now: now.addingTimeInterval(1_000_000), foreground: true))
+
+    let pin = RetryPolicy.record(
+        .failed(.pinChangeHalt),
+        snapshot: BreakerSnapshot(),
+        now: now,
+        jitter: 0
+    )
+    #expect(pin.state == .halted)
+
+    let server = RetryPolicy.record(
+        .failed(.transientServer, retryAfter: 100_000),
+        snapshot: BreakerSnapshot(),
+        now: now,
+        jitter: 0
+    )
+    #expect(server.nextEarliestAttempt == now.addingTimeInterval(RetryPolicy.maximumRetryAfter))
+}
+
+@Test func retryPolicyPersistentBreakerProbesAtMostEverySixHours() {
+    let opened = Date(timeIntervalSince1970: 3_000)
+    let snapshot = BreakerSnapshot(
+        state: .open,
+        consecutiveFailures: 5,
+        openedAt: opened,
+        nextEarliestAttempt: opened
+    )
+    let weekLater = opened.addingTimeInterval(RetryPolicy.persistentAfter)
+    let aged = RetryPolicy.age(snapshot: snapshot, now: weekLater)
+    #expect(aged.state == .failingPersistently)
+    #expect(aged.nextEarliestAttempt == weekLater.addingTimeInterval(RetryPolicy.maximumDelay))
+}
+
 @Test func pipelineExposesExceptionList() {
     #expect(!Pipeline().hkStatisticsExceptions.isEmpty)
 }

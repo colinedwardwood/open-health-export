@@ -62,3 +62,7 @@ restart; only a receipt covering every expected record removes it.
 Each live or replayed transport call durably records an egress attempt before calling the sink and
 one terminal attempt outcome afterwards. Failed attempts remain pending; empty reads produce no
 egress ledger row.
+
+Retry/circuit-breaking is a pure one-result transition: exponential full jitter (15 s / 6 h),
+`Retry-After` capped at 24 h, five transient failures or three unknown acknowledgements to open,
+and a free foreground real-batch half-open probe. It contains no in-wake retry loop.
