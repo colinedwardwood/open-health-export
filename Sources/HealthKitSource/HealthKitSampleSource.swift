@@ -179,6 +179,201 @@ public final class HealthKitSampleSource: SampleSource, @unchecked Sendable {
     }
 }
 
+/// Date-ranged R-08 source. Sweep anchors are throwaway values and never escape this adapter.
+public final class HealthKitDayObservationSource: DayObservationSource, @unchecked Sendable {
+    private let store: HKHealthStore
+    private let context: TemporalContext
+    private let limit: Int
+
+    public init(store: HKHealthStore = HKHealthStore(), context: TemporalContext, limit: Int = 1000) {
+        self.store = store
+        self.context = context
+        self.limit = limit
+    }
+
+    public func samples(metric: MetricID, day: String) async throws -> [SampleRecord] {
+        guard HKHealthStore.isHealthDataAvailable() else {
+            throw HealthKitSourceError.unavailable
+        }
+        guard let type = SampleConversion.quantityType(for: metric) else {
+            throw HealthKitSourceError.unknownMetric(metric)
+        }
+        guard let bounds = BucketKey.boundsP1D(day: day, context: context),
+              let start = SampleConversion.parseUTC(bounds.bucketStart),
+              let end = SampleConversion.parseUTC(bounds.bucketEnd)
+        else {
+            throw HealthKitSourceError.queryFailed("invalid day")
+        }
+        let predicate = HKQuery.predicateForSamples(
+            withStart: start,
+            end: end,
+            options: .strictStartDate
+        )
+        var anchor: HKQueryAnchor?
+        var records: [SampleRecord] = []
+        while true {
+            let page = try await queryPage(
+                type: type,
+                predicate: predicate,
+                anchor: anchor,
+                metric: metric
+            )
+            records.append(contentsOf: page.records)
+            anchor = page.anchor
+            if page.count < limit || page.anchor == nil {
+                return records
+            }
+        }
+    }
+
+    private func queryPage(
+        type: HKQuantityType,
+        predicate: NSPredicate,
+        anchor: HKQueryAnchor?,
+        metric: MetricID
+    ) async throws -> (records: [SampleRecord], anchor: HKQueryAnchor?, count: Int) {
+        try await withCheckedThrowingContinuation { continuation in
+            let query = HKAnchoredObjectQuery(
+                type: type,
+                predicate: predicate,
+                anchor: anchor,
+                limit: limit
+            ) { _, samples, _, newAnchor, error in
+                if let error {
+                    continuation.resume(
+                        throwing: HealthKitSourceError.queryFailed(error.localizedDescription)
+                    )
+                    return
+                }
+                let converted = (samples ?? []).compactMap { sample -> SampleRecord? in
+                    guard let quantity = sample as? HKQuantitySample else { return nil }
+                    return SampleConversion.record(
+                        from: quantity,
+                        metric: metric,
+                        context: self.context
+                    )
+                }
+                continuation.resume(
+                    returning: (converted, newAnchor, samples?.count ?? 0)
+                )
+            }
+            self.store.execute(query)
+        }
+    }
+}
+
+enum StatisticsConversion {
+    static func record(
+        metric: MetricID,
+        day: String,
+        value: Double?,
+        context: TemporalContext,
+        computedAt: String,
+        observedAt: String
+    ) -> AggregateRecord? {
+        guard let declaration = MetricCatalog.declaration(for: metric),
+              declaration.usesHealthKitStatistics,
+              let bounds = BucketKey.boundsP1D(day: day, context: context)
+        else { return nil }
+        let key = BucketKey.render(
+            metricWireId: declaration.wireId,
+            statistic: AggregateStatistic.sum.rawValue,
+            granularity: "P1D",
+            bucketStart: bounds.bucketStart,
+            timeZoneIdentifier: context.timeZoneIdentifier,
+            sourceScope: AggregateSourceScope.all.rawValue
+        )
+        return AggregateRecord(
+            bucketKey: key,
+            metric: metric,
+            statistic: .sum,
+            computation: .healthKitStatisticsCollectionQuery,
+            sourceScope: .all,
+            granularity: "P1D",
+            bucketStart: bounds.bucketStart,
+            bucketEnd: bounds.bucketEnd,
+            bucketDurationSeconds: bounds.bucketDurationSeconds,
+            timeZoneIdentifier: context.timeZoneIdentifier,
+            localStart: bounds.localStart,
+            value: value,
+            unit: declaration.canonicalUnit,
+            sampleCount: 0,
+            state: .open,
+            emitSeq: 1,
+            computedAt: computedAt,
+            observedAt: observedAt
+        )
+    }
+}
+
+/// Canonical de-duplicated daily totals for the catalogue's R-80 exception list.
+public final class HealthKitStatisticsSource: StatisticsSource, @unchecked Sendable {
+    private let store: HKHealthStore
+    private let context: TemporalContext
+
+    public init(store: HKHealthStore = HKHealthStore(), context: TemporalContext) {
+        self.store = store
+        self.context = context
+    }
+
+    public func dailyBucket(metric: MetricID, day: String) async throws -> AggregateRecord? {
+        guard HKHealthStore.isHealthDataAvailable() else {
+            throw HealthKitSourceError.unavailable
+        }
+        guard let declaration = MetricCatalog.declaration(for: metric),
+              declaration.usesHealthKitStatistics,
+              let type = SampleConversion.quantityType(for: metric)
+        else {
+            throw HealthKitSourceError.unknownMetric(metric)
+        }
+        guard let bounds = BucketKey.boundsP1D(day: day, context: context),
+              let start = SampleConversion.parseUTC(bounds.bucketStart),
+              let end = SampleConversion.parseUTC(bounds.bucketEnd)
+        else {
+            throw HealthKitSourceError.queryFailed("invalid day")
+        }
+        let value = try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<Double?, Error>) in
+            let interval = DateComponents(day: 1)
+            let query = HKStatisticsCollectionQuery(
+                quantityType: type,
+                quantitySamplePredicate: HKQuery.predicateForSamples(
+                    withStart: start,
+                    end: end,
+                    options: .strictStartDate
+                ),
+                options: .cumulativeSum,
+                anchorDate: start,
+                intervalComponents: interval
+            )
+            query.initialResultsHandler = { _, collection, error in
+                if let error {
+                    continuation.resume(
+                        throwing: HealthKitSourceError.queryFailed(error.localizedDescription)
+                    )
+                    return
+                }
+                let statistic = collection?.statistics().first
+                let quantity = statistic?.sumQuantity()
+                let raw = quantity?.doubleValue(for: SampleConversion.unit(for: metric))
+                continuation.resume(
+                    returning: raw.map { SampleConversion.canonicalValue($0, metric: metric) }
+                )
+            }
+            self.store.execute(query)
+        }
+        let now = SampleConversion.formatUTC(Date())
+        return StatisticsConversion.record(
+            metric: declaration.id,
+            day: day,
+            value: value,
+            context: context,
+            computedAt: now,
+            observedAt: now
+        )
+    }
+}
+
 /// R-70: time a single anchored page. Call from a device build with a populated store.
 public enum HealthKitThroughput {
     public static func measure(

@@ -83,6 +83,43 @@ import Testing
     #expect(restored != nil)
 }
 
+@Test func statisticsConversionUsesCanonicalHealthKitAggregateFields() throws {
+    let context = TemporalContext(
+        timeZoneIdentifier: "America/New_York",
+        localeIdentifier: "en_US_POSIX",
+        tzDatabaseVersion: "2024a"
+    )
+    let record = try #require(
+        StatisticsConversion.record(
+            metric: MetricCatalog.stepCount.id,
+            day: "2024-03-10",
+            value: 1_234,
+            context: context,
+            computedAt: "2024-03-11T00:00:00Z",
+            observedAt: "2024-03-11T00:00:00Z"
+        )
+    )
+    #expect(record.statistic == .sum)
+    #expect(record.computation == .healthKitStatisticsCollectionQuery)
+    #expect(record.value == 1_234)
+    #expect(record.unit.symbol == "count")
+    #expect(record.bucketDurationSeconds == 23 * 60 * 60)
+    #expect(record.bucketKey.contains("step_count|sum|P1D"))
+}
+
+@Test func statisticsConversionRejectsLocalFoldMetrics() {
+    #expect(
+        StatisticsConversion.record(
+            metric: MetricCatalog.heartRate.id,
+            day: "2024-01-01",
+            value: 72,
+            context: .utc,
+            computedAt: "2024-01-02T00:00:00Z",
+            observedAt: "2024-01-02T00:00:00Z"
+        ) == nil
+    )
+}
+
 @Test func healthKitIsUnavailableOnThisHostOrNot() {
     // macOS CI: unavailable. iOS device: available. Either is a valid observation.
     _ = HKHealthStore.isHealthDataAvailable()
