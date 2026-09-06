@@ -59,7 +59,11 @@ public struct ExportRun: Sendable {
 
         try await store.transact { tx in
             try tx.commitBatch(
-                PendingBatch(id: batchID, payloadURL: payloadURL.path),
+                PendingBatch(
+                    id: batchID,
+                    payloadURL: payloadURL.path,
+                    expectedRecords: page.samples.count + page.tombstones.count
+                ),
                 advancing: CursorAdvance(page: page, epoch: epoch)
             )
             try Census.apply(page: page, to: tx)

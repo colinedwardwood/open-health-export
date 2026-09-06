@@ -78,6 +78,11 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 day TEXT NOT NULL,
                 PRIMARY KEY (metric, day)
             );
+            CREATE TABLE IF NOT EXISTS pending_batches (
+                batch_id TEXT PRIMARY KEY,
+                payload_url TEXT NOT NULL,
+                expected_records INTEGER NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS deliveries (
                 batch_id TEXT PRIMARY KEY,
                 accepted INTEGER NOT NULL
@@ -86,7 +91,7 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 batch_id TEXT PRIMARY KEY,
                 range_description TEXT NOT NULL
             );
-            PRAGMA user_version = 2;
+            PRAGMA user_version = 3;
             """)
     }
 
@@ -147,7 +152,15 @@ private final class SQLiteTransaction: StateTransaction {
     }
 
     func commitBatch(_ batch: PendingBatch, advancing: CursorAdvance) throws {
-        _ = batch
+        let pending = try store.prepare(
+            "INSERT INTO pending_batches (batch_id, payload_url, expected_records) VALUES (?, ?, ?) ON CONFLICT(batch_id) DO UPDATE SET payload_url = excluded.payload_url, expected_records = excluded.expected_records;"
+        )
+        defer { sqlite3_finalize(pending) }
+        bindText(pending, 1, batch.id.rawValue)
+        bindText(pending, 2, batch.payloadURL)
+        sqlite3_bind_int64(pending, 3, sqlite3_int64(batch.expectedRecords))
+        try stepDone(pending)
+
         let snap = advancing.snapshot
         let stmt = try store.prepare(
             "INSERT INTO cursors (metric, epoch, anchor) VALUES (?, ?, ?) ON CONFLICT(metric) DO UPDATE SET epoch = excluded.epoch, anchor = excluded.anchor;"
@@ -159,7 +172,34 @@ private final class SQLiteTransaction: StateTransaction {
         try stepDone(stmt)
     }
 
+    func pendingBatches() throws -> [PendingBatch] {
+        let stmt = try store.prepare(
+            "SELECT batch_id, payload_url, expected_records FROM pending_batches ORDER BY rowid;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        var batches: [PendingBatch] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            batches.append(
+                PendingBatch(
+                    id: BatchID(rawValue: text(stmt, 0)),
+                    payloadURL: text(stmt, 1),
+                    expectedRecords: Int(sqlite3_column_int64(stmt, 2))
+                )
+            )
+        }
+        return batches
+    }
+
     func evict(_ batchID: BatchID, recording: GapRecord) throws {
+        let delete = try store.prepare("DELETE FROM pending_batches WHERE batch_id = ?;")
+        bindText(delete, 1, batchID.rawValue)
+        do {
+            try stepDone(delete)
+            sqlite3_finalize(delete)
+        } catch {
+            sqlite3_finalize(delete)
+            throw error
+        }
         let stmt = try store.prepare(
             "INSERT INTO gaps (batch_id, range_description) VALUES (?, ?) ON CONFLICT(batch_id) DO UPDATE SET range_description = excluded.range_description;"
         )
@@ -177,6 +217,14 @@ private final class SQLiteTransaction: StateTransaction {
         bindText(stmt, 1, receipt.batchID.rawValue)
         sqlite3_bind_int64(stmt, 2, sqlite3_int64(receipt.accepted))
         try stepDone(stmt)
+        guard receipt.unconfirmed == 0 else { return }
+        let delete = try store.prepare(
+            "DELETE FROM pending_batches WHERE batch_id = ? AND expected_records <= ?;"
+        )
+        defer { sqlite3_finalize(delete) }
+        bindText(delete, 1, receipt.batchID.rawValue)
+        sqlite3_bind_int64(delete, 2, sqlite3_int64(receipt.accepted))
+        try stepDone(delete)
     }
 
     func appendJournal(_ event: RunEvent) throws {
@@ -260,6 +308,11 @@ private final class SQLiteTransaction: StateTransaction {
         guard let ptr = sqlite3_column_blob(stmt, index) else { return Data() }
         let count = Int(sqlite3_column_bytes(stmt, index))
         return Data(bytes: ptr, count: count)
+    }
+
+    private func text(_ stmt: OpaquePointer, _ index: Int32) -> String {
+        guard let value = sqlite3_column_text(stmt, index) else { return "" }
+        return String(cString: value)
     }
 
     private func stepDone(_ stmt: OpaquePointer) throws {

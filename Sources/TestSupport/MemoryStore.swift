@@ -10,6 +10,7 @@ public final class MemoryTransaction: StateTransaction {
     public var census: [String: CensusRow] = [:]
     public var dirty: [MetricID: Set<String>] = [:]
     public var deliveries: [BatchID: DeliveryReceipt] = [:]
+    public var pending: [BatchID: PendingBatch] = [:]
 
     public init() {}
 
@@ -18,17 +19,26 @@ public final class MemoryTransaction: StateTransaction {
     }
 
     public func commitBatch(_ batch: PendingBatch, advancing: CursorAdvance) throws {
-        _ = batch
+        pending[batch.id] = batch
         cursors[advancing.metric] = advancing.snapshot
     }
 
+    public func pendingBatches() throws -> [PendingBatch] {
+        pending.values.sorted { $0.id.rawValue < $1.id.rawValue }
+    }
+
     public func evict(_ batchID: BatchID, recording: GapRecord) throws {
-        _ = batchID
+        pending.removeValue(forKey: batchID)
         gaps.append(recording)
     }
 
     public func recordDelivery(_ receipt: DeliveryReceipt) throws {
         deliveries[receipt.batchID] = receipt
+        if let batch = pending[receipt.batchID],
+           receipt.unconfirmed == 0,
+           receipt.accepted >= batch.expectedRecords {
+            pending.removeValue(forKey: receipt.batchID)
+        }
     }
 
     public func appendJournal(_ event: RunEvent) throws {

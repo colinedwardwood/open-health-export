@@ -54,3 +54,7 @@ Health store.
 The catalogue has seven quantity types (steps, heart rate, active energy, walking distance, body
 mass, SpO₂, respiratory rate). HA state JSON is encoded separately from discovery and is not
 eligible for retain.
+
+Committed payloads are now durable queue rows in the same transaction as cursor advancement.
+`PendingDeliveryRunner` replays each queued batch at most once per invocation after a process
+restart; only a receipt covering every expected record removes it.

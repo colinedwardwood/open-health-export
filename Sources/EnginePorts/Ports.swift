@@ -42,12 +42,15 @@ public struct CursorAdvance: Sendable {
     }
 }
 
-public struct PendingBatch: Sendable {
+public struct PendingBatch: Sendable, Equatable {
     public var id: BatchID
     public var payloadURL: String
-    public init(id: BatchID, payloadURL: String) {
+    public var expectedRecords: Int
+
+    public init(id: BatchID, payloadURL: String, expectedRecords: Int = 0) {
         self.id = id
         self.payloadURL = payloadURL
+        self.expectedRecords = expectedRecords
     }
 }
 
@@ -124,6 +127,8 @@ public struct CensusRow: Sendable, Equatable {
 public protocol StateTransaction: AnyObject {
     func loadCursor(metric: MetricID) throws -> CursorSnapshot?
     func commitBatch(_ batch: PendingBatch, advancing: CursorAdvance) throws
+    /// Batches survive process death until a receipt confirms every expected record.
+    func pendingBatches() throws -> [PendingBatch]
     func evict(_ batchID: BatchID, recording: GapRecord) throws
     func recordDelivery(_ receipt: DeliveryReceipt) throws
     func appendJournal(_ event: RunEvent) throws

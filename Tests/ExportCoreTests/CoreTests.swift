@@ -166,6 +166,7 @@ import Watchdog
         )
     }
     #expect(store.transaction.cursors[MetricID(rawValue: "heartRate")]?.epoch == 1)
+    #expect(try store.transaction.pendingBatches().map(\.id.rawValue) == ["b1"])
 }
 
 @Test func sqliteJournalRoundTrip() async throws {
@@ -299,12 +300,49 @@ func testEnvelope() -> WireEnvelope {
     let first = try await run.run()
     #expect(first.kind == .success)
     #expect(store.transaction.cursors[metric]?.anchorBlob == Data([0xAA]))
+    #expect(try store.transaction.pendingBatches().isEmpty)
     let census = try store.transaction.loadCensus(metric: metric, day: "2024-01-01")
     #expect(census?.sampleCount == 1)
     #expect(try store.transaction.dirtyDays(metric: metric) == ["2024-01-01"])
 
     let second = try await run.run()
     #expect(second.kind == .successNothingDue)
+}
+
+@Test func pendingDeliveryRunnerReplaysACommittedBatchAfterRestart() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let page = SamplePage(
+        samples: [heartSample("dddddddd-dddd-dddd-dddd-dddddddddddd")],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0xDD]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-replay-\(UUID().uuidString)")
+    let destination = root.appendingPathComponent("destination")
+    try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+    let payload = root.appendingPathComponent("batch.ndjson")
+    try "one\n".write(to: payload, atomically: true, encoding: .utf8)
+    let store = MemoryStateStore()
+    try await store.transact {
+        try $0.commitBatch(
+            PendingBatch(
+                id: BatchID(rawValue: "replay-batch"),
+                payloadURL: payload.path,
+                expectedRecords: 1
+            ),
+            advancing: CursorAdvance(page: page, epoch: 1)
+        )
+    }
+
+    let runner = PendingDeliveryRunner(
+        destination: .testing(LocalFileSink(directory: destination)),
+        store: store
+    )
+    let receipts = try await runner.runOnce()
+    #expect(receipts.map(\.accepted) == [1])
+    #expect(try store.transaction.pendingBatches().isEmpty)
 }
 
 @Test func skipCommitLeavesCursorUnmovedSoPageIsReread() async throws {
@@ -356,7 +394,7 @@ func testEnvelope() -> WireEnvelope {
     )
     try await store.transact { tx in
         try tx.commitBatch(
-            PendingBatch(id: BatchID(rawValue: "b"), payloadURL: "/tmp/x"),
+            PendingBatch(id: BatchID(rawValue: "b"), payloadURL: "/tmp/x", expectedRecords: 2),
             advancing: CursorAdvance(page: page, epoch: 3)
         )
         try tx.upsertCensus(CensusRow(metric: metric, day: "2024-01-01", sampleCount: 1, digest: "abc"))
@@ -369,4 +407,20 @@ func testEnvelope() -> WireEnvelope {
     #expect(row?.sampleCount == 1)
     let dirty = try await store.transact { try $0.dirtyDays(metric: metric) }
     #expect(dirty == ["2024-01-01"])
+    let pending = try await store.transact { try $0.pendingBatches() }
+    #expect(pending == [
+        PendingBatch(id: BatchID(rawValue: "b"), payloadURL: "/tmp/x", expectedRecords: 2)
+    ])
+    try await store.transact {
+        try $0.recordDelivery(
+            DeliveryReceipt(batchID: BatchID(rawValue: "b"), accepted: 1, statusOnly: false)
+        )
+    }
+    #expect(try await store.transact { try $0.pendingBatches() }.count == 1)
+    try await store.transact {
+        try $0.recordDelivery(
+            DeliveryReceipt(batchID: BatchID(rawValue: "b"), accepted: 2, statusOnly: false)
+        )
+    }
+    #expect(try await store.transact { try $0.pendingBatches() }.isEmpty)
 }
