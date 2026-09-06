@@ -34,11 +34,14 @@ public struct CursorAdvance: Sendable {
         CursorSnapshot(metric: metric, epoch: epoch, anchorBlob: anchorBlob)
     }
 
-    public init(page: SamplePage, epoch: UInt32) {
+    public let tzDatabaseVersion: String
+
+    public init(page: SamplePage, epoch: UInt32, tzDatabaseVersion: String = "unknown") {
         self.metric = page.metric
         self.epoch = epoch
         self.anchorBlob = page.anchorBlob
         self.observedThrough = page.observedThrough
+        self.tzDatabaseVersion = tzDatabaseVersion
     }
 }
 
@@ -46,11 +49,13 @@ public struct PendingBatch: Sendable, Equatable {
     public var id: BatchID
     public var payloadURL: String
     public var expectedRecords: Int
+    public var byteCount: Int
 
-    public init(id: BatchID, payloadURL: String, expectedRecords: Int = 0) {
+    public init(id: BatchID, payloadURL: String, expectedRecords: Int = 0, byteCount: Int = 0) {
         self.id = id
         self.payloadURL = payloadURL
         self.expectedRecords = expectedRecords
+        self.byteCount = byteCount
     }
 }
 
@@ -129,6 +134,8 @@ public protocol StateTransaction: AnyObject {
     func commitBatch(_ batch: PendingBatch, advancing: CursorAdvance) throws
     /// Batches survive process death until a receipt confirms every expected record.
     func pendingBatches() throws -> [PendingBatch]
+    func queuedBytes() throws -> Int
+    func loadGaps() throws -> [GapRecord]
     func evict(_ batchID: BatchID, recording: GapRecord) throws
     func recordDelivery(_ receipt: DeliveryReceipt) throws
     func appendJournal(_ event: RunEvent) throws

@@ -79,3 +79,9 @@ replay remains idempotent. Release builds omit the injector surface.
 
 R-82 tier zero is a committed 200-record canonical NDJSON corpus generated from seed 1. Linux CI
 regenerates it and checks byte identity plus SHA-256.
+
+R-09 enqueue now evicts oldest pending batches inside the same transaction that admits the new
+one, down toward a 230 MiB watermark, and records `queue_eviction:<bytes>` gaps. Victim files
+are unlinked after COMMIT. R-86 cursor rows are `OHEC` envelopes; corrupt or newer formats fail
+closed. Policycheck bans ambient clocks in `Sources/` except CoreTemporal and HealthKitSource.
+A DCO workflow requires `Signed-off-by` on every commit.

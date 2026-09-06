@@ -395,7 +395,8 @@ func testEnvelope() -> WireEnvelope {
 
     let first = try await run.run()
     #expect(first.kind == .success)
-    #expect(store.transaction.cursors[metric]?.anchorBlob == Data([0xAA]))
+    #expect(try store.transaction.loadCursor(metric: metric)?.anchorBlob == Data([0xAA]))
+    #expect(store.transaction.cursors[metric]?.anchorBlob.prefix(4) == Data("OHEC".utf8))
     #expect(try store.transaction.pendingBatches().isEmpty)
     #expect(store.transaction.ledger.count == 2)
     let phases = store.transaction.ledger.map(\.outcomeKind)
@@ -665,4 +666,98 @@ private struct OneExportFault: ExportFaultInjector {
         )
     }
     #expect(try await store.transact { try $0.pendingBatches() }.isEmpty)
+}
+
+@Test func checkpointEnvelopeRoundTripsAndRejectsForwardVersions() throws {
+    let envelope = CheckpointEnvelope(
+        tzDatabaseVersion: "2024a",
+        epoch: 9,
+        adapterAnchor: Data([0xAB, 0xCD])
+    )
+    let restored = try CheckpointEnvelope.decoded(envelope.encoded())
+    #expect(restored.tzDatabaseVersion == "2024a")
+    #expect(restored.epoch == 9)
+    #expect(restored.adapterAnchor == Data([0xAB, 0xCD]))
+    #expect(throws: CheckpointError.corrupt) {
+        _ = try CheckpointEnvelope.decoded(Data("nope".utf8))
+    }
+    var forward = envelope.encoded()
+    forward[4] = UInt8(CheckpointEnvelope.currentFormat + 1)
+    #expect(throws: CheckpointError.unsupportedFormat) {
+        _ = try CheckpointEnvelope.decoded(forward)
+    }
+}
+
+@Test func corruptCheckpointFailsClosedWithoutResettingTheCursor() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let store = MemoryStateStore()
+    store.transaction.cursors[metric] = CursorSnapshot(
+        metric: metric,
+        epoch: 1,
+        anchorBlob: Data("torn".utf8)
+    )
+    let dest = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-corrupt-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+    let run = ExportRun(
+        source: FixtureSource(pages: []),
+        destination: .testing(LocalFileSink(directory: dest)),
+        store: store,
+        metric: metric,
+        scratchDirectory: dest.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    )
+    await #expect(throws: CheckpointError.corrupt) {
+        _ = try await run.run()
+    }
+    #expect(store.transaction.cursors[metric]?.anchorBlob == Data("torn".utf8))
+    #expect(store.transaction.journal.last?.outcomeKind == "failed")
+    #expect(store.transaction.journal.last?.detail == "anchor_undecodable")
+}
+
+@Test func queueAdmissionEvictsOldestBatchesAndRecordsGaps() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let page = SamplePage(
+        samples: [heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([1]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let store = MemoryStateStore()
+    let policy = QueuePolicy(cap: 10, lowWatermark: 6)
+    try await store.transact {
+        try $0.commitBatch(
+            PendingBatch(
+                id: BatchID(rawValue: "old"),
+                payloadURL: "/tmp/old",
+                expectedRecords: 1,
+                byteCount: 8
+            ),
+            advancing: CursorAdvance(page: page, epoch: 1)
+        )
+    }
+    let incoming = PendingBatch(
+        id: BatchID(rawValue: "new"),
+        payloadURL: "/tmp/new",
+        expectedRecords: 1,
+        byteCount: 8
+    )
+    let victims = try await store.transact { tx in
+        let evicted = try QueueAdmission.makeRoom(for: incoming.byteCount, on: tx, policy: policy)
+        try tx.commitBatch(incoming, advancing: CursorAdvance(page: page, epoch: 2))
+        return evicted
+    }
+    #expect(victims.map(\.id.rawValue) == ["old"])
+    #expect(try store.transaction.pendingBatches().map(\.id.rawValue) == ["new"])
+    #expect(store.transaction.gaps.map(\.rangeDescription) == ["queue_eviction:8"])
+    await #expect(throws: QueueAdmissionError.blocked) {
+        try await store.transact { tx in
+            _ = try QueueAdmission.makeRoom(
+                for: 100,
+                on: tx,
+                policy: policy
+            )
+        }
+    }
 }

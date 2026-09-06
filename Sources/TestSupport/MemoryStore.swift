@@ -16,7 +16,13 @@ public final class MemoryTransaction: StateTransaction {
     public init() {}
 
     public func loadCursor(metric: MetricID) throws -> CursorSnapshot? {
-        cursors[metric]
+        guard let stored = cursors[metric] else { return nil }
+        let checkpoint = try CheckpointEnvelope.decoded(stored.anchorBlob)
+        return CursorSnapshot(
+            metric: stored.metric,
+            epoch: checkpoint.epoch,
+            anchorBlob: checkpoint.adapterAnchor
+        )
     }
 
     public func commitBatch(_ batch: PendingBatch, advancing: CursorAdvance) throws {
@@ -24,11 +30,28 @@ public final class MemoryTransaction: StateTransaction {
             pendingOrder.append(batch.id)
         }
         pending[batch.id] = batch
-        cursors[advancing.metric] = advancing.snapshot
+        let envelope = CheckpointEnvelope(
+            tzDatabaseVersion: advancing.tzDatabaseVersion,
+            epoch: advancing.epoch,
+            adapterAnchor: advancing.snapshot.anchorBlob
+        )
+        cursors[advancing.metric] = CursorSnapshot(
+            metric: advancing.metric,
+            epoch: advancing.epoch,
+            anchorBlob: envelope.encoded()
+        )
     }
 
     public func pendingBatches() throws -> [PendingBatch] {
         pendingOrder.compactMap { pending[$0] }
+    }
+
+    public func queuedBytes() throws -> Int {
+        pending.values.reduce(0) { $0 + $1.byteCount }
+    }
+
+    public func loadGaps() throws -> [GapRecord] {
+        gaps
     }
 
     public func evict(_ batchID: BatchID, recording: GapRecord) throws {

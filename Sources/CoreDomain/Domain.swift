@@ -175,7 +175,7 @@ public struct RunOutcome: Sendable, Equatable, CustomStringConvertible {
             return RunOutcome(kind: .cancelledBySystem)
         }
         if tally.terminalError == .destinationUnreachable || tally.terminalError == .internalFault {
-            return RunOutcome(kind: .failed)
+            return RunOutcome(kind: .failed, partialCause: tally.partialCause)
         }
         if tally.nothingDue, tally.read == 0 {
             return RunOutcome(kind: .successNothingDue)

@@ -1,0 +1,36 @@
+name: dco
+on:
+  push:
+  pull_request:
+jobs:
+  signed-off-by:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Every commit carries Signed-off-by
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            range="origin/${GITHUB_BASE_REF}..HEAD"
+          else
+            range="HEAD"
+            if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+              range="HEAD^..HEAD"
+            fi
+          fi
+          missing=0
+          while read -r commit; do
+            [ -z "${commit}" ] && continue
+            if ! git log -1 --format=%B "${commit}" | grep -q '^Signed-off-by: '; then
+              echo "missing Signed-off-by: ${commit}"
+              git log -1 --format='%h %s' "${commit}"
+              missing=1
+            fi
+          done < <(git rev-list "${range}")
+          if [ "${missing}" -ne 0 ]; then
+            echo "R-101: every commit must be signed off (git commit -s)."
+            exit 1
+          fi
+          echo "dco: ok"

@@ -49,6 +49,11 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
         try exec("PRAGMA journal_size_limit=4194304;")
         try exec("PRAGMA wal_autocheckpoint=1000;")
         try migrate()
+        do {
+            try exec("ALTER TABLE pending_batches ADD COLUMN byte_count INTEGER NOT NULL DEFAULT 0;")
+        } catch {
+            _ = error
+        }
     }
 
     deinit {
@@ -91,7 +96,8 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
             CREATE TABLE IF NOT EXISTS pending_batches (
                 batch_id TEXT PRIMARY KEY,
                 payload_url TEXT NOT NULL,
-                expected_records INTEGER NOT NULL
+                expected_records INTEGER NOT NULL,
+                byte_count INTEGER NOT NULL DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS deliveries (
                 batch_id TEXT PRIMARY KEY,
@@ -101,7 +107,7 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 batch_id TEXT PRIMARY KEY,
                 range_description TEXT NOT NULL
             );
-            PRAGMA user_version = 3;
+            PRAGMA user_version = 4;
             """)
     }
 
@@ -156,35 +162,46 @@ private final class SQLiteTransaction: StateTransaction {
         defer { sqlite3_finalize(stmt) }
         bindText(stmt, 1, metric.rawValue)
         guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
-        let epoch = UInt32(sqlite3_column_int64(stmt, 0))
+        _ = sqlite3_column_int64(stmt, 0)
         let blob = blob(stmt, 1)
-        return CursorSnapshot(metric: metric, epoch: epoch, anchorBlob: blob)
+        let checkpoint = try CheckpointEnvelope.decoded(blob)
+        return CursorSnapshot(
+            metric: metric,
+            epoch: checkpoint.epoch,
+            anchorBlob: checkpoint.adapterAnchor
+        )
     }
 
     func commitBatch(_ batch: PendingBatch, advancing: CursorAdvance) throws {
         let pending = try store.prepare(
-            "INSERT INTO pending_batches (batch_id, payload_url, expected_records) VALUES (?, ?, ?) ON CONFLICT(batch_id) DO UPDATE SET payload_url = excluded.payload_url, expected_records = excluded.expected_records;"
+            "INSERT INTO pending_batches (batch_id, payload_url, expected_records, byte_count) VALUES (?, ?, ?, ?) ON CONFLICT(batch_id) DO UPDATE SET payload_url = excluded.payload_url, expected_records = excluded.expected_records, byte_count = excluded.byte_count;"
         )
         defer { sqlite3_finalize(pending) }
         bindText(pending, 1, batch.id.rawValue)
         bindText(pending, 2, batch.payloadURL)
         sqlite3_bind_int64(pending, 3, sqlite3_int64(batch.expectedRecords))
+        sqlite3_bind_int64(pending, 4, sqlite3_int64(batch.byteCount))
         try stepDone(pending)
 
         let snap = advancing.snapshot
+        let envelope = CheckpointEnvelope(
+            tzDatabaseVersion: advancing.tzDatabaseVersion,
+            epoch: snap.epoch,
+            adapterAnchor: snap.anchorBlob
+        )
         let stmt = try store.prepare(
             "INSERT INTO cursors (metric, epoch, anchor) VALUES (?, ?, ?) ON CONFLICT(metric) DO UPDATE SET epoch = excluded.epoch, anchor = excluded.anchor;"
         )
         defer { sqlite3_finalize(stmt) }
         bindText(stmt, 1, snap.metric.rawValue)
         sqlite3_bind_int64(stmt, 2, sqlite3_int64(snap.epoch))
-        bindBlob(stmt, 3, snap.anchorBlob)
+        bindBlob(stmt, 3, envelope.encoded())
         try stepDone(stmt)
     }
 
     func pendingBatches() throws -> [PendingBatch] {
         let stmt = try store.prepare(
-            "SELECT batch_id, payload_url, expected_records FROM pending_batches ORDER BY rowid;"
+            "SELECT batch_id, payload_url, expected_records, byte_count FROM pending_batches ORDER BY rowid;"
         )
         defer { sqlite3_finalize(stmt) }
         var batches: [PendingBatch] = []
@@ -193,11 +210,34 @@ private final class SQLiteTransaction: StateTransaction {
                 PendingBatch(
                     id: BatchID(rawValue: text(stmt, 0)),
                     payloadURL: text(stmt, 1),
-                    expectedRecords: Int(sqlite3_column_int64(stmt, 2))
+                    expectedRecords: Int(sqlite3_column_int64(stmt, 2)),
+                    byteCount: Int(sqlite3_column_int64(stmt, 3))
                 )
             )
         }
         return batches
+    }
+
+    func queuedBytes() throws -> Int {
+        let stmt = try store.prepare("SELECT COALESCE(SUM(byte_count), 0) FROM pending_batches;")
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
+        return Int(sqlite3_column_int64(stmt, 0))
+    }
+
+    func loadGaps() throws -> [GapRecord] {
+        let stmt = try store.prepare("SELECT batch_id, range_description FROM gaps ORDER BY rowid;")
+        defer { sqlite3_finalize(stmt) }
+        var gaps: [GapRecord] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            gaps.append(
+                GapRecord(
+                    batchID: BatchID(rawValue: text(stmt, 0)),
+                    rangeDescription: text(stmt, 1)
+                )
+            )
+        }
+        return gaps
     }
 
     func evict(_ batchID: BatchID, recording: GapRecord) throws {

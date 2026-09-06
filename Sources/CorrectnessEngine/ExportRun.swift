@@ -39,8 +39,16 @@ public struct ExportRun: Sendable {
     }
 
     public func run() async throws -> RunOutcome {
-        let prior = try await store.transact { tx in
-            try tx.loadCursor(metric: metric)
+        let prior: CursorSnapshot?
+        do {
+            prior = try await store.transact { tx in
+                try tx.loadCursor(metric: metric)
+            }
+        } catch let error as CheckpointError {
+            let tally = RunTally(failed: 1, terminalError: .internalFault, partialCause: "anchor_undecodable")
+            let outcome = RunOutcome.derive(from: tally)
+            try await record(outcome: outcome, tally: tally, receipt: nil)
+            throw error
         }
         let page = try await source.page(metric: metric, afterAnchor: prior?.anchorBlob)
         #if DEBUG
@@ -66,30 +74,35 @@ public struct ExportRun: Sendable {
         let payloadURL = scratchDirectory.appendingPathComponent("\(batchID.rawValue).ndjson")
         try FileWriteKit.writeAtomically(payload, to: payloadURL)
 
-        try await store.transact { tx in
+        let recordCount = page.samples.count + page.tombstones.count
+        let pending = PendingBatch(
+            id: batchID,
+            payloadURL: payloadURL.path,
+            expectedRecords: recordCount,
+            byteCount: payload.count
+        )
+        let victims = try await store.transact { tx in
+            let evicted = try QueueAdmission.makeRoom(for: pending.byteCount, on: tx)
             try tx.commitBatch(
-                PendingBatch(
-                    id: batchID,
-                    payloadURL: payloadURL.path,
-                    expectedRecords: page.samples.count + page.tombstones.count
-                ),
-                advancing: CursorAdvance(page: page, epoch: epoch)
+                pending,
+                advancing: CursorAdvance(
+                    page: page,
+                    epoch: epoch,
+                    tzDatabaseVersion: envelope.producerVersion
+                )
             )
             try Census.apply(page: page, to: tx)
             #if DEBUG
             try faults.hit(.duringAnchorPersist)
             #endif
+            return evicted
+        }
+        for victim in victims {
+            try? FileManager.default.removeItem(atPath: victim.payloadURL)
         }
         #if DEBUG
         try faults.hit(.afterEnqueueBeforeDestinationWrite)
         #endif
-
-        let recordCount = page.samples.count + page.tombstones.count
-        let pending = PendingBatch(
-            id: batchID,
-            payloadURL: payloadURL.path,
-            expectedRecords: recordCount
-        )
         #if DEBUG
         let receipt = try await DeliveryExecutor.send(
             batch: pending,

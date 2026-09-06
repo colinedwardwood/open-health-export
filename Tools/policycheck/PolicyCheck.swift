@@ -89,5 +89,23 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck ExportCore quarantine: ok")
+        let ambient = ["Date()", "Calendar.current", "TimeZone.current", "Locale.current"]
+        let allowedAmbient = Set(["CoreTemporal", "HealthKitSource"])
+        var ambientHits: [String] = []
+        if let files = FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil) {
+            for case let file as URL in files where file.pathExtension == "swift" {
+                let target = file.path.split(separator: "/").drop(while: { $0 != "Sources" }).dropFirst().first.map(String.init) ?? ""
+                if allowedAmbient.contains(target) { continue }
+                let text = try String(contentsOf: file, encoding: .utf8)
+                for token in ambient where text.contains(token) {
+                    ambientHits.append("\(file.path): \(token)")
+                }
+            }
+        }
+        if !ambientHits.isEmpty {
+            FileHandle.standardError.write(Data((ambientHits.joined(separator: "\n") + "\n").utf8))
+            exit(1)
+        }
+        print("policycheck ambient clocks: ok")
     }
 }
