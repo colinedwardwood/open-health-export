@@ -9,6 +9,7 @@ import StorageSQLite
 import TestSupport
 import Testing
 import Watchdog
+import RunJournal
 @testable import CorrectnessEngine
 @testable import WireFormat
 
@@ -1254,4 +1255,142 @@ private struct OneExportFault: ExportFaultInjector {
     let texts = try files.map { try String(contentsOf: $0, encoding: .utf8) }
     #expect(texts.contains { $0.contains("\"state\":\"revised\"") })
     #expect(texts.contains { $0.contains("\"supersedes\":1") })
+}
+
+@Test func wakeLedgerAppendsBeforeWorkAndRoundTrips() throws {
+    let path = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-wake-\(UUID().uuidString).log")
+        .path
+    let ledger = WakeLedger(path: path)
+    try ledger.append(WakeRecord(trigger: .observerQuery, atEpoch: 100))
+    try ledger.append(WakeRecord(trigger: .appForeground, atEpoch: 200))
+    #expect(try ledger.records() == [
+        WakeRecord(trigger: .observerQuery, atEpoch: 100),
+        WakeRecord(trigger: .appForeground, atEpoch: 200),
+    ])
+}
+
+@Test func wakeAttributionSeparatesSchedulingFromExecution() {
+    let expected: TimeInterval = 1_000
+    #expect(
+        WakeAttribution.classify(
+            wakes: [],
+            lastJournal: nil,
+            nowEpoch: 2_000,
+            expectedWakeByEpoch: expected
+        ) == .scheduling
+    )
+    #expect(
+        WakeAttribution.classify(
+            wakes: [WakeRecord(trigger: .bgAppRefresh, atEpoch: 1_500)],
+            lastJournal: nil,
+            nowEpoch: 2_000,
+            expectedWakeByEpoch: expected
+        ) == .execution
+    )
+    #expect(
+        WakeAttribution.classify(
+            wakes: [WakeRecord(trigger: .bgAppRefresh, atEpoch: 1_500)],
+            lastJournal: RunEvent(
+                runID: RunID(rawValue: "r"),
+                outcomeKind: "failed",
+                detail: "anchor_undecodable"
+            ),
+            nowEpoch: 2_000,
+            expectedWakeByEpoch: expected
+        ) == .execution
+    )
+    #expect(
+        WakeAttribution.classify(
+            wakes: [WakeRecord(trigger: .bgAppRefresh, atEpoch: 1_500)],
+            lastJournal: RunEvent(
+                runID: RunID(rawValue: "r"),
+                outcomeKind: "success",
+                detail: ""
+            ),
+            nowEpoch: 2_000,
+            expectedWakeByEpoch: expected
+        ) == .none
+    )
+    #expect(
+        WakeAttribution.classify(
+            wakes: [],
+            lastJournal: nil,
+            nowEpoch: 500,
+            expectedWakeByEpoch: expected
+        ) == .none
+    )
+}
+
+@Test func sqlitePersistsRichJournalAndWipeClearsState() async throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-wipe-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let payload = root.appendingPathComponent("batch.ndjson")
+    try "payload\n".write(to: payload, atomically: true, encoding: .utf8)
+    let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+    let metric = MetricID(rawValue: "heartRate")
+    let page = SamplePage(
+        samples: [heartSample("cccccccc-cccc-cccc-cccc-cccccccccccc")],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0xCC]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let event = RunEvent(
+        runID: RunID(rawValue: "r1"),
+        outcomeKind: "success",
+        detail: "",
+        trigger: .observerQuery,
+        samplesRead: 3,
+        samplesCommitted: 3,
+        samplesAcked: 3
+    )
+    try await store.transact { tx in
+        try tx.commitBatch(
+            PendingBatch(
+                id: BatchID(rawValue: "b"),
+                payloadURL: payload.path,
+                expectedRecords: 1
+            ),
+            advancing: CursorAdvance(page: page, epoch: 1)
+        )
+        try tx.appendJournal(event)
+    }
+    #expect(try await store.transact { try $0.loadJournal() } == [event])
+    try await store.wipe()
+    #expect(try await store.transact { try $0.loadCursor(metric: metric) } == nil)
+    #expect(try await store.transact { try $0.pendingBatches() }.isEmpty)
+    #expect(try await store.transact { try $0.loadJournal() }.isEmpty)
+    #expect(!FileManager.default.fileExists(atPath: payload.path))
+}
+
+@Test func exportRunJournalRecordsTriggerAndCounts() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let page = SamplePage(
+        samples: [heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0x11]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let dest = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-journal-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+    let store = MemoryStateStore()
+    let run = ExportRun(
+        source: FixtureSource(pages: [page]),
+        destination: .testing(LocalFileSink(directory: dest)),
+        store: store,
+        metric: metric,
+        scratchDirectory: dest.appendingPathComponent("scratch"),
+        envelope: testEnvelope(),
+        trigger: .observerQuery
+    )
+    _ = try await run.run()
+    let event = try store.transaction.loadJournal().last
+    #expect(event?.trigger == .observerQuery)
+    #expect(event?.samplesRead == 2)
+    #expect(event?.samplesAcked == 2)
+    #expect(event?.outcomeKind == "success")
 }

@@ -128,6 +128,26 @@ public final class MemoryTransaction: StateTransaction {
     public func upsertAggregateEmitSeq(bucketKey: String, emitSeq: Int) throws {
         aggregateEmitSeq[bucketKey] = emitSeq
     }
+
+    public func loadJournal() throws -> [RunEvent] {
+        journal
+    }
+
+    public func wipe() throws -> [String] {
+        let urls = pending.values.map(\.payloadURL)
+        journal = []
+        ledger = []
+        cursors = [:]
+        gaps = []
+        census = [:]
+        dirty = [:]
+        deliveries = [:]
+        pending = [:]
+        pendingOrder = []
+        emittedIndex = [:]
+        aggregateEmitSeq = [:]
+        return urls
+    }
 }
 
 public final class MemoryStateStore: StateStore, @unchecked Sendable {
@@ -139,6 +159,13 @@ public final class MemoryStateStore: StateStore, @unchecked Sendable {
         _ body: (any StateTransaction) throws -> T
     ) async throws -> T {
         try body(transaction)
+    }
+
+    public func wipe() async throws {
+        let urls = try await transact { try $0.wipe() }
+        for path in urls {
+            try? FileManager.default.removeItem(atPath: path)
+        }
     }
 }
 

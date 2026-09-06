@@ -17,6 +17,7 @@ public struct ExportRun: Sendable {
     public var envelope: WireEnvelope
     public var clock: any Clock
     public var temporal: TemporalContext
+    public var trigger: RunTrigger
     #if DEBUG
     public var faults: any ExportFaultInjector = NoExportFaults()
     #endif
@@ -31,7 +32,8 @@ public struct ExportRun: Sendable {
         destinationName: String = "local-file",
         envelope: WireEnvelope,
         clock: any Clock = SystemClock(),
-        temporal: TemporalContext = .utc
+        temporal: TemporalContext = .utc,
+        trigger: RunTrigger = .manual
     ) {
         self.source = source
         self.destination = destination
@@ -43,6 +45,7 @@ public struct ExportRun: Sendable {
         self.envelope = envelope
         self.clock = clock
         self.temporal = temporal
+        self.trigger = trigger
     }
 
     public func run() async throws -> RunOutcome {
@@ -207,7 +210,11 @@ public struct ExportRun: Sendable {
                 RunEvent(
                     runID: RunID(rawValue: "run-\(metric.rawValue)"),
                     outcomeKind: outcome.kind.rawValue,
-                    detail: outcome.partialCause ?? ""
+                    detail: outcome.partialCause ?? "",
+                    trigger: trigger,
+                    samplesRead: tally.read,
+                    samplesCommitted: tally.committed,
+                    samplesAcked: tally.acked
                 )
             )
         }

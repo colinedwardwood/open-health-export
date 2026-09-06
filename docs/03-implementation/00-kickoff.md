@@ -103,3 +103,8 @@ a stable `bucketKey`. Aggregates encode on the wire. `ExportRun` now drains thos
 buckets into the same NDJSON batch as the delta page and clears the dirty days on
 commit. HealthKit statistics are still unused.
 
+Journal rows carry trigger and sample tallies. `WakeLedger` is an append-only
+wake file; `WakeAttribution` splits overdue scheduling from execution. Store
+wipe empties SQLite/memory tables and unlinks pending payloads after COMMIT.
+R-44 revocation purge is not wired.
+

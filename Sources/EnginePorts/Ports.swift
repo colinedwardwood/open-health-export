@@ -81,14 +81,42 @@ public struct DeliveryReceipt: Sendable {
     }
 }
 
-public struct RunEvent: Sendable {
+public enum RunTrigger: String, Sendable, Codable, Equatable, CaseIterable {
+    case manual
+    case observerQuery
+    case bgAppRefresh
+    case bgProcessing
+    case shortcut
+    case appForeground
+    case widgetControl
+    case launch
+}
+
+public struct RunEvent: Sendable, Equatable {
     public var runID: RunID
     public var outcomeKind: String
     public var detail: String
-    public init(runID: RunID, outcomeKind: String, detail: String) {
+    public var trigger: RunTrigger
+    public var samplesRead: Int
+    public var samplesCommitted: Int
+    public var samplesAcked: Int
+
+    public init(
+        runID: RunID,
+        outcomeKind: String,
+        detail: String,
+        trigger: RunTrigger = .manual,
+        samplesRead: Int = 0,
+        samplesCommitted: Int = 0,
+        samplesAcked: Int = 0
+    ) {
         self.runID = runID
         self.outcomeKind = outcomeKind
         self.detail = detail
+        self.trigger = trigger
+        self.samplesRead = samplesRead
+        self.samplesCommitted = samplesCommitted
+        self.samplesAcked = samplesAcked
     }
 }
 
@@ -167,6 +195,9 @@ public protocol StateTransaction: AnyObject {
     func loadEmittedIndex(metric: MetricID, day: String) throws -> [EmittedIndexRow]
     func loadAggregateEmitSeq(bucketKey: String) throws -> Int?
     func upsertAggregateEmitSeq(bucketKey: String, emitSeq: Int) throws
+    func loadJournal() throws -> [RunEvent]
+    /// Clears every table. Returns pending payload paths to unlink after COMMIT (R-43).
+    func wipe() throws -> [String]
 }
 
 public protocol StateStore: Sendable {
@@ -174,6 +205,8 @@ public protocol StateStore: Sendable {
     func transact<T: Sendable>(
         _ body: (any StateTransaction) throws -> T
     ) async throws -> T
+    /// R-43: drop durable state. Payload files named by wipe() are unlinked after COMMIT.
+    func wipe() async throws
 }
 
 public protocol StatisticsSource: Sendable {

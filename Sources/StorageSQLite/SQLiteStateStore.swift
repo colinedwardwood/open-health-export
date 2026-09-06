@@ -54,6 +54,14 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
         } catch {
             _ = error
         }
+        for sql in [
+            "ALTER TABLE journal ADD COLUMN trigger TEXT NOT NULL DEFAULT 'manual';",
+            "ALTER TABLE journal ADD COLUMN samples_read INTEGER NOT NULL DEFAULT 0;",
+            "ALTER TABLE journal ADD COLUMN samples_committed INTEGER NOT NULL DEFAULT 0;",
+            "ALTER TABLE journal ADD COLUMN samples_acked INTEGER NOT NULL DEFAULT 0;",
+        ] {
+            do { try exec(sql) } catch { _ = error }
+        }
     }
 
     deinit {
@@ -68,7 +76,11 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 run_id TEXT NOT NULL,
                 outcome TEXT NOT NULL,
-                detail TEXT NOT NULL
+                detail TEXT NOT NULL,
+                trigger TEXT NOT NULL DEFAULT 'manual',
+                samples_read INTEGER NOT NULL DEFAULT 0,
+                samples_committed INTEGER NOT NULL DEFAULT 0,
+                samples_acked INTEGER NOT NULL DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS ledger (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -119,7 +131,7 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 bucket_key TEXT PRIMARY KEY,
                 emit_seq INTEGER NOT NULL
             );
-            PRAGMA user_version = 6;
+            PRAGMA user_version = 7;
             """)
     }
 
@@ -135,6 +147,13 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
         } catch {
             try? exec("ROLLBACK;")
             throw error
+        }
+    }
+
+    public func wipe() async throws {
+        let urls = try await transact { try $0.wipe() }
+        for path in urls {
+            try? FileManager.default.removeItem(atPath: path)
         }
     }
 
@@ -290,11 +309,17 @@ private final class SQLiteTransaction: StateTransaction {
     }
 
     func appendJournal(_ event: RunEvent) throws {
-        let stmt = try store.prepare("INSERT INTO journal (run_id, outcome, detail) VALUES (?, ?, ?);")
+        let stmt = try store.prepare(
+            "INSERT INTO journal (run_id, outcome, detail, trigger, samples_read, samples_committed, samples_acked) VALUES (?, ?, ?, ?, ?, ?, ?);"
+        )
         defer { sqlite3_finalize(stmt) }
         bindText(stmt, 1, event.runID.rawValue)
         bindText(stmt, 2, event.outcomeKind)
         bindText(stmt, 3, event.detail)
+        bindText(stmt, 4, event.trigger.rawValue)
+        sqlite3_bind_int64(stmt, 5, sqlite3_int64(event.samplesRead))
+        sqlite3_bind_int64(stmt, 6, sqlite3_int64(event.samplesCommitted))
+        sqlite3_bind_int64(stmt, 7, sqlite3_int64(event.samplesAcked))
         try stepDone(stmt)
     }
 
@@ -440,6 +465,44 @@ private final class SQLiteTransaction: StateTransaction {
         bindText(stmt, 1, bucketKey)
         sqlite3_bind_int64(stmt, 2, sqlite3_int64(emitSeq))
         try stepDone(stmt)
+    }
+
+    func loadJournal() throws -> [RunEvent] {
+        let stmt = try store.prepare(
+            "SELECT run_id, outcome, detail, trigger, samples_read, samples_committed, samples_acked FROM journal ORDER BY id;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        var events: [RunEvent] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            events.append(
+                RunEvent(
+                    runID: RunID(rawValue: text(stmt, 0)),
+                    outcomeKind: text(stmt, 1),
+                    detail: text(stmt, 2),
+                    trigger: RunTrigger(rawValue: text(stmt, 3)) ?? .manual,
+                    samplesRead: Int(sqlite3_column_int64(stmt, 4)),
+                    samplesCommitted: Int(sqlite3_column_int64(stmt, 5)),
+                    samplesAcked: Int(sqlite3_column_int64(stmt, 6))
+                )
+            )
+        }
+        return events
+    }
+
+    func wipe() throws -> [String] {
+        let stmt = try store.prepare("SELECT payload_url FROM pending_batches;")
+        defer { sqlite3_finalize(stmt) }
+        var urls: [String] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            urls.append(text(stmt, 0))
+        }
+        for table in [
+            "journal", "ledger", "cursors", "census", "dirty", "pending_batches",
+            "deliveries", "gaps", "emitted_index", "aggregate_emit",
+        ] {
+            try store.exec("DELETE FROM \(table);")
+        }
+        return urls
     }
 
     private func bindText(_ stmt: OpaquePointer, _ index: Int32, _ value: String) {
