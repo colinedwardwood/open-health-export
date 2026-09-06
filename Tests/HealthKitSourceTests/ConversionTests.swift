@@ -113,10 +113,10 @@ import Testing
     #expect(record.unit.symbol == "mL/kg/min")
 }
 
-@Test func bloodGlucoseUsesMillimolesPerLitre() {
+@Test func bloodGlucoseConvertsOnceToCanonicalMilligramsPerDecilitre() {
     let start = Date(timeIntervalSince1970: 1_704_067_200)
-    let unit = HKUnit.moleUnit(with: .milli, molarMass: HKUnitMolarMassBloodGlucose).unitDivided(by: .liter())
-    let quantity = HKQuantity(unit: unit, doubleValue: 5.5)
+    let unit = HKUnit.gramUnit(with: .milli).unitDivided(by: .literUnit(with: .deci))
+    let quantity = HKQuantity(unit: unit, doubleValue: 99)
     let sample = HKQuantitySample(
         type: HKQuantityType(.bloodGlucose),
         quantity: quantity,
@@ -128,8 +128,51 @@ import Testing
         metric: MetricCatalog.bloodGlucose.id,
         context: .utc
     )
-    #expect(record.value == 5.5)
-    #expect(record.unit.symbol == "mmol/L")
+    #expect(record.value == 99)
+    #expect(record.unit.symbol == "mg/dL")
+}
+
+@Test func expandedCatalogueUsesCanonicalAdapterUnits() {
+    let start = Date(timeIntervalSince1970: 1_704_067_200)
+    let fixtures: [(MetricDeclaration, HKUnit, Double, Double)] = [
+        (MetricCatalog.cyclingDistance, .meter(), 1_500, 1.5),
+        (MetricCatalog.flightsClimbed, .count(), 12, 12),
+        (MetricCatalog.basalEnergy, .kilocalorie(), 450, 450),
+        (MetricCatalog.exerciseTime, .second(), 1_800, 30),
+        (MetricCatalog.standTime, .minute(), 10, 10),
+        (
+            MetricCatalog.walkingHeartRateAverage,
+            HKUnit.count().unitDivided(by: .minute()),
+            91,
+            91
+        ),
+        (MetricCatalog.heartRateVariabilitySDNN, .second(), 0.042, 42),
+        (MetricCatalog.bodyTemperature, .degreeFahrenheit(), 98.6, 37),
+        (MetricCatalog.basalBodyTemperature, .degreeCelsius(), 36.5, 36.5),
+        (MetricCatalog.leanBodyMass, .gramUnit(with: .kilo), 55, 55),
+        (MetricCatalog.dietaryWater, .liter(), 0.25, 250),
+        (MetricCatalog.bloodPressureSystolic, .millimeterOfMercury(), 120, 120),
+        (MetricCatalog.bloodPressureDiastolic, .millimeterOfMercury(), 80, 80),
+    ]
+    for (declaration, sourceUnit, sourceValue, expected) in fixtures {
+        guard let type = SampleConversion.quantityType(for: declaration.id) else {
+            Issue.record("missing HealthKit quantity type for \(declaration.id.rawValue)")
+            continue
+        }
+        let sample = HKQuantitySample(
+            type: type,
+            quantity: HKQuantity(unit: sourceUnit, doubleValue: sourceValue),
+            start: start,
+            end: start
+        )
+        let record = SampleConversion.record(
+            from: sample,
+            metric: declaration.id,
+            context: .utc
+        )
+        #expect(abs(record.value - expected) < 0.000_001)
+        #expect(record.unit == declaration.canonicalUnit)
+    }
 }
 
 @Test func queryAnchorRoundTripsThroughOpaqueEnvelope() throws {

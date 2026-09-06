@@ -40,20 +40,33 @@ enum SampleConversion {
 
     static func unit(for metric: MetricID) -> HKUnit {
         switch metric {
-        case MetricCatalog.heartRate.id, MetricCatalog.respiratoryRate.id, MetricCatalog.restingHeartRate.id:
+        case MetricCatalog.heartRate.id,
+             MetricCatalog.respiratoryRate.id,
+             MetricCatalog.restingHeartRate.id,
+             MetricCatalog.walkingHeartRateAverage.id:
             return HKUnit.count().unitDivided(by: .minute())
-        case MetricCatalog.activeEnergy.id:
+        case MetricCatalog.activeEnergy.id, MetricCatalog.basalEnergy.id:
             return .kilocalorie()
-        case MetricCatalog.bodyMass.id:
+        case MetricCatalog.bodyMass.id, MetricCatalog.leanBodyMass.id:
             return .gramUnit(with: .kilo)
         case MetricCatalog.oxygenSaturation.id:
             return .percent()
-        case MetricCatalog.walkingRunningDistance.id:
+        case MetricCatalog.walkingRunningDistance.id, MetricCatalog.cyclingDistance.id:
             return .meter()
         case MetricCatalog.vo2Max.id:
             return HKUnit.literUnit(with: .milli).unitDivided(by: .gramUnit(with: .kilo).unitMultiplied(by: .minute()))
         case MetricCatalog.bloodGlucose.id:
-            return HKUnit.moleUnit(with: .milli, molarMass: HKUnitMolarMassBloodGlucose).unitDivided(by: .liter())
+            return HKUnit.gramUnit(with: .milli).unitDivided(by: .literUnit(with: .deci))
+        case MetricCatalog.exerciseTime.id, MetricCatalog.standTime.id:
+            return .minute()
+        case MetricCatalog.heartRateVariabilitySDNN.id:
+            return .secondUnit(with: .milli)
+        case MetricCatalog.bodyTemperature.id, MetricCatalog.basalBodyTemperature.id:
+            return .degreeCelsius()
+        case MetricCatalog.dietaryWater.id:
+            return .literUnit(with: .milli)
+        case MetricCatalog.bloodPressureSystolic.id, MetricCatalog.bloodPressureDiastolic.id:
+            return .millimeterOfMercury()
         default:
             return .count()
         }
@@ -63,7 +76,7 @@ enum SampleConversion {
         switch metric {
         case MetricCatalog.oxygenSaturation.id:
             return hkValue * 100
-        case MetricCatalog.walkingRunningDistance.id:
+        case MetricCatalog.walkingRunningDistance.id, MetricCatalog.cyclingDistance.id:
             return hkValue / 1000
         default:
             return hkValue

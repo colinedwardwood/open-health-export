@@ -186,12 +186,207 @@ public enum MetricCatalog {
         id: MetricID(rawValue: "bloodGlucose"),
         wireId: "blood_glucose",
         hkIdentifier: "HKQuantityTypeIdentifierBloodGlucose",
-        canonicalUnit: CanonicalUnit(symbol: "mmol/L"),
-        wireUnit: "mmol/L",
+        canonicalUnit: CanonicalUnit(symbol: "mg/dL"),
+        wireUnit: "mg/dL",
         cumulative: false,
         usesHealthKitStatistics: false,
         sensitivity: .sensitive,
-        haUnit: "mmol/L",
+        haUnit: "mg/dL",
+        haDeviceClass: "blood_glucose_concentration",
+        haStateClass: "measurement",
+        haRequiresAggregate: false
+    )
+
+    public static let cyclingDistance = MetricDeclaration(
+        id: MetricID(rawValue: "cyclingDistance"),
+        wireId: "cycling_distance",
+        hkIdentifier: "HKQuantityTypeIdentifierDistanceCycling",
+        canonicalUnit: CanonicalUnit(symbol: "km"),
+        wireUnit: "km",
+        cumulative: true,
+        usesHealthKitStatistics: true,
+        sensitivity: .routine,
+        haUnit: "km",
+        haDeviceClass: "distance",
+        haStateClass: "total_increasing",
+        haRequiresAggregate: true
+    )
+
+    public static let flightsClimbed = MetricDeclaration(
+        id: MetricID(rawValue: "flightsClimbed"),
+        wireId: "flights_climbed",
+        hkIdentifier: "HKQuantityTypeIdentifierFlightsClimbed",
+        canonicalUnit: CanonicalUnit(symbol: "count"),
+        wireUnit: "count",
+        cumulative: true,
+        usesHealthKitStatistics: true,
+        sensitivity: .routine,
+        haUnit: "flights",
+        haDeviceClass: nil,
+        haStateClass: "total_increasing",
+        haRequiresAggregate: true
+    )
+
+    public static let basalEnergy = MetricDeclaration(
+        id: MetricID(rawValue: "basalEnergy"),
+        wireId: "basal_energy",
+        hkIdentifier: "HKQuantityTypeIdentifierBasalEnergyBurned",
+        canonicalUnit: CanonicalUnit(symbol: "kcal"),
+        wireUnit: "kcal",
+        cumulative: true,
+        usesHealthKitStatistics: true,
+        sensitivity: .routine,
+        haUnit: "kcal",
+        haDeviceClass: "energy",
+        haStateClass: "total_increasing",
+        haRequiresAggregate: true
+    )
+
+    public static let exerciseTime = MetricDeclaration(
+        id: MetricID(rawValue: "exerciseTime"),
+        wireId: "exercise_time",
+        hkIdentifier: "HKQuantityTypeIdentifierAppleExerciseTime",
+        canonicalUnit: CanonicalUnit(symbol: "min"),
+        wireUnit: "min",
+        cumulative: true,
+        usesHealthKitStatistics: true,
+        sensitivity: .routine,
+        haUnit: "min",
+        haDeviceClass: "duration",
+        haStateClass: "total_increasing",
+        haRequiresAggregate: true
+    )
+
+    public static let standTime = MetricDeclaration(
+        id: MetricID(rawValue: "standTime"),
+        wireId: "stand_time",
+        hkIdentifier: "HKQuantityTypeIdentifierAppleStandTime",
+        canonicalUnit: CanonicalUnit(symbol: "min"),
+        wireUnit: "min",
+        cumulative: true,
+        usesHealthKitStatistics: true,
+        sensitivity: .routine,
+        haUnit: "min",
+        haDeviceClass: "duration",
+        haStateClass: "total_increasing",
+        haRequiresAggregate: true
+    )
+
+    public static let walkingHeartRateAverage = MetricDeclaration(
+        id: MetricID(rawValue: "walkingHeartRateAverage"),
+        wireId: "walking_heart_rate_average",
+        hkIdentifier: "HKQuantityTypeIdentifierWalkingHeartRateAverage",
+        canonicalUnit: CanonicalUnit(symbol: "count/min"),
+        wireUnit: "bpm",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .routine,
+        haUnit: "bpm",
+        haDeviceClass: nil,
+        haStateClass: "measurement",
+        haRequiresAggregate: false
+    )
+
+    public static let heartRateVariabilitySDNN = MetricDeclaration(
+        id: MetricID(rawValue: "heartRateVariabilitySDNN"),
+        wireId: "heart_rate_variability_sdnn",
+        hkIdentifier: "HKQuantityTypeIdentifierHeartRateVariabilitySDNN",
+        canonicalUnit: CanonicalUnit(symbol: "ms"),
+        wireUnit: "ms",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .sensitive,
+        haUnit: "ms",
+        haDeviceClass: "duration",
+        haStateClass: "measurement",
+        haRequiresAggregate: false
+    )
+
+    public static let bodyTemperature = MetricDeclaration(
+        id: MetricID(rawValue: "bodyTemperature"),
+        wireId: "body_temperature",
+        hkIdentifier: "HKQuantityTypeIdentifierBodyTemperature",
+        canonicalUnit: CanonicalUnit(symbol: "degC"),
+        wireUnit: "degC",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .sensitive,
+        haUnit: "°C",
+        haDeviceClass: "temperature",
+        haStateClass: "measurement",
+        haRequiresAggregate: false
+    )
+
+    public static let basalBodyTemperature = MetricDeclaration(
+        id: MetricID(rawValue: "basalBodyTemperature"),
+        wireId: "basal_body_temperature",
+        hkIdentifier: "HKQuantityTypeIdentifierBasalBodyTemperature",
+        canonicalUnit: CanonicalUnit(symbol: "degC"),
+        wireUnit: "degC",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .sensitive,
+        haUnit: "°C",
+        haDeviceClass: "temperature",
+        haStateClass: "measurement",
+        haRequiresAggregate: false
+    )
+
+    public static let leanBodyMass = MetricDeclaration(
+        id: MetricID(rawValue: "leanBodyMass"),
+        wireId: "lean_body_mass",
+        hkIdentifier: "HKQuantityTypeIdentifierLeanBodyMass",
+        canonicalUnit: CanonicalUnit(symbol: "kg"),
+        wireUnit: "kg",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .sensitive,
+        haUnit: "kg",
+        haDeviceClass: "weight",
+        haStateClass: "measurement",
+        haRequiresAggregate: false
+    )
+
+    public static let dietaryWater = MetricDeclaration(
+        id: MetricID(rawValue: "dietaryWater"),
+        wireId: "dietary_water",
+        hkIdentifier: "HKQuantityTypeIdentifierDietaryWater",
+        canonicalUnit: CanonicalUnit(symbol: "mL"),
+        wireUnit: "mL",
+        cumulative: true,
+        usesHealthKitStatistics: true,
+        sensitivity: .routine,
+        haUnit: "mL",
+        haDeviceClass: "volume",
+        haStateClass: "total_increasing",
+        haRequiresAggregate: true
+    )
+
+    public static let bloodPressureSystolic = MetricDeclaration(
+        id: MetricID(rawValue: "bloodPressureSystolic"),
+        wireId: "blood_pressure_systolic",
+        hkIdentifier: "HKQuantityTypeIdentifierBloodPressureSystolic",
+        canonicalUnit: CanonicalUnit(symbol: "mmHg"),
+        wireUnit: "mmHg",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .sensitive,
+        haUnit: "mmHg",
+        haDeviceClass: nil,
+        haStateClass: "measurement",
+        haRequiresAggregate: false
+    )
+
+    public static let bloodPressureDiastolic = MetricDeclaration(
+        id: MetricID(rawValue: "bloodPressureDiastolic"),
+        wireId: "blood_pressure_diastolic",
+        hkIdentifier: "HKQuantityTypeIdentifierBloodPressureDiastolic",
+        canonicalUnit: CanonicalUnit(symbol: "mmHg"),
+        wireUnit: "mmHg",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .sensitive,
+        haUnit: "mmHg",
         haDeviceClass: nil,
         haStateClass: "measurement",
         haRequiresAggregate: false
@@ -208,6 +403,19 @@ public enum MetricCatalog {
         restingHeartRate,
         vo2Max,
         bloodGlucose,
+        cyclingDistance,
+        flightsClimbed,
+        basalEnergy,
+        exerciseTime,
+        standTime,
+        walkingHeartRateAverage,
+        heartRateVariabilitySDNN,
+        bodyTemperature,
+        basalBodyTemperature,
+        leanBodyMass,
+        dietaryWater,
+        bloodPressureSystolic,
+        bloodPressureDiastolic,
     ]
 
     public static func declaration(for id: MetricID) -> MetricDeclaration? {

@@ -51,10 +51,11 @@ asks for camera permission before scanning and always keeps paste as a fallback.
 export one page, then forget pairing and pair again. Simulator has no camera and often an empty
 Health store.
 
-The catalogue has ten quantity types (steps, heart rate, resting heart rate, active
-energy, walking distance, body mass, SpO₂, respiratory rate, VO₂ max, blood glucose).
+The catalogue has 23 curated quantity types, including activity totals, cardiac
+measurements, temperatures, body composition, hydration and blood pressure.
 HA state JSON is encoded separately from discovery and is not eligible for retain.
-Blood glucose has no guessed `device_class`.
+Blood glucose is canonical `mg/dL` and uses HA's real
+`blood_glucose_concentration` class; metrics without a real class still omit it.
 
 Committed payloads are now durable queue rows in the same transaction as cursor advancement.
 `PendingDeliveryRunner` replays only the oldest queued batch per sink invocation after a process
