@@ -17,6 +17,12 @@ import Watchdog
 import WidgetKit
 import WireFormat
 
+private struct CompanionVerificationRecord: Codable {
+    var serviceName: String
+    var macInstallationID: String
+    var report: DestinationTestReport
+}
+
 enum HarnessExport {
     static func installationID() throws -> String {
         let root = try applicationSupportRoot()
@@ -88,14 +94,54 @@ enum HarnessExport {
         let store = try SQLiteStateStore(path: sqliteURL.path)
         let psk = try CompanionPSK.preSharedKey(from: session.secret)
         let discovered = try await CompanionDiscovery().find(pairedName: session.serviceName, for: .seconds(8))
-        let stream = NWByteStream(
-            service: discovered,
-            options: NWByteStream.Options(requireTLS13: true, failFastOnWaiting: true, preSharedKey: psk)
+        let options = NWByteStream.Options(
+            requireTLS13: true,
+            failFastOnWaiting: true,
+            preSharedKey: psk
         )
-        let sink = CompanionSink(
-            pipe: ByteStreamCompanionPipe(stream: stream),
-            installationID: session.localInstallationID
+        let deliveryPipe = ByteStreamCompanionPipe(
+            stream: NWByteStream(service: discovered, options: options)
         )
+        let verified: VerifiedDestination
+        let verificationURL = companionTestReportURL(root: root)
+        if let data = try? Data(contentsOf: verificationURL),
+           let saved = try? JSONDecoder().decode(CompanionVerificationRecord.self, from: data),
+           saved.serviceName == session.serviceName,
+           saved.macInstallationID == session.macInstallationID,
+           saved.report.allowsEnablement {
+            verified = try CompanionDestinationEnable.resume(
+                deliveryPipe: deliveryPipe,
+                installationID: session.localInstallationID,
+                testReport: saved.report
+            )
+        } else {
+            let testPipe = ByteStreamCompanionPipe(
+                stream: NWByteStream(service: discovered, options: options)
+            )
+            let completed = try await CompanionDestinationEnable.complete(
+                testPipe: testPipe,
+                deliveryPipe: deliveryPipe,
+                installationID: session.localInstallationID,
+                emittedAt: Date().ISO8601Format()
+            )
+            verified = completed.destination
+            let record = CompanionVerificationRecord(
+                serviceName: session.serviceName,
+                macInstallationID: session.macInstallationID,
+                report: completed.report
+            )
+            try JSONEncoder().encode(record).write(to: verificationURL, options: .atomic)
+            if let snapshotURL = StatusSnapshotLocation.url(destinationID: "companion") {
+                try DestinationSnapshotFile.recordSecurityEvents(
+                    completed.events.count,
+                    destinationID: "companion",
+                    destinationLabel: "Mac companion · \(session.serviceName)",
+                    writtenAtEpoch: Date().timeIntervalSince1970,
+                    at: snapshotURL
+                )
+            }
+            try await emitTrustNotices(completed.events, destination: session.serviceName)
+        }
         let context = TemporalContext(
             timeZoneIdentifier: "UTC",
             localeIdentifier: "en_US_POSIX",
@@ -109,7 +155,7 @@ enum HarnessExport {
         for metric in [MetricCatalog.heartRate.id, MetricCatalog.stepCount.id] {
             let run = ExportRun(
                 source: source,
-                destination: .testing(sink),
+                destination: verified,
                 store: store,
                 metric: metric,
                 scratchDirectory: scratch,
@@ -264,6 +310,7 @@ enum HarnessExport {
             atEpoch: Date().timeIntervalSince1970
         )
         try? FileManager.default.removeItem(at: localFileTestReportURL(root: root))
+        try? FileManager.default.removeItem(at: companionTestReportURL(root: root))
         try await vault().forget()
         if let directory = StatusSnapshotLocation.directory() {
             try? FileManager.default.removeItem(at: directory)
@@ -306,15 +353,26 @@ enum HarnessExport {
     }
 
     private static func emitTrustNotices(_ events: [TrustEvent]) async throws {
+        try await emitTrustNotices(events, destination: "local-file")
+    }
+
+    private static func emitTrustNotices(
+        _ events: [TrustEvent],
+        destination: String
+    ) async throws {
         guard !events.isEmpty else { return }
         let notifier = LocalUserNotifier()
         for event in events {
-            try await notifier.notify(TrustNotice.notice(for: event, destination: "local-file"))
+            try await notifier.notify(TrustNotice.notice(for: event, destination: destination))
         }
     }
 
     private static func localFileTestReportURL(root: URL) -> URL {
         root.appendingPathComponent("local-file-test.json")
+    }
+
+    private static func companionTestReportURL(root: URL) -> URL {
+        root.appendingPathComponent("companion-test.json")
     }
 
     private static func ledgerHeadSeal() -> any LedgerHeadSeal {
@@ -335,5 +393,25 @@ enum HarnessExport {
             store: KeychainSecretStore(service: "app.openhealthexporter.ios.psk"),
             recordFile: root.appendingPathComponent("pairing.json")
         )
+    }
+
+    static func forgetCompanion() async throws {
+        let root = try applicationSupportRoot()
+        try await vault().forget()
+        try? FileManager.default.removeItem(at: companionTestReportURL(root: root))
+        let event = TrustEvent.trustLost
+        if let snapshotURL = StatusSnapshotLocation.url(destinationID: "companion") {
+            try DestinationSnapshotFile.recordSecurityEvents(
+                1,
+                destinationID: "companion",
+                destinationLabel: "Mac companion",
+                enabled: false,
+                state: .blocked,
+                writtenAtEpoch: Date().timeIntervalSince1970,
+                at: snapshotURL
+            )
+        }
+        try await emitTrustNotices([event], destination: "companion")
+        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
     }
 }

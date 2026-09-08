@@ -165,3 +165,32 @@ private func writeCompanionPayload() throws -> (URL, BatchID, String) {
     #expect(report.verdict == .passed)
     #expect(report.failingStep == nil)
 }
+
+@Test func companionDestinationEnableTestsBeforeReturningVerifiedSink() async throws {
+    let broker = LoopbackCompanionBroker()
+    let enabled = try await CompanionDestinationEnable.complete(
+        testPipe: broker,
+        deliveryPipe: broker,
+        installationID: "phone",
+        emittedAt: "2024-01-01T00:00:00Z"
+    )
+    #expect(enabled.report.verdict == .passed)
+    #expect(enabled.events == [
+        .canaryConfirmed,
+        .pinRecorded(groupedFingerprint: nil),
+        .destinationEnabled,
+    ])
+    let (file, batchID, _) = try writeCompanionPayload()
+    let receipt = try await enabled.destination.sink.send(
+        fileHandle: file.path,
+        idempotencyKey: batchID
+    )
+    #expect(receipt.accepted == 1)
+
+    let resumed = try CompanionDestinationEnable.resume(
+        deliveryPipe: broker,
+        installationID: "phone",
+        testReport: enabled.report
+    )
+    _ = resumed.sink
+}

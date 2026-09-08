@@ -168,5 +168,7 @@ through a real-path canary (R-25) and drains trust events into R-40 notices
 without repeating them on later launches. Unacknowledged destination changes
 can be cleared from that screen. The screen documents Apple's Hidden Apps
 recovery path (R-41). Two-tap controls stop one metric (R-44 explicit stop)
-and run `DestructiveWipe` (R-43).
+and run `DestructiveWipe` (R-43). Companion export follows the same
+test-before-enable rule using its protocol canary; forgetting a pairing removes
+the passing report and records a blocked trust-loss change.
 

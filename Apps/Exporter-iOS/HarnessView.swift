@@ -483,11 +483,12 @@ struct HarnessView: View {
     @MainActor
     private func forgetPairing() async {
         do {
-            try await HarnessExport.vault().forget()
+            try await HarnessExport.forgetCompanion()
             pairing = nil
             sas = ""
             pairingPaste = ""
-            status = "Ready. Companion pairing forgotten."
+            destinationStatusLines = HarnessExport.destinationStatusLines()
+            status = "Ready. Companion pairing forgotten and its destination disabled."
         } catch {
             status = "Failed: \(error.localizedDescription)"
         }

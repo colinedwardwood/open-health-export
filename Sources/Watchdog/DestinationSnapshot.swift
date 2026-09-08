@@ -149,6 +149,8 @@ public enum DestinationSnapshotFile {
         _ count: Int,
         destinationID: String,
         destinationLabel: String? = nil,
+        enabled: Bool? = nil,
+        state: DestinationDisplayState? = nil,
         writtenAtEpoch: TimeInterval,
         at url: URL
     ) throws {
@@ -166,6 +168,12 @@ public enum DestinationSnapshotFile {
                 unacknowledgedSecurityEventCount: count,
                 writtenAtEpoch: writtenAtEpoch
             )
+        }
+        if let enabled {
+            snapshot.enabled = enabled
+        }
+        if let state {
+            snapshot.state = state
         }
         snapshot.writtenAtEpoch = writtenAtEpoch
         try write(snapshot, to: url)
