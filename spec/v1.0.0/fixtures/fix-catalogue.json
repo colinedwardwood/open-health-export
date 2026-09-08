@@ -1,0 +1,437 @@
+{
+  "version": "1.0.0",
+  "cases": [
+    {
+      "id": "T01",
+      "family": "T",
+      "ciTier": "t0",
+      "summary": "DST spring-forward nonexistent local time 02:30"
+    },
+    {
+      "id": "T02",
+      "family": "T",
+      "ciTier": "t0",
+      "summary": "DST fall-back 25-hour civil day"
+    },
+    {
+      "id": "T03",
+      "family": "T",
+      "ciTier": "t0",
+      "summary": "Half-hour and 45-minute offsets"
+    },
+    {
+      "id": "T04",
+      "family": "T",
+      "ciTier": "t0",
+      "summary": "Southern-hemisphere DST mid-year"
+    },
+    {
+      "id": "T05",
+      "family": "T",
+      "ciTier": "t0",
+      "summary": "Historic zone rules at the sample instant"
+    },
+    {
+      "id": "T06",
+      "family": "T",
+      "ciTier": "t0",
+      "summary": "Originating offset on the record, not device-now"
+    },
+    {
+      "id": "T07",
+      "family": "T",
+      "ciTier": "t0",
+      "summary": "Leap day and non-leap Feb 28 to Mar 1"
+    },
+    {
+      "id": "T08",
+      "family": "T",
+      "ciTier": "t0",
+      "summary": "No 86400-second day assumption"
+    },
+    {
+      "id": "T09",
+      "family": "T",
+      "ciTier": "t0",
+      "summary": "Zero-duration sample encodes"
+    },
+    {
+      "id": "T10",
+      "family": "T",
+      "ciTier": "t0",
+      "summary": "Inverted interval rejected"
+    },
+    {
+      "id": "T11",
+      "family": "T",
+      "ciTier": "t0",
+      "summary": "Pre-1970 and future-dated samples encode"
+    },
+    {
+      "id": "T12",
+      "family": "T",
+      "ciTier": "t0",
+      "summary": "Sample spanning a DST day still encodes; parts are additive"
+    },
+    {
+      "id": "T13",
+      "family": "T",
+      "ciTier": "t0",
+      "summary": "Interval crossing midnight and year boundary"
+    },
+    {
+      "id": "T14",
+      "family": "T",
+      "ciTier": "t0",
+      "summary": "26-hour session encodes without clamping"
+    },
+    {
+      "id": "T15",
+      "family": "T",
+      "ciTier": "t0",
+      "summary": "Machine buckets ignore display locale"
+    },
+    {
+      "id": "S01",
+      "family": "S",
+      "ciTier": "t0",
+      "summary": "Four sources at the same instant remain four UUIDs"
+    },
+    {
+      "id": "S02",
+      "family": "S",
+      "ciTier": "t0",
+      "summary": "Identity is UUID not bundle ID"
+    },
+    {
+      "id": "S03",
+      "family": "S",
+      "ciTier": "t0",
+      "summary": "Overlapping samples from one source all count"
+    },
+    {
+      "id": "S04",
+      "family": "S",
+      "ciTier": "t0",
+      "summary": "Missing source revision fields do not crash encode"
+    },
+    {
+      "id": "S05",
+      "family": "S",
+      "ciTier": "t0",
+      "summary": "Encode without device metadata"
+    },
+    {
+      "id": "S06",
+      "family": "S",
+      "ciTier": "t0",
+      "summary": "Unresolvable source still exports by UUID"
+    },
+    {
+      "id": "S07",
+      "family": "S",
+      "ciTier": "t0",
+      "summary": "Two exporter IDs do not share batch identity"
+    },
+    {
+      "id": "S08",
+      "family": "S",
+      "ciTier": "t0",
+      "summary": "Completeness is store-relative via the anchor"
+    },
+    {
+      "id": "M01",
+      "family": "M",
+      "ciTier": "t0",
+      "summary": "Retroactive historical sample is date-ordered on the wire"
+    },
+    {
+      "id": "M02",
+      "family": "M",
+      "ciTier": "t0",
+      "summary": "Tombstone carries UUID only"
+    },
+    {
+      "id": "M03",
+      "family": "M",
+      "ciTier": "t0",
+      "summary": "Edit is delete plus new UUID"
+    },
+    {
+      "id": "M04",
+      "family": "M",
+      "ciTier": "t0",
+      "summary": "Insert and tombstone of the same UUID in one batch"
+    },
+    {
+      "id": "M05",
+      "family": "M",
+      "ciTier": "t0",
+      "summary": "New UUIDs after restore re-export"
+    },
+    {
+      "id": "M06",
+      "family": "M",
+      "ciTier": "t0",
+      "summary": "Corrupt checkpoint fails closed"
+    },
+    {
+      "id": "M07",
+      "family": "M",
+      "ciTier": "nightly",
+      "summary": "500k-sample backfill is a volume gate"
+    },
+    {
+      "id": "M08",
+      "family": "M",
+      "ciTier": "t0",
+      "summary": "Forward-version checkpoint rejected"
+    },
+    {
+      "id": "A01",
+      "family": "A",
+      "ciTier": "t0",
+      "summary": "Empty read is nothingDue, never a denial claim"
+    },
+    {
+      "id": "A02",
+      "family": "A",
+      "ciTier": "t0",
+      "summary": "History-clipped is a distinct disable reason"
+    },
+    {
+      "id": "A03",
+      "family": "A",
+      "ciTier": "t0",
+      "summary": "Revocation purge does not advance as success"
+    },
+    {
+      "id": "A04",
+      "family": "A",
+      "ciTier": "t0",
+      "summary": "Per-type disable does not fail sibling metrics"
+    },
+    {
+      "id": "A05",
+      "family": "A",
+      "ciTier": "t0",
+      "summary": "Share set stays empty including share-disallowed types"
+    },
+    {
+      "id": "A06",
+      "family": "A",
+      "ciTier": "t0",
+      "summary": "MDM restricted is a distinct reason from revocation"
+    },
+    {
+      "id": "A07",
+      "family": "A",
+      "ciTier": "t0",
+      "summary": "Local Network denial copy is distinct from unreachable"
+    },
+    {
+      "id": "U01",
+      "family": "U",
+      "ciTier": "t0",
+      "summary": "Canonical unit round-trips including -40 C/F and glucose"
+    },
+    {
+      "id": "U02",
+      "family": "U",
+      "ciTier": "t0",
+      "summary": "Zero speed does not produce infinite pace"
+    },
+    {
+      "id": "U03",
+      "family": "U",
+      "ciTier": "t0",
+      "summary": "JSON numbers stay finite and decimal-stable"
+    },
+    {
+      "id": "U04",
+      "family": "U",
+      "ciTier": "t0",
+      "summary": "NaN and infinities are rejected"
+    },
+    {
+      "id": "U05",
+      "family": "U",
+      "ciTier": "t0",
+      "summary": "Implausible extremes encode unclamped"
+    },
+    {
+      "id": "U06",
+      "family": "U",
+      "ciTier": "t0",
+      "summary": "Meaningful zero is present, not omitted"
+    },
+    {
+      "id": "U07",
+      "family": "U",
+      "ciTier": "t0",
+      "summary": "Cumulative sums stay in Double, not Float32"
+    },
+    {
+      "id": "U08",
+      "family": "U",
+      "ciTier": "t0",
+      "summary": "JSON numbers ignore comma-decimal locales"
+    },
+    {
+      "id": "F01",
+      "family": "F",
+      "ciTier": "t0",
+      "summary": "Optional metadata absent still encodes"
+    },
+    {
+      "id": "F02",
+      "family": "F",
+      "ciTier": "t0",
+      "summary": "Wire kinds stay typed machine tokens"
+    },
+    {
+      "id": "F03",
+      "family": "F",
+      "ciTier": "t0",
+      "summary": "Hostile strings are JSON-escaped"
+    },
+    {
+      "id": "F04",
+      "family": "F",
+      "ciTier": "t0",
+      "summary": "Formula-looking values stay quoted JSON strings"
+    },
+    {
+      "id": "F05",
+      "family": "F",
+      "ciTier": "t0",
+      "summary": "Canonical JSON keys are unique after sort"
+    },
+    {
+      "id": "F06",
+      "family": "F",
+      "ciTier": "t0",
+      "summary": "Enumerations are raw identifiers, not display names"
+    },
+    {
+      "id": "F07",
+      "family": "F",
+      "ciTier": "nightly",
+      "summary": "Multi-gigabyte export is a volume gate"
+    },
+    {
+      "id": "F08",
+      "family": "F",
+      "ciTier": "t0",
+      "summary": "Request templates reject injection"
+    },
+    {
+      "id": "V01",
+      "family": "V",
+      "ciTier": "nightly",
+      "summary": "T1 10M corpus is generated, not stored"
+    },
+    {
+      "id": "V02",
+      "family": "V",
+      "ciTier": "nightly",
+      "summary": "Per-type 20M store uses a bounded page limit"
+    },
+    {
+      "id": "V03",
+      "family": "V",
+      "ciTier": "nightly",
+      "summary": "Workout-route fan-out is a volume gate"
+    },
+    {
+      "id": "V04",
+      "family": "V",
+      "ciTier": "t0",
+      "summary": "Empty store is successNothingDue"
+    },
+    {
+      "id": "V05",
+      "family": "V",
+      "ciTier": "t0",
+      "summary": "ExportRun is per-metric so sibling types stay independent"
+    },
+    {
+      "id": "V06",
+      "family": "V",
+      "ciTier": "t0",
+      "summary": "Six R-83 seams exist; process-exit is a host test"
+    },
+    {
+      "id": "V07",
+      "family": "V",
+      "ciTier": "t0",
+      "summary": "Duplicate idempotent delivery converges"
+    },
+    {
+      "id": "V08",
+      "family": "V",
+      "ciTier": "t0",
+      "summary": "Atomic replace never leaves a torn destination"
+    },
+    {
+      "id": "V09",
+      "family": "V",
+      "ciTier": "t0",
+      "summary": ".local mDNS hostnames are permitted destinations"
+    },
+    {
+      "id": "V10",
+      "family": "V",
+      "ciTier": "t0",
+      "summary": "Connect timeout is configured on the byte stream"
+    },
+    {
+      "id": "V11",
+      "family": "V",
+      "ciTier": "t0",
+      "summary": "256 MiB queue cap evicts oldest first"
+    },
+    {
+      "id": "P01",
+      "family": "P",
+      "ciTier": "t0",
+      "summary": "Companion resume continues from the next chunk"
+    },
+    {
+      "id": "P02",
+      "family": "P",
+      "ciTier": "t0",
+      "summary": "Pinned identity not advertised name disambiguates peers"
+    },
+    {
+      "id": "P03",
+      "family": "P",
+      "ciTier": "t0",
+      "summary": "Pin mismatch sends zero bytes"
+    },
+    {
+      "id": "P04",
+      "family": "P",
+      "ciTier": "t0",
+      "summary": "Companion archive writes through atomic replace"
+    },
+    {
+      "id": "P05",
+      "family": "P",
+      "ciTier": "t0",
+      "summary": "Truncated companion frames do not panic"
+    },
+    {
+      "id": "P06",
+      "family": "P",
+      "ciTier": "t0",
+      "summary": "Device-locked is distinct from transport failure"
+    },
+    {
+      "id": "P07",
+      "family": "P",
+      "ciTier": "t0",
+      "summary": "Committed companion records do not carry the receiver clock"
+    }
+  ]
+}

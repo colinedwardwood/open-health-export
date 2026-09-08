@@ -474,4 +474,11 @@ public enum MetricCatalog {
     public static var hkStatisticsExceptions: [MetricID] {
         all.filter(\.usesHealthKitStatistics).map(\.id)
     }
+
+    /// Identifiers HealthKit forbids sharing. Authorization must request an empty share set.
+    public static let shareDisallowedHKIdentifiers: Set<String> = [
+        "HKQuantityTypeIdentifierAppleExerciseTime",
+        "HKQuantityTypeIdentifierAppleStandTime",
+        "HKDataTypeIdentifierElectrocardiogram",
+    ]
 }

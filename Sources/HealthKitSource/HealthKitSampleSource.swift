@@ -149,7 +149,7 @@ public final class HealthKitSampleSource: SampleSource, @unchecked Sendable {
     private let context: TemporalContext
     private let limit: Int
 
-    public init(store: HKHealthStore = HKHealthStore(), context: TemporalContext, limit: Int = 1000) {
+    public init(store: HKHealthStore = HKHealthStore(), context: TemporalContext, limit: Int = SamplePaging.defaultPageLimit) {
         self.store = store
         self.context = context
         self.limit = limit
@@ -210,7 +210,7 @@ public final class HealthKitDayObservationSource: DayObservationSource, @uncheck
     private let context: TemporalContext
     private let limit: Int
 
-    public init(store: HKHealthStore = HKHealthStore(), context: TemporalContext, limit: Int = 1000) {
+    public init(store: HKHealthStore = HKHealthStore(), context: TemporalContext, limit: Int = SamplePaging.defaultPageLimit) {
         self.store = store
         self.context = context
         self.limit = limit

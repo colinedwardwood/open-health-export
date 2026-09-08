@@ -23,6 +23,14 @@ import Redaction
     for errorClass in ErrorClass.allCases {
         #expect(ErrorClassManifest.records[errorClass] != nil)
     }
+    let copies = ErrorClass.allCases
+        .map { ErrorClassManifest.record(for: $0).userFacingCopy }
+        .filter { !$0.isEmpty }
+    #expect(Set(copies).count == copies.count)
+    #expect(
+        ErrorClassManifest.record(for: .localNetworkDenied).userFacingCopy
+            != ErrorClassManifest.record(for: .destinationUnreachable).userFacingCopy
+    )
     #expect(!ErrorClassManifest.record(for: .deviceLocked).scheduleFailure)
     #expect(ErrorClassManifest.record(for: .budgetExhausted).scheduleFailure)
 }

@@ -65,6 +65,11 @@ public struct TLSIdentity: Sendable, Equatable {
 }
 
 public enum AddressClassifying {
+    /// mDNS Home Assistant hosts are valid destinations; classification uses the resolved IP.
+    public static func hostnameLooksLikeMDNS(_ host: String) -> Bool {
+        host.lowercased().hasSuffix(".local") || host.lowercased().hasSuffix(".local.")
+    }
+
     public static func classify(_ address: String) -> AddressClass {
         let parts = address.split(separator: ".").compactMap { UInt8($0) }
         guard parts.count == 4 else { return .unknown }

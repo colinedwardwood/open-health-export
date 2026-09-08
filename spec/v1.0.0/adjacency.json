@@ -1,0 +1,289 @@
+{
+  "package": "open-health-exporter",
+  "targets": [
+    {
+      "name": "CSQLite",
+      "type": "system",
+      "dependencies": []
+    },
+    {
+      "name": "CompanionReceive",
+      "type": "regular",
+      "dependencies": [
+        "CompanionWire",
+        "FileWriteKit",
+        "NetEgress",
+        "WireFormat"
+      ]
+    },
+    {
+      "name": "CompanionWire",
+      "type": "regular",
+      "dependencies": [
+        "CoreDomain",
+        "WireFormat"
+      ]
+    },
+    {
+      "name": "CoreDomain",
+      "type": "regular",
+      "dependencies": []
+    },
+    {
+      "name": "CoreTemporal",
+      "type": "regular",
+      "dependencies": [
+        "CoreDomain"
+      ]
+    },
+    {
+      "name": "CorrectnessEngine",
+      "type": "regular",
+      "dependencies": [
+        "CoreDomain",
+        "CoreTemporal",
+        "DestinationTrust",
+        "EnginePorts",
+        "FileWriteKit",
+        "MetricCatalog",
+        "RunJournal",
+        "Watchdog",
+        "WireFormat"
+      ]
+    },
+    {
+      "name": "DestinationTrust",
+      "type": "regular",
+      "dependencies": [
+        "EnginePorts",
+        "NetEgress"
+      ]
+    },
+    {
+      "name": "DiagnosticBundle",
+      "type": "regular",
+      "dependencies": [
+        "CoreDomain",
+        "EnginePorts",
+        "Redaction"
+      ]
+    },
+    {
+      "name": "EnginePorts",
+      "type": "regular",
+      "dependencies": [
+        "CoreDomain",
+        "CoreTemporal"
+      ]
+    },
+    {
+      "name": "ExportCoreTests",
+      "type": "test",
+      "dependencies": [
+        "CompanionReceive",
+        "CompanionWire",
+        "CoreDomain",
+        "CoreTemporal",
+        "CorrectnessEngine",
+        "DestinationTrust",
+        "DiagnosticBundle",
+        "EnginePorts",
+        "FileWriteKit",
+        "MQTTCodec",
+        "MetricCatalog",
+        "NetEgress",
+        "Redaction",
+        "RequestTemplate",
+        "RunJournal",
+        "SinkCompanion",
+        "SinkHTTP",
+        "SinkLocalFile",
+        "SinkMQTT",
+        "StorageSQLite",
+        "TestSupport",
+        "Watchdog",
+        "WireFormat"
+      ]
+    },
+    {
+      "name": "FileWriteKit",
+      "type": "regular",
+      "dependencies": []
+    },
+    {
+      "name": "MQTTCodec",
+      "type": "regular",
+      "dependencies": []
+    },
+    {
+      "name": "MetricCatalog",
+      "type": "regular",
+      "dependencies": [
+        "CoreDomain"
+      ]
+    },
+    {
+      "name": "NetEgress",
+      "type": "regular",
+      "dependencies": [
+        "EnginePorts",
+        "RunJournal",
+        "WireFormat"
+      ]
+    },
+    {
+      "name": "Redaction",
+      "type": "regular",
+      "dependencies": [
+        "CoreDomain"
+      ]
+    },
+    {
+      "name": "RequestTemplate",
+      "type": "regular",
+      "dependencies": []
+    },
+    {
+      "name": "RunJournal",
+      "type": "regular",
+      "dependencies": [
+        "CoreDomain",
+        "EnginePorts",
+        "Redaction",
+        "WireFormat"
+      ]
+    },
+    {
+      "name": "SinkCompanion",
+      "type": "regular",
+      "dependencies": [
+        "CompanionWire",
+        "CoreDomain",
+        "DestinationTrust",
+        "EnginePorts",
+        "FileWriteKit",
+        "NetEgress",
+        "WireFormat"
+      ]
+    },
+    {
+      "name": "SinkHTTP",
+      "type": "regular",
+      "dependencies": [
+        "CoreDomain",
+        "DestinationTrust",
+        "EnginePorts",
+        "FileWriteKit",
+        "MetricCatalog",
+        "NetEgress",
+        "RequestTemplate",
+        "WireFormat"
+      ]
+    },
+    {
+      "name": "SinkLocalFile",
+      "type": "regular",
+      "dependencies": [
+        "CoreDomain",
+        "DestinationTrust",
+        "EnginePorts",
+        "FileWriteKit",
+        "WireFormat"
+      ]
+    },
+    {
+      "name": "SinkMQTT",
+      "type": "regular",
+      "dependencies": [
+        "CoreDomain",
+        "EnginePorts",
+        "MQTTCodec",
+        "NetEgress",
+        "WireFormat"
+      ]
+    },
+    {
+      "name": "StorageSQLite",
+      "type": "regular",
+      "dependencies": [
+        "CSQLite",
+        "CoreDomain",
+        "CoreTemporal",
+        "EnginePorts",
+        "RunJournal"
+      ]
+    },
+    {
+      "name": "TestSupport",
+      "type": "regular",
+      "dependencies": [
+        "CompanionReceive",
+        "CompanionWire",
+        "CoreDomain",
+        "CoreTemporal",
+        "CorrectnessEngine",
+        "DestinationTrust",
+        "EnginePorts",
+        "FileWriteKit",
+        "MQTTCodec",
+        "MetricCatalog",
+        "NetEgress",
+        "RequestTemplate",
+        "RunJournal",
+        "SinkCompanion",
+        "SinkHTTP",
+        "SinkLocalFile",
+        "SinkMQTT",
+        "StorageSQLite",
+        "Watchdog",
+        "WireFormat"
+      ]
+    },
+    {
+      "name": "Watchdog",
+      "type": "regular",
+      "dependencies": [
+        "CoreDomain",
+        "CoreTemporal",
+        "EnginePorts"
+      ]
+    },
+    {
+      "name": "WireFormat",
+      "type": "regular",
+      "dependencies": [
+        "CoreDomain",
+        "CoreTemporal",
+        "MetricCatalog"
+      ]
+    },
+    {
+      "name": "corpusgen",
+      "type": "executable",
+      "dependencies": [
+        "CoreDomain",
+        "MetricCatalog",
+        "WireFormat"
+      ]
+    },
+    {
+      "name": "m0harness",
+      "type": "executable",
+      "dependencies": []
+    },
+    {
+      "name": "policycheck",
+      "type": "executable",
+      "dependencies": []
+    },
+    {
+      "name": "wirefuzz",
+      "type": "executable",
+      "dependencies": [
+        "CompanionWire",
+        "MQTTCodec",
+        "WireFormat"
+      ]
+    }
+  ]
+}

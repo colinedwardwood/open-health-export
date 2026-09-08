@@ -192,5 +192,117 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck no alternate icons: ok")
+        try checkAdjacency(root: root)
+        try checkHealthKitSymbolsStayInAdapter(sources: sources)
     }
+
+    static func checkHealthKitSymbolsStayInAdapter(sources: URL) throws {
+        let forbidden = ["HKHealthStore", "HKQuantitySample", "HKObserverQuery", "HKAnchoredObjectQuery"]
+        var hits: [String] = []
+        guard let files = FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil) else {
+            return
+        }
+        for case let file as URL in files where file.pathExtension == "swift" {
+            let target = file.path.split(separator: "/").drop(while: { $0 != "Sources" }).dropFirst().first.map(String.init) ?? ""
+            if target == "HealthKitSource" { continue }
+            let text = try String(contentsOf: file, encoding: .utf8)
+            for token in forbidden where text.contains(token) {
+                hits.append("\(file.path): \(token)")
+            }
+        }
+        if !hits.isEmpty {
+            FileHandle.standardError.write(Data((hits.joined(separator: "\n") + "\n").utf8))
+            exit(1)
+        }
+        print("policycheck HealthKit types stay in HealthKitSource: ok")
+    }
+
+    static func checkAdjacency(root: URL) throws {
+        let expectedURL = root.appendingPathComponent("spec/v1.0.0/adjacency.json")
+        let expectedData = try Data(contentsOf: expectedURL)
+        let expected = try JSONSerialization.jsonObject(with: expectedData)
+        let dumped = try dumpPackageJSON(root: root)
+        let actual = try adjacencyManifest(fromDump: dumped)
+        let expectedObject = expected as? [String: Any]
+        guard
+            let expectedTargets = expectedObject?["targets"] as? [[String: Any]],
+            let actualTargets = actual["targets"] as? [[String: Any]]
+        else {
+            FileHandle.standardError.write(Data("adjacency manifest shape mismatch\n".utf8))
+            exit(1)
+        }
+        let expectedNorm = try canonicalJSON(expectedTargets)
+        let actualNorm = try canonicalJSON(actualTargets)
+        if expectedNorm != actualNorm {
+            FileHandle.standardError.write(
+                Data(
+                    "adjacency drift vs spec/v1.0.0/adjacency.json\nexpected:\n\(expectedNorm)\nactual:\n\(actualNorm)\n".utf8
+                )
+            )
+            exit(1)
+        }
+        print("policycheck adjacency matches dump-package: ok")
+    }
+
+    static func dumpPackageJSON(root: URL) throws -> Any {
+        let process = Process()
+        process.currentDirectoryURL = root
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = ["swift", "package", "dump-package"]
+        let stdout = Pipe()
+        let stderr = Pipe()
+        process.standardOutput = stdout
+        process.standardError = stderr
+        try process.run()
+        process.waitUntilExit()
+        let data = stdout.fileHandleForReading.readDataToEndOfFile()
+        if process.terminationStatus != 0 {
+            let err = String(data: stderr.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            FileHandle.standardError.write(Data("swift package dump-package failed: \(err)\n".utf8))
+            exit(1)
+        }
+        return try JSONSerialization.jsonObject(with: data)
+    }
+
+    static func adjacencyManifest(fromDump dump: Any) throws -> [String: Any] {
+        let darwinOnly: Set<String> = ["HealthKitSource", "HealthKitSourceTests"]
+        guard let package = dump as? [String: Any],
+              let targets = package["targets"] as? [[String: Any]]
+        else {
+            throw AdjacencyError.unreadableDump
+        }
+        var rows: [[String: Any]] = []
+        for target in targets {
+            guard let name = target["name"] as? String else { continue }
+            if darwinOnly.contains(name) { continue }
+            var deps: [String] = []
+            if let dependencies = target["dependencies"] as? [[String: Any]] {
+                for dependency in dependencies {
+                    if let byName = dependency["byName"] as? [Any], let first = byName.first as? String {
+                        deps.append(first)
+                    } else if let product = dependency["product"] as? [Any], let first = product.first as? String {
+                        deps.append(first)
+                    } else if let targetName = dependency["target"] as? [Any], let first = targetName.first as? String {
+                        deps.append(first)
+                    }
+                }
+            }
+            rows.append([
+                "name": name,
+                "type": target["type"] as? String ?? "regular",
+                "dependencies": deps.sorted(),
+            ])
+        }
+        rows.sort { ($0["name"] as? String ?? "") < ($1["name"] as? String ?? "") }
+        return ["package": "open-health-exporter", "targets": rows]
+    }
+
+    static func canonicalJSON(_ value: Any) throws -> String {
+        let data = try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys, .prettyPrinted])
+        return String(data: data, encoding: .utf8) ?? ""
+    }
+}
+
+enum AdjacencyError: Error {
+    case unreadableDump
 }

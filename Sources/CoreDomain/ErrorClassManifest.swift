@@ -2,6 +2,7 @@
 /// error until the table grows. The bijection test still asserts unique copy keys (DP-6).
 public struct ErrorClassRecord: Sendable, Equatable {
     public var userCopyKey: String
+    public var userFacingCopy: String
     public var retryable: Bool
     public var blocksEnablement: Bool
     public var ledgerKind: String
@@ -19,6 +20,7 @@ public enum ErrorClassManifest {
         case .none:
             return ErrorClassRecord(
                 userCopyKey: "error.none",
+                userFacingCopy: "",
                 retryable: false,
                 blocksEnablement: false,
                 ledgerKind: "none",
@@ -28,6 +30,7 @@ public enum ErrorClassManifest {
         case .deviceLocked:
             return ErrorClassRecord(
                 userCopyKey: "error.deviceLocked",
+                userFacingCopy: "The device is locked, so Health data is temporarily unavailable. Export will retry when it unlocks.",
                 retryable: true,
                 blocksEnablement: false,
                 ledgerKind: "execute",
@@ -37,6 +40,7 @@ public enum ErrorClassManifest {
         case .localNetworkDenied:
             return ErrorClassRecord(
                 userCopyKey: "error.localNetworkDenied",
+                userFacingCopy: "Local Network access is off for this app, so it cannot find your Mac. That is different from the Mac being asleep or on another network. Allow Local Network in Settings, then test again.",
                 retryable: true,
                 blocksEnablement: false,
                 ledgerKind: "execute",
@@ -46,6 +50,7 @@ public enum ErrorClassManifest {
         case .destinationUnreachable:
             return ErrorClassRecord(
                 userCopyKey: "error.destinationUnreachable",
+                userFacingCopy: "Couldn't find your Mac on this network. Both devices need to be on the same network, the Mac needs to be awake, and the companion needs to be running on it.",
                 retryable: true,
                 blocksEnablement: false,
                 ledgerKind: "execute",
@@ -55,6 +60,7 @@ public enum ErrorClassManifest {
         case .budgetExhausted:
             return ErrorClassRecord(
                 userCopyKey: "error.budgetExhausted",
+                userFacingCopy: "The system stopped this export because the background time budget ran out. It will try again later.",
                 retryable: true,
                 blocksEnablement: false,
                 ledgerKind: "schedule",
@@ -64,6 +70,7 @@ public enum ErrorClassManifest {
         case .cancelledBySystem:
             return ErrorClassRecord(
                 userCopyKey: "error.cancelledBySystem",
+                userFacingCopy: "The system cancelled this export. It will try again later.",
                 retryable: true,
                 blocksEnablement: false,
                 ledgerKind: "schedule",
@@ -73,6 +80,7 @@ public enum ErrorClassManifest {
         case .internalFault:
             return ErrorClassRecord(
                 userCopyKey: "error.internalFault",
+                userFacingCopy: "Export stopped because of an internal fault. Check diagnostics for the recorded error class.",
                 retryable: false,
                 blocksEnablement: false,
                 ledgerKind: "execute",

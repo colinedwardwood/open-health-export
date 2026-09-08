@@ -70,6 +70,17 @@ public struct PendingBatch: Sendable, Equatable {
     }
 }
 
+public enum TypeDisableReason {
+    public static let authorizationRevoked = "authorization_revoked"
+    public static let historyClipped = "history_clipped"
+    public static let mdmRestricted = "health_data_restricted"
+    public static let explicitStop = "explicit_stop"
+}
+
+public enum SamplePaging {
+    public static let defaultPageLimit = 1000
+}
+
 public struct TypeStatus: Sendable, Equatable {
     public var metric: MetricID
     public var disabled: Bool

@@ -145,9 +145,10 @@ public enum NativeWire {
     }
 }
 
-public enum WireError: Error {
+public enum WireError: Error, Equatable {
     case utf8
     case nonFiniteNumber
+    case invertedInterval
 }
 
 private extension NativeWire {
@@ -209,6 +210,9 @@ private extension NativeWire {
     }
 
     static func encodeQuantity(_ sample: SampleRecord, metric: MetricID, envelope: WireEnvelope) throws -> String {
+        if sample.end < sample.start {
+            throw WireError.invertedInterval
+        }
         let decl = MetricCatalog.declaration(for: metric)
         let json: CanonicalJSON = .object([
             "batchSeq": .integer(envelope.seq),
