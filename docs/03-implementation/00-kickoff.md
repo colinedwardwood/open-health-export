@@ -135,6 +135,11 @@ distinguishes chain damage, head mismatch, a missing seal, and changed identity.
 `DestructiveWipe` destroys supplied credential stores and the signing identity,
 writes the successor wipe-genesis entry, then seals it with a fresh identity.
 
+All three app bundles carry `PrivacyInfo.xcprivacy` with zero tracking domains
+and zero collected-data declarations. `policycheck` parses those manifests and
+rejects remote Swift packages and binary targets, making the static R-36/R-52
+claims required CI gates rather than release notes.
+
 The diagnostic core now emits a sorted UTF-8 `ohe.diagnostic/1` document,
 bounded to 200 runs and 200 KiB. Run fields are emitted by the per-sink
 redaction manifest; raw run IDs and free-form detail never enter the bundle.

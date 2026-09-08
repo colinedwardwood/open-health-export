@@ -89,6 +89,45 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck ExportCore quarantine: ok")
+        let compactManifest = manifest.filter { !$0.isWhitespace }
+        if compactManifest.contains(".package(url:") || compactManifest.contains(".binaryTarget(") {
+            FileHandle.standardError.write(
+                Data("third-party package or binary target requires R-36 review\n".utf8)
+            )
+            exit(1)
+        }
+        print("policycheck no third-party runtime package: ok")
+        let requiredPrivacyManifests = [
+            apps.appendingPathComponent("Exporter-iOS/PrivacyInfo.xcprivacy"),
+            apps.appendingPathComponent("StatusWidget/PrivacyInfo.xcprivacy"),
+            apps.appendingPathComponent("Companion-macOS/PrivacyInfo.xcprivacy"),
+        ]
+        var privacyViolations: [String] = []
+        for file in requiredPrivacyManifests {
+            guard let data = try? Data(contentsOf: file),
+                  let plist = try? PropertyListSerialization.propertyList(from: data, format: nil),
+                  let values = plist as? [String: Any]
+            else {
+                privacyViolations.append("\(file.path): missing or malformed")
+                continue
+            }
+            if values["NSPrivacyTracking"] as? Bool != false {
+                privacyViolations.append("\(file.path): tracking must be false")
+            }
+            if (values["NSPrivacyTrackingDomains"] as? [String])?.isEmpty != true {
+                privacyViolations.append("\(file.path): tracking domains must be empty")
+            }
+            if (values["NSPrivacyCollectedDataTypes"] as? [Any])?.isEmpty != true {
+                privacyViolations.append("\(file.path): collected data types must be empty")
+            }
+        }
+        if !privacyViolations.isEmpty {
+            FileHandle.standardError.write(
+                Data((privacyViolations.joined(separator: "\n") + "\n").utf8)
+            )
+            exit(1)
+        }
+        print("policycheck privacy manifests declare zero collection: ok")
         let ambient = ["Date()", "Calendar.current", "TimeZone.current", "Locale.current"]
         let allowedAmbient = Set(["CoreTemporal", "HealthKitSource"])
         var ambientHits: [String] = []
