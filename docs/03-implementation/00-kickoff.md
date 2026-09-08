@@ -192,6 +192,9 @@ Default configuration makes no attributable network dials: a local-file
 `ExportRun` leaves the opt-in `EgressAttemptLog` empty, while the real HTTP
 transport records the host before `URLSession` runs.
 
+A scriptable HTTPS receiver keyed by `Idempotency-Key` converges on
+duplicate delivery: two sends of one batch leave a single stored row.
+
 R-25 now has a named-step destination test. Local folder write/read/confirm
 must pass (or MQTT QoS 0 report `sentUnconfirmed`) before `enable`. A failed
 test cannot enable. HTTPS/HA tests cover TLS, pin mismatch, 401, bearer

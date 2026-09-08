@@ -68,6 +68,45 @@ import WireFormat
     #expect(requests[0].headers["Content-Type"] == "application/x-ndjson; profile=\"ohe.wire/1\"")
 }
 
+@Test func duplicateHTTPSDeliveryConvergesAtTheReceiver() async throws {
+    let (file, batchID) = try writeHTTPSPayload()
+    let receiver = ConvergingHTTPReceiver()
+    let destination = try HTTPSDestination(
+        urlString: "https://ha.example/api/webhook/ohe",
+        allowedHosts: ["ha.example"]
+    )
+    let sink = HTTPSSink(destination: destination, transport: receiver)
+    let first = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
+    let second = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
+    #expect(first.accepted == 1)
+    #expect(second.accepted == 1)
+    #expect(await receiver.storedRows == 1)
+    #expect(await receiver.deliveries == 2)
+}
+
+private actor ConvergingHTTPReceiver: HTTPTransport {
+    var stored: [String: Data] = [:]
+    var storedRows = 0
+    var deliveries = 0
+
+    func execute(_ request: OutboundHTTPRequest) async throws -> OutboundHTTPResponse {
+        deliveries += 1
+        let key = request.headers["Idempotency-Key"] ?? ""
+        let body = try Data(contentsOf: request.bodyFile)
+        if let existing = stored[key] {
+            guard existing == body else {
+                return OutboundHTTPResponse(status: 409, body: Data())
+            }
+        } else {
+            stored[key] = body
+            storedRows += NativeWire.countRecords(in: String(decoding: body, as: UTF8.self))
+        }
+        let accepted = NativeWire.countRecords(in: String(decoding: body, as: UTF8.self))
+        let payload = Data("{\"spec\":\"ohe.wire/1\",\"accepted\":\(accepted)}".utf8)
+        return OutboundHTTPResponse(status: 200, body: payload)
+    }
+}
+
 @Test func httpsReceiptBodyIsFullAckEvidence() async throws {
     let (file, batchID) = try writeHTTPSPayload()
     let body = Data("{\"spec\":\"ohe.wire/1\",\"accepted\":1}".utf8)
