@@ -7,6 +7,10 @@ public protocol LedgerHeadSeal: Sendable {
     func matches(head: String, signature: String) async -> Bool
 }
 
+public protocol ResettableLedgerHeadSeal: LedgerHeadSeal {
+    func destroyIdentity() async throws
+}
+
 public struct LedgerHeadSealRecord: Sendable, Equatable, Codable {
     public var schemaVersion: Int
     public var head: String

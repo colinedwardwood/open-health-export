@@ -10,7 +10,7 @@ public enum SecureEnclaveLedgerSealError: Error, Equatable {
 
 /// P-256 ledger-head signer. Shipping configuration creates a permanent,
 /// non-exportable Secure Enclave key; tests can request an ephemeral software key.
-public actor SecureEnclaveLedgerSeal: LedgerHeadSeal {
+public actor SecureEnclaveLedgerSeal: ResettableLedgerHeadSeal {
     public let applicationTag: String
     public let useSecureEnclave: Bool
     public let permanent: Bool
@@ -58,6 +58,20 @@ public actor SecureEnclaveLedgerSeal: LedgerHeadSeal {
         )
         _ = error?.takeRetainedValue()
         return valid
+    }
+
+    public func destroyIdentity() async throws {
+        cachedKey = nil
+        guard permanent else { return }
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassKey,
+            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrApplicationTag as String: Data(applicationTag.utf8),
+        ]
+        let status = SecItemDelete(query as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw SecureEnclaveLedgerSealError.keyUnavailable
+        }
     }
 
     private func privateKey(createIfMissing: Bool) throws -> SecKey {

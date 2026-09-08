@@ -132,6 +132,8 @@ secret on Darwin). Shipping iOS runs now seal the verified head with a
 non-exportable Secure Enclave P-256 key after the terminal transaction; the
 simulator uses the same P-256 signature path with a software key. The ledger UI
 distinguishes chain damage, head mismatch, a missing seal, and changed identity.
+`DestructiveWipe` destroys supplied credential stores and the signing identity,
+writes the successor wipe-genesis entry, then seals it with a fresh identity.
 
 The diagnostic core now emits a sorted UTF-8 `ohe.diagnostic/1` document,
 bounded to 200 runs and 200 KiB. Run fields are emitted by the per-sink

@@ -6,7 +6,7 @@ import Security
 
 /// Keychain-backed ledger-head secret by default. Generates 32 random bytes on first use.
 /// This is tamper-evidence of identity change after a wipe, not an SE signature.
-public struct KeychainLedgerSeal: LedgerHeadSeal, Sendable {
+public struct KeychainLedgerSeal: ResettableLedgerHeadSeal, Sendable {
     public var store: any SecretStore
     public var handle: SecretHandle
 
@@ -24,6 +24,10 @@ public struct KeychainLedgerSeal: LedgerHeadSeal, Sendable {
 
     public func matches(head: String, signature: String) async -> Bool {
         await HashLedgerSeal(secret: (try? await secret()) ?? "").matches(head: head, signature: signature)
+    }
+
+    public func destroyIdentity() async throws {
+        try await store.delete(handle)
     }
 
     private func secret() async throws -> String {

@@ -1878,6 +1878,46 @@ private struct OneExportFault: ExportFaultInjector {
     #expect(successor[0].wallTimeEpoch == 1_234)
 }
 
+@Test func destructiveWipeDeletesSecretsAndSealsSuccessorGenesisWithNewIdentity() async throws {
+    let state = MemoryStateStore()
+    try await state.transact { tx in
+        try tx.appendLedger(
+            EgressEntry(
+                destination: "local-file",
+                sampleCount: 3,
+                outcomeKind: "success",
+                wallTimeEpoch: 1
+            )
+        )
+    }
+    let secrets = MemorySecretStore()
+    let handle = SecretHandle(rawValue: "credential")
+    try await secrets.store([1, 2, 3], handle: handle)
+    let seal = ResettableTestLedgerSeal()
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-wipe-seal-\(UUID().uuidString).json")
+
+    try await DestructiveWipe.perform(
+        store: state,
+        secretStores: [secrets],
+        ledgerSeal: seal,
+        ledgerSealURL: url,
+        atEpoch: 1_234
+    )
+
+    await #expect(throws: SecretStoreError.notFound) {
+        _ = try await secrets.load(handle)
+    }
+    let successor = try await state.transact { try $0.loadLedger() }
+    #expect(successor.count == 1)
+    #expect(successor[0].outcomeKind == "genesis_after_wipe")
+    #expect(await seal.destroyedCount == 1)
+    #expect(
+        await LedgerHeadSealRecordFile.verify(entries: successor, seal: seal, url: url)
+            == .valid(head: successor[0].entryHash, count: 1)
+    )
+}
+
 @Test func exportRunJournalRecordsTriggerAndCounts() async throws {
     let metric = MetricID(rawValue: "heartRate")
     let page = SamplePage(
@@ -1988,6 +2028,25 @@ private struct OneExportFault: ExportFaultInjector {
     #expect(journal.last?.outcomeKind == "purged")
     let gaps = try await store.transact { try $0.loadGaps() }
     #expect(gaps.contains { $0.rangeDescription.hasPrefix("purged_by_revocation:") })
+}
+
+private actor ResettableTestLedgerSeal: ResettableLedgerHeadSeal {
+    private var generation = 0
+    private(set) var destroyedCount = 0
+
+    func signedHead(_ head: String) async throws -> String {
+        try await HashLedgerSeal(secret: "generation-\(generation)").signedHead(head)
+    }
+
+    func matches(head: String, signature: String) async -> Bool {
+        await HashLedgerSeal(secret: "generation-\(generation)")
+            .matches(head: head, signature: signature)
+    }
+
+    func destroyIdentity() async throws {
+        generation += 1
+        destroyedCount += 1
+    }
 }
 
 final class CountingSource: SampleSource, @unchecked Sendable {
