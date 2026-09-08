@@ -230,6 +230,14 @@ public struct ExportRun: Sendable {
                     samplesAcked: tally.acked
                 )
             )
+            try tx.appendLedger(
+                EgressEntry(
+                    destination: destinationName,
+                    sampleCount: tally.committed,
+                    outcomeKind: "run:\(outcome.kind.rawValue)",
+                    wallTimeEpoch: clock.now().timeIntervalSince1970
+                )
+            )
         }
         try writeSnapshot(outcome: outcome, tally: tally)
         try writeExternalStatus(outcome: outcome, tally: tally)

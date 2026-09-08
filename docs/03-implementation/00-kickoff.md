@@ -143,6 +143,9 @@ simulator uses the same P-256 signature path with a software key. The ledger UI
 distinguishes chain damage, head mismatch, a missing seal, and changed identity.
 `DestructiveWipe` destroys supplied credential stores and the signing identity,
 writes the successor wipe-genesis entry, then seals it with a fresh identity.
+Every derived delta and reconciliation outcome also appends a terminal run row,
+so no-work and disabled-type executions are represented when no delivery
+attempt exists.
 
 All three app bundles carry `PrivacyInfo.xcprivacy` with zero tracking domains
 and zero collected-data declarations. `policycheck` parses those manifests and

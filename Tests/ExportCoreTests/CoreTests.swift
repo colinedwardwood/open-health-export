@@ -899,10 +899,11 @@ func statisticsRecord(
     #expect(try store.transaction.loadCursor(metric: metric)?.anchorBlob == Data([0xAA]))
     #expect(store.transaction.cursors[metric]?.anchorBlob.prefix(4) == Data("OHEC".utf8))
     #expect(try store.transaction.pendingBatches().isEmpty)
-    #expect(store.transaction.ledger.count == 2)
+    #expect(store.transaction.ledger.count == 3)
     let phases = store.transaction.ledger.map(\.outcomeKind)
     #expect(phases[0].split(separator: ":").last == "attempt")
     #expect(phases[1].split(separator: ":").last == "acknowledged")
+    #expect(phases[2] == "run:success")
     #expect(phases[0].split(separator: ":").first == phases[1].split(separator: ":").first)
     let census = try store.transaction.loadCensus(metric: metric, day: "2024-01-01")
     #expect(census?.sampleCount == 1)
@@ -921,7 +922,8 @@ func statisticsRecord(
 
     let second = try await run.run()
     #expect(second.kind == .successNothingDue)
-    #expect(store.transaction.ledger.count == 2)
+    #expect(store.transaction.ledger.count == 4)
+    #expect(store.transaction.ledger.last?.outcomeKind == "run:successNothingDue")
 }
 
 #if DEBUG
@@ -2442,4 +2444,5 @@ final class CountingSource: SampleSource, @unchecked Sendable {
     #expect(outcome.kind == .failed)
     #expect(outcome.partialCause == "types_purged")
     #expect(source.pages == 0)
+    #expect(try store.transaction.loadLedger().last?.outcomeKind == "run:failed")
 }
