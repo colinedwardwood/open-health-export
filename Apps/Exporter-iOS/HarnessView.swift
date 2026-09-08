@@ -142,6 +142,7 @@ struct HarnessView: View {
                 phase = .ready
                 status = "Ready. Next: request Health read access, then measure."
             }
+            .accessibilityIdentifier("disclosure-continue")
             .accessibilityHint("Shows Health permission and measurement controls.")
         }
     }
@@ -151,11 +152,13 @@ struct HarnessView: View {
             Button("Request Health read access") {
                 Task { await requestAccess() }
             }
+            .accessibilityIdentifier("health-request")
             .disabled(phase == .working)
 
             Button("Run R-70 (one anchored page per type)") {
                 Task { await runR70() }
             }
+            .accessibilityIdentifier("stop-heart-rate")
             .disabled(phase == .working)
             Button("Export one page (local file)") {
                 Task { await runLocalExport() }
@@ -265,6 +268,7 @@ struct HarnessView: View {
             Button("Build diagnostic bundle") {
                 buildDiagnostic()
             }
+            .accessibilityIdentifier("diagnostic-build")
             .disabled(phase == .working)
             .accessibilityHint("Assembles a redacted ohe.diagnostic/1 JSON preview. Share does not exist until you confirm you read it.")
             if !diagnosticPreview.isEmpty {
@@ -274,6 +278,7 @@ struct HarnessView: View {
                 Button("I have read this diagnostic") {
                     confirmDiagnosticRead()
                 }
+                .accessibilityIdentifier("diagnostic-confirm")
                 .disabled(diagnosticPayload == nil)
             }
             if let diagnosticShareURL {

@@ -50,7 +50,21 @@ targets:
       - sdk: AVFoundation.framework
       - target: StatusWidget
     scheme:
-      testTargets: []
+      testTargets:
+        - ExporteriOSUITests
+  ExporteriOSUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Tests/ExporterUITests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(PRODUCT_BUNDLE_IDENTIFIER_ROOT).ios-uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: ExporteriOS
+    dependencies:
+      - target: ExporteriOS
   StatusWidget:
     type: app-extension
     platform: iOS

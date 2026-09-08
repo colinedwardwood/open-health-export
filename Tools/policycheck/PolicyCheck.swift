@@ -63,6 +63,22 @@ struct PolicyCheck {
         }
         print("policycheck app targets use no direct network APIs: ok")
 
+        let projectText = try String(
+            contentsOf: root.appendingPathComponent("project.yml"),
+            encoding: .utf8
+        )
+        let uiTestPath = root.appendingPathComponent(
+            "Tests/ExporterUITests/ExporterUITests.swift"
+        )
+        guard projectText.contains("ExporteriOSUITests:"),
+              projectText.contains("- ExporteriOSUITests"),
+              FileManager.default.fileExists(atPath: uiTestPath.path)
+        else {
+            FileHandle.standardError.write(Data("iOS XCUITest target or suite is missing\n".utf8))
+            exit(1)
+        }
+        print("policycheck iOS XCUITest target is wired: ok")
+
         let exporterEntitlements = apps
             .appendingPathComponent("Exporter-iOS/Exporter.entitlements")
         let entitlementText = try String(contentsOf: exporterEntitlements, encoding: .utf8)
