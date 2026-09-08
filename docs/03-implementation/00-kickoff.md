@@ -135,8 +135,8 @@ state and triggers R-44 only for the observable
 `unnecessary → shouldRequest` transition. The purge evicts and unlinks queued
 payloads, clears cursors and emitted-index rows, bumps per-type generation,
 disables background delivery, and records journal and ledger evidence. Empty
-reads remain explicitly non-evidence of denial. Device timing confirmation and
-the explicit-stop XCUITest remain open.
+reads remain explicitly non-evidence of denial. The explicit-stop XCUITest runs
+on an iPhone Simulator in macOS CI; device timing confirmation remains open.
 New pending rows also carry a creation epoch. Foreground launch enforces the
 ratified seven-day TTL transactionally, records gap and ledger evidence,
 unlinks bytes after commit, re-seals the head and posts classified user copy.
@@ -149,6 +149,9 @@ anchor adapter. `HealthKitStatisticsSource` produces canonical P1D totals for
 the catalogue's cumulative exception list. `AggregateResolver` selects those
 statistics for cumulative metrics, never silently substitutes a local fold,
 and leaves the dirty day queued when no statistics source is available.
+Later runs now union persisted dirty days even when the anchored delta is empty,
+refetch full-day observations for local folds, and emit catch-up aggregates under
+a generation-specific idempotency key. Batch headers carry `completeThrough`.
 
 Egress entries are now a SHA-256 chain with sequence, previous hash, canonical
 fields, byte count, and wall time. Delivery attempts and outcomes are separately

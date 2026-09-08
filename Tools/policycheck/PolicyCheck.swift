@@ -243,6 +243,7 @@ struct PolicyCheck {
             "adjacency.json",
             "fixtures/fix-catalogue.json",
             "fixtures/receiver-expected-state.json",
+            "catalogue/hk-statistics-exceptions.json",
             "catalogue/metrics.json",
             "schema/ohe.wire.1.json",
         ] {
@@ -306,6 +307,52 @@ struct PolicyCheck {
                 Data("wire metric IDs, kinds, or canonical units drifted from the spec catalogue\n".utf8)
             )
             exit(1)
+        }
+
+        let exceptions = try JSONSerialization.jsonObject(
+            with: Data(
+                contentsOf: spec.appendingPathComponent(
+                    "catalogue/hk-statistics-exceptions.json"
+                )
+            )
+        ) as? [String: Any]
+        let exceptionRows = exceptions?["exceptions"] as? [[String: Any]] ?? []
+        let committedExceptionIDs = exceptionRows.compactMap { $0["metricId"] as? String }
+            .sorted()
+        let actualExceptionIDs = MetricCatalog.hkStatisticsExceptions.compactMap {
+            MetricCatalog.declaration(for: $0)?.wireId
+        }.sorted()
+        guard committedExceptionIDs == actualExceptionIDs else {
+            FileHandle.standardError.write(
+                Data("hkStatistics exception list drifted from its committed golden\n".utf8)
+            )
+            exit(1)
+        }
+        let initialADR001: Set<String> = [
+            "active_energy", "basal_energy", "cycling_distance", "dietary_water",
+            "exercise_time", "flights_climbed", "stand_time", "step_count",
+            "walking_running_distance",
+        ]
+        let decisions = root.appendingPathComponent("docs/02-design/decisions")
+        let decisionNames = try FileManager.default.contentsOfDirectory(atPath: decisions.path)
+        for row in exceptionRows {
+            guard let metricID = row["metricId"] as? String,
+                  let adr = row["adr"] as? String,
+                  let reason = row["reason"] as? String,
+                  !reason.isEmpty,
+                  decisionNames.contains(where: { $0.hasPrefix("\(adr)-") })
+            else {
+                FileHandle.standardError.write(
+                    Data("hkStatistics exception lacks a reason or accepted ADR\n".utf8)
+                )
+                exit(1)
+            }
+            if adr == "ADR-001", !initialADR001.contains(metricID) {
+                FileHandle.standardError.write(
+                    Data("new hkStatistics exception reuses the initial ADR\n".utf8)
+                )
+                exit(1)
+            }
         }
 
         let frozenMarker = spec.appendingPathComponent("FROZEN")

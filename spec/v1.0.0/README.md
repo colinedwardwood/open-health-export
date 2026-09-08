@@ -20,7 +20,10 @@
     }
   },
   "schema": "schema/ohe.wire.1.json",
-  "catalogue": "catalogue/metrics.json",
+  "catalogue": {
+    "metrics": "catalogue/metrics.json",
+    "hkStatisticsExceptions": "catalogue/hk-statistics-exceptions.json"
+  },
   "freeze": {
     "marker": "FROZEN",
     "baselineWhenFrozen": "schema/ohe.wire.1.frozen.json",
