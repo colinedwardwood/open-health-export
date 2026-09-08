@@ -38,8 +38,9 @@ final class ExporterUITests: XCTestCase {
         enterControls()
         let stop = scrollToHittable(app.buttons["stop-heart-rate"])
         stop.tap()
-        XCTAssertEqual(stop.label, "Confirm: stop exporting heart rate")
-        stop.tap()
+        let confirm = app.buttons["stop-heart-rate"]
+        XCTAssertEqual(confirm.label, "Confirm: stop exporting heart rate")
+        confirm.tap()
         XCTAssertTrue(
             app.staticTexts["Status: Ready. Heart rate is disabled and queued payloads for that type were purged."]
                 .waitForExistence(timeout: 5)

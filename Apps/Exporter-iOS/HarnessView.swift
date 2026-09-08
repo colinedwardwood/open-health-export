@@ -158,7 +158,6 @@ struct HarnessView: View {
             Button("Run R-70 (one anchored page per type)") {
                 Task { await runR70() }
             }
-            .accessibilityIdentifier("stop-heart-rate")
             .disabled(phase == .working)
             Button("Export one page (local file)") {
                 Task { await runLocalExport() }
@@ -252,6 +251,7 @@ struct HarnessView: View {
                     status = "Ready. Tap again to purge queued heart-rate payloads and disable that type."
                 }
             }
+            .accessibilityIdentifier("stop-heart-rate")
             .disabled(phase == .working)
             Button(wipeArmed ? "Confirm: delete credentials and ledger identity" : "Delete everything on this device") {
                 if wipeArmed {
