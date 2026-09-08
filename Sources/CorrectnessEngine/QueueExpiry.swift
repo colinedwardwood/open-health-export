@@ -66,7 +66,8 @@ public enum QueueExpiry {
                 trigger: .launch,
                 samplesRead: 0,
                 samplesCommitted: result.expiredRecords,
-                samplesAcked: 0
+                samplesAcked: 0,
+                wallTimeEpoch: nowEpoch
             )
         )
         return (result, expired.map(\.payloadURL))

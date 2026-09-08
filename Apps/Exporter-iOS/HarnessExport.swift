@@ -261,7 +261,8 @@ enum HarnessExport {
         let root = try applicationSupportRoot()
         let journal = SQLiteDiagnosticReader.read(
             path: root.appendingPathComponent("state.sqlite").path,
-            maxRuns: assembler.maxRuns
+            maxRuns: assembler.maxRuns,
+            windowSeconds: assembler.windowSeconds
         )
         let payload = try assembler.assemble(
             header: DiagnosticHeader(

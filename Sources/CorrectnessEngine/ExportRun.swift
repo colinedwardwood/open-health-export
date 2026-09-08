@@ -218,6 +218,7 @@ public struct ExportRun: Sendable {
     }
 
     private func record(outcome: RunOutcome, tally: RunTally, receipt: DeliveryReceipt?) async throws {
+        let nowEpoch = clock.now().timeIntervalSince1970
         try await store.transact { tx in
             if let receipt {
                 try tx.recordDelivery(receipt)
@@ -230,7 +231,11 @@ public struct ExportRun: Sendable {
                     trigger: trigger,
                     samplesRead: tally.read,
                     samplesCommitted: tally.committed,
-                    samplesAcked: tally.acked
+                    samplesAcked: tally.acked,
+                    wallTimeEpoch: nowEpoch,
+                    errorClass: tally.terminalError == .none
+                        ? nil
+                        : tally.terminalError.rawValue
                 )
             )
             try tx.appendLedger(
@@ -238,7 +243,7 @@ public struct ExportRun: Sendable {
                     destination: destinationName,
                     sampleCount: tally.committed,
                     outcomeKind: "run:\(outcome.kind.rawValue)",
-                    wallTimeEpoch: clock.now().timeIntervalSince1970
+                    wallTimeEpoch: nowEpoch
                 )
             )
         }

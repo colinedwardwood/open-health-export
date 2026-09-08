@@ -1,4 +1,5 @@
 import CoreDomain
+import CoreTemporal
 import CSQLite
 import EnginePorts
 import Foundation
@@ -18,7 +19,12 @@ public struct DiagnosticJournalRead: Sendable, Equatable {
 /// OBS-09: an independent, read-only diagnostic path that still returns a
 /// partial result when the primary state store or individual journal rows fail.
 public enum SQLiteDiagnosticReader {
-    public static func read(path: String, maxRuns: Int = 200) -> DiagnosticJournalRead {
+    public static func read(
+        path: String,
+        maxRuns: Int = 30,
+        windowSeconds: TimeInterval = 24 * 60 * 60,
+        nowEpoch: TimeInterval = SystemClock().now().timeIntervalSince1970
+    ) -> DiagnosticJournalRead {
         var db: OpaquePointer?
         let flags = SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX
         guard sqlite3_open_v2(path, &db, flags, nil) == SQLITE_OK, let db else {
@@ -33,7 +39,14 @@ public enum SQLiteDiagnosticReader {
         _ = sqlite3_busy_timeout(db, 1_000)
 
         let integrityPassed = integrityCheck(db)
-        if integrityPassed, let bulk = bulkRead(db, limit: max(0, maxRuns)) {
+        let minimumRuns = max(0, maxRuns)
+        let cutoffEpoch = nowEpoch - max(0, windowSeconds)
+        if integrityPassed,
+           let bulk = bulkRead(
+               db,
+               minimumRuns: minimumRuns,
+               cutoffEpoch: cutoffEpoch
+           ) {
             var degraded: [String] = []
             if bulk.skipped > 0 {
                 degraded.append("journal_rows_skipped=\(bulk.skipped)")
@@ -46,7 +59,11 @@ public enum SQLiteDiagnosticReader {
         }
 
         var degraded = ["sqlite_integrity_check_failed"]
-        guard let salvaged = salvageRows(db, limit: max(0, maxRuns)) else {
+        guard let salvaged = salvageRows(
+            db,
+            minimumRuns: minimumRuns,
+            cutoffEpoch: cutoffEpoch
+        ) else {
             degraded.append("journal_unreadable")
             degraded.append("journal_rows_skipped=0;count_unavailable")
             return DiagnosticJournalRead(events: [], degraded: degraded, skippedRows: 0)
@@ -78,16 +95,17 @@ public enum SQLiteDiagnosticReader {
 
     private static func bulkRead(
         _ db: OpaquePointer,
-        limit: Int
+        minimumRuns: Int,
+        cutoffEpoch: TimeInterval
     ) -> (events: [RunEvent], skipped: Int)? {
         let sql = """
             SELECT run_id, outcome, detail, trigger,
-                   samples_read, samples_committed, samples_acked
-            FROM (
-                SELECT id, run_id, outcome, detail, trigger,
-                       samples_read, samples_committed, samples_acked
-                FROM journal ORDER BY id DESC LIMIT ?
-            ) ORDER BY id;
+                   samples_read, samples_committed, samples_acked,
+                   wall_time_epoch, error_class
+            FROM journal
+            WHERE wall_time_epoch >= ?
+               OR id IN (SELECT id FROM journal ORDER BY id DESC LIMIT ?)
+            ORDER BY id;
             """
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK,
@@ -97,7 +115,8 @@ public enum SQLiteDiagnosticReader {
             return nil
         }
         defer { sqlite3_finalize(statement) }
-        sqlite3_bind_int64(statement, 1, sqlite3_int64(limit))
+        sqlite3_bind_double(statement, 1, cutoffEpoch)
+        sqlite3_bind_int64(statement, 2, sqlite3_int64(minimumRuns))
 
         var events: [RunEvent] = []
         var skipped = 0
@@ -119,12 +138,18 @@ public enum SQLiteDiagnosticReader {
 
     private static func salvageRows(
         _ db: OpaquePointer,
-        limit: Int
+        minimumRuns: Int,
+        cutoffEpoch: TimeInterval
     ) -> (events: [RunEvent], skipped: Int)? {
         var idsStatement: OpaquePointer?
         guard sqlite3_prepare_v2(
             db,
-            "SELECT id FROM journal ORDER BY id DESC LIMIT ?;",
+            """
+            SELECT id FROM journal
+            WHERE wall_time_epoch >= ?
+               OR id IN (SELECT id FROM journal ORDER BY id DESC LIMIT ?)
+            ORDER BY id DESC;
+            """,
             -1,
             &idsStatement,
             nil
@@ -132,7 +157,8 @@ public enum SQLiteDiagnosticReader {
             sqlite3_finalize(idsStatement)
             return nil
         }
-        sqlite3_bind_int64(idsStatement, 1, sqlite3_int64(limit))
+        sqlite3_bind_double(idsStatement, 1, cutoffEpoch)
+        sqlite3_bind_int64(idsStatement, 2, sqlite3_int64(minimumRuns))
         var ids: [Int64] = []
         while sqlite3_step(idsStatement) == SQLITE_ROW {
             ids.append(sqlite3_column_int64(idsStatement, 0))
@@ -154,7 +180,8 @@ public enum SQLiteDiagnosticReader {
     private static func readRow(_ db: OpaquePointer, id: Int64) -> RunEvent? {
         let sql = """
             SELECT run_id, outcome, detail, trigger,
-                   samples_read, samples_committed, samples_acked
+                   samples_read, samples_committed, samples_acked,
+                   wall_time_epoch, error_class
             FROM journal WHERE id = ?;
             """
         var statement: OpaquePointer?
@@ -190,6 +217,8 @@ public enum SQLiteDiagnosticReader {
         let read = sqlite3_column_int64(statement, 4)
         let committed = sqlite3_column_int64(statement, 5)
         let acked = sqlite3_column_int64(statement, 6)
+        let wallTimeEpoch = sqlite3_column_double(statement, 7)
+        let errorClass = sqlite3_column_text(statement, 8).map { String(cString: $0) }
         guard read >= 0, committed >= 0, acked >= 0,
               read <= Int64(Int.max),
               committed <= Int64(Int.max),
@@ -204,7 +233,9 @@ public enum SQLiteDiagnosticReader {
             trigger: trigger,
             samplesRead: Int(read),
             samplesCommitted: Int(committed),
-            samplesAcked: Int(acked)
+            samplesAcked: Int(acked),
+            wallTimeEpoch: wallTimeEpoch,
+            errorClass: errorClass
         )
     }
 }

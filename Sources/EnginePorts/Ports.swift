@@ -136,6 +136,8 @@ public struct RunEvent: Sendable, Equatable {
     public var samplesRead: Int
     public var samplesCommitted: Int
     public var samplesAcked: Int
+    public var wallTimeEpoch: TimeInterval
+    public var errorClass: String?
 
     public init(
         runID: RunID,
@@ -144,7 +146,9 @@ public struct RunEvent: Sendable, Equatable {
         trigger: RunTrigger = .manual,
         samplesRead: Int = 0,
         samplesCommitted: Int = 0,
-        samplesAcked: Int = 0
+        samplesAcked: Int = 0,
+        wallTimeEpoch: TimeInterval = 0,
+        errorClass: String? = nil
     ) {
         self.runID = runID
         self.outcomeKind = outcomeKind
@@ -153,6 +157,8 @@ public struct RunEvent: Sendable, Equatable {
         self.samplesRead = samplesRead
         self.samplesCommitted = samplesCommitted
         self.samplesAcked = samplesAcked
+        self.wallTimeEpoch = wallTimeEpoch
+        self.errorClass = errorClass
     }
 }
 

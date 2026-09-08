@@ -65,6 +65,8 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
             "ALTER TABLE ledger ADD COLUMN detail TEXT NOT NULL DEFAULT '';",
             "ALTER TABLE ledger ADD COLUMN wall_time_epoch REAL NOT NULL DEFAULT 0;",
             "ALTER TABLE type_status ADD COLUMN generation INTEGER NOT NULL DEFAULT 1;",
+            "ALTER TABLE journal ADD COLUMN wall_time_epoch REAL NOT NULL DEFAULT 0;",
+            "ALTER TABLE journal ADD COLUMN error_class TEXT;",
         ] {
             do { try exec(sql) } catch { _ = error }
         }
@@ -87,7 +89,9 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 trigger TEXT NOT NULL DEFAULT 'manual',
                 samples_read INTEGER NOT NULL DEFAULT 0,
                 samples_committed INTEGER NOT NULL DEFAULT 0,
-                samples_acked INTEGER NOT NULL DEFAULT 0
+                samples_acked INTEGER NOT NULL DEFAULT 0,
+                wall_time_epoch REAL NOT NULL DEFAULT 0,
+                error_class TEXT
             );
             CREATE TABLE IF NOT EXISTS ledger (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -367,7 +371,7 @@ private final class SQLiteTransaction: StateTransaction {
 
     func appendJournal(_ event: RunEvent) throws {
         let stmt = try store.prepare(
-            "INSERT INTO journal (run_id, outcome, detail, trigger, samples_read, samples_committed, samples_acked) VALUES (?, ?, ?, ?, ?, ?, ?);"
+            "INSERT INTO journal (run_id, outcome, detail, trigger, samples_read, samples_committed, samples_acked, wall_time_epoch, error_class) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);"
         )
         defer { sqlite3_finalize(stmt) }
         bindText(stmt, 1, event.runID.rawValue)
@@ -377,6 +381,12 @@ private final class SQLiteTransaction: StateTransaction {
         sqlite3_bind_int64(stmt, 5, sqlite3_int64(event.samplesRead))
         sqlite3_bind_int64(stmt, 6, sqlite3_int64(event.samplesCommitted))
         sqlite3_bind_int64(stmt, 7, sqlite3_int64(event.samplesAcked))
+        sqlite3_bind_double(stmt, 8, event.wallTimeEpoch)
+        if let errorClass = event.errorClass {
+            bindText(stmt, 9, errorClass)
+        } else {
+            sqlite3_bind_null(stmt, 9)
+        }
         try stepDone(stmt)
     }
 
@@ -575,7 +585,7 @@ private final class SQLiteTransaction: StateTransaction {
 
     func loadJournal() throws -> [RunEvent] {
         let stmt = try store.prepare(
-            "SELECT run_id, outcome, detail, trigger, samples_read, samples_committed, samples_acked FROM journal ORDER BY id;"
+            "SELECT run_id, outcome, detail, trigger, samples_read, samples_committed, samples_acked, wall_time_epoch, error_class FROM journal ORDER BY id;"
         )
         defer { sqlite3_finalize(stmt) }
         var events: [RunEvent] = []
@@ -588,7 +598,11 @@ private final class SQLiteTransaction: StateTransaction {
                     trigger: RunTrigger(rawValue: text(stmt, 3)) ?? .manual,
                     samplesRead: Int(sqlite3_column_int64(stmt, 4)),
                     samplesCommitted: Int(sqlite3_column_int64(stmt, 5)),
-                    samplesAcked: Int(sqlite3_column_int64(stmt, 6))
+                    samplesAcked: Int(sqlite3_column_int64(stmt, 6)),
+                    wallTimeEpoch: sqlite3_column_double(stmt, 7),
+                    errorClass: sqlite3_column_type(stmt, 8) == SQLITE_NULL
+                        ? nil
+                        : text(stmt, 8)
                 )
             )
         }

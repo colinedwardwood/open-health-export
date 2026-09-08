@@ -18,7 +18,7 @@ let linuxCore: [Target] = [
     .target(name: "Redaction", dependencies: ["CoreDomain"]),
     .target(
         name: "StorageSQLite",
-        dependencies: ["EnginePorts", "CoreDomain", "CSQLite", "RunJournal"],
+        dependencies: ["EnginePorts", "CoreDomain", "CoreTemporal", "CSQLite", "RunJournal"],
         linkerSettings: [.linkedLibrary("sqlite3")]
     ),
     .target(name: "RunJournal", dependencies: ["EnginePorts", "CoreDomain", "Redaction", "WireFormat"]),

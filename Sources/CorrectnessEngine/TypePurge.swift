@@ -60,7 +60,8 @@ public enum TypePurge {
                 runID: RunID(rawValue: "purge-\(metric.rawValue)"),
                 outcomeKind: "purged",
                 detail: reason,
-                trigger: .manual
+                trigger: .manual,
+                wallTimeEpoch: atEpoch
             )
         )
         return victims.map(\.payloadURL)

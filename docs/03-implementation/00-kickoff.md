@@ -171,8 +171,11 @@ rejects remote Swift packages and binary targets, making the static R-36/R-52
 claims required CI gates rather than release notes.
 
 The diagnostic core now emits a sorted UTF-8 `ohe.diagnostic/1` document,
-bounded to 200 runs and 200 KiB. Run fields are emitted by the per-sink
-redaction manifest; raw run IDs and free-form detail never enter the bundle.
+bounded to 200 KiB. Journal rows persist wall time and closed error class; the
+normal and salvage readers select every run from the previous 24 hours plus
+enough older rows to retain at least the latest 30. Run fields are emitted by
+the per-sink redaction manifest; raw run IDs and free-form detail never enter
+the bundle.
 `DiagnosticPreviewGate` exposes no share payload until full-content review.
 The iOS harness now builds a redacted bundle, shows the JSON, and only then
 exposes Share. Its journal input uses an independent read-only SQLite

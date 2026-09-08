@@ -132,6 +132,59 @@ import Redaction
     #expect(read.skippedRows == 0)
 }
 
+@Test func diagnosticWindowKeepsEveryRunInLastDayEvenAboveThirty() async throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-diagnostic-window-\(UUID().uuidString).sqlite")
+    let now: TimeInterval = 2_000_000
+    do {
+        let store = try SQLiteStateStore(path: url.path)
+        for index in 0..<45 {
+            let inWindow = index >= 5
+            try await store.transact { tx in
+                try tx.appendJournal(
+                    RunEvent(
+                        runID: RunID(rawValue: "run-\(index)"),
+                        outcomeKind: index == 44 ? "failed" : "success",
+                        detail: "",
+                        trigger: .launch,
+                        wallTimeEpoch: inWindow ? now - TimeInterval(index) : now - 90_000,
+                        errorClass: index == 44 ? "network" : nil
+                    )
+                )
+            }
+        }
+    }
+
+    let read = SQLiteDiagnosticReader.read(
+        path: url.path,
+        maxRuns: 30,
+        windowSeconds: 86_400,
+        nowEpoch: now
+    )
+    #expect(read.events.count == 40)
+    #expect(read.events.first?.runID.rawValue == "run-5")
+    #expect(read.events.last?.errorClass == "network")
+
+    let generatedAt = Date(timeIntervalSince1970: now).ISO8601Format()
+    let bundle = try BundleAssembler().assemble(
+        header: DiagnosticHeader(
+            appVersion: "test",
+            osVersion: "test",
+            deviceModel: "test",
+            localeIdentifier: "en_US_POSIX",
+            utcOffsetMinutes: 0,
+            generatedAt: generatedAt
+        ),
+        events: read.events
+    )
+    let object = try #require(
+        JSONSerialization.jsonObject(with: bundle) as? [String: Any]
+    )
+    let runs = try #require(object["runs"] as? [[String: Any]])
+    #expect(runs.count == 40)
+    #expect(runs.last?["errorClass"] as? String == "network")
+}
+
 @Test func diagnosticReaderSkipsMalformedRowsAndStillBuildsBundle() async throws {
     let url = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-diagnostic-salvage-\(UUID().uuidString).sqlite")
