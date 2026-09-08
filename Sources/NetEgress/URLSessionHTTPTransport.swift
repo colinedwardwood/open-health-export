@@ -12,6 +12,7 @@ public struct URLSessionHTTPTransport: HTTPTransport {
     }
 
     public func execute(_ request: OutboundHTTPRequest) async throws -> OutboundHTTPResponse {
+        EgressAttemptLog.record(kind: .http, host: request.url.host ?? request.url.absoluteString)
         var urlRequest = URLRequest(url: request.url)
         urlRequest.httpMethod = request.method
         for (name, value) in request.headers {

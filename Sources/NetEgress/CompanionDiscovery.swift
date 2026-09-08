@@ -37,6 +37,7 @@ public actor CompanionDiscovery {
 
     private func start() {
         guard browser == nil else { return }
+        EgressAttemptLog.record(kind: .discovery, host: BonjourService.companionType)
         let descriptor = NWBrowser.Descriptor.bonjour(type: BonjourService.companionType, domain: nil)
         let browser = NWBrowser(for: descriptor, using: .tcp)
         browser.browseResultsChangedHandler = { [weak self] results, _ in

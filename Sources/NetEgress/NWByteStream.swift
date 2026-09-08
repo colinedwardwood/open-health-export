@@ -88,6 +88,12 @@ public actor NWByteStream: ByteStream {
 
     public func open() async throws {
         if isReady { return }
+        switch target {
+        case .hostPort(let endpoint):
+            EgressAttemptLog.record(kind: .byteStream, host: endpoint.host)
+        case .bonjour(let service):
+            EgressAttemptLog.record(kind: .byteStream, host: service.name)
+        }
         let connection: NWConnection
         switch target {
         case .hostPort(let endpoint):

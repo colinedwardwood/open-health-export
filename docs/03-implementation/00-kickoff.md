@@ -188,6 +188,10 @@ onto that set, and a destination that silently discards the body after
 connecting cannot derive `success`. A 10,000-tuple check refuses success when
 fewer records were acknowledged than read.
 
+Default configuration makes no attributable network dials: a local-file
+`ExportRun` leaves the opt-in `EgressAttemptLog` empty, while the real HTTP
+transport records the host before `URLSession` runs.
+
 R-25 now has a named-step destination test. Local folder write/read/confirm
 must pass (or MQTT QoS 0 report `sentUnconfirmed`) before `enable`. A failed
 test cannot enable. HTTPS/HA tests cover TLS, pin mismatch, 401, bearer

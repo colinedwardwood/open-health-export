@@ -5,6 +5,7 @@ import DestinationTrust
 import EnginePorts
 import Foundation
 import MetricCatalog
+import NetEgress
 import SinkLocalFile
 import StorageSQLite
 import TestSupport
@@ -385,6 +386,48 @@ import Redaction
     let discardedOutcome = try await discarded.run()
     #expect(discardedOutcome.kind == .partial)
     #expect(discardedOutcome.kind != .success)
+}
+
+@Test func defaultLocalFileExportMakesNoAttributableNetworkDials() async throws {
+    let recorder = EgressAttemptLog.Recorder()
+    try await EgressAttemptLog.$recorder.withValue(recorder) {
+        let dest = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ohe-r52-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+        let run = ExportRun(
+            source: CountingSource(),
+            destination: .testing(LocalFileSink(directory: dest)),
+            store: MemoryStateStore(),
+            metric: MetricCatalog.heartRate.id,
+            scratchDirectory: dest.appendingPathComponent("scratch"),
+            envelope: testEnvelope()
+        )
+        _ = try await run.run()
+        #expect(recorder.snapshot().isEmpty)
+    }
+}
+
+@Test func urlSessionTransportRecordsTheHostBeforeAnyBytesMove() async {
+    let recorder = EgressAttemptLog.Recorder()
+    await EgressAttemptLog.$recorder.withValue(recorder) {
+        let body = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ohe-r52-body-\(UUID().uuidString)")
+        try? Data().write(to: body)
+        let transport = URLSessionHTTPTransport()
+        do {
+            _ = try await transport.execute(
+                OutboundHTTPRequest(
+                    method: "POST",
+                    url: URL(string: "https://127.0.0.1:1/r52")!,
+                    headers: [:],
+                    bodyFile: body
+                )
+            )
+        } catch {
+            _ = error
+        }
+        #expect(recorder.snapshot() == [EgressAttempt(kind: .http, host: "127.0.0.1")])
+    }
 }
 
 @Test func hkStatisticsExceptionListIsNonEmpty() {
