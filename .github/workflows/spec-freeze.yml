@@ -3,13 +3,25 @@ on:
   pull_request:
     paths:
       - spec/v1.0.0/**
+  push:
+    paths:
+      - spec/v1.0.0/**
 jobs:
   freeze:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Frozen tree is additive only
+      - name: Spec artifacts parse
         run: |
-          echo "spec freeze gate stub — v1.0.0 is not yet FROZEN"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path("spec/v1.0.0")
+          json.loads((root / "README.md").read_text())
+          json.loads((root / "adjacency.json").read_text())
+          json.loads((root / "fixtures/fix-catalogue.json").read_text())
+          assert (root / "fixtures/tier0.ndjson").stat().st_size > 0
+          if (root / "FROZEN").exists():
+              raise SystemExit("v1.0.0 is marked FROZEN; additive-only freeze diffs are the next gate")
+          print("spec artifacts parse and remain unfrozen: ok")
+          PY

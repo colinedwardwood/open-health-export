@@ -36,13 +36,7 @@ import Redaction
 }
 
 @Test func diagnosticBundleIsBoundedManifestDerivedAndRedacted() throws {
-    let canaries = [
-        "clinic.example.org",
-        "bearer-secret-token-0123456789",
-        "72.123456",
-        "Dexcom G7",
-        "HKCategoryTypeIdentifierSexualActivity",
-    ]
+    let canaries = RedactionCanary.tokens
     let canary = canaries.joined(separator: " ")
     let events = [
         RunEvent(

@@ -194,6 +194,7 @@ struct PolicyCheck {
         print("policycheck no alternate icons: ok")
         try checkAdjacency(root: root)
         try checkHealthKitSymbolsStayInAdapter(sources: sources)
+        try checkSpecArtifacts(root: root)
     }
 
     static func checkHealthKitSymbolsStayInAdapter(sources: URL) throws {
@@ -215,6 +216,28 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck HealthKit types stay in HealthKitSource: ok")
+    }
+
+    static func checkSpecArtifacts(root: URL) throws {
+        let spec = root.appendingPathComponent("spec/v1.0.0")
+        for relative in ["README.md", "adjacency.json", "fixtures/fix-catalogue.json"] {
+            let url = spec.appendingPathComponent(relative)
+            let data = try Data(contentsOf: url)
+            _ = try JSONSerialization.jsonObject(with: data)
+        }
+        let corpus = spec.appendingPathComponent("fixtures/tier0.ndjson")
+        let size = try FileManager.default.attributesOfItem(atPath: corpus.path)[.size] as? Int ?? 0
+        guard size > 0 else {
+            FileHandle.standardError.write(Data("tier0 corpus missing\n".utf8))
+            exit(1)
+        }
+        if FileManager.default.fileExists(atPath: spec.appendingPathComponent("FROZEN").path) {
+            FileHandle.standardError.write(
+                Data("spec/v1.0.0 is marked FROZEN; freeze diffs are not implemented in this check\n".utf8)
+            )
+            exit(1)
+        }
+        print("policycheck spec artifacts parse and remain unfrozen: ok")
     }
 
     static func checkAdjacency(root: URL) throws {

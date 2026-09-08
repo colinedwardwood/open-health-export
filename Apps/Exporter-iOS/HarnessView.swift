@@ -7,6 +7,7 @@ import EnginePorts
 import HealthKitSource
 import MetricCatalog
 import SwiftUI
+import WireFormat
 
 struct HarnessView: View {
     @Environment(\.scenePhase) private var scenePhase
@@ -36,6 +37,7 @@ struct HarnessView: View {
     @State private var wipeArmed = false
     @State private var stopHeartRateArmed = false
     @State private var demoConfirmName = ""
+    @State private var browserSearch = ""
     @State private var foregroundCatchUpStarted = false
 
     var body: some View {
@@ -53,6 +55,7 @@ struct HarnessView: View {
                         disclosure
                     } else {
                         controls
+                        dataBrowser
                     }
 
                     if !results.isEmpty {
@@ -386,6 +389,46 @@ struct HarnessView: View {
         results = lines
         status = "Ready. R-70 finished. Copy the lines below into the findings doc. Simulator stores are often empty; use REF-B or the XR for a real number."
         phase = .ready
+    }
+
+    private var dataBrowser: some View {
+        let latest = Dictionary(
+            uniqueKeysWithValues: MetricCatalog.all.enumerated().map { index, declaration in
+                (declaration.id, DemoCorpus.sample(at: index, seed: 1, declaration: declaration))
+            }
+        )
+        let rows = DataBrowser.rows(
+            latest: latest,
+            exported: Set(MetricCatalog.all.map(\.id)),
+            search: browserSearch
+        )
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("Data")
+                .font(.headline)
+            Text("Demo values. This is what App Review sees without HealthKit history.")
+                .font(.footnote)
+                .foregroundStyle(.orange)
+            TextField("Search types", text: $browserSearch)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+            ForEach(rows) { row in
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack {
+                        Text(row.title)
+                        if row.sensitive {
+                            Text("sensitive")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Text(row.subtitle)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(row.title), \(row.subtitle)")
+            }
+        }
     }
 
     @MainActor
