@@ -93,11 +93,11 @@ struct HarnessView: View {
                     await runLocalExport(trigger: .appForeground)
                 }
             }
-            .onChange(of: scenePhase) { _, next in
-                guard next == .active else { return }
-                AppLifecycleCoordinator.shared.recordWake(.appForeground)
-                Task { await startHealthObserversIfEligible() }
-            }
+        }
+        .onChange(of: scenePhase) { _, next in
+            guard next == .active else { return }
+            AppLifecycleCoordinator.shared.recordWake(.appForeground)
+            Task { await startHealthObserversIfEligible() }
         }
         .task(id: disclosureAcknowledged) {
             await startHealthObserversIfEligible()
