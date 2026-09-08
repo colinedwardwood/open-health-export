@@ -89,21 +89,23 @@ closed. Policycheck bans ambient clocks in `Sources/` except CoreTemporal and He
 A DCO workflow requires `Signed-off-by` on every commit.
 
 Successful delta commits now upsert one `emitted_index` row per sample UUID in the
-same transaction as the cursor (R-08 write path). Reconcile still does not run.
+same transaction as the cursor (R-08 write path).
 
 Census rows accumulate across pages with an XOR digest; tombstones decrement the
 census and drop the UUID from `emitted_index` when known. Unknown deletions journal
 `deletion_undatable`. `ReconcileCompare` classifies cell mismatches and absence
-tombstones; the bounded sweep still does not run.
+tombstones.
 
 `ReconcilePlanner` turns a cell compare into concrete repairs for a day, including
 absence tombstones from the emitted index. Dirty days can be cleared after a drain.
-The HealthKit-backed trailing sweep is not wired yet.
+The local export path runs the HealthKit-backed trailing seven-day sweep after
+each metric delta without advancing its anchored cursor.
 
 Dirty days can feed `AggregateDrain.planDay` for a localSampleFold P1D bucket with
 a stable `bucketKey`. Aggregates encode on the wire. `ExportRun` now drains those
 buckets into the same NDJSON batch as the delta page and clears the dirty days on
-commit. HealthKit statistics are still unused.
+commit. App-created runs supply `HealthKitStatisticsSource`, so cumulative
+catalogue metrics use HealthKit's de-duplicated canonical daily totals.
 
 Journal rows carry trigger and sample tallies. `WakeLedger` is an append-only
 wake file; `WakeAttribution` splits overdue scheduling from execution. Store
@@ -112,8 +114,8 @@ wipe empties SQLite/memory tables and unlinks pending payloads after COMMIT.
 Pending batches are indexed by metric. `TypePurge` drops that type's queue,
 writes a ledger row, and disables further export for it on an observed
 grant→denied transition or an explicit stop — never on an empty read (R-60).
-The 60-second clock starts at observation. HealthKit observation at every
-wake and the two-tap UI are not wired.
+The 60-second clock starts at observation. A two-tap explicit-stop UI is wired;
+HealthKit observation at every wake remains open.
 
 `ReconcileSweep` applies the seven-day trailing plan from fixture (or later
 HealthKit) date-ranged observations and enqueues repairs without moving the

@@ -53,6 +53,8 @@ enum HarnessExport {
             tzDatabaseVersion: "host"
         )
         let source = HealthKitSampleSource(context: context, limit: 1000)
+        let observations = HealthKitDayObservationSource(context: context, limit: 1000)
+        let statistics = HealthKitStatisticsSource(context: context)
         let now = Date().ISO8601Format()
         let exporterId = try installationID()
         let ledgerSeal = ledgerHeadSeal()
@@ -73,6 +75,8 @@ enum HarnessExport {
                     emittedAt: now,
                     observedAt: now
                 ),
+                temporal: context,
+                statistics: statistics,
                 snapshotURL: StatusSnapshotLocation.url(destinationID: "local-file"),
                 ledgerHeadSeal: ledgerSeal,
                 ledgerSealURL: ledgerSealURL
@@ -80,6 +84,29 @@ enum HarnessExport {
             let outcome = try await run.run()
             WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
             lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
+
+            let reconcile = ReconcileSweep(
+                observations: observations,
+                destination: verified,
+                store: store,
+                metric: metric,
+                scratchDirectory: scratch,
+                destinationName: "local-file",
+                envelope: WireEnvelope(
+                    exporterId: exporterId,
+                    seq: 1,
+                    emittedAt: now,
+                    observedAt: now
+                ),
+                temporal: context,
+                statistics: statistics,
+                trigger: .manual,
+                snapshotURL: StatusSnapshotLocation.url(destinationID: "local-file"),
+                ledgerHeadSeal: ledgerSeal,
+                ledgerSealURL: ledgerSealURL
+            )
+            let reconciled = try await reconcile.run(throughDay: String(now.prefix(10)))
+            lines.append("\(metric.rawValue) reconcile: \(reconciled.kind.rawValue)")
         }
         lines.append("Files: \(dest.path)")
         return lines
@@ -148,6 +175,7 @@ enum HarnessExport {
             tzDatabaseVersion: "host"
         )
         let source = HealthKitSampleSource(context: context, limit: 1000)
+        let statistics = HealthKitStatisticsSource(context: context)
         let now = Date().ISO8601Format()
         let ledgerSeal = ledgerHeadSeal()
         let ledgerSealURL = root.appendingPathComponent("ledger-head-seal.json")
@@ -166,6 +194,8 @@ enum HarnessExport {
                     emittedAt: now,
                     observedAt: now
                 ),
+                temporal: context,
+                statistics: statistics,
                 snapshotURL: StatusSnapshotLocation.url(destinationID: "companion"),
                 ledgerHeadSeal: ledgerSeal,
                 ledgerSealURL: ledgerSealURL

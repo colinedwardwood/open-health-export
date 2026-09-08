@@ -1466,13 +1466,19 @@ private struct OneExportFault: ExportFaultInjector {
     )
     _ = try await first.run()
     let cursor = try store.transaction.loadCursor(metric: metric)
+    let seal = HashLedgerSeal(secret: "reconcile-device")
+    let sealURL = dest.appendingPathComponent("reconcile-ledger-seal.json")
+    let snapshotURL = dest.appendingPathComponent("reconcile-status.json")
     let sweep = ReconcileSweep(
         observations: FixtureDays(byDay: ["2024-01-01": [keep]]),
         destination: .testing(LocalFileSink(directory: dest)),
         store: store,
         metric: metric,
         scratchDirectory: dest.appendingPathComponent("scratch-sweep"),
-        envelope: testEnvelope()
+        envelope: testEnvelope(),
+        snapshotURL: snapshotURL,
+        ledgerHeadSeal: seal,
+        ledgerSealURL: sealURL
     )
     let outcome = try await sweep.run(throughDay: "2024-01-01")
     #expect(outcome.kind == .success)
@@ -1486,6 +1492,13 @@ private struct OneExportFault: ExportFaultInjector {
         .joined()
     #expect(texts.contains(gone.key.uuid))
     #expect(texts.contains("\"kind\":\"tombstone\""))
+    let snapshot = try DestinationSnapshotFile.read(from: snapshotURL)
+    #expect(snapshot.lastOutcome == "success")
+    let entries = try store.transaction.loadLedger()
+    #expect(
+        await LedgerHeadSealRecordFile.verify(entries: entries, seal: seal, url: sealURL)
+            == .valid(head: entries.last?.entryHash ?? LedgerChain.genesisHash, count: entries.count)
+    )
 }
 
 @Test func reconcileSweepReemitsNewSamplesAndLeavesCursor() async throws {

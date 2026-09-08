@@ -4,6 +4,8 @@ import DestinationTrust
 import EnginePorts
 import FileWriteKit
 import Foundation
+import RunJournal
+import Watchdog
 import WireFormat
 
 /// R-08 trailing-window apply. Plans from stored census vs date-ranged observations, then
@@ -20,6 +22,9 @@ public struct ReconcileSweep: Sendable {
     public var temporal: TemporalContext
     public var statistics: (any StatisticsSource)?
     public var trigger: RunTrigger
+    public var snapshotURL: URL?
+    public var ledgerHeadSeal: (any LedgerHeadSeal)?
+    public var ledgerSealURL: URL?
 
     public init(
         observations: any DayObservationSource,
@@ -32,7 +37,10 @@ public struct ReconcileSweep: Sendable {
         clock: any Clock = SystemClock(),
         temporal: TemporalContext = .utc,
         statistics: (any StatisticsSource)? = nil,
-        trigger: RunTrigger = .manual
+        trigger: RunTrigger = .manual,
+        snapshotURL: URL? = nil,
+        ledgerHeadSeal: (any LedgerHeadSeal)? = nil,
+        ledgerSealURL: URL? = nil
     ) {
         self.observations = observations
         self.destination = destination
@@ -45,6 +53,9 @@ public struct ReconcileSweep: Sendable {
         self.temporal = temporal
         self.statistics = statistics
         self.trigger = trigger
+        self.snapshotURL = snapshotURL
+        self.ledgerHeadSeal = ledgerHeadSeal
+        self.ledgerSealURL = ledgerSealURL
     }
 
     public func run(throughDay: String) async throws -> RunOutcome {
@@ -201,5 +212,39 @@ public struct ReconcileSweep: Sendable {
                 )
             )
         }
+        try writeSnapshot(outcome: outcome)
+        try await writeLedgerHeadSeal()
+    }
+
+    private func writeSnapshot(outcome: RunOutcome) throws {
+        guard let snapshotURL else { return }
+        let now = clock.now().timeIntervalSince1970
+        let prior = try? DestinationSnapshotFile.read(from: snapshotURL)
+        let succeeded = outcome.kind == .success || outcome.kind == .successNothingDue
+        try DestinationSnapshotFile.write(
+            DestinationStatusSnapshot(
+                destinationID: destinationName,
+                enabled: true,
+                lastOutcome: outcome.kind.rawValue,
+                lastSuccessEpoch: succeeded ? now : prior?.lastSuccessEpoch,
+                unacknowledgedSecurityEventCount:
+                    prior?.unacknowledgedSecurityEventCount ?? 0,
+                writtenAtEpoch: now
+            ),
+            to: snapshotURL
+        )
+    }
+
+    private func writeLedgerHeadSeal() async throws {
+        guard let ledgerHeadSeal, let ledgerSealURL else { return }
+        let entries = try await store.transact { tx in
+            try tx.loadLedger()
+        }
+        try await LedgerHeadSealRecordFile.update(
+            entries: entries,
+            seal: ledgerHeadSeal,
+            sealedAtEpoch: clock.now().timeIntervalSince1970,
+            url: ledgerSealURL
+        )
     }
 }
