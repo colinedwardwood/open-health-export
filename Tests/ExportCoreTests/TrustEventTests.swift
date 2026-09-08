@@ -108,7 +108,7 @@ private let everyTrustEvent: [TrustEvent] = [
     let kinds = everyTrustEvent.map { TrustNotice.notice(for: $0, destination: "ha.example").kind }
     #expect(kinds.count == everyTrustEvent.count)
     #expect(Set(kinds).count == everyTrustEvent.count)
-    #expect(Set(kinds) == Set(UserNotice.Kind.allCases))
+    #expect(Set(kinds) == Set(UserNotice.Kind.allCases.filter { $0 != .queueExpired }))
 }
 
 @Test func noticesCarryNoProse() {

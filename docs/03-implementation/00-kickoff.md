@@ -100,6 +100,9 @@ tombstones.
 absence tombstones from the emitted index. Dirty days can be cleared after a drain.
 The local export path runs the HealthKit-backed trailing seven-day sweep after
 each metric delta without advancing its anchored cursor.
+Once disclosure is acknowledged and the local destination has passed R-25,
+each foreground launch starts one bounded catch-up and attributes it as
+`appForeground`.
 
 Dirty days can feed `AggregateDrain.planDay` for a localSampleFold P1D bucket with
 a stable `bucketKey`. Aggregates encode on the wire. `ExportRun` now drains those

@@ -35,7 +35,9 @@ enum HarnessExport {
         return id
     }
 
-    static func runOnePageEachMetric() async throws -> [String] {
+    static func runOnePageEachMetric(
+        trigger: RunTrigger = .manual
+    ) async throws -> [String] {
         let fm = FileManager.default
         let root = try applicationSupportRoot()
         let sqliteURL = root.appendingPathComponent("state.sqlite")
@@ -77,6 +79,7 @@ enum HarnessExport {
                 ),
                 temporal: context,
                 statistics: statistics,
+                trigger: trigger,
                 snapshotURL: StatusSnapshotLocation.url(destinationID: "local-file"),
                 externalStatusURL: dest.appendingPathComponent("status.json"),
                 ledgerHeadSeal: ledgerSeal,
@@ -101,7 +104,7 @@ enum HarnessExport {
                 ),
                 temporal: context,
                 statistics: statistics,
-                trigger: .manual,
+                trigger: trigger,
                 snapshotURL: StatusSnapshotLocation.url(destinationID: "local-file"),
                 externalStatusURL: dest.appendingPathComponent("status.json"),
                 ledgerHeadSeal: ledgerSeal,
@@ -429,6 +432,16 @@ enum HarnessExport {
 
     private static func localFileTestReportURL(root: URL) -> URL {
         root.appendingPathComponent("local-file-test.json")
+    }
+
+    static func isLocalFileEnabled() -> Bool {
+        guard let root = try? applicationSupportRoot(),
+              let data = try? Data(contentsOf: localFileTestReportURL(root: root)),
+              let report = try? JSONDecoder().decode(DestinationTestReport.self, from: data)
+        else {
+            return false
+        }
+        return report.allowsEnablement
     }
 
     private static func companionTestReportURL(root: URL) -> URL {

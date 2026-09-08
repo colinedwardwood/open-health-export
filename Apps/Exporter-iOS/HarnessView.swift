@@ -16,6 +16,8 @@ struct HarnessView: View {
     }
 
     @State private var phase: Phase = .disclosure
+    @AppStorage("ohe.disclosureAcknowledged")
+    private var disclosureAcknowledged = false
     @State private var status = "Waiting for disclosure acknowledgement."
     @State private var results: [String] = []
     @State private var timeToFirstFrameMS: Double = 0
@@ -32,6 +34,7 @@ struct HarnessView: View {
     @State private var ledgerWarning = ""
     @State private var wipeArmed = false
     @State private var stopHeartRateArmed = false
+    @State private var foregroundCatchUpStarted = false
 
     var body: some View {
         NavigationStack {
@@ -67,6 +70,10 @@ struct HarnessView: View {
         .onAppear {
             timeToFirstFrameMS = LaunchMark.millisecondsToNow()
             destinationStatusLines = HarnessExport.destinationStatusLines()
+            if disclosureAcknowledged {
+                phase = .ready
+                status = "Ready."
+            }
             Task {
                 do {
                     let expired = try await HarnessExport.expireQueuesAndNotify()
@@ -78,6 +85,12 @@ struct HarnessView: View {
                 }
                 await restorePairing()
                 await refreshLedgerIntegrity()
+                if disclosureAcknowledged,
+                   !foregroundCatchUpStarted,
+                   HarnessExport.isLocalFileEnabled() {
+                    foregroundCatchUpStarted = true
+                    await runLocalExport(trigger: .appForeground)
+                }
             }
         }
         .sheet(isPresented: $showScanner) {
@@ -101,6 +114,7 @@ struct HarnessView: View {
             Text("When the phone is locked, Apple withholds Health data after a short window. Background export is best-effort: iOS may not wake the app, and we will say so instead of pretending a schedule ran.")
             Text("You choose what is read. We do not hide destinations, and we do not send telemetry to the maintainers.")
             Button("I understand — continue") {
+                disclosureAcknowledged = true
                 phase = .ready
                 status = "Ready. Next: request Health read access, then measure."
             }
@@ -347,12 +361,12 @@ struct HarnessView: View {
     }
 
     @MainActor
-    private func runLocalExport() async {
+    private func runLocalExport(trigger: RunTrigger = .manual) async {
         phase = .working
         status = "Working: local-file export."
         results = []
         do {
-            results = try await HarnessExport.runOnePageEachMetric()
+            results = try await HarnessExport.runOnePageEachMetric(trigger: trigger)
             destinationStatusLines = HarnessExport.destinationStatusLines()
             await refreshLedgerIntegrity()
             status = "Ready. Local export finished. Outcome kinds are engine-derived, not assigned by this screen."
@@ -403,14 +417,19 @@ struct HarnessView: View {
             pairing = nil
             sas = ""
             pairingPaste = ""
+            disclosureAcknowledged = false
+            foregroundCatchUpStarted = false
             destinationStatusLines = HarnessExport.destinationStatusLines()
             ledgerLines = []
             await refreshLedgerIntegrity()
-            status = "Ready. Credentials and the previous ledger identity were destroyed."
+            phase = .disclosure
+            status = "Credentials and the previous ledger identity were destroyed."
         } catch {
             status = "Failed: \(error.localizedDescription)"
         }
-        phase = .ready
+        if disclosureAcknowledged {
+            phase = .ready
+        }
     }
 
     @MainActor

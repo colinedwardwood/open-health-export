@@ -614,6 +614,7 @@ import Redaction
         scratchDirectory: dest.appendingPathComponent("scratch"),
         envelope: testEnvelope(),
         clock: FrozenClock(instant: Date(timeIntervalSince1970: 42)),
+        trigger: .appForeground,
         snapshotURL: snapshotURL,
         externalStatusURL: externalStatusURL,
         ledgerHeadSeal: ledgerSeal,
@@ -640,6 +641,7 @@ import Redaction
     #expect(external.samplesSent == 2)
     #expect(external.samplesAcked == 2)
     #expect(external.samplesRejected == 0)
+    #expect(try store.transaction.loadJournal().last?.trigger == .appForeground)
     let ledger = try await store.transact { try $0.loadLedger() }
     #expect(
         await LedgerHeadSealRecordFile.verify(
