@@ -66,7 +66,7 @@ targets:
       - path: Apps/AppShared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: $(PRODUCT_BUNDLE_IDENTIFIER_ROOT).widget
+        PRODUCT_BUNDLE_IDENTIFIER: $(PRODUCT_BUNDLE_IDENTIFIER_ROOT).ios.widget
         PRODUCT_NAME: $(PRODUCT_NAME)StatusWidget
         INFOPLIST_FILE: Apps/StatusWidget/Info.plist
         CODE_SIGN_ENTITLEMENTS: Apps/StatusWidget/StatusWidget.entitlements
