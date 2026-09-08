@@ -1,0 +1,114 @@
+import CoreDomain
+import Foundation
+import MetricCatalog
+import Testing
+
+private func browserSample(
+    metric: MetricID,
+    uuid: String,
+    start: String,
+    value: Double
+) -> SampleRecord {
+    SampleRecord(
+        key: RecordKey(uuid: uuid),
+        metric: metric,
+        start: start,
+        end: start,
+        timeZoneOffsetMinutes: 0,
+        timeZoneSource: .unknown,
+        value: value,
+        unit: MetricCatalog.declaration(for: metric)?.canonicalUnit
+            ?? CanonicalUnit(symbol: "count"),
+        observedAt: start
+    )
+}
+
+@Test func dataBrowserDetailFiltersPeriodAndKeepsNewestFirst() throws {
+    let metric = MetricCatalog.heartRate.id
+    let now = try #require(ISO8601DateFormatter().date(from: "2026-09-08T12:00:00Z"))
+    let detail = try #require(
+        DataBrowser.detail(
+            metric: metric,
+            samples: [
+                browserSample(
+                    metric: metric,
+                    uuid: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    start: "2026-09-08T11:00:00Z",
+                    value: 72
+                ),
+                browserSample(
+                    metric: metric,
+                    uuid: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                    start: "2026-09-07T11:00:00Z",
+                    value: 68
+                ),
+                browserSample(
+                    metric: metric,
+                    uuid: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+                    start: "2026-08-01T11:00:00Z",
+                    value: 60
+                ),
+            ],
+            destinations: [
+                DataBrowserDestination(name: "Archive folder", lastSent: "2026-09-08T11:30:00Z"),
+            ],
+            period: .week,
+            now: now
+        )
+    )
+    #expect(detail.samples.map(\.value) == [72, 68])
+    #expect(detail.latest?.value == 72)
+    #expect(detail.exportUnit == "bpm")
+    #expect(detail.destinations.map(\.name) == ["Archive folder"])
+}
+
+@Test func aggregateDetailNamesTheExportComputation() throws {
+    let detail = try #require(
+        DataBrowser.detail(
+            metric: MetricCatalog.stepCount.id,
+            samples: [],
+            now: Date(timeIntervalSince1970: 0)
+        )
+    )
+    #expect(detail.aggregationExplanation == "sum · cumulative · local day")
+    #expect(DataBrowser.emptyDetailCopy.contains("access is off in Health"))
+}
+
+@Test func selectionReviewRequiresSensitiveIndividualConfirmation() throws {
+    var draft = DataSelectionDraft(baseline: [MetricCatalog.stepCount.id])
+    #expect(throws: DataSelectionError.sensitiveConfirmationRequired) {
+        try draft.toggle(
+            MetricCatalog.bodyMass.id,
+            destinationName: "Archive folder"
+        )
+    }
+    try draft.toggle(
+        MetricCatalog.bodyMass.id,
+        destinationName: "Archive folder",
+        sensitiveConfirmation: "Archive folder"
+    )
+    try draft.toggle(
+        MetricCatalog.stepCount.id,
+        destinationName: "Archive folder"
+    )
+    let review = draft.review(authorized: [], destinationName: "Archive folder")
+    #expect(review.adding == [MetricCatalog.bodyMass.id])
+    #expect(review.removing == [MetricCatalog.stepCount.id])
+    #expect(review.needingPermission == [MetricCatalog.bodyMass.id])
+    #expect(
+        review.removalWarning
+            == "Removing a type does not delete data already sent to Archive folder."
+    )
+}
+
+@Test func routineBulkInvertNeverSelectsSensitiveMetrics() {
+    var draft = DataSelectionDraft(baseline: [])
+    draft.invertRoutine([
+        MetricCatalog.stepCount.id,
+        MetricCatalog.bodyMass.id,
+        MetricCatalog.heartRate.id,
+    ])
+    #expect(draft.selected == [MetricCatalog.stepCount.id, MetricCatalog.heartRate.id])
+    draft.clearAll()
+    #expect(draft.selected.isEmpty)
+}

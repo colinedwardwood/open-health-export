@@ -38,6 +38,15 @@ struct HarnessView: View {
     @State private var stopHeartRateArmed = false
     @State private var demoConfirmName = ""
     @State private var browserSearch = ""
+    @State private var browserSelecting = false
+    @State private var browserReviewVisible = false
+    @State private var browserBaseline = Set(MetricCatalog.all.map(\.id))
+    @State private var browserSelection = Set(MetricCatalog.all.map(\.id))
+    @State private var selectedBrowserMetric: MetricID?
+    @State private var pendingSensitiveMetric: MetricID?
+    @State private var sensitiveDestinationConfirmation = ""
+    @State private var liveBrowserSamples: [MetricID: [SampleRecord]] = [:]
+    @State private var browserLoadingHealth = false
     @State private var foregroundCatchUpStarted = false
     @AppStorage("ohe.advisoryEnabled")
     private var advisoryEnabled = true
@@ -403,42 +412,219 @@ struct HarnessView: View {
     }
 
     private var dataBrowser: some View {
-        let latest = Dictionary(
-            uniqueKeysWithValues: MetricCatalog.all.enumerated().map { index, declaration in
-                (declaration.id, DemoCorpus.sample(at: index, seed: 1, declaration: declaration))
-            }
-        )
+        let samples = MetricCatalog.all.enumerated().map { index, declaration in
+            DemoCorpus.sample(at: index, seed: 1, declaration: declaration)
+        }
+        let latest = Dictionary(uniqueKeysWithValues: samples.map { ($0.metric, $0) })
         let rows = DataBrowser.rows(
             latest: latest,
-            exported: Set(MetricCatalog.all.map(\.id)),
+            exported: browserSelection,
             search: browserSearch
         )
+        let selectedDetail = selectedBrowserMetric.flatMap { metric in
+            let live = liveBrowserSamples[metric]
+            let detailSamples = live ?? samples.filter { $0.metric == metric }
+            let detailNow = live == nil
+                ? detailSamples.first.flatMap { ISO8601DateFormatter().date(from: $0.start) }
+                    ?? Date(timeIntervalSince1970: 0)
+                : Date()
+            return DataBrowser.detail(
+                metric: metric,
+                samples: detailSamples,
+                destinations: browserSelection.contains(metric)
+                    ? [DataBrowserDestination(name: "Archive folder", lastSent: "demo")]
+                    : [],
+                now: detailNow
+            )
+        }
         return VStack(alignment: .leading, spacing: 8) {
-            Text("Data")
-                .font(.headline)
-            Text("Demo values. This is what App Review sees without HealthKit history.")
+            HStack {
+                Text(selectedDetail?.title ?? "Data")
+                    .font(.headline)
+                Spacer()
+                if selectedDetail != nil {
+                    Button("Back") { selectedBrowserMetric = nil }
+                } else if browserSelecting {
+                    Button("Review changes") {
+                        browserSelecting = false
+                        browserReviewVisible = true
+                    }
+                } else {
+                    Button("Select") {
+                        browserBaseline = browserSelection
+                        browserSelecting = true
+                        browserReviewVisible = false
+                    }
+                }
+            }
+            Text(
+                selectedBrowserMetric.flatMap { liveBrowserSamples[$0] } == nil
+                    ? "Demo values. This is what App Review sees without HealthKit history."
+                    : "Health values read on this iPhone."
+            )
                 .font(.footnote)
-                .foregroundStyle(.orange)
-            TextField("Search types", text: $browserSearch)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-            ForEach(rows) { row in
-                VStack(alignment: .leading, spacing: 2) {
+                .foregroundColor(
+                    selectedBrowserMetric.flatMap { liveBrowserSamples[$0] } == nil
+                        ? .orange
+                        : .secondary
+                )
+
+            if let detail = selectedDetail {
+                Button(browserLoadingHealth ? "Loading Health data…" : "Load 30 days from Health") {
+                    Task { await loadBrowserSamples(metric: detail.metric) }
+                }
+                .disabled(browserLoadingHealth)
+                dataBrowserDetail(detail)
+            } else {
+                if browserSelecting {
                     HStack {
-                        Text(row.title)
-                        if row.sensitive {
-                            Text("sensitive")
-                                .font(.caption2)
+                        Button("Invert routine") {
+                            var draft = DataSelectionDraft(baseline: browserSelection)
+                            draft.invertRoutine(MetricCatalog.all.map(\.id))
+                            browserSelection = draft.selected
+                        }
+                        Button("Clear all") { browserSelection.removeAll() }
+                    }
+                }
+                if browserReviewVisible {
+                    let adding = browserSelection.subtracting(browserBaseline)
+                    let removing = browserBaseline.subtracting(browserSelection)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Review changes").font(.headline)
+                        Text("Adding \(adding.count) types")
+                        Text("Removing \(removing.count) types")
+                        if !removing.isEmpty {
+                            Text("Removing a type does not delete data already sent to Archive folder.")
+                                .font(.footnote)
+                                .foregroundStyle(.orange)
+                        }
+                        Button("Continue") {
+                            browserBaseline = browserSelection
+                            browserReviewVisible = false
+                        }
+                    }
+                }
+                if let pendingSensitiveMetric {
+                    Text("Sensitive type — type Archive folder to add it individually.")
+                        .font(.footnote)
+                    TextField("Archive folder", text: $sensitiveDestinationConfirmation)
+                    Button("Confirm sensitive type") {
+                        if sensitiveDestinationConfirmation == "Archive folder" {
+                            browserSelection.insert(pendingSensitiveMetric)
+                            self.pendingSensitiveMetric = nil
+                            sensitiveDestinationConfirmation = ""
+                        }
+                    }
+                    .disabled(sensitiveDestinationConfirmation != "Archive folder")
+                }
+                TextField("Search types", text: $browserSearch)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                ForEach(rows) { row in
+                    Button {
+                        if browserSelecting {
+                            if browserSelection.contains(row.metric) {
+                                browserSelection.remove(row.metric)
+                            } else if row.sensitive {
+                                pendingSensitiveMetric = row.metric
+                            } else {
+                                browserSelection.insert(row.metric)
+                            }
+                        } else {
+                            selectedBrowserMetric = row.metric
+                            Task { await loadBrowserSamples(metric: row.metric) }
+                        }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack {
+                                if browserSelecting {
+                                    Image(systemName: browserSelection.contains(row.metric)
+                                        ? "checkmark.circle.fill"
+                                        : "circle")
+                                }
+                                Text(row.title)
+                                if row.sensitive {
+                                    Text("sensitive")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            Text(row.subtitle)
+                                .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    Text(row.subtitle)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(row.title), \(row.subtitle)")
                 }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("\(row.title), \(row.subtitle)")
             }
+        }
+    }
+
+    @ViewBuilder
+    private func dataBrowserDetail(_ detail: DataBrowserDetail) -> some View {
+        if let latest = detail.latest {
+            Text("Latest").font(.caption)
+            Text("\(DataBrowser.formatValue(latest.value)) \(detail.exportUnit)")
+            Text(latest.start).font(.footnote)
+        } else {
+            Text(DataBrowser.emptyDetailCopy).font(.footnote)
+        }
+        Text("Exported to").font(.caption)
+        if detail.destinations.isEmpty {
+            Text("Not included in any export.")
+        } else {
+            ForEach(detail.destinations, id: \.name) { destination in
+                Text("\(destination.name) · last sent \(destination.lastSent ?? "never")")
+            }
+        }
+        Text("Export unit: \(detail.exportUnit)").font(.footnote)
+        if let explanation = detail.aggregationExplanation {
+            Text("Daily buckets (this is what we export)").font(.caption)
+            Text("Computed as: \(explanation)").font(.footnote)
+        }
+        Text("Samples").font(.caption)
+        ForEach(detail.samples, id: \.key.uuid) { sample in
+            Text("\(DataBrowser.formatValue(sample.value)) \(detail.exportUnit) · \(sample.start)")
+                .font(.footnote)
+        }
+    }
+
+    @MainActor
+    private func loadBrowserSamples(metric: MetricID) async {
+        browserLoadingHealth = true
+        defer { browserLoadingHealth = false }
+        let timeZone = TimeZone.current
+        let context = TemporalContext(
+            timeZoneIdentifier: timeZone.identifier,
+            localeIdentifier: "en_US_POSIX",
+            tzDatabaseVersion: "host"
+        )
+        let source = HealthKitDayObservationSource(context: context, limit: 1000)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "yyyy-MM-dd"
+        var loaded: [SampleRecord] = []
+        do {
+            for offset in 0 ..< DataBrowserPeriod.month.rawValue {
+                guard let date = calendar.date(byAdding: .day, value: -offset, to: Date()) else {
+                    continue
+                }
+                loaded.append(contentsOf: try await source.samples(
+                    metric: metric,
+                    day: formatter.string(from: date)
+                ))
+            }
+            liveBrowserSamples[metric] = loaded
+            status = loaded.isEmpty
+                ? DataBrowser.emptyDetailCopy
+                : "Loaded \(loaded.count) Health samples for comparison."
+        } catch {
+            status = "Couldn't read this type. Health data may be locked; this usually resolves on its own."
         }
     }
 
