@@ -61,6 +61,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(PRODUCT_BUNDLE_IDENTIFIER_ROOT).ios-uitests
+        PRODUCT_NAME: ExporteriOSUITests
+        PRODUCT_MODULE_NAME: ExporteriOSUITests
         GENERATE_INFOPLIST_FILE: YES
         TEST_TARGET_NAME: ExporteriOS
     dependencies:
