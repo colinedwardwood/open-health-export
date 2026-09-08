@@ -96,6 +96,93 @@ import Redaction
     }
 }
 
+@Test func diagnosticReaderUsesIndependentReadOnlyConnectionAndBoundsRuns() async throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-diagnostic-reader-\(UUID().uuidString).sqlite")
+    do {
+        let store = try SQLiteStateStore(path: url.path)
+        for index in 0..<4 {
+            try await store.transact { tx in
+                try tx.appendJournal(
+                    RunEvent(
+                        runID: RunID(rawValue: "run-\(index)"),
+                        outcomeKind: "success",
+                        detail: "not included",
+                        trigger: .launch,
+                        samplesRead: index,
+                        samplesCommitted: index,
+                        samplesAcked: index
+                    )
+                )
+            }
+        }
+    }
+    let read = SQLiteDiagnosticReader.read(path: url.path, maxRuns: 2)
+    #expect(read.events.map(\.runID.rawValue) == ["run-2", "run-3"])
+    #expect(read.degraded.isEmpty)
+    #expect(read.skippedRows == 0)
+}
+
+@Test func diagnosticReaderSkipsMalformedRowsAndStillBuildsBundle() async throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-diagnostic-salvage-\(UUID().uuidString).sqlite")
+    do {
+        let store = try SQLiteStateStore(path: url.path)
+        try await store.transact { tx in
+            try tx.appendJournal(
+                RunEvent(
+                    runID: RunID(rawValue: "good"),
+                    outcomeKind: "success",
+                    detail: "",
+                    trigger: .manual
+                )
+            )
+            try tx.appendJournal(
+                RunEvent(
+                    runID: RunID(rawValue: "bad-trigger"),
+                    outcomeKind: "failed",
+                    detail: "",
+                    trigger: .launch
+                )
+            )
+        }
+    }
+    var bytes = try Data(contentsOf: url)
+    let valid = Data("launch".utf8)
+    let invalid = Data("bogus!".utf8)
+    let range = try #require(bytes.range(of: valid))
+    bytes.replaceSubrange(range, with: invalid)
+    try bytes.write(to: url)
+
+    let read = SQLiteDiagnosticReader.read(path: url.path)
+    #expect(read.events.map(\.runID.rawValue) == ["good"])
+    #expect(read.skippedRows == 1)
+    #expect(read.degraded.contains("journal_rows_skipped=1"))
+    let bundle = try BundleAssembler().assemble(
+        header: DiagnosticHeader(
+            appVersion: "1",
+            osVersion: "1",
+            deviceModel: "test",
+            localeIdentifier: "en_US",
+            utcOffsetMinutes: 0,
+            generatedAt: "2024-01-01T00:00:00Z",
+            degraded: read.degraded
+        ),
+        events: read.events
+    )
+    #expect(String(decoding: bundle, as: UTF8.self).contains("journal_rows_skipped=1"))
+}
+
+@Test func diagnosticReaderDegradesInsteadOfThrowingForUnreadableDatabase() throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-diagnostic-broken-\(UUID().uuidString).sqlite")
+    try Data("not a sqlite database".utf8).write(to: url)
+    let read = SQLiteDiagnosticReader.read(path: url.path)
+    #expect(read.events.isEmpty)
+    #expect(read.degraded.contains("sqlite_integrity_check_failed"))
+    #expect(read.degraded.contains("journal_unreadable"))
+}
+
 @Test func redactionManifestKeysAreUnique() {
     #expect(Set(Allowlist.manifest.map(\.key)).count == Allowlist.manifest.count)
     #expect(!Allowlist.permitted("metric", in: .bundle))

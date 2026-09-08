@@ -145,7 +145,9 @@ bounded to 200 runs and 200 KiB. Run fields are emitted by the per-sink
 redaction manifest; raw run IDs and free-form detail never enter the bundle.
 `DiagnosticPreviewGate` exposes no share payload until full-content review.
 The iOS harness now builds a redacted bundle, shows the JSON, and only then
-exposes Share. Corruption-salvage reader remains open.
+exposes Share. Its journal input uses an independent read-only SQLite
+connection, runs `integrity_check`, and degrades to bounded row salvage with
+an explicit skipped-row count.
 
 R-25 now has a named-step destination test. Local folder write/read/confirm
 must pass (or MQTT QoS 0 report `sentUnconfirmed`) before `enable`. A failed

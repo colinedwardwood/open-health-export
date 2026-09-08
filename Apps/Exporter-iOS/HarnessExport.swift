@@ -198,6 +198,11 @@ enum HarnessExport {
     @MainActor
     static func diagnosticBundle() throws -> (preview: String, payload: Data) {
         let assembler = BundleAssembler()
+        let root = try applicationSupportRoot()
+        let journal = SQLiteDiagnosticReader.read(
+            path: root.appendingPathComponent("state.sqlite").path,
+            maxRuns: assembler.maxRuns
+        )
         let payload = try assembler.assemble(
             header: DiagnosticHeader(
                 appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0",
@@ -205,12 +210,13 @@ enum HarnessExport {
                 deviceModel: UIDevice.current.model,
                 localeIdentifier: Locale.current.identifier,
                 utcOffsetMinutes: TimeZone.current.secondsFromGMT() / 60,
-                generatedAt: Date().ISO8601Format()
+                generatedAt: Date().ISO8601Format(),
+                degraded: journal.degraded
             ),
-            events: []
+            events: journal.events
         )
         let text = String(decoding: payload, as: UTF8.self)
-        let lines = assembler.previewLines(events: [])
+        let lines = assembler.previewLines(events: journal.events)
         let preview = lines.isEmpty ? text : lines.joined(separator: "\n") + "\n\n" + text
         return (preview, payload)
     }
