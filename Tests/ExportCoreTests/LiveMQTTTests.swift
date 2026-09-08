@@ -9,6 +9,8 @@ import SinkMQTT
 import Testing
 import WireFormat
 
+@Suite(.serialized)
+struct LiveMQTTTests {
 @Test func mqttPublishesOverLoopbackTCP() async throws {
     let broker = try LocalMQTTBroker()
     let port = try await broker.start()
@@ -73,5 +75,6 @@ import WireFormat
         _ = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
     }
     await broker.stop()
+}
 }
 #endif
