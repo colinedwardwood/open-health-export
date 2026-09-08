@@ -1,0 +1,37 @@
+name: macos-build
+on:
+  push:
+  pull_request:
+concurrency:
+  group: macos-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  darwin:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Test Darwin package targets
+        run: swift test
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Build iOS exporter and widget
+        run: |
+          xcodebuild \
+            -project OpenHealthExporter.xcodeproj \
+            -target ExporteriOS \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+      - name: Build macOS companion
+        run: |
+          xcodebuild \
+            -project OpenHealthExporter.xcodeproj \
+            -target CompanionMac \
+            -sdk macosx \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            build
