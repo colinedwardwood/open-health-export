@@ -176,3 +176,9 @@ and run `DestructiveWipe` (R-43). Companion export follows the same
 test-before-enable rule using its protocol canary; forgetting a pairing removes
 the passing report and records a blocked trust-loss change.
 
+R-27's local monitoring surface writes an atomic `status.json` beside the
+archive after every run, including failures and nothing-due outcomes. The
+versioned, value-free record carries freshness, confirmed acknowledgement,
+counts, attribution and error class. The failure taxonomy and `jq` example are
+published in `r27-failure-taxonomy.md`; thresholds remain absent until R-71.
+

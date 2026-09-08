@@ -22,6 +22,7 @@ public struct ExportRun: Sendable {
     public var statistics: (any StatisticsSource)?
     public var trigger: RunTrigger
     public var snapshotURL: URL?
+    public var externalStatusURL: URL?
     public var ledgerHeadSeal: (any LedgerHeadSeal)?
     public var ledgerSealURL: URL?
     #if DEBUG
@@ -42,6 +43,7 @@ public struct ExportRun: Sendable {
         statistics: (any StatisticsSource)? = nil,
         trigger: RunTrigger = .manual,
         snapshotURL: URL? = nil,
+        externalStatusURL: URL? = nil,
         ledgerHeadSeal: (any LedgerHeadSeal)? = nil,
         ledgerSealURL: URL? = nil
     ) {
@@ -58,6 +60,7 @@ public struct ExportRun: Sendable {
         self.statistics = statistics
         self.trigger = trigger
         self.snapshotURL = snapshotURL
+        self.externalStatusURL = externalStatusURL
         self.ledgerHeadSeal = ledgerHeadSeal
         self.ledgerSealURL = ledgerSealURL
     }
@@ -228,6 +231,7 @@ public struct ExportRun: Sendable {
             )
         }
         try writeSnapshot(outcome: outcome)
+        try writeExternalStatus(outcome: outcome, tally: tally)
         try await writeLedgerHeadSeal()
     }
 
@@ -261,5 +265,24 @@ public struct ExportRun: Sendable {
             sealedAtEpoch: clock.now().timeIntervalSince1970,
             url: ledgerSealURL
         )
+    }
+
+    private func writeExternalStatus(outcome: RunOutcome, tally: RunTally) throws {
+        guard let externalStatusURL else { return }
+        let prior = try? ExternalStatusRecordFile.read(from: externalStatusURL)
+        let snapshot = snapshotURL.flatMap { try? DestinationSnapshotFile.read(from: $0) }
+        let record = ExternalStatusRecord.next(
+            prior: prior,
+            exporterInstanceID: envelope.exporterId,
+            destinationID: destinationName,
+            runAt: envelope.emittedAt,
+            runAtEpoch: clock.now().timeIntervalSince1970,
+            outcome: outcome,
+            tally: tally,
+            trigger: trigger,
+            staleThresholdSeconds: snapshot?.staleThresholdSeconds,
+            overdueThresholdSeconds: snapshot?.overdueThresholdSeconds
+        )
+        try ExternalStatusRecordFile.write(record, to: externalStatusURL)
     }
 }

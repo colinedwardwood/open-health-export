@@ -550,7 +550,8 @@ import Redaction
     let dest = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-snap-run-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
-    let snapshotURL = dest.appendingPathComponent("status.json")
+    let snapshotURL = dest.appendingPathComponent("widget-status.json")
+    let externalStatusURL = dest.appendingPathComponent("status.json")
     let ledgerSealURL = dest.appendingPathComponent("ledger-head-seal.json")
     let ledgerSeal = HashLedgerSeal(secret: "test-device")
     let store = MemoryStateStore()
@@ -573,6 +574,7 @@ import Redaction
         envelope: testEnvelope(),
         clock: FrozenClock(instant: Date(timeIntervalSince1970: 42)),
         snapshotURL: snapshotURL,
+        externalStatusURL: externalStatusURL,
         ledgerHeadSeal: ledgerSeal,
         ledgerSealURL: ledgerSealURL
     )
@@ -582,6 +584,17 @@ import Redaction
     #expect(snapshot.lastSuccessEpoch == 42)
     #expect(snapshot.unacknowledgedSecurityEventCount == 2)
     #expect(snapshot.writtenAtEpoch == 42)
+    let external = try ExternalStatusRecordFile.read(from: externalStatusURL)
+    #expect(external.schemaVersion == 1)
+    #expect(external.destinationID == "local-file")
+    #expect(external.runSeq == 1)
+    #expect(external.outcome == "success")
+    #expect(external.lastSuccessAt == testEnvelope().emittedAt)
+    #expect(external.lastConfirmedAckAt == testEnvelope().emittedAt)
+    #expect(external.samplesRead == 2)
+    #expect(external.samplesSent == 2)
+    #expect(external.samplesAcked == 2)
+    #expect(external.samplesRejected == 0)
     let ledger = try await store.transact { try $0.loadLedger() }
     #expect(
         await LedgerHeadSealRecordFile.verify(
@@ -590,6 +603,40 @@ import Redaction
             url: ledgerSealURL
         ) == .valid(head: ledger.last?.entryHash ?? LedgerChain.genesisHash, count: ledger.count)
     )
+}
+
+@Test func externalStatusKeepsLastSuccessAcrossFailuresAndAdvancesSequence() {
+    let successTally = RunTally(read: 3, committed: 3, acked: 3)
+    let success = ExternalStatusRecord.next(
+        prior: nil,
+        exporterInstanceID: "device",
+        destinationID: "archive",
+        runAt: "1970-01-01T00:01:40Z",
+        runAtEpoch: 100,
+        outcome: RunOutcome.derive(from: successTally),
+        tally: successTally,
+        trigger: .manual
+    )
+    let failureTally = RunTally(
+        failed: 1,
+        terminalError: .destinationUnreachable
+    )
+    let failed = ExternalStatusRecord.next(
+        prior: success,
+        exporterInstanceID: "device",
+        destinationID: "archive",
+        runAt: "1970-01-01T00:03:40Z",
+        runAtEpoch: 220,
+        outcome: RunOutcome.derive(from: failureTally),
+        tally: failureTally,
+        trigger: .bgAppRefresh
+    )
+    #expect(failed.runSeq == 2)
+    #expect(failed.lastSuccessAt == success.lastSuccessAt)
+    #expect(failed.lastConfirmedAckAt == success.lastConfirmedAckAt)
+    #expect(failed.ageSeconds == 120)
+    #expect(failed.attribution == "scheduling")
+    #expect(failed.errorClass == "destinationUnreachable")
 }
 
 @Test func freshnessTargetRequiresFourteenDaysAndOneHundredObservations() {

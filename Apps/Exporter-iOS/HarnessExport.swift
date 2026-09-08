@@ -78,6 +78,7 @@ enum HarnessExport {
                 temporal: context,
                 statistics: statistics,
                 snapshotURL: StatusSnapshotLocation.url(destinationID: "local-file"),
+                externalStatusURL: dest.appendingPathComponent("status.json"),
                 ledgerHeadSeal: ledgerSeal,
                 ledgerSealURL: ledgerSealURL
             )
@@ -102,6 +103,7 @@ enum HarnessExport {
                 statistics: statistics,
                 trigger: .manual,
                 snapshotURL: StatusSnapshotLocation.url(destinationID: "local-file"),
+                externalStatusURL: dest.appendingPathComponent("status.json"),
                 ledgerHeadSeal: ledgerSeal,
                 ledgerSealURL: ledgerSealURL
             )
