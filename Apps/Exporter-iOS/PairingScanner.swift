@@ -79,6 +79,7 @@ struct PairingScanner: UIViewControllerRepresentable {
     }
 }
 
+@MainActor
 enum PairingCamera {
     static var canPresentScanner: Bool {
         DataScannerViewController.isSupported && DataScannerViewController.isAvailable
