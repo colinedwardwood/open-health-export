@@ -41,6 +41,44 @@ public struct CanonicalUnit: Hashable, Sendable, Codable {
     public init(symbol: String) { self.symbol = symbol }
 }
 
+public struct SampleSourceIdentity: Sendable, Codable, Equatable {
+    public var name: String
+    public var bundleIdentifier: String?
+    public var productType: String?
+
+    public init(
+        name: String,
+        bundleIdentifier: String? = nil,
+        productType: String? = nil
+    ) {
+        self.name = name
+        self.bundleIdentifier = bundleIdentifier
+        self.productType = productType
+    }
+}
+
+public struct SampleDevice: Sendable, Codable, Equatable {
+    public var name: String?
+    public var manufacturer: String?
+    public var model: String?
+    public var hardwareVersion: String?
+    public var softwareVersion: String?
+
+    public init(
+        name: String? = nil,
+        manufacturer: String? = nil,
+        model: String? = nil,
+        hardwareVersion: String? = nil,
+        softwareVersion: String? = nil
+    ) {
+        self.name = name
+        self.manufacturer = manufacturer
+        self.model = model
+        self.hardwareVersion = hardwareVersion
+        self.softwareVersion = softwareVersion
+    }
+}
+
 public struct SampleRecord: Sendable, Codable, Equatable {
     public var key: RecordKey
     public var metric: MetricID
@@ -51,6 +89,9 @@ public struct SampleRecord: Sendable, Codable, Equatable {
     public var value: Double
     public var unit: CanonicalUnit
     public var observedAt: String
+    public var source: SampleSourceIdentity?
+    public var device: SampleDevice?
+    public var wasUserEntered: Bool?
 
     public init(
         key: RecordKey,
@@ -61,7 +102,10 @@ public struct SampleRecord: Sendable, Codable, Equatable {
         timeZoneSource: TimeZoneSource,
         value: Double,
         unit: CanonicalUnit,
-        observedAt: String
+        observedAt: String,
+        source: SampleSourceIdentity? = nil,
+        device: SampleDevice? = nil,
+        wasUserEntered: Bool? = nil
     ) {
         self.key = key
         self.metric = metric
@@ -72,6 +116,9 @@ public struct SampleRecord: Sendable, Codable, Equatable {
         self.value = value
         self.unit = unit
         self.observedAt = observedAt
+        self.source = source
+        self.device = device
+        self.wasUserEntered = wasUserEntered
     }
 }
 

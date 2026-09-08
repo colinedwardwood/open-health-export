@@ -62,6 +62,36 @@ private enum WireContractFixture {
     try WireJSONSchema.validateNDJSON(String(decoding: canary, as: UTF8.self), schema: schema)
 }
 
+@Test func quantityWirePreservesSourceDeviceAndUserEntry() throws {
+    var sample = heartSample("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee")
+    sample.source = SampleSourceIdentity(
+        name: "Apple Watch",
+        bundleIdentifier: "com.apple.health",
+        productType: "Watch6,18"
+    )
+    sample.device = SampleDevice(
+        name: "Colin's Watch",
+        manufacturer: "Apple Inc.",
+        model: "Watch",
+        hardwareVersion: "1",
+        softwareVersion: "26.0"
+    )
+    sample.wasUserEntered = false
+    let line = try NativeWire.encode(sample, envelope: testEnvelope())
+    let object = try #require(
+        JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
+    )
+    let source = try #require(object["source"] as? [String: Any])
+    let device = try #require(object["device"] as? [String: Any])
+    #expect(source["name"] as? String == "Apple Watch")
+    #expect(source["bundleId"] as? String == "com.apple.health")
+    #expect(source["productType"] as? String == "Watch6,18")
+    #expect(device["name"] as? String == "Colin's Watch")
+    #expect(device["softwareVersion"] as? String == "26.0")
+    #expect(object["wasUserEntered"] as? Bool == false)
+    try WireJSONSchema.validate(instance: object, schema: WireContractFixture.schema())
+}
+
 @Test func schemaRejectsMissingRequiredWrongTypesAndClosedEnums() throws {
     let schema = try WireContractFixture.schema()
     let valid: [String: Any] = [

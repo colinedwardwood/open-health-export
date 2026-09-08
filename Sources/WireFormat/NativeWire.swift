@@ -252,6 +252,38 @@ private extension NativeWire {
         if envelope.demo {
             object["demo"] = .bool(true)
         }
+        if let source = sample.source {
+            var sourceObject: [String: CanonicalJSON] = [
+                "name": .string(source.name),
+            ]
+            if let bundleIdentifier = source.bundleIdentifier {
+                sourceObject["bundleId"] = .string(bundleIdentifier)
+            }
+            if let productType = source.productType {
+                sourceObject["productType"] = .string(productType)
+            }
+            object["source"] = .object(sourceObject)
+        }
+        if let device = sample.device {
+            var deviceObject: [String: CanonicalJSON] = [:]
+            if let name = device.name { deviceObject["name"] = .string(name) }
+            if let manufacturer = device.manufacturer {
+                deviceObject["manufacturer"] = .string(manufacturer)
+            }
+            if let model = device.model { deviceObject["model"] = .string(model) }
+            if let hardwareVersion = device.hardwareVersion {
+                deviceObject["hardwareVersion"] = .string(hardwareVersion)
+            }
+            if let softwareVersion = device.softwareVersion {
+                deviceObject["softwareVersion"] = .string(softwareVersion)
+            }
+            if !deviceObject.isEmpty {
+                object["device"] = .object(deviceObject)
+            }
+        }
+        if let wasUserEntered = sample.wasUserEntered {
+            object["wasUserEntered"] = .bool(wasUserEntered)
+        }
         return try CanonicalJSON.object(object).serialized()
     }
 

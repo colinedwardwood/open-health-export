@@ -95,6 +95,23 @@ enum SampleConversion {
         let offset = context.timeZone().secondsFromGMT(for: sample.startDate) / 60
         let canonical = MetricCatalog.declaration(for: metric)?.canonicalUnit
             ?? CanonicalUnit(symbol: unit.unitString)
+        let sourceRevision = sample.sourceRevision
+        let source = SampleSourceIdentity(
+            name: sourceRevision.source.name,
+            bundleIdentifier: sourceRevision.source.bundleIdentifier,
+            productType: sourceRevision.productType
+        )
+        let device = sample.device.map {
+            SampleDevice(
+                name: $0.name,
+                manufacturer: $0.manufacturer,
+                model: $0.model,
+                hardwareVersion: $0.hardwareVersion,
+                softwareVersion: $0.softwareVersion
+            )
+        }
+        let wasUserEntered = (sample.metadata?[HKMetadataKeyWasUserEntered] as? NSNumber)?
+            .boolValue
         return SampleRecord(
             key: RecordKey(uuid: sample.uuid.uuidString),
             metric: metric,
@@ -104,7 +121,10 @@ enum SampleConversion {
             timeZoneSource: .deviceCurrent,
             value: canonicalValue(sample.quantity.doubleValue(for: unit), metric: metric),
             unit: canonical,
-            observedAt: formatUTC(Date())
+            observedAt: formatUTC(Date()),
+            source: source,
+            device: device,
+            wasUserEntered: wasUserEntered
         )
     }
 

@@ -4,6 +4,36 @@ import MetricCatalog
 
 /// Seeded synthetic samples shared by `corpusgen` (R-82) and demo mode (R-114).
 public enum DemoCorpus {
+    public static let sources: [SampleSourceIdentity] = [
+        SampleSourceIdentity(
+            name: "Synthetic Apple Watch",
+            bundleIdentifier: "com.apple.health.synthetic.watch",
+            productType: "Watch6,18"
+        ),
+        SampleSourceIdentity(
+            name: "Synthetic iPhone",
+            bundleIdentifier: "com.apple.health.synthetic.phone",
+            productType: "iPhone17,1"
+        ),
+        SampleSourceIdentity(
+            name: "Synthetic CGM",
+            bundleIdentifier: "org.openhealthexporter.synthetic.cgm"
+        ),
+        SampleSourceIdentity(
+            name: "Synthetic Scale",
+            bundleIdentifier: "org.openhealthexporter.synthetic.scale"
+        ),
+        SampleSourceIdentity(
+            name: "Synthetic Workout App",
+            bundleIdentifier: "org.openhealthexporter.synthetic.workout"
+        ),
+        SampleSourceIdentity(
+            name: "Synthetic Manual Entry",
+            bundleIdentifier: "com.apple.Health",
+            productType: "manual"
+        ),
+    ]
+
     public static func sample(
         at index: Int,
         seed: UInt64,
@@ -25,6 +55,8 @@ public enum DemoCorpus {
             random & 0xFFFF_FFFF_FFFF
         )
         let value = Double(random % 100_000) / 100
+        let sourceIndex = (index / max(MetricCatalog.all.count, 1)) % sources.count
+        let source = sources[sourceIndex]
         return SampleRecord(
             key: RecordKey(uuid: uuid),
             metric: declaration.id,
@@ -34,7 +66,15 @@ public enum DemoCorpus {
             timeZoneSource: .unknown,
             value: value,
             unit: declaration.canonicalUnit,
-            observedAt: timestamp
+            observedAt: timestamp,
+            source: source,
+            device: SampleDevice(
+                name: source.name,
+                manufacturer: "Synthetic",
+                model: "fixture-\(sourceIndex + 1)",
+                softwareVersion: "1.0"
+            ),
+            wasUserEntered: sourceIndex == sources.count - 1
         )
     }
 

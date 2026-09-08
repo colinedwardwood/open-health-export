@@ -68,3 +68,13 @@ import WireFormat
     #expect(record.value.isFinite)
     #expect(record.start.hasSuffix("Z"))
 }
+
+@Test func tierZeroCorpusCarriesSixSyntheticSourceIdentities() {
+    let sources = (0 ..< 200).compactMap { index in
+        let declaration = MetricCatalog.all[index % MetricCatalog.all.count]
+        return DemoCorpus.sample(at: index, seed: 1, declaration: declaration)
+            .source?.bundleIdentifier
+    }
+    #expect(Set(sources).count == 6)
+    #expect(sources.allSatisfy { $0.contains("synthetic") || $0 == "com.apple.Health" })
+}

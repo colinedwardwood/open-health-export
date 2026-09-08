@@ -29,6 +29,41 @@ import Testing
     #expect(record.timeZoneOffsetMinutes == 0)
 }
 
+@Test func conversionPreservesSourceDeviceAndUserEntryMetadata() throws {
+    let start = Date(timeIntervalSince1970: 1_704_067_200)
+    let device = HKDevice(
+        name: "Test Watch",
+        manufacturer: "Synthetic",
+        model: "Fixture",
+        hardwareVersion: "1",
+        firmwareVersion: nil,
+        softwareVersion: "2",
+        localIdentifier: nil,
+        udiDeviceIdentifier: nil
+    )
+    let sample = HKQuantitySample(
+        type: HKQuantityType(.heartRate),
+        quantity: HKQuantity(
+            unit: HKUnit.count().unitDivided(by: .minute()),
+            doubleValue: 72
+        ),
+        start: start,
+        end: start,
+        device: device,
+        metadata: [HKMetadataKeyWasUserEntered: true]
+    )
+    let record = SampleConversion.record(
+        from: sample,
+        metric: MetricCatalog.heartRate.id,
+        context: .utc
+    )
+    #expect(record.source != nil)
+    #expect(record.device?.name == "Test Watch")
+    #expect(record.device?.manufacturer == "Synthetic")
+    #expect(record.device?.softwareVersion == "2")
+    #expect(record.wasUserEntered == true)
+}
+
 @Test func oxygenSaturationIsPercentNotAHumidityClass() {
     let start = Date(timeIntervalSince1970: 1_704_067_200)
     let quantity = HKQuantity(unit: .percent(), doubleValue: 0.98)

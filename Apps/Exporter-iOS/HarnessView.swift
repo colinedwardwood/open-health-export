@@ -572,6 +572,7 @@ struct HarnessView: View {
             Text("Latest").font(.caption)
             Text("\(DataBrowser.formatValue(latest.value)) \(detail.exportUnit)")
             Text(latest.start).font(.footnote)
+            Text("Source: \(latest.source?.name ?? "Unknown")").font(.footnote)
         } else {
             Text(DataBrowser.emptyDetailCopy).font(.footnote)
         }

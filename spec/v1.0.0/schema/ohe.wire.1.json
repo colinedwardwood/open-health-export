@@ -77,6 +77,27 @@
         "metricId": { "type": "string", "x-ohe-open": true },
         "observedAt": { "type": "string" },
         "semantics": { "type": "string", "enum": ["curated", "unmapped"], "x-ohe-open": false },
+        "source": {
+          "type": "object",
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string" },
+            "bundleId": { "type": "string" },
+            "productType": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "device": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "manufacturer": { "type": "string" },
+            "model": { "type": "string" },
+            "hardwareVersion": { "type": "string" },
+            "softwareVersion": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
         "start": { "type": "string" },
         "tzOffsetMinutes": { "type": "integer" },
         "tzSource": {
@@ -88,6 +109,7 @@
         "uuid": { "type": "string" },
         "v": { "type": "integer", "const": 1 },
         "value": { "type": "number" },
+        "wasUserEntered": { "type": "boolean" },
         "demo": { "type": "boolean" }
       }
     },

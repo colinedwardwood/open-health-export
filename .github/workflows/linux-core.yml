@@ -20,7 +20,7 @@ jobs:
         run: |
           swift run corpusgen --seed 1 --count 200 > /tmp/tier0.ndjson
           cmp spec/v1.0.0/fixtures/tier0.ndjson /tmp/tier0.ndjson
-          echo "e88430b1e69a5505a9db085ffe710fb372e170a13bb37e09c496511734972009  /tmp/tier0.ndjson" | sha256sum --check -
+          echo "ddcfe22f49ca3060a044b8b10959051dbf05b4645c3c72b9dcd4155c490e4f36  /tmp/tier0.ndjson" | sha256sum --check -
       - name: Fuzz the wire decoders
         run: |
           swift run wirefuzz --iterations 200000

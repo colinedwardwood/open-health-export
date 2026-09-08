@@ -173,7 +173,8 @@ public enum DataBrowser {
             let sample = latest[declaration.id]
             let subtitle: String
             if let sample {
-                subtitle = "\(formatValue(sample.value)) \(declaration.wireUnit) · \(sample.start)"
+                let source = sample.source.map { " · \($0.name)" } ?? ""
+                subtitle = "\(formatValue(sample.value)) \(declaration.wireUnit) · \(sample.start)\(source)"
             } else {
                 subtitle = noDataCopy
             }
