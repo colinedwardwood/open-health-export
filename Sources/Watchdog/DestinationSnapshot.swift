@@ -26,6 +26,10 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
     public var state: DestinationDisplayState
     public var lastOutcome: String?
     public var lastSuccessEpoch: TimeInterval?
+    public var lastConfirmedAckEpoch: TimeInterval?
+    public var attribution: String?
+    public var attributionConfidence: String?
+    public var errorClass: String?
     public var staleThresholdSeconds: TimeInterval?
     public var overdueThresholdSeconds: TimeInterval?
     public var nextAttemptEarliestEpoch: TimeInterval?
@@ -40,6 +44,10 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
         state: DestinationDisplayState? = nil,
         lastOutcome: String? = nil,
         lastSuccessEpoch: TimeInterval? = nil,
+        lastConfirmedAckEpoch: TimeInterval? = nil,
+        attribution: String? = nil,
+        attributionConfidence: String? = nil,
+        errorClass: String? = nil,
         staleThresholdSeconds: TimeInterval? = nil,
         overdueThresholdSeconds: TimeInterval? = nil,
         nextAttemptEarliestEpoch: TimeInterval? = nil,
@@ -54,6 +62,10 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
         self.state = state ?? Self.inferState(enabled: enabled, lastOutcome: lastOutcome)
         self.lastOutcome = lastOutcome
         self.lastSuccessEpoch = lastSuccessEpoch
+        self.lastConfirmedAckEpoch = lastConfirmedAckEpoch
+        self.attribution = attribution
+        self.attributionConfidence = attributionConfidence
+        self.errorClass = errorClass
         self.staleThresholdSeconds = staleThresholdSeconds
         self.overdueThresholdSeconds = overdueThresholdSeconds
         self.nextAttemptEarliestEpoch = nextAttemptEarliestEpoch
@@ -70,6 +82,10 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
         case state
         case lastOutcome
         case lastSuccessEpoch
+        case lastConfirmedAckEpoch
+        case attribution
+        case attributionConfidence
+        case errorClass
         case staleThresholdSeconds
         case overdueThresholdSeconds
         case nextAttemptEarliestEpoch
@@ -89,6 +105,16 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
         state = try values.decodeIfPresent(DestinationDisplayState.self, forKey: .state)
             ?? Self.inferState(enabled: enabled, lastOutcome: lastOutcome)
         lastSuccessEpoch = try values.decodeIfPresent(TimeInterval.self, forKey: .lastSuccessEpoch)
+        lastConfirmedAckEpoch = try values.decodeIfPresent(
+            TimeInterval.self,
+            forKey: .lastConfirmedAckEpoch
+        )
+        attribution = try values.decodeIfPresent(String.self, forKey: .attribution)
+        attributionConfidence = try values.decodeIfPresent(
+            String.self,
+            forKey: .attributionConfidence
+        )
+        errorClass = try values.decodeIfPresent(String.self, forKey: .errorClass)
         staleThresholdSeconds = try values.decodeIfPresent(TimeInterval.self, forKey: .staleThresholdSeconds)
         overdueThresholdSeconds = try values.decodeIfPresent(TimeInterval.self, forKey: .overdueThresholdSeconds)
         nextAttemptEarliestEpoch = try values.decodeIfPresent(TimeInterval.self, forKey: .nextAttemptEarliestEpoch)

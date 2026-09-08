@@ -87,7 +87,7 @@ public struct ExternalStatusRecord: Sendable, Equatable, Codable {
         )
     }
 
-    private static func attribution(for trigger: RunTrigger) -> String {
+    public static func attribution(for trigger: RunTrigger) -> String {
         switch trigger {
         case .observerQuery, .bgAppRefresh, .bgProcessing:
             "scheduling"

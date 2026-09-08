@@ -181,4 +181,7 @@ archive after every run, including failures and nothing-due outcomes. The
 versioned, value-free record carries freshness, confirmed acknowledgement,
 counts, attribution and error class. The failure taxonomy and `jq` example are
 published in `r27-failure-taxonomy.md`; thresholds remain absent until R-71.
+The `Last successful export` App Intent exposes the same value-free fields as
+typed per-destination entities to Shortcuts without opening the app or using
+the network.
 

@@ -215,12 +215,12 @@ public struct ReconcileSweep: Sendable {
                 )
             )
         }
-        try writeSnapshot(outcome: outcome)
+        try writeSnapshot(outcome: outcome, tally: tally)
         try writeExternalStatus(outcome: outcome, tally: tally)
         try await writeLedgerHeadSeal()
     }
 
-    private func writeSnapshot(outcome: RunOutcome) throws {
+    private func writeSnapshot(outcome: RunOutcome, tally: RunTally) throws {
         guard let snapshotURL else { return }
         let now = clock.now().timeIntervalSince1970
         let prior = try? DestinationSnapshotFile.read(from: snapshotURL)
@@ -231,6 +231,11 @@ public struct ReconcileSweep: Sendable {
                 enabled: true,
                 lastOutcome: outcome.kind.rawValue,
                 lastSuccessEpoch: succeeded ? now : prior?.lastSuccessEpoch,
+                lastConfirmedAckEpoch:
+                    outcome.ackEvidence == .receiptFull ? now : prior?.lastConfirmedAckEpoch,
+                attribution: ExternalStatusRecord.attribution(for: trigger),
+                attributionConfidence: "evidenced",
+                errorClass: tally.terminalError.rawValue,
                 unacknowledgedSecurityEventCount:
                     prior?.unacknowledgedSecurityEventCount ?? 0,
                 writtenAtEpoch: now

@@ -582,6 +582,10 @@ import Redaction
     let snapshot = try DestinationSnapshotFile.read(from: snapshotURL)
     #expect(snapshot.lastOutcome == "success")
     #expect(snapshot.lastSuccessEpoch == 42)
+    #expect(snapshot.lastConfirmedAckEpoch == 42)
+    #expect(snapshot.attribution == "execution")
+    #expect(snapshot.attributionConfidence == "evidenced")
+    #expect(snapshot.errorClass == "none")
     #expect(snapshot.unacknowledgedSecurityEventCount == 2)
     #expect(snapshot.writtenAtEpoch == 42)
     let external = try ExternalStatusRecordFile.read(from: externalStatusURL)
@@ -603,6 +607,32 @@ import Redaction
             url: ledgerSealURL
         ) == .valid(head: ledger.last?.entryHash ?? LedgerChain.genesisHash, count: ledger.count)
     )
+}
+
+@Test func destinationMonitoringStatusIsTypedAndComputesAgeAndTimelineState() {
+    let status = DestinationMonitoringStatus(
+        snapshot: DestinationStatusSnapshot(
+            destinationID: "archive",
+            destinationLabel: "Archive folder",
+            enabled: true,
+            state: .healthy,
+            lastOutcome: "success",
+            lastSuccessEpoch: 100,
+            lastConfirmedAckEpoch: 100,
+            attribution: "execution",
+            attributionConfidence: "evidenced",
+            errorClass: "none",
+            staleThresholdSeconds: 50,
+            writtenAtEpoch: 100
+        ),
+        nowEpoch: 160
+    )
+    #expect(status.destinationID == "archive")
+    #expect(status.label == "Archive folder")
+    #expect(status.ageSeconds == 60)
+    #expect(status.state == "stale")
+    #expect(status.lastOutcome == "success")
+    #expect(status.attribution == "execution")
 }
 
 @Test func externalStatusKeepsLastSuccessAcrossFailuresAndAdvancesSequence() {
