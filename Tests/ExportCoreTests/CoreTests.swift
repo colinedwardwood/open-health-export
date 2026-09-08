@@ -314,6 +314,38 @@ import Redaction
     #expect(!HADiscovery.retainAllowed(topic: stateTopic, payload: state))
 }
 
+@Test func homeAssistantDiscoveryContractIsGeneratedForEveryCatalogueMetric() throws {
+    #expect(Set(MetricCatalog.all.map(\.id)).count == MetricCatalog.all.count)
+    #expect(Set(MetricCatalog.all.map(\.wireId)).count == MetricCatalog.all.count)
+    #expect(Set(MetricCatalog.all.map(\.hkIdentifier)).count == MetricCatalog.all.count)
+
+    let data = try HADiscovery.encodeDeviceConfig(
+        exporterId: "device-1234",
+        metrics: MetricCatalog.all.map(\.id)
+    )
+    let root = try #require(
+        JSONSerialization.jsonObject(with: data) as? [String: Any]
+    )
+    let components = try #require(root["cmps"] as? [String: Any])
+    #expect(components.count == MetricCatalog.all.count)
+
+    for declaration in MetricCatalog.all {
+        let statistic = declaration.cumulative ? "sum" : "mean"
+        let granularity = declaration.cumulative ? "P1D" : "PT1H"
+        let key = "\(declaration.wireId)_\(statistic)_\(granularity.lowercased())"
+        let component = try #require(components[key] as? [String: Any])
+        #expect(component["p"] as? String == "sensor")
+        #expect(
+            component["state_topic"] as? String
+                == "ohe/device-1234/v1/state/\(declaration.wireId)/\(statistic)/\(granularity)"
+        )
+        #expect(component["availability_topic"] as? String == "ohe/device-1234/v1/status")
+        #expect(component["unit_of_measurement"] as? String == declaration.haUnit)
+        #expect(component["device_class"] as? String == declaration.haDeviceClass)
+        #expect(component["state_class"] as? String == declaration.haStateClass)
+    }
+}
+
 @Test func dayBucketIsDeterministicUnderFrozenClock() {
     let date = Date(timeIntervalSince1970: 1_704_067_200) // 2024-01-01 00:00 UTC
     let context = TemporalContext(

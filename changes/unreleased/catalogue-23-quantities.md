@@ -13,3 +13,6 @@ dashboard is actively confusing.
 Height's Home Assistant unit is `cm` while the wire canonical remains metres.
 BMI omits `unit_of_measurement`. Body fat is percent, converted from HealthKit's
 fraction the same way oxygen saturation is.
+The Home Assistant discovery contract test is generated across the entire
+catalogue and checks unique identifiers plus exact topic, unit, device-class
+and state-class fields for every declaration.
