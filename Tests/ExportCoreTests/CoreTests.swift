@@ -27,7 +27,14 @@ import Redaction
 }
 
 @Test func diagnosticBundleIsBoundedManifestDerivedAndRedacted() throws {
-    let canary = "clinic.example.org bearer-secret HKCategoryTypeIdentifierSexualActivity"
+    let canaries = [
+        "clinic.example.org",
+        "bearer-secret-token-0123456789",
+        "72.123456",
+        "Dexcom G7",
+        "HKCategoryTypeIdentifierSexualActivity",
+    ]
+    let canary = canaries.joined(separator: " ")
     let events = [
         RunEvent(
             runID: RunID(rawValue: canary),
@@ -61,7 +68,9 @@ import Redaction
     #expect(text.contains("\"schema\":\"ohe.diagnostic/1\""))
     #expect(text.contains("\"runID\":\"bundle-run-1\""))
     #expect(text.contains("\"samplesAcked\":2"))
-    #expect(!text.contains(canary))
+    for secret in canaries {
+        #expect(!text.contains(secret))
+    }
     #expect(!text.contains("heartRate"))
     #expect(!text.contains("\"detail\""))
     #expect(!text.contains("\"destination\""))

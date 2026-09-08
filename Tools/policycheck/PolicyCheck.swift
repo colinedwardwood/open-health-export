@@ -41,22 +41,25 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck imports: ok")
-        // R-34: the phone dials out to the Mac companion. Nothing in an app target may listen.
+        // R-34/R-37/R-52: app targets use reviewed NetEgress adapters, never direct sockets.
         let apps = root.appendingPathComponent("Apps")
-        var listeners: [String] = []
+        var appNetworkBypasses: [String] = []
         if let appFiles = FileManager.default.enumerator(at: apps, includingPropertiesForKeys: nil) {
             for case let file as URL in appFiles where file.pathExtension == "swift" {
                 let text = try String(contentsOf: file, encoding: .utf8)
-                for token in ["NWListener", "NWBrowser"] where text.contains(token) {
-                    listeners.append("\(file.path): \(token)")
+                for token in ["URLSession", "NWConnection", "NWListener", "NWBrowser"]
+                    where text.contains(token) {
+                    appNetworkBypasses.append("\(file.path): \(token)")
                 }
             }
         }
-        if !listeners.isEmpty {
-            FileHandle.standardError.write(Data((listeners.joined(separator: "\n") + "\n").utf8))
+        if !appNetworkBypasses.isEmpty {
+            FileHandle.standardError.write(
+                Data((appNetworkBypasses.joined(separator: "\n") + "\n").utf8)
+            )
             exit(1)
         }
-        print("policycheck no listener on iOS: ok")
+        print("policycheck app targets use no direct network APIs: ok")
         var healthOnMac: [String] = []
         if let appFiles = FileManager.default.enumerator(at: apps, includingPropertiesForKeys: nil) {
             for case let file as URL in appFiles where file.pathExtension == "swift" {
