@@ -7,7 +7,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   darwin:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
