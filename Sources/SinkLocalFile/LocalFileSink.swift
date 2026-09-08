@@ -17,8 +17,13 @@ public struct LocalFileSink: DestinationSink, Sendable {
 
     public func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt {
         let source = URL(fileURLWithPath: fileHandle)
-        let destination = directory.appendingPathComponent("\(idempotencyKey.rawValue).ndjson")
         let sourceData = try Data(contentsOf: source)
+        let destination = directory.appendingPathComponent(
+            NativeWire.outputFileName(
+                batchID: idempotencyKey,
+                demo: NativeWire.payloadIsDemo(sourceData)
+            )
+        )
         if FileManager.default.fileExists(atPath: destination.path) {
             guard try Data(contentsOf: destination) == sourceData else {
                 throw LocalFileSinkError.idempotencyConflict

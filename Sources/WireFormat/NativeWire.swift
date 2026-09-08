@@ -13,6 +13,7 @@ public struct WireEnvelope: Sendable, Equatable {
     public var mode: String
     public var spec: String
     public var specVersion: String
+    public var demo: Bool
 
     public init(
         exporterId: String,
@@ -24,7 +25,8 @@ public struct WireEnvelope: Sendable, Equatable {
         producerVersion: String = "0.1.0",
         mode: String = "samples",
         spec: String = "ohe.wire/1",
-        specVersion: String = "1.0"
+        specVersion: String = "1.0",
+        demo: Bool = false
     ) {
         self.exporterId = exporterId
         self.seq = seq
@@ -36,6 +38,7 @@ public struct WireEnvelope: Sendable, Equatable {
         self.mode = mode
         self.spec = spec
         self.specVersion = specVersion
+        self.demo = demo
     }
 }
 
@@ -48,6 +51,19 @@ public enum NativeWire {
         let hex = digest.prefix(16).map { String(format: "%02x", $0) }.joined()
         let id = "\(hex.prefix(8))-\(hex.dropFirst(8).prefix(4))-\(hex.dropFirst(12).prefix(4))-\(hex.dropFirst(16).prefix(4))-\(hex.dropFirst(20))"
         return BatchID(rawValue: String(id))
+    }
+
+    public static let demoFilePrefix = "DEMO-"
+
+    public static func outputFileName(batchID: BatchID, demo: Bool) -> String {
+        "\(demo ? demoFilePrefix : "")\(batchID.rawValue).ndjson"
+    }
+
+    public static func payloadIsDemo(_ data: Data) -> Bool {
+        guard let first = String(decoding: data, as: UTF8.self).split(whereSeparator: \.isNewline).first else {
+            return false
+        }
+        return first.contains("\"demo\":true")
     }
 
     public static func countRecords(in text: String) -> Int {
@@ -158,7 +174,7 @@ private extension NativeWire {
         types: [String],
         recordCount: Int
     ) throws -> String {
-        let json: CanonicalJSON = .object([
+        var object: [String: CanonicalJSON] = [
             "batchId": .string(batchID.rawValue),
             "emittedAt": .string(envelope.emittedAt),
             "exporterId": .string(envelope.exporterId),
@@ -174,8 +190,11 @@ private extension NativeWire {
             "spec": .string(envelope.spec),
             "specVersion": .string(envelope.specVersion),
             "types": .array(types.map { .string($0) }),
-        ])
-        return try json.serialized()
+        ]
+        if envelope.demo {
+            object["demo"] = .bool(true)
+        }
+        return try CanonicalJSON.object(object).serialized()
     }
 
     static func encodeFooter(
@@ -214,7 +233,7 @@ private extension NativeWire {
             throw WireError.invertedInterval
         }
         let decl = MetricCatalog.declaration(for: metric)
-        let json: CanonicalJSON = .object([
+        var object: [String: CanonicalJSON] = [
             "batchSeq": .integer(envelope.seq),
             "end": .string(sample.end),
             "hkIdentifier": .string(decl?.hkIdentifier ?? metric.rawValue),
@@ -229,13 +248,16 @@ private extension NativeWire {
             "uuid": .string(sample.key.uuid.lowercased()),
             "v": .integer(1),
             "value": .number(sample.value),
-        ])
-        return try json.serialized()
+        ]
+        if envelope.demo {
+            object["demo"] = .bool(true)
+        }
+        return try CanonicalJSON.object(object).serialized()
     }
 
     static func encodeTombstone(_ tomb: TombstoneRecord, metric: MetricID, envelope: WireEnvelope) throws -> String {
         let decl = MetricCatalog.declaration(for: metric)
-        let json: CanonicalJSON = .object([
+        var object: [String: CanonicalJSON] = [
             "batchSeq": .integer(envelope.seq),
             "bestEffort": .bool(true),
             "hkIdentifier": .string(decl?.hkIdentifier ?? metric.rawValue),
@@ -245,8 +267,11 @@ private extension NativeWire {
             "reason": .string("healthKitDeleted"),
             "uuid": .string(tomb.key.uuid.lowercased()),
             "v": .integer(1),
-        ])
-        return try json.serialized()
+        ]
+        if envelope.demo {
+            object["demo"] = .bool(true)
+        }
+        return try CanonicalJSON.object(object).serialized()
     }
 
     static func encodeAggregate(_ record: AggregateRecord, envelope: WireEnvelope) throws -> String {
@@ -278,6 +303,9 @@ private extension NativeWire {
         }
         if let supersedes = record.supersedes {
             object["supersedes"] = .integer(supersedes)
+        }
+        if envelope.demo {
+            object["demo"] = .bool(true)
         }
         return try CanonicalJSON.object(object).serialized()
     }

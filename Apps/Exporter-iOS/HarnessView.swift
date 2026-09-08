@@ -35,6 +35,7 @@ struct HarnessView: View {
     @State private var ledgerWarning = ""
     @State private var wipeArmed = false
     @State private var stopHeartRateArmed = false
+    @State private var demoConfirmName = ""
     @State private var foregroundCatchUpStarted = false
 
     var body: some View {
@@ -147,6 +148,19 @@ struct HarnessView: View {
             }
             .disabled(phase == .working)
             .accessibilityHint("Writes NDJSON under Application Support using the engine and local-file sink.")
+            Text("DEMO MODE — synthetic data")
+                .font(.headline)
+                .foregroundStyle(.orange)
+            Text("Demo export never reads HealthKit. Type the destination name local-file to confirm you are not sending this into a live archive.")
+                .font(.footnote)
+            TextField("Type local-file to confirm demo export", text: $demoConfirmName)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+            Button("Export demo dataset (every catalogue metric)") {
+                Task { await runDemoExport() }
+            }
+            .disabled(phase == .working || demoConfirmName != "local-file")
+            .accessibilityHint("Exports synthetic samples marked demo:true into a DEMO- prefixed local folder.")
             Button("Send sample destination-enabled notice") {
                 Task { await sendSampleNotice() }
             }
@@ -375,6 +389,19 @@ struct HarnessView: View {
     }
 
     @MainActor
+    private func runDemoExport() async {
+        phase = .working
+        status = "Exporting demo dataset…"
+        do {
+            results = try await HarnessExport.runDemoDataset(typedDestinationName: demoConfirmName)
+            destinationStatusLines = HarnessExport.destinationStatusLines()
+            status = "Demo export finished. Files are DEMO- prefixed."
+        } catch {
+            status = "Failed: \(error.localizedDescription)"
+        }
+        phase = .ready
+    }
+
     private func runLocalExport(trigger: RunTrigger = .manual) async {
         phase = .working
         status = "Working: local-file export."

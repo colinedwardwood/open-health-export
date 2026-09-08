@@ -13,5 +13,10 @@
       "role": "Stage 4 FIX-* meta-test input; every t0 ID has a Linux witness"
     }
   },
-  "adjacency": "adjacency.json"
+  "adjacency": "adjacency.json",
+  "demo": {
+    "field": "demo",
+    "when": "true only on synthetic export records",
+    "filenamePrefix": "DEMO-"
+  }
 }

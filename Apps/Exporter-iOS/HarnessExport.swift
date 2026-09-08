@@ -142,6 +142,54 @@ enum HarnessExport {
         return lines
     }
 
+    static func runDemoDataset(typedDestinationName: String) async throws -> [String] {
+        try DemoExportGate.confirmSending(to: "local-file", typed: typedDestinationName)
+        let fm = FileManager.default
+        let root = try applicationSupportRoot()
+        let sqliteURL = root.appendingPathComponent("demo-state.sqlite")
+        let dest = root.appendingPathComponent("demo-exports", isDirectory: true)
+        let scratch = root.appendingPathComponent("demo-scratch", isDirectory: true)
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+        try fm.createDirectory(at: scratch, withIntermediateDirectories: true)
+        let store = try SQLiteStateStore(path: sqliteURL.path)
+        let (verified, events) = try verifiedLocalFile(root: root, destinationDirectory: dest)
+        try await emitTrustNotices(events)
+        let context = TemporalContext(
+            timeZoneIdentifier: "UTC",
+            localeIdentifier: "en_US_POSIX",
+            tzDatabaseVersion: "host"
+        )
+        let now = Date().ISO8601Format()
+        let exporterId = try installationID()
+        var envelope = WireEnvelope(
+            exporterId: exporterId,
+            seq: 1,
+            emittedAt: now,
+            observedAt: now,
+            demo: true
+        )
+        envelope.reason = "demo"
+        let source = DemoSampleSource(seed: 1, samplesPerMetric: 4)
+        var lines: [String] = ["DEMO MODE — synthetic data, not HealthKit"]
+        for declaration in MetricCatalog.all {
+            let run = ExportRun(
+                source: source,
+                destination: verified,
+                store: store,
+                metric: declaration.id,
+                scratchDirectory: scratch,
+                destinationName: "local-file",
+                envelope: envelope,
+                temporal: context,
+                trigger: .manual
+            )
+            let outcome = try await run.run()
+            lines.append("\(declaration.id.rawValue): \(outcome.kind.rawValue) (demo)")
+        }
+        lines.append("Files: \(dest.path)")
+        return lines
+    }
+
     static func runCompanion(session: PairingSession) async throws -> [String] {
         let fm = FileManager.default
         let root = try applicationSupportRoot()

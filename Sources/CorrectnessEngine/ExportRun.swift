@@ -114,7 +114,9 @@ public struct ExportRun: Sendable {
         #if DEBUG
         try faults.hit(.afterTransform)
         #endif
-        let payloadURL = scratchDirectory.appendingPathComponent("\(batchID.rawValue).ndjson")
+        let payloadURL = scratchDirectory.appendingPathComponent(
+            NativeWire.outputFileName(batchID: batchID, demo: envelope.demo)
+        )
         try FileWriteKit.writeAtomically(payload, to: payloadURL)
 
         let recordCount = page.samples.count + page.tombstones.count + aggregates.count
@@ -241,7 +243,9 @@ public struct ExportRun: Sendable {
                 RunEvent(
                     runID: RunID(rawValue: "run-\(metric.rawValue)"),
                     outcomeKind: outcome.kind.rawValue,
-                    detail: outcome.partialCause ?? "",
+                    detail: envelope.demo
+                        ? "demo"
+                        : (outcome.partialCause ?? ""),
                     trigger: trigger,
                     samplesRead: tally.read,
                     samplesCommitted: tally.committed,
@@ -256,7 +260,9 @@ public struct ExportRun: Sendable {
                 EgressEntry(
                     destination: destinationName,
                     sampleCount: tally.committed,
-                    outcomeKind: "run:\(outcome.kind.rawValue)",
+                    outcomeKind: envelope.demo
+                        ? "run:\(outcome.kind.rawValue):demo"
+                        : "run:\(outcome.kind.rawValue)",
                     wallTimeEpoch: nowEpoch
                 )
             )
