@@ -60,6 +60,19 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck app targets use no direct network APIs: ok")
+
+        let exporterEntitlements = apps
+            .appendingPathComponent("Exporter-iOS/Exporter.entitlements")
+        let entitlementText = try String(contentsOf: exporterEntitlements, encoding: .utf8)
+        guard entitlementText.contains(
+            "<key>com.apple.developer.healthkit.background-delivery</key>"
+        ) else {
+            FileHandle.standardError.write(
+                Data("HealthKit observer is missing background-delivery entitlement\n".utf8)
+            )
+            exit(1)
+        }
+        print("policycheck HealthKit background delivery entitlement: ok")
         var healthOnMac: [String] = []
         if let appFiles = FileManager.default.enumerator(at: apps, includingPropertiesForKeys: nil) {
             for case let file as URL in appFiles where file.pathExtension == "swift" {

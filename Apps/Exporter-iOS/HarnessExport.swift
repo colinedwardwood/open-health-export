@@ -23,6 +23,26 @@ private struct CompanionVerificationRecord: Codable {
     var report: DestinationTestReport
 }
 
+private actor ObserverExportGate {
+    static let shared = ObserverExportGate()
+    private var pending: Set<MetricID> = []
+    private var running = false
+
+    func enqueue(_ metric: MetricID) async {
+        pending.insert(metric)
+        guard !running else { return }
+        running = true
+        defer { running = false }
+        while let next = pending.first {
+            pending.remove(next)
+            _ = try? await HarnessExport.runOnePageEachMetric(
+                metrics: [next],
+                trigger: .observerQuery
+            )
+        }
+    }
+}
+
 enum HarnessExport {
     static func installationID() throws -> String {
         let root = try applicationSupportRoot()
@@ -36,6 +56,10 @@ enum HarnessExport {
     }
 
     static func runOnePageEachMetric(
+        metrics: [MetricID] = [
+            MetricCatalog.heartRate.id,
+            MetricCatalog.stepCount.id,
+        ],
         trigger: RunTrigger = .manual
     ) async throws -> [String] {
         let fm = FileManager.default
@@ -63,7 +87,7 @@ enum HarnessExport {
         let ledgerSealURL = root.appendingPathComponent("ledger-head-seal.json")
 
         var lines: [String] = []
-        for metric in [MetricCatalog.heartRate.id, MetricCatalog.stepCount.id] {
+        for metric in metrics {
             let run = ExportRun(
                 source: source,
                 destination: verified,
@@ -442,6 +466,22 @@ enum HarnessExport {
             return false
         }
         return report.allowsEnablement
+    }
+
+    static func startHealthObservers() async throws -> HealthKitObserverCoordinator {
+        let root = try applicationSupportRoot()
+        let coordinator = HealthKitObserverCoordinator(
+            wakeLedger: WakeLedger(path: root.appendingPathComponent("wake-ledger.log").path)
+        )
+        try await coordinator.start(
+            metrics: [
+                MetricCatalog.heartRate.id,
+                MetricCatalog.stepCount.id,
+            ]
+        ) { metric in
+            await ObserverExportGate.shared.enqueue(metric)
+        }
+        return coordinator
     }
 
     private static func companionTestReportURL(root: URL) -> URL {

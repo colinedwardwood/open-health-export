@@ -2082,6 +2082,17 @@ private struct OneExportFault: ExportFaultInjector {
     ])
 }
 
+@Test func observerCompletionReceiptFinishesExactlyOnceIncludingDeinit() {
+    var completions = 0
+    var receipt: ObserverCompletionReceipt? = ObserverCompletionReceipt {
+        completions += 1
+    }
+    receipt?.finish()
+    receipt?.finish()
+    receipt = nil
+    #expect(completions == 1)
+}
+
 @Test func ledgerChainDetectsInteriorMutationAndReordering() {
     let first = LedgerChain.seal(
         EgressEntry(destination: "one", sampleCount: 2, outcomeKind: "attempt"),

@@ -35,6 +35,7 @@ struct HarnessView: View {
     @State private var wipeArmed = false
     @State private var stopHeartRateArmed = false
     @State private var foregroundCatchUpStarted = false
+    @State private var healthObservers: HealthKitObserverCoordinator?
 
     var body: some View {
         NavigationStack {
@@ -92,6 +93,9 @@ struct HarnessView: View {
                     await runLocalExport(trigger: .appForeground)
                 }
             }
+        }
+        .task(id: disclosureAcknowledged) {
+            await startHealthObserversIfEligible()
         }
         .sheet(isPresented: $showScanner) {
             PairingScanner(
@@ -383,6 +387,7 @@ struct HarnessView: View {
         wipeArmed = false
         do {
             destinationStatusLines = try await HarnessExport.enableLocalFileDestination()
+            await startHealthObserversIfEligible()
             await refreshLedgerIntegrity()
             status = "Ready. Local archive passed write/read/confirm and is enabled."
         } catch {
@@ -419,6 +424,8 @@ struct HarnessView: View {
             pairingPaste = ""
             disclosureAcknowledged = false
             foregroundCatchUpStarted = false
+            healthObservers?.stop()
+            healthObservers = nil
             destinationStatusLines = HarnessExport.destinationStatusLines()
             ledgerLines = []
             await refreshLedgerIntegrity()
@@ -518,6 +525,21 @@ struct HarnessView: View {
             status = "Ready. Companion pairing forgotten and its destination disabled."
         } catch {
             status = "Failed: \(error.localizedDescription)"
+        }
+    }
+
+    @MainActor
+    private func startHealthObserversIfEligible() async {
+        guard disclosureAcknowledged,
+              HarnessExport.isLocalFileEnabled(),
+              healthObservers == nil
+        else {
+            return
+        }
+        do {
+            healthObservers = try await HarnessExport.startHealthObservers()
+        } catch {
+            status = "Background Health delivery registration failed: \(error.localizedDescription)"
         }
     }
 }

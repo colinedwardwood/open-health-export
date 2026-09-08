@@ -107,7 +107,7 @@ var targets = linuxCore
 targets.append(contentsOf: [
     .target(
         name: "HealthKitSource",
-        dependencies: ["EnginePorts", "CoreDomain", "CoreTemporal", "MetricCatalog"],
+        dependencies: ["EnginePorts", "CoreDomain", "CoreTemporal", "MetricCatalog", "RunJournal"],
         swiftSettings: [.define("OHE_HAS_HEALTHKIT")]
     ),
     .testTarget(
