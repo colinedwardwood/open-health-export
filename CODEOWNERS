@@ -1,0 +1,5 @@
+# Security-sensitive paths. Changing the golden advisory request is a telemetry change.
+
+spec/v1.0.0/fixtures/advisory-golden-request.txt @colinedwardwood
+Sources/NetEgress/ @colinedwardwood
+Sources/WireFormat/AdvisoryFeed.swift @colinedwardwood

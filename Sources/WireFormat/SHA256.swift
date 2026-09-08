@@ -118,3 +118,25 @@ enum SHA256 {
         }
     }
 }
+
+/// RFC 2104 HMAC-SHA256. First-party so Linux CI can verify advisory feeds without CryptoKit.
+public enum HMACSHA256 {
+    public static func authenticate(key: Data, message: Data) -> Data {
+        let block = 64
+        var prepared = key.count > block ? SHA256.hash(key) : key
+        if prepared.count < block {
+            prepared.append(Data(repeating: 0, count: block - prepared.count))
+        }
+        let outer = Data(prepared.map { $0 ^ 0x5c })
+        let inner = Data(prepared.map { $0 ^ 0x36 })
+        var innerMessage = inner
+        innerMessage.append(message)
+        var outerMessage = outer
+        outerMessage.append(SHA256.hash(innerMessage))
+        return SHA256.hash(outerMessage)
+    }
+
+    public static func hex(key: Data, message: Data) -> String {
+        authenticate(key: key, message: message).map { String(format: "%02x", $0) }.joined()
+    }
+}

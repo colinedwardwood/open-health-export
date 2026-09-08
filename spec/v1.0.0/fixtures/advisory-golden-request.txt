@@ -1,0 +1,4 @@
+GET /advisories/v1.json HTTP/1.1
+accept: application/json
+host: advisories.openhealthexporter.org
+user-agent: OpenHealthExporter/0.1

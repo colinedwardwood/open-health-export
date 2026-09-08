@@ -108,7 +108,7 @@ private let everyTrustEvent: [TrustEvent] = [
     let kinds = everyTrustEvent.map { TrustNotice.notice(for: $0, destination: "ha.example").kind }
     #expect(kinds.count == everyTrustEvent.count)
     #expect(Set(kinds).count == everyTrustEvent.count)
-    #expect(Set(kinds) == Set(UserNotice.Kind.allCases.filter { $0 != .queueExpired }))
+    #expect(Set(kinds) == Set(UserNotice.Kind.allCases.filter { $0 != .queueExpired && $0 != .exportOverdue }))
 }
 
 @Test func noticesCarryNoProse() {
@@ -140,7 +140,7 @@ private let everyTrustEvent: [TrustEvent] = [
     _ = try setup.enable(sink: TrustEventSinkStub())
     let notifier = RecordingNotifier()
     for event in setup.drainEvents() {
-        try await notifier.notify(TrustNotice.notice(for: event, destination: "ha.example"))
+        _ = try await notifier.notify(TrustNotice.notice(for: event, destination: "ha.example"))
     }
     #expect(await notifier.kinds == [.destinationVerified, .destinationPinned, .destinationEnabled])
     let recorded = await notifier.notices
@@ -154,7 +154,7 @@ private let everyTrustEvent: [TrustEvent] = [
     let notifier = RecordingNotifier(failOnAttempt: 2)
     await #expect(throws: RecordingNotifier.Failure.injected(attempt: 2)) {
         for event in events {
-            try await notifier.notify(TrustNotice.notice(for: event, destination: "ha.example"))
+            _ = try await notifier.notify(TrustNotice.notice(for: event, destination: "ha.example"))
         }
     }
     #expect(await notifier.kinds == [.destinationVerified])

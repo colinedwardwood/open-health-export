@@ -49,6 +49,11 @@ public enum NoticeCopy {
                 title: "Queued exports expired",
                 body: "\(notice.destination) had queued data older than seven days. It was deleted instead of being sent late."
             )
+        case .exportOverdue:
+            return LocalizedNotice(
+                title: "Export overdue",
+                body: "\(notice.destination) has not completed a successful export within the freshness window."
+            )
         }
     }
 }

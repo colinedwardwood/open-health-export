@@ -39,6 +39,8 @@ struct HarnessView: View {
     @State private var demoConfirmName = ""
     @State private var browserSearch = ""
     @State private var foregroundCatchUpStarted = false
+    @AppStorage("ohe.advisoryEnabled")
+    private var advisoryEnabled = true
 
     var body: some View {
         NavigationStack {
@@ -169,6 +171,15 @@ struct HarnessView: View {
             }
             .disabled(phase == .working)
             .accessibilityHint("Asks for notification permission and posts one R-40 notice with copy from the registry.")
+
+            Text("Security advisories")
+                .font(.headline)
+            Text(AdvisoryPinnedKeys.urlString)
+                .font(.footnote)
+                .textSelection(.enabled)
+            Text("This is the sole built-in host. The app never sends Health data there. Fetch happens only on a visible foreground launch, never during export.")
+                .font(.footnote)
+            Toggle("Fetch security advisories", isOn: $advisoryEnabled)
 
             Text("Where your data goes")
                 .font(.headline)
@@ -532,10 +543,17 @@ struct HarnessView: View {
         phase = .working
         status = "Working: local notification."
         do {
-            try await LocalUserNotifier().notify(
+            let delivery = try await LocalUserNotifier().notify(
                 UserNotice(kind: .destinationEnabled, destination: "local-file")
             )
-            status = "Ready. If you allowed notifications, the copy came from NoticeCopy, not this screen."
+            switch delivery {
+            case .posted:
+                status = "Ready. The copy came from NoticeCopy, not this screen."
+            case .skippedAuthorizationDenied:
+                status = "Ready. Notifications are off — the widget still escalates when export is overdue."
+            case .notRequired:
+                status = "Ready."
+            }
         } catch {
             status = "Failed: \(error.localizedDescription)"
         }

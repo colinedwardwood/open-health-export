@@ -430,7 +430,7 @@ enum HarnessExport {
             sealedAtEpoch: now,
             url: root.appendingPathComponent("ledger-head-seal.json")
         )
-        try await LocalUserNotifier().notify(
+        _ = try await LocalUserNotifier().notify(
             UserNotice(kind: .queueExpired, destination: "Configured destinations")
         )
         return result
@@ -500,7 +500,7 @@ enum HarnessExport {
         guard !events.isEmpty else { return }
         let notifier = LocalUserNotifier()
         for event in events {
-            try await notifier.notify(TrustNotice.notice(for: event, destination: destination))
+            _ = try await notifier.notify(TrustNotice.notice(for: event, destination: destination))
         }
     }
 

@@ -340,6 +340,7 @@ public struct UserNotice: Sendable, Equatable {
         case destinationEnabled
         case destinationTrustLost
         case queueExpired
+        case exportOverdue
     }
 
     public var kind: Kind
@@ -360,9 +361,16 @@ public struct UserNotice: Sendable, Equatable {
     }
 }
 
+/// Outcome of a notify attempt. Call sites cannot suppress; the OS can still deny (R-40).
+public enum NoticeDelivery: Sendable, Equatable {
+    case posted
+    case skippedAuthorizationDenied
+    case notRequired
+}
+
 /// R-41: no suppression parameter exists, so no call site can decline to notify.
 public protocol UserNotifier: Sendable {
-    func notify(_ notice: UserNotice) async throws
+    func notify(_ notice: UserNotice) async throws -> NoticeDelivery
 }
 
 /// Opaque Keychain (or test-double) reference. The bytes never travel with the handle (AR-18).

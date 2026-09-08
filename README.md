@@ -43,6 +43,12 @@ On the wire, destinations receive **`ohe.wire/1` NDJSON** (see `docs/02-design/0
 HTTPS POSTs that file with `Idempotency-Key` and `Content-Type: application/x-ndjson; profile="ohe.wire/1"`.
 JSON document, CSV, and the Health Auto Export profile are specified but not emitted yet.
 
+The sole built-in network host is the security advisory feed
+`https://advisories.openhealthexporter.org/advisories/v1.json` (R-38). It is fetched only on a
+user-visible foreground launch, never during export, and is disableable in the app. The GET
+carries marketing major.minor in `User-Agent` and nothing else identifying. Block it at your
+resolver if you do not want the fetch.
+
 ## Status
 
 `maintained` — v1 not yet released. Minimum iOS 18.0. Mac companion is a notarised Developer ID
