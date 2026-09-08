@@ -14,7 +14,57 @@ import Testing
     #expect(!(await b.matches(head: head, signature: signature)))
 }
 
+@Test func ledgerHeadRecordDetectsChainRewriteAndIdentityChange() async throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-ledger-seal-\(UUID().uuidString).json")
+    let first = LedgerChain.seal(
+        EgressEntry(
+            destination: "local-file",
+            sampleCount: 1,
+            outcomeKind: "attempt",
+            wallTimeEpoch: 1
+        ),
+        sequence: 1,
+        previousHash: LedgerChain.genesisHash
+    )
+    let seal = HashLedgerSeal(secret: "device-a")
+    try await LedgerHeadSealRecordFile.update(
+        entries: [first],
+        seal: seal,
+        sealedAtEpoch: 2,
+        url: url
+    )
+    #expect(
+        await LedgerHeadSealRecordFile.verify(entries: [first], seal: seal, url: url)
+            == .valid(head: first.entryHash, count: 1)
+    )
+    #expect(
+        await LedgerHeadSealRecordFile.verify(
+            entries: [first],
+            seal: HashLedgerSeal(secret: "device-b"),
+            url: url
+        ) == .identityChanged
+    )
+    var rewritten = first
+    rewritten.sampleCount = 99
+    #expect(
+        await LedgerHeadSealRecordFile.verify(entries: [rewritten], seal: seal, url: url)
+            == .chainInvalid(sequence: 1)
+    )
+}
+
 #if canImport(Security)
+@Test func p256LedgerSealSignsAndDetectsHeadChangesWithoutSecureEnclaveInTests() async throws {
+    let seal = SecureEnclaveLedgerSeal(
+        applicationTag: "app.openhealthexporter.test.ephemeral",
+        useSecureEnclave: false,
+        permanent: false
+    )
+    let signature = try await seal.signedHead("head-1")
+    #expect(await seal.matches(head: "head-1", signature: signature))
+    #expect(!(await seal.matches(head: "head-2", signature: signature)))
+}
+
 @Test func keychainLedgerSealChangesWhenTheStoredSecretIsReplaced() async throws {
     let handle = SecretHandle(rawValue: "ledger")
     let store = MemorySecretStore()

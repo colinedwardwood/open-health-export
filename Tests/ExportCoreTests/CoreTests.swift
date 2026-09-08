@@ -414,21 +414,34 @@ import Redaction
         .appendingPathComponent("ohe-snap-run-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
     let snapshotURL = dest.appendingPathComponent("status.json")
+    let ledgerSealURL = dest.appendingPathComponent("ledger-head-seal.json")
+    let ledgerSeal = HashLedgerSeal(secret: "test-device")
+    let store = MemoryStateStore()
     let run = ExportRun(
         source: FixtureSource(pages: [page]),
         destination: .testing(LocalFileSink(directory: dest)),
-        store: MemoryStateStore(),
+        store: store,
         metric: metric,
         scratchDirectory: dest.appendingPathComponent("scratch"),
         envelope: testEnvelope(),
         clock: FrozenClock(instant: Date(timeIntervalSince1970: 42)),
-        snapshotURL: snapshotURL
+        snapshotURL: snapshotURL,
+        ledgerHeadSeal: ledgerSeal,
+        ledgerSealURL: ledgerSealURL
     )
     #expect(try await run.run().kind == .success)
     let snapshot = try DestinationSnapshotFile.read(from: snapshotURL)
     #expect(snapshot.lastOutcome == "success")
     #expect(snapshot.lastSuccessEpoch == 42)
     #expect(snapshot.writtenAtEpoch == 42)
+    let ledger = try await store.transact { try $0.loadLedger() }
+    #expect(
+        await LedgerHeadSealRecordFile.verify(
+            entries: ledger,
+            seal: ledgerSeal,
+            url: ledgerSealURL
+        ) == .valid(head: ledger.last?.entryHash ?? LedgerChain.genesisHash, count: ledger.count)
+    )
 }
 
 @Test func freshnessTargetRequiresFourteenDaysAndOneHundredObservations() {

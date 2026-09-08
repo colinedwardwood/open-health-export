@@ -128,7 +128,10 @@ fields, byte count, and wall time. Delivery attempts and outcomes are separately
 sealed; verification detects edits and reordering. Delete-all starts a successor
 chain with a genesis marker naming the destroyed count and prior head.
 Ledger-head identity can be sealed with `HashLedgerSeal` (and a Keychain-backed
-secret on Darwin). Secure Enclave signatures and ledger UI remain unimplemented.
+secret on Darwin). Shipping iOS runs now seal the verified head with a
+non-exportable Secure Enclave P-256 key after the terminal transaction; the
+simulator uses the same P-256 signature path with a software key. The ledger UI
+distinguishes chain damage, head mismatch, a missing seal, and changed identity.
 
 The diagnostic core now emits a sorted UTF-8 `ohe.diagnostic/1` document,
 bounded to 200 runs and 200 KiB. Run fields are emitted by the per-sink

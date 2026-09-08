@@ -7,6 +7,86 @@ public protocol LedgerHeadSeal: Sendable {
     func matches(head: String, signature: String) async -> Bool
 }
 
+public struct LedgerHeadSealRecord: Sendable, Equatable, Codable {
+    public var schemaVersion: Int
+    public var head: String
+    public var signature: String
+    public var sealedAtEpoch: TimeInterval
+
+    public init(head: String, signature: String, sealedAtEpoch: TimeInterval) {
+        self.schemaVersion = 1
+        self.head = head
+        self.signature = signature
+        self.sealedAtEpoch = sealedAtEpoch
+    }
+}
+
+public enum LedgerHeadSealVerification: Sendable, Equatable {
+    case valid(head: String, count: Int)
+    case chainInvalid(sequence: Int)
+    case sealMissing
+    case headMismatch
+    case identityChanged
+}
+
+public enum LedgerHeadSealRecordError: Error, Equatable {
+    case chainInvalid(sequence: Int)
+}
+
+public enum LedgerHeadSealRecordFile {
+    public static func update(
+        entries: [EgressEntry],
+        seal: any LedgerHeadSeal,
+        sealedAtEpoch: TimeInterval,
+        url: URL
+    ) async throws {
+        let head: String
+        switch LedgerChain.verify(entries) {
+        case .valid(let verifiedHead, _):
+            head = verifiedHead
+        case .invalid(let sequence):
+            throw LedgerHeadSealRecordError.chainInvalid(sequence: sequence)
+        }
+        let record = LedgerHeadSealRecord(
+            head: head,
+            signature: try await seal.signedHead(head),
+            sealedAtEpoch: sealedAtEpoch
+        )
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let data = try JSONEncoder().encode(record)
+        try data.write(to: url, options: .atomic)
+    }
+
+    public static func verify(
+        entries: [EgressEntry],
+        seal: any LedgerHeadSeal,
+        url: URL
+    ) async -> LedgerHeadSealVerification {
+        let head: String
+        let count: Int
+        switch LedgerChain.verify(entries) {
+        case .valid(let verifiedHead, let verifiedCount):
+            head = verifiedHead
+            count = verifiedCount
+        case .invalid(let sequence):
+            return .chainInvalid(sequence: sequence)
+        }
+        guard let data = try? Data(contentsOf: url),
+              let record = try? JSONDecoder().decode(LedgerHeadSealRecord.self, from: data)
+        else {
+            return .sealMissing
+        }
+        guard record.head == head else { return .headMismatch }
+        guard await seal.matches(head: head, signature: record.signature) else {
+            return .identityChanged
+        }
+        return .valid(head: head, count: count)
+    }
+}
+
 /// Portable seal: SHA-256 over a local secret. Not a Secure Enclave key.
 public struct HashLedgerSeal: LedgerHeadSeal, Sendable {
     public var secret: String

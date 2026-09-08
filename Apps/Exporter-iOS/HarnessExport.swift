@@ -48,6 +48,8 @@ enum HarnessExport {
         let source = HealthKitSampleSource(context: context, limit: 1000)
         let now = Date().ISO8601Format()
         let exporterId = try installationID()
+        let ledgerSeal = ledgerHeadSeal()
+        let ledgerSealURL = root.appendingPathComponent("ledger-head-seal.json")
 
         var lines: [String] = []
         for metric in [MetricCatalog.heartRate.id, MetricCatalog.stepCount.id] {
@@ -64,7 +66,9 @@ enum HarnessExport {
                     emittedAt: now,
                     observedAt: now
                 ),
-                snapshotURL: StatusSnapshotLocation.url(destinationID: "local-file")
+                snapshotURL: StatusSnapshotLocation.url(destinationID: "local-file"),
+                ledgerHeadSeal: ledgerSeal,
+                ledgerSealURL: ledgerSealURL
             )
             let outcome = try await run.run()
             WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
@@ -98,6 +102,8 @@ enum HarnessExport {
         )
         let source = HealthKitSampleSource(context: context, limit: 1000)
         let now = Date().ISO8601Format()
+        let ledgerSeal = ledgerHeadSeal()
+        let ledgerSealURL = root.appendingPathComponent("ledger-head-seal.json")
         var lines: [String] = []
         for metric in [MetricCatalog.heartRate.id, MetricCatalog.stepCount.id] {
             let run = ExportRun(
@@ -113,7 +119,9 @@ enum HarnessExport {
                     emittedAt: now,
                     observedAt: now
                 ),
-                snapshotURL: StatusSnapshotLocation.url(destinationID: "companion")
+                snapshotURL: StatusSnapshotLocation.url(destinationID: "companion"),
+                ledgerHeadSeal: ledgerSeal,
+                ledgerSealURL: ledgerSealURL
             )
             let outcome = try await run.run()
             WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
@@ -177,13 +185,24 @@ enum HarnessExport {
         let entries = try await store.transact { tx in
             try tx.loadLedger()
         }
+        let verification = await LedgerHeadSealRecordFile.verify(
+            entries: entries,
+            seal: ledgerHeadSeal(),
+            url: root.appendingPathComponent("ledger-head-seal.json")
+        )
         var lines: [String]
-        switch LedgerChain.verify(entries) {
+        switch verification {
         case .valid(let head, let count):
             let shortHead = head == LedgerChain.genesisHash ? "genesis" : String(head.prefix(12))
-            lines = ["Chain valid · \(count) entries · head \(shortHead)"]
-        case .invalid(let sequence):
+            lines = ["Chain and device seal valid · \(count) entries · head \(shortHead)"]
+        case .chainInvalid(let sequence):
             lines = ["WARNING: chain verification failed at sequence \(sequence)"]
+        case .sealMissing:
+            lines = ["WARNING: ledger head has not been device-sealed"]
+        case .headMismatch:
+            lines = ["WARNING: sealed head does not match the ledger"]
+        case .identityChanged:
+            lines = ["WARNING: ledger identity changed"]
         }
         lines.append(contentsOf: entries.suffix(50).reversed().map { entry in
             let date = Date(timeIntervalSince1970: entry.wallTimeEpoch)
@@ -191,6 +210,14 @@ enum HarnessExport {
             return "\(date) · \(entry.destination) · \(entry.outcomeKind) · \(entry.sampleCount) records · \(entry.byteCount) bytes"
         })
         return lines
+    }
+
+    private static func ledgerHeadSeal() -> any LedgerHeadSeal {
+        #if targetEnvironment(simulator)
+        SecureEnclaveLedgerSeal(useSecureEnclave: false, permanent: true)
+        #else
+        SecureEnclaveLedgerSeal()
+        #endif
     }
 
     static func vault() throws -> PairingVault {

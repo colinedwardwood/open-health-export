@@ -4,6 +4,7 @@ import DestinationTrust
 import EnginePorts
 import FileWriteKit
 import Foundation
+import RunJournal
 import Watchdog
 import WireFormat
 
@@ -21,6 +22,8 @@ public struct ExportRun: Sendable {
     public var statistics: (any StatisticsSource)?
     public var trigger: RunTrigger
     public var snapshotURL: URL?
+    public var ledgerHeadSeal: (any LedgerHeadSeal)?
+    public var ledgerSealURL: URL?
     #if DEBUG
     public var faults: any ExportFaultInjector = NoExportFaults()
     #endif
@@ -38,7 +41,9 @@ public struct ExportRun: Sendable {
         temporal: TemporalContext = .utc,
         statistics: (any StatisticsSource)? = nil,
         trigger: RunTrigger = .manual,
-        snapshotURL: URL? = nil
+        snapshotURL: URL? = nil,
+        ledgerHeadSeal: (any LedgerHeadSeal)? = nil,
+        ledgerSealURL: URL? = nil
     ) {
         self.source = source
         self.destination = destination
@@ -53,6 +58,8 @@ public struct ExportRun: Sendable {
         self.statistics = statistics
         self.trigger = trigger
         self.snapshotURL = snapshotURL
+        self.ledgerHeadSeal = ledgerHeadSeal
+        self.ledgerSealURL = ledgerSealURL
     }
 
     public func run() async throws -> RunOutcome {
@@ -221,6 +228,7 @@ public struct ExportRun: Sendable {
             )
         }
         try writeSnapshot(outcome: outcome)
+        try await writeLedgerHeadSeal()
     }
 
     private func writeSnapshot(outcome: RunOutcome) throws {
@@ -237,6 +245,19 @@ public struct ExportRun: Sendable {
                 writtenAtEpoch: now
             ),
             to: snapshotURL
+        )
+    }
+
+    private func writeLedgerHeadSeal() async throws {
+        guard let ledgerHeadSeal, let ledgerSealURL else { return }
+        let entries = try await store.transact { tx in
+            try tx.loadLedger()
+        }
+        try await LedgerHeadSealRecordFile.update(
+            entries: entries,
+            seal: ledgerHeadSeal,
+            sealedAtEpoch: clock.now().timeIntervalSince1970,
+            url: ledgerSealURL
         )
     }
 }
