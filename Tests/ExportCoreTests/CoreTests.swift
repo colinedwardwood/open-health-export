@@ -16,6 +16,12 @@ import Redaction
 @testable import CorrectnessEngine
 @testable import WireFormat
 
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
+
 @Test func errorClassManifestIsInBijectionWithTheEnum() {
     let keys = ErrorClass.allCases.map { ErrorClassManifest.record(for: $0).userCopyKey }
     #expect(Set(keys).count == ErrorClass.allCases.count)
@@ -1258,6 +1264,102 @@ private struct OneExportFault: ExportFaultInjector {
             ).filter { $0.pathExtension == "ndjson" }
             #expect(delivered.count == 1, "idempotent replay duplicated \(location.rawValue)")
         }
+    }
+}
+
+private struct ProcessExitFault: ExportFaultInjector {
+    func hit(_ location: ExportFaultLocation) throws {
+        guard let raw = getenv("OHE_PROCESS_EXIT_SEAM"),
+              String(cString: raw) == location.rawValue
+        else {
+            return
+        }
+        _exit(9)
+    }
+}
+
+private func runUntilProcessExitSeam() async throws {
+    guard let rawRoot = getenv("OHE_PROCESS_EXIT_ROOT") else {
+        _exit(2)
+    }
+    let root = URL(fileURLWithPath: String(cString: rawRoot), isDirectory: true)
+    let destinationURL = root.appendingPathComponent("destination")
+    try FileManager.default.createDirectory(
+        at: destinationURL,
+        withIntermediateDirectories: true
+    )
+    let metric = MetricCatalog.heartRate.id
+    let page = SamplePage(
+        samples: [heartSample("e0000000-0000-4000-8000-000000000001")],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0xE0]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    var run = ExportRun(
+        source: FixtureSource(pages: [page]),
+        destination: .testing(LocalFileSink(directory: destinationURL)),
+        store: try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path),
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    )
+    run.faults = ProcessExitFault()
+    _ = try await run.run()
+    _exit(3)
+}
+
+@Test func p3ProcessExitAtEverySeamResumesWithoutLoss() async throws {
+    for location in ExportFaultLocation.allCases {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ohe-process-exit-\(location.rawValue)-\(UUID().uuidString)")
+        setenv("OHE_PROCESS_EXIT_ROOT", root.path, 1)
+        setenv("OHE_PROCESS_EXIT_SEAM", location.rawValue, 1)
+        await #expect(processExitsWith: .exitCode(9)) {
+            try await runUntilProcessExitSeam()
+        }
+        unsetenv("OHE_PROCESS_EXIT_ROOT")
+        unsetenv("OHE_PROCESS_EXIT_SEAM")
+
+        let destinationURL = root.appendingPathComponent("destination")
+        let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+        if !(try await store.transact { try $0.pendingBatches() }).isEmpty {
+            let replay = PendingDeliveryRunner(
+                destination: .testing(LocalFileSink(directory: destinationURL)),
+                store: store
+            )
+            _ = try await replay.runOnce()
+        }
+        let metric = MetricCatalog.heartRate.id
+        let page = SamplePage(
+            samples: [heartSample("e0000000-0000-4000-8000-000000000001")],
+            tombstones: [],
+            metric: metric,
+            anchorBlob: Data([0xE0]),
+            observedThrough: Date(timeIntervalSince1970: 0)
+        )
+        let resumed = ExportRun(
+            source: FixtureSource(pages: [page]),
+            destination: .testing(LocalFileSink(directory: destinationURL)),
+            store: store,
+            metric: metric,
+            scratchDirectory: root.appendingPathComponent("resume-scratch"),
+            envelope: testEnvelope()
+        )
+        _ = try await resumed.run()
+        let delivered = try FileManager.default.contentsOfDirectory(
+            at: destinationURL,
+            includingPropertiesForKeys: nil
+        ).filter { $0.pathExtension == "ndjson" }
+        #expect(delivered.count == 1, "delivery count at \(location.rawValue)")
+        var receiver = ReferenceReceiver()
+        try receiver.ingest(
+            ndjson: String(contentsOf: delivered[0], encoding: .utf8)
+        )
+        #expect(
+            receiver.quantities["e0000000-0000-4000-8000-000000000001"] != nil,
+            "sample lost at \(location.rawValue)"
+        )
     }
 }
 #endif
