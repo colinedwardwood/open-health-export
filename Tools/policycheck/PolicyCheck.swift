@@ -1,4 +1,6 @@
 import Foundation
+import MetricCatalog
+import WireFormat
 
 @main
 struct PolicyCheck {
@@ -220,7 +222,14 @@ struct PolicyCheck {
 
     static func checkSpecArtifacts(root: URL) throws {
         let spec = root.appendingPathComponent("spec/v1.0.0")
-        for relative in ["README.md", "adjacency.json", "fixtures/fix-catalogue.json"] {
+        for relative in [
+            "README.md",
+            "adjacency.json",
+            "fixtures/fix-catalogue.json",
+            "fixtures/receiver-expected-state.json",
+            "catalogue/metrics.json",
+            "schema/ohe.wire.1.json",
+        ] {
             let url = spec.appendingPathComponent(relative)
             let data = try Data(contentsOf: url)
             _ = try JSONSerialization.jsonObject(with: data)
@@ -231,13 +240,76 @@ struct PolicyCheck {
             FileHandle.standardError.write(Data("tier0 corpus missing\n".utf8))
             exit(1)
         }
-        if FileManager.default.fileExists(atPath: spec.appendingPathComponent("FROZEN").path) {
+
+        let schemaURL = spec.appendingPathComponent("schema/ohe.wire.1.json")
+        let schema = try WireJSONSchema.load(Data(contentsOf: schemaURL))
+        let corpusText = try String(contentsOf: corpus, encoding: .utf8)
+        try WireJSONSchema.validateNDJSON(corpusText, schema: schema)
+
+        let receiverInput = try String(
+            contentsOf: spec.appendingPathComponent("fixtures/receiver-sequence.ndjson"),
+            encoding: .utf8
+        )
+        var receiver = ReferenceReceiver()
+        try receiver.ingest(ndjson: receiverInput)
+        let expected = try JSONSerialization.jsonObject(
+            with: Data(contentsOf: spec.appendingPathComponent("fixtures/receiver-expected-state.json"))
+        )
+        let actualData = try JSONSerialization.data(
+            withJSONObject: receiver.expectedState(),
+            options: [.sortedKeys]
+        )
+        let expectedData = try JSONSerialization.data(withJSONObject: expected, options: [.sortedKeys])
+        guard actualData == expectedData else {
+            FileHandle.standardError.write(Data("reference receiver final state drift\n".utf8))
+            exit(1)
+        }
+
+        let catalogueURL = spec.appendingPathComponent("catalogue/metrics.json")
+        let catalogue = try JSONSerialization.jsonObject(
+            with: Data(contentsOf: catalogueURL)
+        ) as? [String: Any]
+        let committedMetrics = catalogue?["metrics"] as? [[String: Any]] ?? []
+        let actualMetrics: [[String: Any]] = MetricCatalog.all.map {
+            [
+                "metricId": $0.wireId,
+                "kind": "sample.quantity",
+                "canonicalUnit": $0.wireUnit,
+            ]
+        }
+        let committedMetricData = try JSONSerialization.data(
+            withJSONObject: committedMetrics,
+            options: [.sortedKeys]
+        )
+        let actualMetricData = try JSONSerialization.data(
+            withJSONObject: actualMetrics,
+            options: [.sortedKeys]
+        )
+        guard committedMetricData == actualMetricData else {
             FileHandle.standardError.write(
-                Data("spec/v1.0.0 is marked FROZEN; freeze diffs are not implemented in this check\n".utf8)
+                Data("wire metric IDs, kinds, or canonical units drifted from the spec catalogue\n".utf8)
             )
             exit(1)
         }
-        print("policycheck spec artifacts parse and remain unfrozen: ok")
+
+        let frozenMarker = spec.appendingPathComponent("FROZEN")
+        if FileManager.default.fileExists(atPath: frozenMarker.path) {
+            let frozenURL = spec.appendingPathComponent("schema/ohe.wire.1.frozen.json")
+            guard FileManager.default.fileExists(atPath: frozenURL.path) else {
+                FileHandle.standardError.write(Data("frozen spec is missing its schema baseline\n".utf8))
+                exit(1)
+            }
+            let frozen = try WireJSONSchema.load(Data(contentsOf: frozenURL))
+            if let failure = WireJSONSchema.freezeGate(
+                frozen: frozen,
+                current: schema,
+                markedFrozen: true
+            ) {
+                FileHandle.standardError.write(Data(("breaking frozen schema change:\n" + failure + "\n").utf8))
+                exit(1)
+            }
+        }
+        print("policycheck schema, corpus, receiver, and freeze gate: ok")
     }
 
     static func checkAdjacency(root: URL) throws {

@@ -1,0 +1,31 @@
+{
+  "specVersion": "1.0",
+  "metrics": [
+    {"metricId":"step_count","kind":"sample.quantity","canonicalUnit":"count"},
+    {"metricId":"heart_rate","kind":"sample.quantity","canonicalUnit":"bpm"},
+    {"metricId":"active_energy","kind":"sample.quantity","canonicalUnit":"kcal"},
+    {"metricId":"walking_running_distance","kind":"sample.quantity","canonicalUnit":"km"},
+    {"metricId":"body_mass","kind":"sample.quantity","canonicalUnit":"kg"},
+    {"metricId":"oxygen_saturation","kind":"sample.quantity","canonicalUnit":"%"},
+    {"metricId":"respiratory_rate","kind":"sample.quantity","canonicalUnit":"count/min"},
+    {"metricId":"resting_heart_rate","kind":"sample.quantity","canonicalUnit":"bpm"},
+    {"metricId":"vo2_max","kind":"sample.quantity","canonicalUnit":"mL/kg/min"},
+    {"metricId":"blood_glucose","kind":"sample.quantity","canonicalUnit":"mg/dL"},
+    {"metricId":"cycling_distance","kind":"sample.quantity","canonicalUnit":"km"},
+    {"metricId":"flights_climbed","kind":"sample.quantity","canonicalUnit":"count"},
+    {"metricId":"basal_energy","kind":"sample.quantity","canonicalUnit":"kcal"},
+    {"metricId":"exercise_time","kind":"sample.quantity","canonicalUnit":"min"},
+    {"metricId":"stand_time","kind":"sample.quantity","canonicalUnit":"min"},
+    {"metricId":"walking_heart_rate_average","kind":"sample.quantity","canonicalUnit":"bpm"},
+    {"metricId":"heart_rate_variability_sdnn","kind":"sample.quantity","canonicalUnit":"ms"},
+    {"metricId":"body_temperature","kind":"sample.quantity","canonicalUnit":"degC"},
+    {"metricId":"basal_body_temperature","kind":"sample.quantity","canonicalUnit":"degC"},
+    {"metricId":"height","kind":"sample.quantity","canonicalUnit":"m"},
+    {"metricId":"body_fat_percentage","kind":"sample.quantity","canonicalUnit":"%"},
+    {"metricId":"body_mass_index","kind":"sample.quantity","canonicalUnit":"count"},
+    {"metricId":"lean_body_mass","kind":"sample.quantity","canonicalUnit":"kg"},
+    {"metricId":"dietary_water","kind":"sample.quantity","canonicalUnit":"mL"},
+    {"metricId":"blood_pressure_systolic","kind":"sample.quantity","canonicalUnit":"mmHg"},
+    {"metricId":"blood_pressure_diastolic","kind":"sample.quantity","canonicalUnit":"mmHg"}
+  ]
+}

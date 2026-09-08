@@ -11,17 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Spec artifacts parse
-        run: |
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          root = Path("spec/v1.0.0")
-          json.loads((root / "README.md").read_text())
-          json.loads((root / "adjacency.json").read_text())
-          json.loads((root / "fixtures/fix-catalogue.json").read_text())
-          assert (root / "fixtures/tier0.ndjson").stat().st_size > 0
-          if (root / "FROZEN").exists():
-              raise SystemExit("v1.0.0 is marked FROZEN; additive-only freeze diffs are the next gate")
-          print("spec artifacts parse and remain unfrozen: ok")
-          PY
+      - uses: swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc # v3
+        with:
+          swift-version: "6.3.3"
+      - name: Schema, receiver, and freeze policy
+        run: swift run policycheck

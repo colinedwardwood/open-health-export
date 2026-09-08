@@ -274,7 +274,17 @@
     {
       "name": "policycheck",
       "type": "executable",
-      "dependencies": []
+      "dependencies": [
+        "MetricCatalog",
+        "WireFormat"
+      ]
+    },
+    {
+      "name": "receiver",
+      "type": "executable",
+      "dependencies": [
+        "WireFormat"
+      ]
     },
     {
       "name": "wirefuzz",

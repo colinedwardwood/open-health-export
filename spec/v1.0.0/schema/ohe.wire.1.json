@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openhealthexporter.org/spec/ohe.wire/1",
+  "title": "ohe.wire/1 NDJSON record",
+  "x-ohe-specVersion": "1.0",
+  "oneOf": [
+    { "$ref": "#/$defs/header" },
+    { "$ref": "#/$defs/footer" },
+    { "$ref": "#/$defs/quantity" },
+    { "$ref": "#/$defs/tombstone" },
+    { "$ref": "#/$defs/aggregate" },
+    { "$ref": "#/$defs/canary" }
+  ],
+  "$defs": {
+    "header": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "batchId", "emittedAt", "exporterId", "kind", "mode", "producer",
+        "reason", "recordCount", "seq", "spec", "specVersion", "types"
+      ],
+      "properties": {
+        "kind": { "type": "string", "const": "batch.header", "x-ohe-open": false },
+        "batchId": { "type": "string" },
+        "emittedAt": { "type": "string" },
+        "exporterId": { "type": "string" },
+        "mode": {
+          "type": "string",
+          "enum": ["samples", "aggregates", "mixed"],
+          "x-ohe-open": false
+        },
+        "producer": {
+          "type": "object",
+          "required": ["name", "version"],
+          "properties": {
+            "name": { "type": "string" },
+            "version": { "type": "string" }
+          }
+        },
+        "reason": {
+          "type": "string",
+          "enum": ["delta", "backfill", "reconcile", "manual", "reexportAfterEviction", "destinationTest"],
+          "x-ohe-open": false
+        },
+        "recordCount": { "type": "integer" },
+        "seq": { "type": "integer" },
+        "spec": { "type": "string", "const": "ohe.wire/1" },
+        "specVersion": { "type": "string" },
+        "types": { "type": "array", "items": { "type": "string" } },
+        "demo": { "type": "boolean" }
+      }
+    },
+    "footer": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["batchId", "complete", "contentDigest", "counts", "kind"],
+      "properties": {
+        "kind": { "type": "string", "const": "batch.footer", "x-ohe-open": false },
+        "batchId": { "type": "string" },
+        "complete": { "type": "boolean" },
+        "contentDigest": { "type": "string" },
+        "counts": { "type": "object" }
+      }
+    },
+    "quantity": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "batchSeq", "end", "hkIdentifier", "kind", "metricId", "observedAt",
+        "semantics", "start", "tzOffsetMinutes", "tzSource", "unit", "uuid", "v", "value"
+      ],
+      "properties": {
+        "kind": { "type": "string", "const": "sample.quantity", "x-ohe-open": false },
+        "batchSeq": { "type": "integer" },
+        "end": { "type": "string" },
+        "hkIdentifier": { "type": "string", "x-ohe-open": true },
+        "metricId": { "type": "string", "x-ohe-open": true },
+        "observedAt": { "type": "string" },
+        "semantics": { "type": "string", "enum": ["curated", "unmapped"], "x-ohe-open": false },
+        "start": { "type": "string" },
+        "tzOffsetMinutes": { "type": "integer" },
+        "tzSource": {
+          "type": "string",
+          "enum": ["sampleMetadata", "inferred", "deviceCurrent", "unknown"],
+          "x-ohe-open": false
+        },
+        "unit": { "type": "string" },
+        "uuid": { "type": "string" },
+        "v": { "type": "integer", "const": 1 },
+        "value": { "type": "number" },
+        "demo": { "type": "boolean" }
+      }
+    },
+    "tombstone": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "batchSeq", "bestEffort", "hkIdentifier", "kind", "metricId",
+        "observedAt", "reason", "uuid", "v"
+      ],
+      "properties": {
+        "kind": { "type": "string", "const": "tombstone", "x-ohe-open": false },
+        "batchSeq": { "type": "integer" },
+        "bestEffort": { "type": "boolean" },
+        "hkIdentifier": { "type": "string", "x-ohe-open": true },
+        "metricId": { "type": "string", "x-ohe-open": true },
+        "observedAt": { "type": "string" },
+        "reason": { "type": "string", "enum": ["healthKitDeleted"], "x-ohe-open": false },
+        "uuid": { "type": "string" },
+        "v": { "type": "integer", "const": 1 },
+        "demo": { "type": "boolean" }
+      }
+    },
+    "aggregate": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "batchSeq", "bucketDurationSeconds", "bucketEnd", "bucketKey", "bucketStart",
+        "computation", "computedAt", "emitSeq", "granularity", "kind", "localStart",
+        "metricId", "observedAt", "sampleCount", "sourceScope", "state", "statistic",
+        "tzId", "unit", "v"
+      ],
+      "properties": {
+        "kind": { "type": "string", "const": "aggregate", "x-ohe-open": false },
+        "batchSeq": { "type": "integer" },
+        "bucketDurationSeconds": { "type": "integer" },
+        "bucketEnd": { "type": "string" },
+        "bucketKey": { "type": "string" },
+        "bucketStart": { "type": "string" },
+        "computation": { "type": "string", "x-ohe-open": false },
+        "computedAt": { "type": "string" },
+        "emitSeq": { "type": "integer" },
+        "granularity": { "type": "string", "x-ohe-open": false },
+        "localStart": { "type": "string" },
+        "metricId": { "type": "string", "x-ohe-open": true },
+        "observedAt": { "type": "string" },
+        "sampleCount": { "type": "integer" },
+        "sourceScope": { "type": "string", "x-ohe-open": false },
+        "state": { "type": "string", "x-ohe-open": false },
+        "statistic": { "type": "string", "x-ohe-open": false },
+        "tzId": { "type": "string" },
+        "unit": { "type": "string" },
+        "v": { "type": "integer", "const": 1 },
+        "value": { "type": "number" },
+        "supersedes": { "type": "integer" },
+        "demo": { "type": "boolean" }
+      }
+    },
+    "canary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["batchSeq", "code", "kind", "observedAt", "v"],
+      "properties": {
+        "kind": { "type": "string", "const": "canary", "x-ohe-open": false },
+        "batchSeq": { "type": "integer" },
+        "code": { "type": "string" },
+        "observedAt": { "type": "string" },
+        "v": { "type": "integer", "const": 1 }
+      }
+    }
+  }
+}

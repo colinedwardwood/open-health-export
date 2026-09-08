@@ -23,6 +23,15 @@ swift run policycheck
 
 HealthKit is confined to `Sources/HealthKitSource`. The Linux job fails if core imports it.
 
+Validate the committed conformance sequence with the reference receiver:
+
+```
+swift run receiver -- spec/v1.0.0/fixtures/receiver-sequence.ndjson
+```
+
+The command prints the converged final state. The receiver tolerates additive record kinds and
+fields while applying quantity upserts and tombstones.
+
 iOS harness (M0 / R-70):
 
 ```

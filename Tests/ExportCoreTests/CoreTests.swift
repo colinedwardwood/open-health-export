@@ -284,6 +284,19 @@ import Redaction
     }
 }
 
+@Test func haeCompatibilityCannotArmHonestySurfacesOrDisableNativeOutput() {
+    #expect(
+        ExportProfile.haeCompatibility.label
+            == "compatibility export — correctness claims do not apply"
+    )
+    #expect(!ExportProfile.haeCompatibility.eligibleForHonestySurfaces)
+    #expect(ExportProfile.native.eligibleForHonestySurfaces)
+    #expect(
+        ExportProfileSelection.enabled(requested: [.haeCompatibility])
+            == [.native, .haeCompatibility]
+    )
+}
+
 @Test func successRequiresAckedAtLeastRead() {
     let short = RunTally(read: 10, acked: 4, partialCause: "deferred_discretionary")
     let outcome = RunOutcome.derive(from: short)

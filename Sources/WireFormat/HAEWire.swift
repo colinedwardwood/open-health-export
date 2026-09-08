@@ -8,6 +8,34 @@ public struct HAELossAccepted: Sendable, Equatable {
     public init() {}
 }
 
+public enum ExportProfile: String, Sendable, Hashable, CaseIterable {
+    case native
+    case haeCompatibility
+
+    public var label: String {
+        switch self {
+        case .native:
+            "ohe.wire/1"
+        case .haeCompatibility:
+            "compatibility export — correctness claims do not apply"
+        }
+    }
+
+    /// HAE has no UUID/tombstone/receipt contract, so it cannot arm R-23/R-24/R-27.
+    public var eligibleForHonestySurfaces: Bool {
+        self == .native
+    }
+}
+
+public enum ExportProfileSelection {
+    /// Selecting HAE always co-enables native output; compatibility is never the sole archive.
+    public static func enabled(requested: Set<ExportProfile>) -> Set<ExportProfile> {
+        requested.contains(.haeCompatibility)
+            ? requested.union([.native])
+            : requested
+    }
+}
+
 public enum HAEError: Error, Equatable {
     case tombstonesNotRepresentable
     case unknownMetric

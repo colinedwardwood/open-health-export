@@ -168,7 +168,7 @@ enum HarnessExport {
             observedAt: now,
             demo: true
         )
-        envelope.reason = "demo"
+        envelope.reason = "manual"
         let source = DemoSampleSource(seed: 1, samplesPerMetric: 4)
         var lines: [String] = ["DEMO MODE — synthetic data, not HealthKit"]
         for declaration in MetricCatalog.all {

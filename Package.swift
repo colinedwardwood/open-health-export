@@ -64,8 +64,17 @@ let linuxCore: [Target] = [
         dependencies: ["CoreDomain", "MetricCatalog", "WireFormat"],
         path: "Tools/corpusgen"
     ),
-    .executableTarget(name: "policycheck", path: "Tools/policycheck"),
+    .executableTarget(
+        name: "policycheck",
+        dependencies: ["MetricCatalog", "WireFormat"],
+        path: "Tools/policycheck"
+    ),
     .executableTarget(name: "m0harness", path: "Tools/m0harness"),
+    .executableTarget(
+        name: "receiver",
+        dependencies: ["WireFormat"],
+        path: "Tools/receiver"
+    ),
     .executableTarget(
         name: "wirefuzz",
         dependencies: ["CompanionWire", "MQTTCodec", "WireFormat"],
@@ -143,6 +152,7 @@ var products: [Product] = [
     .executable(name: "corpusgen", targets: ["corpusgen"]),
     .executable(name: "policycheck", targets: ["policycheck"]),
     .executable(name: "m0harness", targets: ["m0harness"]),
+    .executable(name: "receiver", targets: ["receiver"]),
     .executable(name: "wirefuzz", targets: ["wirefuzz"]),
     .library(name: "SinkMQTT", targets: ["MQTTCodec", "SinkMQTT"]),
 ]
