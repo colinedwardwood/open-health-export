@@ -156,24 +156,38 @@ public struct ExportRun: Sendable {
         #if DEBUG
         try faults.hit(.afterEnqueueBeforeDestinationWrite)
         #endif
-        #if DEBUG
-        let receipt = try await DeliveryExecutor.send(
-            batch: pending,
-            destination: destination,
-            destinationName: destinationName,
-            store: store,
-            faults: faults,
-            clock: clock
-        )
-        #else
-        let receipt = try await DeliveryExecutor.send(
-            batch: pending,
-            destination: destination,
-            destinationName: destinationName,
-            store: store,
-            clock: clock
-        )
-        #endif
+        let receipt: DeliveryReceipt
+        do {
+            #if DEBUG
+            receipt = try await DeliveryExecutor.send(
+                batch: pending,
+                destination: destination,
+                destinationName: destinationName,
+                store: store,
+                faults: faults,
+                clock: clock
+            )
+            #else
+            receipt = try await DeliveryExecutor.send(
+                batch: pending,
+                destination: destination,
+                destinationName: destinationName,
+                store: store,
+                clock: clock
+            )
+            #endif
+        } catch let error as DestinationSendError {
+            let tally = RunTally(
+                read: recordCount,
+                committed: recordCount,
+                failed: 1,
+                terminalError: error.errorClass,
+                partialCause: error.errorClass.rawValue
+            )
+            let outcome = RunOutcome.derive(from: tally)
+            try await record(outcome: outcome, tally: tally, receipt: nil)
+            return outcome
+        }
         #if DEBUG
         try faults.hit(.afterAckBeforeRelease)
         #endif

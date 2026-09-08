@@ -303,6 +303,90 @@ import Redaction
     #expect(outcome.ackEvidence == .statusOnly)
 }
 
+@Test func everyClosedRunOutcomeIsReachableFromATally() {
+    let cases: [(RunTally, RunOutcome.Kind)] = [
+        (RunTally(read: 2, acked: 2), .success),
+        (RunTally(nothingDue: true), .successNothingDue),
+        (RunTally(read: 4, acked: 1, partialCause: "receipt_short"), .partial),
+        (RunTally(read: 4, acked: 0, unconfirmed: 4), .unknownAck),
+        (RunTally(failed: 1, terminalError: .destinationUnreachable), .failed),
+        (RunTally(terminalError: .budgetExhausted), .abandonedNoBudget),
+        (RunTally(terminalError: .cancelledBySystem), .cancelledBySystem),
+        (RunTally(terminalError: .deviceLocked), .blockedDeviceLocked),
+        (RunTally(terminalError: .localNetworkDenied), .localNetworkDenied),
+    ]
+    #expect(Set(cases.map(\.1)) == Set(RunOutcome.Kind.allCases))
+    for (tally, kind) in cases {
+        let outcome = RunOutcome.derive(from: tally)
+        #expect(outcome.kind == kind)
+        if kind == .partial {
+            #expect(outcome.partialCause != nil)
+            #expect(!(outcome.partialCause ?? "").isEmpty)
+        }
+        #expect(outcome.kind != .success || tally.acked >= tally.read)
+    }
+}
+
+@Test func silentBodyDiscardNeverDerivesSuccess() {
+    let discarded = RunTally(read: 5, acked: 0, ackEvidenceStatusOnly: true)
+    let outcome = RunOutcome.derive(from: discarded)
+    #expect(outcome.kind != .success)
+    #expect(outcome.kind != .successNothingDue)
+    #expect(outcome.kind == .partial)
+    #expect(outcome.partialCause == "unspecified")
+}
+
+@Test func randomAckCountsNeverSucceedWhenTheDestinationReadsFewerThanItSent() {
+    var seed: UInt64 = 0xC0FFEE
+    func next(_ bound: Int) -> Int {
+        seed = seed &* 6_364_136_223_846_793_005 &+ 1
+        return Int(seed % UInt64(bound))
+    }
+    for _ in 0..<10_000 {
+        let read = next(32)
+        let acked = next(read + 1)
+        let unconfirmed = next(8)
+        let tally = RunTally(read: read, acked: acked, unconfirmed: unconfirmed)
+        let outcome = RunOutcome.derive(from: tally)
+        if acked < read {
+            #expect(outcome.kind != .success)
+            #expect(outcome.kind != .successNothingDue)
+        }
+        if outcome.kind == .partial {
+            #expect(outcome.partialCause == "unspecified")
+        }
+    }
+}
+
+@Test func exportRunMapsLocalNetworkDeniedAndSilentDiscardToClosedOutcomes() async throws {
+    let dest = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-r21-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+
+    let denied = ExportRun(
+        source: CountingSource(),
+        destination: .testing(ThrowingSink(error: .localNetworkDenied)),
+        store: MemoryStateStore(),
+        metric: MetricCatalog.heartRate.id,
+        scratchDirectory: dest.appendingPathComponent("denied"),
+        envelope: testEnvelope()
+    )
+    let deniedOutcome = try await denied.run()
+    #expect(deniedOutcome.kind == .localNetworkDenied)
+
+    let discarded = ExportRun(
+        source: CountingSource(),
+        destination: .testing(SilentDiscardSink()),
+        store: MemoryStateStore(),
+        metric: MetricCatalog.heartRate.id,
+        scratchDirectory: dest.appendingPathComponent("discard"),
+        envelope: testEnvelope()
+    )
+    let discardedOutcome = try await discarded.run()
+    #expect(discardedOutcome.kind == .partial)
+    #expect(discardedOutcome.kind != .success)
+}
+
 @Test func hkStatisticsExceptionListIsNonEmpty() {
     #expect(MetricCatalog.hkStatisticsExceptions.contains(MetricCatalog.stepCount.id))
 }
@@ -2627,4 +2711,18 @@ final class CountingSource: SampleSource, @unchecked Sendable {
     )
     _ = try await run.run()
     #expect(try store.transaction.loadCursor(metric: metric)?.epoch == 4)
+}
+
+private struct ThrowingSink: DestinationSink {
+    var error: DestinationSendError
+
+    func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt {
+        throw error
+    }
+}
+
+private struct SilentDiscardSink: DestinationSink {
+    func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt {
+        DeliveryReceipt(batchID: idempotencyKey, accepted: 0, statusOnly: true)
+    }
 }

@@ -182,6 +182,12 @@ exposes Share. Its journal input uses an independent read-only SQLite
 connection, runs `integrity_check`, and degrades to bounded row salvage with
 an explicit skipped-row count.
 
+Every closed R-21 outcome is reachable from a tally, including
+`local_network_denied`. `ExportRun` maps classified destination send errors
+onto that set, and a destination that silently discards the body after
+connecting cannot derive `success`. A 10,000-tuple check refuses success when
+fewer records were acknowledged than read.
+
 R-25 now has a named-step destination test. Local folder write/read/confirm
 must pass (or MQTT QoS 0 report `sentUnconfirmed`) before `enable`. A failed
 test cannot enable. HTTPS/HA tests cover TLS, pin mismatch, 401, bearer

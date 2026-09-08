@@ -293,6 +293,27 @@ public protocol DayObservationSource: Sendable {
     func samples(metric: MetricID, day: String) async throws -> [SampleRecord]
 }
 
+/// Classified destination failure. Call sites must not invent a `RunOutcome`.
+public enum DestinationSendError: Error, Sendable, Equatable {
+    case localNetworkDenied
+    case destinationUnreachable
+    case cancelledBySystem
+    case budgetExhausted
+    case deviceLocked
+    case internalFault(String)
+
+    public var errorClass: ErrorClass {
+        switch self {
+        case .localNetworkDenied: .localNetworkDenied
+        case .destinationUnreachable: .destinationUnreachable
+        case .cancelledBySystem: .cancelledBySystem
+        case .budgetExhausted: .budgetExhausted
+        case .deviceLocked: .deviceLocked
+        case .internalFault: .internalFault
+        }
+    }
+}
+
 public protocol DestinationSink: Sendable {
     func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt
 }
