@@ -51,19 +51,22 @@ public struct PendingBatch: Sendable, Equatable {
     public var expectedRecords: Int
     public var byteCount: Int
     public var metric: MetricID
+    public var createdAtEpoch: TimeInterval?
 
     public init(
         id: BatchID,
         payloadURL: String,
         expectedRecords: Int = 0,
         byteCount: Int = 0,
-        metric: MetricID = MetricID(rawValue: "")
+        metric: MetricID = MetricID(rawValue: ""),
+        createdAtEpoch: TimeInterval? = nil
     ) {
         self.id = id
         self.payloadURL = payloadURL
         self.expectedRecords = expectedRecords
         self.byteCount = byteCount
         self.metric = metric
+        self.createdAtEpoch = createdAtEpoch
     }
 }
 
@@ -290,6 +293,7 @@ public struct UserNotice: Sendable, Equatable {
         case destinationRepointed
         case destinationEnabled
         case destinationTrustLost
+        case queueExpired
     }
 
     public var kind: Kind

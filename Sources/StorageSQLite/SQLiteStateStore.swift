@@ -53,6 +53,7 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
         for sql in [
             "ALTER TABLE pending_batches ADD COLUMN byte_count INTEGER NOT NULL DEFAULT 0;",
             "ALTER TABLE pending_batches ADD COLUMN metric TEXT NOT NULL DEFAULT '';",
+            "ALTER TABLE pending_batches ADD COLUMN created_at_epoch REAL;",
             "ALTER TABLE journal ADD COLUMN trigger TEXT NOT NULL DEFAULT 'manual';",
             "ALTER TABLE journal ADD COLUMN samples_read INTEGER NOT NULL DEFAULT 0;",
             "ALTER TABLE journal ADD COLUMN samples_committed INTEGER NOT NULL DEFAULT 0;",
@@ -121,7 +122,8 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 payload_url TEXT NOT NULL,
                 expected_records INTEGER NOT NULL,
                 byte_count INTEGER NOT NULL DEFAULT 0,
-                metric TEXT NOT NULL DEFAULT ''
+                metric TEXT NOT NULL DEFAULT '',
+                created_at_epoch REAL
             );
             CREATE INDEX IF NOT EXISTS idx_pending_metric ON pending_batches (metric);
             CREATE TABLE IF NOT EXISTS deliveries (
@@ -244,7 +246,7 @@ private final class SQLiteTransaction: StateTransaction {
 
     func enqueuePending(_ batch: PendingBatch) throws {
         let pending = try store.prepare(
-            "INSERT INTO pending_batches (batch_id, payload_url, expected_records, byte_count, metric) VALUES (?, ?, ?, ?, ?) ON CONFLICT(batch_id) DO UPDATE SET payload_url = excluded.payload_url, expected_records = excluded.expected_records, byte_count = excluded.byte_count, metric = excluded.metric;"
+            "INSERT INTO pending_batches (batch_id, payload_url, expected_records, byte_count, metric, created_at_epoch) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(batch_id) DO UPDATE SET payload_url = excluded.payload_url, expected_records = excluded.expected_records, byte_count = excluded.byte_count, metric = excluded.metric, created_at_epoch = COALESCE(pending_batches.created_at_epoch, excluded.created_at_epoch);"
         )
         defer { sqlite3_finalize(pending) }
         bindText(pending, 1, batch.id.rawValue)
@@ -252,6 +254,11 @@ private final class SQLiteTransaction: StateTransaction {
         sqlite3_bind_int64(pending, 3, sqlite3_int64(batch.expectedRecords))
         sqlite3_bind_int64(pending, 4, sqlite3_int64(batch.byteCount))
         bindText(pending, 5, batch.metric.rawValue)
+        if let createdAtEpoch = batch.createdAtEpoch {
+            sqlite3_bind_double(pending, 6, createdAtEpoch)
+        } else {
+            sqlite3_bind_null(pending, 6)
+        }
         try stepDone(pending)
     }
 
@@ -276,7 +283,7 @@ private final class SQLiteTransaction: StateTransaction {
 
     func pendingBatches() throws -> [PendingBatch] {
         let stmt = try store.prepare(
-            "SELECT batch_id, payload_url, expected_records, byte_count, metric FROM pending_batches ORDER BY rowid;"
+            "SELECT batch_id, payload_url, expected_records, byte_count, metric, created_at_epoch FROM pending_batches ORDER BY rowid;"
         )
         defer { sqlite3_finalize(stmt) }
         var batches: [PendingBatch] = []
@@ -287,7 +294,10 @@ private final class SQLiteTransaction: StateTransaction {
                     payloadURL: text(stmt, 1),
                     expectedRecords: Int(sqlite3_column_int64(stmt, 2)),
                     byteCount: Int(sqlite3_column_int64(stmt, 3)),
-                    metric: MetricID(rawValue: text(stmt, 4))
+                    metric: MetricID(rawValue: text(stmt, 4)),
+                    createdAtEpoch: sqlite3_column_type(stmt, 5) == SQLITE_NULL
+                        ? nil
+                        : sqlite3_column_double(stmt, 5)
                 )
             )
         }

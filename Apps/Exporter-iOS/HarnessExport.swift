@@ -337,6 +337,28 @@ enum HarnessExport {
         )
     }
 
+    static func expireQueuesAndNotify() async throws -> QueueExpiryResult {
+        let root = try applicationSupportRoot()
+        let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+        let now = Date().timeIntervalSince1970
+        let result = try await store.expirePending(
+            nowEpoch: now,
+            destination: "configured destinations"
+        )
+        guard result.expiredBatches > 0 else { return result }
+        let entries = try await store.transact { try $0.loadLedger() }
+        try await LedgerHeadSealRecordFile.update(
+            entries: entries,
+            seal: ledgerHeadSeal(),
+            sealedAtEpoch: now,
+            url: root.appendingPathComponent("ledger-head-seal.json")
+        )
+        try await LocalUserNotifier().notify(
+            UserNotice(kind: .queueExpired, destination: "Configured destinations")
+        )
+        return result
+    }
+
     static func wipeEverything() async throws {
         let root = try applicationSupportRoot()
         let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)

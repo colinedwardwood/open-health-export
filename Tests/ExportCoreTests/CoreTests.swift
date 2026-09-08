@@ -1282,6 +1282,80 @@ private struct OneExportFault: ExportFaultInjector {
     }
 }
 
+@Test func queueExpiryDeletesSevenDayOldPayloadsAndRecordsTamperEvidentEvidence() async throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-queue-expiry-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let expiredURL = directory.appendingPathComponent("expired.ndjson")
+    let freshURL = directory.appendingPathComponent("fresh.ndjson")
+    let legacyURL = directory.appendingPathComponent("legacy.ndjson")
+    for url in [expiredURL, freshURL, legacyURL] {
+        try Data("payload".utf8).write(to: url)
+    }
+    let store = MemoryStateStore()
+    try await store.transact { tx in
+        try tx.enqueuePending(
+            PendingBatch(
+                id: BatchID(rawValue: "expired"),
+                payloadURL: expiredURL.path,
+                expectedRecords: 3,
+                byteCount: 7,
+                metric: MetricCatalog.heartRate.id,
+                createdAtEpoch: 100
+            )
+        )
+        try tx.enqueuePending(
+            PendingBatch(
+                id: BatchID(rawValue: "fresh"),
+                payloadURL: freshURL.path,
+                expectedRecords: 2,
+                byteCount: 7,
+                metric: MetricCatalog.stepCount.id,
+                createdAtEpoch: 101
+            )
+        )
+        try tx.enqueuePending(
+            PendingBatch(
+                id: BatchID(rawValue: "legacy"),
+                payloadURL: legacyURL.path,
+                expectedRecords: 1,
+                byteCount: 7,
+                metric: MetricCatalog.bodyMass.id
+            )
+        )
+    }
+
+    let result = try await store.expirePending(
+        nowEpoch: 100 + QueueExpiry.timeToLive,
+        destination: "local-file"
+    )
+    #expect(result == QueueExpiryResult(expiredBatches: 1, expiredRecords: 3, expiredBytes: 7))
+    #expect(!FileManager.default.fileExists(atPath: expiredURL.path))
+    #expect(FileManager.default.fileExists(atPath: freshURL.path))
+    #expect(FileManager.default.fileExists(atPath: legacyURL.path))
+    #expect(try store.transaction.pendingBatches().map(\.id.rawValue) == ["fresh", "legacy"])
+    #expect(try store.transaction.loadGaps().last?.rangeDescription == "queue_ttl_expired")
+    let ledger = try store.transaction.loadLedger()
+    #expect(LedgerChain.verify(ledger) == .valid(head: ledger[0].entryHash, count: 1))
+    #expect(ledger[0].outcomeKind == "queue_ttl_expired")
+}
+
+@Test func sqlitePendingBatchPersistsCreationEpoch() async throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-pending-age-\(UUID().uuidString).sqlite")
+    let store = try SQLiteStateStore(path: url.path)
+    let pending = PendingBatch(
+        id: BatchID(rawValue: "aged"),
+        payloadURL: "/tmp/aged",
+        expectedRecords: 1,
+        byteCount: 2,
+        metric: MetricCatalog.heartRate.id,
+        createdAtEpoch: 123
+    )
+    try await store.transact { try $0.enqueuePending(pending) }
+    #expect(try await store.transact { try $0.pendingBatches() } == [pending])
+}
+
 @Test func sqlitePersistsEmittedIndexOnCommit() async throws {
     let path = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-index-\(UUID().uuidString).sqlite")

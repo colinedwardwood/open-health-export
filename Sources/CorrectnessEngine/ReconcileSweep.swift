@@ -132,7 +132,8 @@ public struct ReconcileSweep: Sendable {
             payloadURL: payloadURL.path,
             expectedRecords: recordCount,
             byteCount: payload.count,
-            metric: metric
+            metric: metric,
+            createdAtEpoch: clock.now().timeIntervalSince1970
         )
         let victims = try await store.transact { tx in
             let evicted = try QueueAdmission.makeRoom(for: pending.byteCount, on: tx)

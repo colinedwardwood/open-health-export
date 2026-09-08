@@ -116,6 +116,10 @@ writes a ledger row, and disables further export for it on an observed
 grant→denied transition or an explicit stop — never on an empty read (R-60).
 The 60-second clock starts at observation. A two-tap explicit-stop UI is wired;
 HealthKit observation at every wake remains open.
+New pending rows also carry a creation epoch. Foreground launch enforces the
+ratified seven-day TTL transactionally, records gap and ledger evidence,
+unlinks bytes after commit, re-seals the head and posts classified user copy.
+Legacy rows with no trustworthy epoch are not guessed expired.
 
 `ReconcileSweep` applies the seven-day trailing plan from fixture (or later
 HealthKit) date-ranged observations and enqueues repairs without moving the

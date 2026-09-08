@@ -68,6 +68,14 @@ struct HarnessView: View {
             timeToFirstFrameMS = LaunchMark.millisecondsToNow()
             destinationStatusLines = HarnessExport.destinationStatusLines()
             Task {
+                do {
+                    let expired = try await HarnessExport.expireQueuesAndNotify()
+                    if expired.expiredBatches > 0 {
+                        status = "Ready. Deleted \(expired.expiredBatches) queued export(s) older than seven days."
+                    }
+                } catch {
+                    status = "Failed to enforce queue expiry: \(error.localizedDescription)"
+                }
                 await restorePairing()
                 await refreshLedgerIntegrity()
             }
