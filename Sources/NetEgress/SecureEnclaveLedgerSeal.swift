@@ -93,11 +93,27 @@ public actor SecureEnclaveLedgerSeal: ResettableLedgerHeadSeal {
             attributes[kSecAttrTokenID as String] = kSecAttrTokenIDSecureEnclave
         }
         if permanent {
-            attributes[kSecPrivateKeyAttrs as String] = [
+            var privateAttributes: [String: Any] = [
                 kSecAttrIsPermanent as String: true,
                 kSecAttrApplicationTag as String: Data(applicationTag.utf8),
-                kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
             ]
+            if useSecureEnclave {
+                var accessError: Unmanaged<CFError>?
+                guard let access = SecAccessControlCreateWithFlags(
+                    nil,
+                    kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+                    .privateKeyUsage,
+                    &accessError
+                ) else {
+                    _ = accessError?.takeRetainedValue()
+                    throw SecureEnclaveLedgerSealError.keyUnavailable
+                }
+                privateAttributes[kSecAttrAccessControl as String] = access
+            } else {
+                privateAttributes[kSecAttrAccessible as String] =
+                    kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            }
+            attributes[kSecPrivateKeyAttrs as String] = privateAttributes
         }
         var error: Unmanaged<CFError>?
         guard let key = SecKeyCreateRandomKey(attributes as CFDictionary, &error) else {
