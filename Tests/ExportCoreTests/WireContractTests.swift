@@ -99,6 +99,87 @@ private func sleepCategory(value: Int = 3) -> CategoryRecord {
     #expect(receiver.tombstones == [category.key.uuid])
 }
 
+@Test func correlationAndWorkoutStructuralRecordsValidateAndConverge() throws {
+    let correlation = CorrelationRecord(
+        key: RecordKey(uuid: "f1000000-0000-4000-8000-000000000001"),
+        metric: MetricID(rawValue: "blood_pressure"),
+        healthKitIdentifier: "HKCorrelationTypeIdentifierBloodPressure",
+        correlationType: "bloodPressure",
+        start: "2026-09-08T06:00:00Z",
+        end: "2026-09-08T06:00:00Z",
+        timeZoneOffsetMinutes: 0,
+        timeZoneSource: .unknown,
+        components: [
+            CorrelationComponent(
+                key: RecordKey(uuid: "f1000000-0000-4000-8000-000000000002"),
+                metric: MetricID(rawValue: "blood_pressure_systolic"),
+                healthKitIdentifier: "HKQuantityTypeIdentifierBloodPressureSystolic",
+                value: 120,
+                unit: CanonicalUnit(symbol: "mmHg")
+            ),
+            CorrelationComponent(
+                key: RecordKey(uuid: "f1000000-0000-4000-8000-000000000003"),
+                metric: MetricID(rawValue: "blood_pressure_diastolic"),
+                healthKitIdentifier: "HKQuantityTypeIdentifierBloodPressureDiastolic",
+                value: 80,
+                unit: CanonicalUnit(symbol: "mmHg")
+            ),
+        ],
+        observedAt: "2026-09-08T06:01:00Z"
+    )
+    let workout = WorkoutRecord(
+        key: RecordKey(uuid: "f2000000-0000-4000-8000-000000000001"),
+        activityType: "running",
+        activityTypeRaw: 37,
+        start: "2026-09-08T07:00:00Z",
+        end: "2026-09-08T08:00:00Z",
+        timeZoneOffsetMinutes: 0,
+        timeZoneSource: .unknown,
+        durationSeconds: 3_300,
+        isIndoor: false,
+        totals: [
+            "active_energy": WorkoutTotal(
+                value: 431.2,
+                unit: CanonicalUnit(symbol: "kcal"),
+                statistic: .sum
+            ),
+        ],
+        events: [
+            WorkoutEventRecord(
+                timestamp: "2026-09-08T07:30:00Z",
+                type: "pause",
+                durationSeconds: 300
+            ),
+        ],
+        hasRoute: true,
+        seriesIncluded: [],
+        observedAt: "2026-09-08T08:01:00Z"
+    )
+    let schema = try WireContractFixture.schema()
+    for line in [
+        try NativeWire.encode(correlation, envelope: testEnvelope()),
+        try NativeWire.encode(workout, envelope: testEnvelope()),
+    ] {
+        let object = try #require(
+            JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
+        )
+        try WireJSONSchema.validate(instance: object, schema: schema)
+    }
+    let batch = try NativeWire.encode(
+        samples: [],
+        correlations: [correlation],
+        workouts: [workout],
+        tombstones: [],
+        metric: MetricID(rawValue: "structural"),
+        batchID: BatchID(rawValue: "f3000000-0000-4000-8000-000000000001"),
+        envelope: testEnvelope()
+    )
+    var receiver = ReferenceReceiver()
+    try receiver.ingest(ndjson: String(decoding: batch, as: UTF8.self))
+    #expect(receiver.structuralRecords[correlation.key.uuid] == "sample.correlation")
+    #expect(receiver.structuralRecords[workout.key.uuid] == "workout")
+}
+
 @Test func nativeBatchKindsValidateAgainstCommittedJSONSchema() throws {
     let schema = try WireContractFixture.schema()
     let envelope = testEnvelope()

@@ -93,6 +93,8 @@ public enum NativeWire {
     public static func encode(
         samples: [SampleRecord],
         categories: [CategoryRecord] = [],
+        correlations: [CorrelationRecord] = [],
+        workouts: [WorkoutRecord] = [],
         tombstones: [TombstoneRecord],
         aggregates: [AggregateRecord] = [],
         metric: MetricID,
@@ -103,12 +105,20 @@ public enum NativeWire {
             .sorted { lhs, rhs in
                 (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
             }
-            .map { try encodeQuantity($0, metric: metric, envelope: envelope) }
+            .map { try encodeQuantity($0, metric: $0.metric, envelope: envelope) }
         let categoryLines = try categories
             .sorted { lhs, rhs in
                 (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
             }
             .map { try encodeCategory($0, envelope: envelope) }
+        let correlationLines = try correlations
+            .sorted { $0.key.uuid.lowercased() < $1.key.uuid.lowercased() }
+            .map { try encodeCorrelation($0, envelope: envelope) }
+        let workoutLines = try workouts
+            .sorted { lhs, rhs in
+                (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
+            }
+            .map { try encodeWorkout($0, envelope: envelope) }
         let tombLines = try tombstones
             .sorted { $0.key.uuid.lowercased() < $1.key.uuid.lowercased() }
             .map { try encodeTombstone($0, metric: metric, envelope: envelope) }
@@ -117,7 +127,8 @@ public enum NativeWire {
                 (lhs.bucketStart, lhs.bucketKey) < (rhs.bucketStart, rhs.bucketKey)
             }
             .map { try encodeAggregate($0, envelope: envelope) }
-        let records = sampleLines + categoryLines + tombLines + aggregateLines
+        let records = sampleLines + categoryLines + correlationLines
+            + workoutLines + tombLines + aggregateLines
         var body = Data()
         for line in records {
             body.append(contentsOf: line.utf8)
@@ -127,13 +138,21 @@ public enum NativeWire {
         let header = try encodeHeader(
             batchID: batchID,
             envelope: envelope,
-            types: [wireMetricID(metric)],
+            types: Set(
+                [wireMetricID(metric)]
+                    + samples.map { wireMetricID($0.metric) }
+                    + categories.map(\.metric.rawValue)
+                    + correlations.map(\.metric.rawValue)
+                    + workouts.map(\.metric.rawValue)
+            ).sorted(),
             recordCount: records.count
         )
         let footer = try encodeFooter(
             batchID: batchID,
             sampleCount: samples.count,
             categoryCount: categories.count,
+            correlationCount: correlations.count,
+            workoutCount: workouts.count,
             tombstoneCount: tombstones.count,
             canaryCount: 0,
             digest: digest,
@@ -154,6 +173,17 @@ public enum NativeWire {
 
     public static func encode(_ category: CategoryRecord, envelope: WireEnvelope) throws -> String {
         try encodeCategory(category, envelope: envelope)
+    }
+
+    public static func encode(
+        _ correlation: CorrelationRecord,
+        envelope: WireEnvelope
+    ) throws -> String {
+        try encodeCorrelation(correlation, envelope: envelope)
+    }
+
+    public static func encode(_ workout: WorkoutRecord, envelope: WireEnvelope) throws -> String {
+        try encodeWorkout(workout, envelope: envelope)
     }
 
     public static func encodeCanary(code: String, batchID: BatchID, envelope: WireEnvelope) throws -> Data {
@@ -230,6 +260,8 @@ private extension NativeWire {
         batchID: BatchID,
         sampleCount: Int,
         categoryCount: Int = 0,
+        correlationCount: Int = 0,
+        workoutCount: Int = 0,
         tombstoneCount: Int,
         canaryCount: Int,
         digest: String,
@@ -241,6 +273,12 @@ private extension NativeWire {
         }
         if categoryCount > 0 {
             counts["sample.category"] = .integer(categoryCount)
+        }
+        if correlationCount > 0 {
+            counts["sample.correlation"] = .integer(correlationCount)
+        }
+        if workoutCount > 0 {
+            counts["workout"] = .integer(workoutCount)
         }
         if tombstoneCount > 0 {
             counts["tombstone"] = .integer(tombstoneCount)
@@ -327,6 +365,106 @@ private extension NativeWire {
             source: category.source,
             device: category.device,
             wasUserEntered: category.wasUserEntered,
+            to: &object
+        )
+        return try CanonicalJSON.object(object).serialized()
+    }
+
+    static func encodeCorrelation(
+        _ correlation: CorrelationRecord,
+        envelope: WireEnvelope
+    ) throws -> String {
+        if correlation.end < correlation.start {
+            throw WireError.invertedInterval
+        }
+        let components: [CanonicalJSON] = correlation.components
+            .sorted { $0.key.uuid.lowercased() < $1.key.uuid.lowercased() }
+            .map {
+                .object([
+                    "hkIdentifier": .string($0.healthKitIdentifier),
+                    "metricId": .string($0.metric.rawValue),
+                    "unit": .string($0.unit.symbol),
+                    "uuid": .string($0.key.uuid.lowercased()),
+                    "value": .number($0.value),
+                ])
+            }
+        var object: [String: CanonicalJSON] = [
+            "batchSeq": .integer(envelope.seq),
+            "components": .array(components),
+            "correlationType": .string(correlation.correlationType),
+            "end": .string(correlation.end),
+            "hkIdentifier": .string(correlation.healthKitIdentifier),
+            "kind": .string("sample.correlation"),
+            "metricId": .string(correlation.metric.rawValue),
+            "observedAt": .string(correlation.observedAt),
+            "start": .string(correlation.start),
+            "tzOffsetMinutes": .integer(correlation.timeZoneOffsetMinutes),
+            "tzSource": .string(correlation.timeZoneSource.rawValue),
+            "uuid": .string(correlation.key.uuid.lowercased()),
+            "v": .integer(1),
+        ]
+        if envelope.demo { object["demo"] = .bool(true) }
+        appendProvenance(
+            source: correlation.source,
+            device: correlation.device,
+            wasUserEntered: correlation.wasUserEntered,
+            to: &object
+        )
+        return try CanonicalJSON.object(object).serialized()
+    }
+
+    static func encodeWorkout(
+        _ workout: WorkoutRecord,
+        envelope: WireEnvelope
+    ) throws -> String {
+        if workout.end < workout.start {
+            throw WireError.invertedInterval
+        }
+        let totals = workout.totals.reduce(into: [String: CanonicalJSON]()) {
+            $0[$1.key] = .object([
+                "statistic": .string($1.value.statistic.rawValue),
+                "unit": .string($1.value.unit.symbol),
+                "value": .number($1.value.value),
+            ])
+        }
+        let events: [CanonicalJSON] = workout.events
+            .sorted { ($0.timestamp, $0.type) < ($1.timestamp, $1.type) }
+            .map {
+                .object([
+                    "durationSeconds": .number($0.durationSeconds),
+                    "t": .string($0.timestamp),
+                    "type": .string($0.type),
+                ])
+            }
+        var object: [String: CanonicalJSON] = [
+            "activityType": .string(workout.activityType),
+            "activityTypeRaw": .integer(workout.activityTypeRaw),
+            "batchSeq": .integer(envelope.seq),
+            "durationSeconds": .number(workout.durationSeconds),
+            "end": .string(workout.end),
+            "events": .array(events),
+            "hasRoute": .bool(workout.hasRoute),
+            "kind": .string("workout"),
+            "metricId": .string(workout.metric.rawValue),
+            "observedAt": .string(workout.observedAt),
+            "seriesIncluded": .array(
+                workout.seriesIncluded.sorted().map { .string($0) }
+            ),
+            "start": .string(workout.start),
+            "totals": .object(totals),
+            "tzOffsetMinutes": .integer(workout.timeZoneOffsetMinutes),
+            "tzSource": .string(workout.timeZoneSource.rawValue),
+            "uuid": .string(workout.key.uuid.lowercased()),
+            "v": .integer(1),
+        ]
+        if let isIndoor = workout.isIndoor {
+            object["isIndoor"] = .bool(isIndoor)
+        }
+        if envelope.demo { object["demo"] = .bool(true) }
+        appendProvenance(
+            source: workout.source,
+            device: workout.device,
+            wasUserEntered: workout.wasUserEntered,
             to: &object
         )
         return try CanonicalJSON.object(object).serialized()

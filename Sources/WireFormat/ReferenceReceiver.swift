@@ -4,17 +4,20 @@ import Foundation
 public struct ReferenceReceiver: Sendable, Equatable {
     public var quantities: [String: Double]
     public var categories: [String: Int]
+    public var structuralRecords: [String: String]
     public var tombstones: Set<String>
     public var ingested: Int
 
     public init(
         quantities: [String: Double] = [:],
         categories: [String: Int] = [:],
+        structuralRecords: [String: String] = [:],
         tombstones: Set<String> = [],
         ingested: Int = 0
     ) {
         self.quantities = quantities
         self.categories = categories
+        self.structuralRecords = structuralRecords
         self.tombstones = tombstones
         self.ingested = ingested
     }
@@ -49,12 +52,21 @@ public struct ReferenceReceiver: Sendable, Equatable {
             categories[uuid] = value.intValue
             quantities.removeValue(forKey: uuid)
             tombstones.remove(uuid)
+        case "sample.correlation", "workout":
+            guard let uuid = object["uuid"] as? String else {
+                throw JSONSchemaError.missingRequired("uuid")
+            }
+            structuralRecords[uuid] = kind
+            quantities.removeValue(forKey: uuid)
+            categories.removeValue(forKey: uuid)
+            tombstones.remove(uuid)
         case "tombstone":
             guard let uuid = object["uuid"] as? String else {
                 throw JSONSchemaError.missingRequired("uuid")
             }
             quantities.removeValue(forKey: uuid)
             categories.removeValue(forKey: uuid)
+            structuralRecords.removeValue(forKey: uuid)
             tombstones.insert(uuid)
         default:
             break
@@ -70,6 +82,13 @@ public struct ReferenceReceiver: Sendable, Equatable {
         if !categories.isEmpty {
             state["categories"] = categories.keys.sorted().reduce(into: [String: Int]()) {
                 $0[$1] = categories[$1]
+            }
+        }
+        if !structuralRecords.isEmpty {
+            state["structuralRecords"] = structuralRecords.keys.sorted().reduce(
+                into: [String: String]()
+            ) {
+                $0[$1] = structuralRecords[$1]
             }
         }
         return state

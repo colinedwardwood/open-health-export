@@ -196,6 +196,182 @@ enum CategoryConversion {
     }
 }
 
+enum CorrelationConversion {
+    static let bloodPressureMetric = MetricID(rawValue: "blood_pressure")
+
+    static func correlationType(for metric: MetricID) -> HKCorrelationType? {
+        guard metric == bloodPressureMetric else { return nil }
+        return HKCorrelationType.correlationType(forIdentifier: .bloodPressure)
+    }
+
+    static func records(
+        from correlation: HKCorrelation,
+        metric: MetricID,
+        context: TemporalContext
+    ) -> (components: [SampleRecord], correlation: CorrelationRecord) {
+        let components = correlation.objects.compactMap { object -> SampleRecord? in
+            guard let quantity = object as? HKQuantitySample,
+                  let declaration = MetricCatalog.all.first(where: {
+                      $0.hkIdentifier == quantity.quantityType.identifier
+                  })
+            else { return nil }
+            return SampleConversion.record(
+                from: quantity,
+                metric: declaration.id,
+                context: context
+            )
+        }.sorted { $0.key.uuid < $1.key.uuid }
+        let sourceRevision = correlation.sourceRevision
+        let source = SampleSourceIdentity(
+            name: sourceRevision.source.name,
+            bundleIdentifier: sourceRevision.source.bundleIdentifier,
+            productType: sourceRevision.productType
+        )
+        let device = correlation.device.map {
+            SampleDevice(
+                name: $0.name,
+                manufacturer: $0.manufacturer,
+                model: $0.model,
+                hardwareVersion: $0.hardwareVersion,
+                softwareVersion: $0.softwareVersion
+            )
+        }
+        let componentRecords = components.map {
+            CorrelationComponent(
+                key: $0.key,
+                metric: MetricID(
+                    rawValue: MetricCatalog.declaration(for: $0.metric)?.wireId
+                        ?? $0.metric.rawValue
+                ),
+                healthKitIdentifier:
+                    MetricCatalog.declaration(for: $0.metric)?.hkIdentifier
+                        ?? $0.metric.rawValue,
+                value: $0.value,
+                unit: $0.unit
+            )
+        }
+        return (
+            components,
+            CorrelationRecord(
+                key: RecordKey(uuid: correlation.uuid.uuidString),
+                metric: metric,
+                healthKitIdentifier: correlation.correlationType.identifier,
+                correlationType: "bloodPressure",
+                start: SampleConversion.formatUTC(correlation.startDate),
+                end: SampleConversion.formatUTC(correlation.endDate),
+                timeZoneOffsetMinutes: context.timeZone().secondsFromGMT(
+                    for: correlation.startDate
+                ) / 60,
+                timeZoneSource: .deviceCurrent,
+                components: componentRecords,
+                observedAt: SampleConversion.formatUTC(Date()),
+                source: source,
+                device: device,
+                wasUserEntered:
+                    (correlation.metadata?[HKMetadataKeyWasUserEntered] as? NSNumber)?
+                        .boolValue
+            )
+        )
+    }
+}
+
+enum WorkoutConversion {
+    static let metric = MetricID(rawValue: "workout")
+
+    static func record(
+        from workout: HKWorkout,
+        context: TemporalContext,
+        hasRoute: Bool = false,
+        seriesIncluded: [String] = []
+    ) -> WorkoutRecord {
+        var totals: [String: WorkoutTotal] = [:]
+        let energyType = HKQuantityType(.activeEnergyBurned)
+        if let energy = workout.statistics(for: energyType)?.sumQuantity() {
+            totals["active_energy"] = WorkoutTotal(
+                value: energy.doubleValue(for: .kilocalorie()),
+                unit: CanonicalUnit(symbol: "kcal"),
+                statistic: .sum
+            )
+        }
+        if let distance = workout.totalDistance {
+            totals["distance"] = WorkoutTotal(
+                value: distance.doubleValue(for: .meterUnit(with: .kilo)),
+                unit: CanonicalUnit(symbol: "km"),
+                statistic: .sum
+            )
+        }
+        let sourceRevision = workout.sourceRevision
+        return WorkoutRecord(
+            key: RecordKey(uuid: workout.uuid.uuidString),
+            activityType: activityName(workout.workoutActivityType),
+            activityTypeRaw: Int(workout.workoutActivityType.rawValue),
+            start: SampleConversion.formatUTC(workout.startDate),
+            end: SampleConversion.formatUTC(workout.endDate),
+            timeZoneOffsetMinutes: context.timeZone().secondsFromGMT(
+                for: workout.startDate
+            ) / 60,
+            timeZoneSource: .deviceCurrent,
+            durationSeconds: workout.duration,
+            isIndoor:
+                (workout.metadata?[HKMetadataKeyIndoorWorkout] as? NSNumber)?.boolValue,
+            totals: totals,
+            events: (workout.workoutEvents ?? []).map {
+                WorkoutEventRecord(
+                    timestamp: SampleConversion.formatUTC($0.dateInterval.start),
+                    type: eventName($0.type),
+                    durationSeconds: $0.dateInterval.duration
+                )
+            },
+            hasRoute: hasRoute,
+            seriesIncluded: seriesIncluded,
+            observedAt: SampleConversion.formatUTC(Date()),
+            source: SampleSourceIdentity(
+                name: sourceRevision.source.name,
+                bundleIdentifier: sourceRevision.source.bundleIdentifier,
+                productType: sourceRevision.productType
+            ),
+            device: workout.device.map {
+                SampleDevice(
+                    name: $0.name,
+                    manufacturer: $0.manufacturer,
+                    model: $0.model,
+                    hardwareVersion: $0.hardwareVersion,
+                    softwareVersion: $0.softwareVersion
+                )
+            },
+            wasUserEntered:
+                (workout.metadata?[HKMetadataKeyWasUserEntered] as? NSNumber)?.boolValue
+        )
+    }
+
+    static func activityName(_ type: HKWorkoutActivityType) -> String {
+        switch type {
+        case .running: "running"
+        case .walking: "walking"
+        case .cycling: "cycling"
+        case .swimming: "swimming"
+        case .highIntensityIntervalTraining: "highIntensityIntervalTraining"
+        case .traditionalStrengthTraining: "traditionalStrengthTraining"
+        case .functionalStrengthTraining: "functionalStrengthTraining"
+        case .yoga: "yoga"
+        default: "raw_\(type.rawValue)"
+        }
+    }
+
+    static func eventName(_ type: HKWorkoutEventType) -> String {
+        switch type {
+        case .pause: "pause"
+        case .resume: "resume"
+        case .lap: "lap"
+        case .segment: "segment"
+        case .marker: "marker"
+        case .motionPaused: "motionPaused"
+        case .motionResumed: "motionResumed"
+        default: "raw_\(type.rawValue)"
+        }
+    }
+}
+
 public enum HealthKitSourceError: Error, Sendable {
     case unavailable
     case unknownMetric(MetricID)
@@ -210,6 +386,10 @@ public enum HealthKitAuthorization {
                 types.insert(type)
             } else if let type = CategoryConversion.categoryType(for: metric) {
                 types.insert(type)
+            } else if let type = CorrelationConversion.correlationType(for: metric) {
+                types.insert(type)
+            } else if metric == WorkoutConversion.metric {
+                types.insert(HKWorkoutType.workoutType())
             }
         }
         return types
@@ -352,6 +532,83 @@ public final class HealthKitCategorySource: SampleSource, @unchecked Sendable {
                     returning: SamplePage(
                         samples: [],
                         categories: categories,
+                        tombstones: tombstones,
+                        metric: metric,
+                        anchorBlob: blob,
+                        observedThrough: latest
+                    )
+                )
+            }
+            self.store.execute(query)
+        }
+    }
+}
+
+public final class HealthKitCorrelationSource: SampleSource, @unchecked Sendable {
+    private let store: HKHealthStore
+    private let context: TemporalContext
+    private let limit: Int
+
+    public init(
+        store: HKHealthStore = HKHealthStore(),
+        context: TemporalContext,
+        limit: Int = SamplePaging.defaultPageLimit
+    ) {
+        self.store = store
+        self.context = context
+        self.limit = limit
+    }
+
+    public func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage {
+        guard HKHealthStore.isHealthDataAvailable() else {
+            throw HealthKitSourceError.unavailable
+        }
+        guard let type = CorrelationConversion.correlationType(for: metric) else {
+            throw HealthKitSourceError.unknownMetric(metric)
+        }
+        let anchor = try afterAnchor.flatMap(AnchorCoding.decode)
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKAnchoredObjectQuery(
+                type: type,
+                predicate: nil,
+                anchor: anchor,
+                limit: limit
+            ) { _, samples, deleted, newAnchor, error in
+                if let error {
+                    continuation.resume(
+                        throwing: HealthKitSourceError.queryFailed(
+                            error.localizedDescription
+                        )
+                    )
+                    return
+                }
+                let converted = (samples ?? []).compactMap {
+                    ($0 as? HKCorrelation).map {
+                        CorrelationConversion.records(
+                            from: $0,
+                            metric: metric,
+                            context: self.context
+                        )
+                    }
+                }
+                let correlations = converted.map(\.correlation)
+                let tombstones = (deleted ?? []).map {
+                    SampleConversion.tombstone(from: $0, metric: metric)
+                }
+                let blob: Data
+                do {
+                    blob = try newAnchor.map(AnchorCoding.encode) ?? Data()
+                } catch {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                let latest = correlations.compactMap {
+                    SampleConversion.parseUTC($0.end)
+                }.max() ?? Date(timeIntervalSince1970: 0)
+                continuation.resume(
+                    returning: SamplePage(
+                        samples: [],
+                        correlations: correlations,
                         tombstones: tombstones,
                         metric: metric,
                         anchorBlob: blob,

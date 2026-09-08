@@ -27,6 +27,28 @@ enum Census {
                 fold.xor ^ sampleDigest(category.key.uuid)
             )
         }
+        for correlation in page.correlations {
+            let day = String(correlation.start.prefix(10))
+            if try tx.loadEmittedIndex(uuid: correlation.key.uuid) != nil {
+                continue
+            }
+            let fold = delta[day] ?? (0, 0)
+            delta[day] = (
+                fold.count + 1,
+                fold.xor ^ sampleDigest(correlation.key.uuid)
+            )
+        }
+        for workout in page.workouts {
+            let day = String(workout.start.prefix(10))
+            if try tx.loadEmittedIndex(uuid: workout.key.uuid) != nil {
+                continue
+            }
+            let fold = delta[day] ?? (0, 0)
+            delta[day] = (
+                fold.count + 1,
+                fold.xor ^ sampleDigest(workout.key.uuid)
+            )
+        }
 
         for tombstone in page.tombstones {
             if let indexed = try tx.loadEmittedIndex(uuid: tombstone.key.uuid) {

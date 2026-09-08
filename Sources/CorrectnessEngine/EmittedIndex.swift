@@ -27,5 +27,27 @@ enum EmittedIndex {
                 )
             )
         }
+        for correlation in page.correlations {
+            try tx.upsertEmittedIndex(
+                EmittedIndexRow(
+                    uuid: correlation.key.uuid,
+                    metric: page.metric,
+                    day: String(correlation.start.prefix(10)),
+                    digest: Census.digestUUIDs([correlation.key.uuid]),
+                    batchID: batchID
+                )
+            )
+        }
+        for workout in page.workouts {
+            try tx.upsertEmittedIndex(
+                EmittedIndexRow(
+                    uuid: workout.key.uuid,
+                    metric: page.metric,
+                    day: String(workout.start.prefix(10)),
+                    digest: Census.digestUUIDs([workout.key.uuid]),
+                    batchID: batchID
+                )
+            )
+        }
     }
 }

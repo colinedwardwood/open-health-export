@@ -8,6 +8,8 @@
     { "$ref": "#/$defs/footer" },
     { "$ref": "#/$defs/quantity" },
     { "$ref": "#/$defs/category" },
+    { "$ref": "#/$defs/correlation" },
+    { "$ref": "#/$defs/workout" },
     { "$ref": "#/$defs/tombstone" },
     { "$ref": "#/$defs/aggregate" },
     { "$ref": "#/$defs/canary" }
@@ -147,6 +149,66 @@
         "v": { "type": "integer", "const": 1 },
         "wasUserEntered": { "type": "boolean" },
         "demo": { "type": "boolean" }
+      }
+    },
+    "correlation": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "batchSeq", "components", "correlationType", "end", "hkIdentifier", "kind",
+        "metricId", "observedAt", "start", "tzOffsetMinutes", "tzSource", "uuid", "v"
+      ],
+      "properties": {
+        "kind": { "type": "string", "const": "sample.correlation", "x-ohe-open": false },
+        "batchSeq": { "type": "integer" },
+        "components": { "type": "array" },
+        "correlationType": { "type": "string", "x-ohe-open": true },
+        "end": { "type": "string" },
+        "hkIdentifier": { "type": "string", "x-ohe-open": true },
+        "metricId": { "type": "string", "x-ohe-open": true },
+        "observedAt": { "type": "string" },
+        "start": { "type": "string" },
+        "tzOffsetMinutes": { "type": "integer" },
+        "tzSource": {
+          "type": "string",
+          "enum": ["sampleMetadata", "inferred", "deviceCurrent", "unknown"],
+          "x-ohe-open": false
+        },
+        "uuid": { "type": "string" },
+        "v": { "type": "integer", "const": 1 }
+      }
+    },
+    "workout": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "activityType", "activityTypeRaw", "batchSeq", "durationSeconds", "end",
+        "hasRoute", "kind", "metricId", "observedAt", "seriesIncluded", "start",
+        "tzOffsetMinutes", "tzSource", "uuid", "v"
+      ],
+      "properties": {
+        "kind": { "type": "string", "const": "workout", "x-ohe-open": false },
+        "activityType": { "type": "string", "x-ohe-open": true },
+        "activityTypeRaw": { "type": "integer" },
+        "batchSeq": { "type": "integer" },
+        "durationSeconds": { "type": "number" },
+        "end": { "type": "string" },
+        "events": { "type": "array" },
+        "hasRoute": { "type": "boolean" },
+        "isIndoor": { "type": "boolean" },
+        "metricId": { "type": "string", "x-ohe-open": true },
+        "observedAt": { "type": "string" },
+        "seriesIncluded": { "type": "array" },
+        "start": { "type": "string" },
+        "totals": { "type": "object" },
+        "tzOffsetMinutes": { "type": "integer" },
+        "tzSource": {
+          "type": "string",
+          "enum": ["sampleMetadata", "inferred", "deviceCurrent", "unknown"],
+          "x-ohe-open": false
+        },
+        "uuid": { "type": "string" },
+        "v": { "type": "integer", "const": 1 }
       }
     },
     "tombstone": {

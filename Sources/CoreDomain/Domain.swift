@@ -171,6 +171,159 @@ public struct CategoryRecord: Sendable, Codable, Equatable {
     }
 }
 
+public struct CorrelationComponent: Sendable, Codable, Equatable {
+    public var key: RecordKey
+    public var metric: MetricID
+    public var healthKitIdentifier: String
+    public var value: Double
+    public var unit: CanonicalUnit
+
+    public init(
+        key: RecordKey,
+        metric: MetricID,
+        healthKitIdentifier: String,
+        value: Double,
+        unit: CanonicalUnit
+    ) {
+        self.key = key
+        self.metric = metric
+        self.healthKitIdentifier = healthKitIdentifier
+        self.value = value
+        self.unit = unit
+    }
+}
+
+public struct CorrelationRecord: Sendable, Codable, Equatable {
+    public var key: RecordKey
+    public var metric: MetricID
+    public var healthKitIdentifier: String
+    public var correlationType: String
+    public var start: String
+    public var end: String
+    public var timeZoneOffsetMinutes: Int
+    public var timeZoneSource: TimeZoneSource
+    public var components: [CorrelationComponent]
+    public var observedAt: String
+    public var source: SampleSourceIdentity?
+    public var device: SampleDevice?
+    public var wasUserEntered: Bool?
+
+    public init(
+        key: RecordKey,
+        metric: MetricID,
+        healthKitIdentifier: String,
+        correlationType: String,
+        start: String,
+        end: String,
+        timeZoneOffsetMinutes: Int,
+        timeZoneSource: TimeZoneSource,
+        components: [CorrelationComponent],
+        observedAt: String,
+        source: SampleSourceIdentity? = nil,
+        device: SampleDevice? = nil,
+        wasUserEntered: Bool? = nil
+    ) {
+        self.key = key
+        self.metric = metric
+        self.healthKitIdentifier = healthKitIdentifier
+        self.correlationType = correlationType
+        self.start = start
+        self.end = end
+        self.timeZoneOffsetMinutes = timeZoneOffsetMinutes
+        self.timeZoneSource = timeZoneSource
+        self.components = components
+        self.observedAt = observedAt
+        self.source = source
+        self.device = device
+        self.wasUserEntered = wasUserEntered
+    }
+}
+
+public struct WorkoutTotal: Sendable, Codable, Equatable {
+    public var value: Double
+    public var unit: CanonicalUnit
+    public var statistic: AggregateStatistic
+
+    public init(value: Double, unit: CanonicalUnit, statistic: AggregateStatistic) {
+        self.value = value
+        self.unit = unit
+        self.statistic = statistic
+    }
+}
+
+public struct WorkoutEventRecord: Sendable, Codable, Equatable {
+    public var timestamp: String
+    public var type: String
+    public var durationSeconds: Double
+
+    public init(timestamp: String, type: String, durationSeconds: Double) {
+        self.timestamp = timestamp
+        self.type = type
+        self.durationSeconds = durationSeconds
+    }
+}
+
+public struct WorkoutRecord: Sendable, Codable, Equatable {
+    public var key: RecordKey
+    public var metric: MetricID
+    public var activityType: String
+    public var activityTypeRaw: Int
+    public var start: String
+    public var end: String
+    public var timeZoneOffsetMinutes: Int
+    public var timeZoneSource: TimeZoneSource
+    public var durationSeconds: Double
+    public var isIndoor: Bool?
+    public var totals: [String: WorkoutTotal]
+    public var events: [WorkoutEventRecord]
+    public var hasRoute: Bool
+    public var seriesIncluded: [String]
+    public var observedAt: String
+    public var source: SampleSourceIdentity?
+    public var device: SampleDevice?
+    public var wasUserEntered: Bool?
+
+    public init(
+        key: RecordKey,
+        metric: MetricID = MetricID(rawValue: "workout"),
+        activityType: String,
+        activityTypeRaw: Int,
+        start: String,
+        end: String,
+        timeZoneOffsetMinutes: Int,
+        timeZoneSource: TimeZoneSource,
+        durationSeconds: Double,
+        isIndoor: Bool? = nil,
+        totals: [String: WorkoutTotal] = [:],
+        events: [WorkoutEventRecord] = [],
+        hasRoute: Bool,
+        seriesIncluded: [String] = [],
+        observedAt: String,
+        source: SampleSourceIdentity? = nil,
+        device: SampleDevice? = nil,
+        wasUserEntered: Bool? = nil
+    ) {
+        self.key = key
+        self.metric = metric
+        self.activityType = activityType
+        self.activityTypeRaw = activityTypeRaw
+        self.start = start
+        self.end = end
+        self.timeZoneOffsetMinutes = timeZoneOffsetMinutes
+        self.timeZoneSource = timeZoneSource
+        self.durationSeconds = durationSeconds
+        self.isIndoor = isIndoor
+        self.totals = totals
+        self.events = events
+        self.hasRoute = hasRoute
+        self.seriesIncluded = seriesIncluded
+        self.observedAt = observedAt
+        self.source = source
+        self.device = device
+        self.wasUserEntered = wasUserEntered
+    }
+}
+
 public struct TombstoneRecord: Sendable, Codable, Equatable {
     public var key: RecordKey
     public var metric: MetricID

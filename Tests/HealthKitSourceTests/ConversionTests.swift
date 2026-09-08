@@ -89,6 +89,57 @@ import Testing
     )
 }
 
+@Test func bloodPressureCorrelationKeepsComponentUUIDsAndCanonicalValues() {
+    let date = Date(timeIntervalSince1970: 1_704_067_200)
+    let systolic = HKQuantitySample(
+        type: HKQuantityType(.bloodPressureSystolic),
+        quantity: HKQuantity(unit: .millimeterOfMercury(), doubleValue: 120),
+        start: date,
+        end: date
+    )
+    let diastolic = HKQuantitySample(
+        type: HKQuantityType(.bloodPressureDiastolic),
+        quantity: HKQuantity(unit: .millimeterOfMercury(), doubleValue: 80),
+        start: date,
+        end: date
+    )
+    let correlation = HKCorrelation(
+        type: HKCorrelationType(.bloodPressure),
+        start: date,
+        end: date,
+        objects: [systolic, diastolic]
+    )
+    let converted = CorrelationConversion.records(
+        from: correlation,
+        metric: CorrelationConversion.bloodPressureMetric,
+        context: .utc
+    )
+    #expect(converted.components.count == 2)
+    #expect(Set(converted.components.map(\.key.uuid)) == [systolic.uuid.uuidString, diastolic.uuid.uuidString])
+    #expect(converted.correlation.components.map(\.key.uuid) == converted.components.map(\.key.uuid))
+    #expect(converted.correlation.correlationType == "bloodPressure")
+}
+
+@Test func workoutConversionKeepsHealthKitDurationAndRawActivityType() {
+    let start = Date(timeIntervalSince1970: 1_704_067_200)
+    let workout = HKWorkout(
+        activityType: .running,
+        start: start,
+        end: start.addingTimeInterval(3_600),
+        duration: 3_300,
+        totalEnergyBurned: HKQuantity(unit: .kilocalorie(), doubleValue: 431.2),
+        totalDistance: HKQuantity(unit: .meter(), doubleValue: 10_000),
+        metadata: [HKMetadataKeyIndoorWorkout: false]
+    )
+    let converted = WorkoutConversion.record(from: workout, context: .utc)
+    #expect(converted.activityType == "running")
+    #expect(converted.activityTypeRaw == Int(HKWorkoutActivityType.running.rawValue))
+    #expect(converted.durationSeconds == 3_300)
+    #expect(converted.totals["active_energy"]?.value == 431.2)
+    #expect(converted.totals["distance"]?.value == 10)
+    #expect(converted.hasRoute == false)
+}
+
 @Test func oxygenSaturationIsPercentNotAHumidityClass() {
     let start = Date(timeIntervalSince1970: 1_704_067_200)
     let quantity = HKQuantity(unit: .percent(), doubleValue: 0.98)
