@@ -156,7 +156,8 @@ widget and watchdog can read without SQLite. The iOS app and small/medium
 WidgetKit extension share versioned, per-destination snapshots through an App
 Group. Timelines precompute stale/overdue transitions without inventing an
 R-71 threshold, and every status uses a distinct glyph and text label with no
-health values.
+health values. Small, medium, accessory-rectangular and accessory-circular
+families show unacknowledged destination changes until explicit acknowledgement.
 
 The harness's fixed `Where your data goes` section renders those same
 destination snapshots and provides an egress-ledger view. Opening the ledger

@@ -242,6 +242,8 @@ public struct ExportRun: Sendable {
                 enabled: true,
                 lastOutcome: outcome.kind.rawValue,
                 lastSuccessEpoch: succeeded ? now : prior?.lastSuccessEpoch,
+                unacknowledgedSecurityEventCount:
+                    prior?.unacknowledgedSecurityEventCount ?? 0,
                 writtenAtEpoch: now
             ),
             to: snapshotURL

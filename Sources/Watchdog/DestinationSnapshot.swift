@@ -30,6 +30,7 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
     public var overdueThresholdSeconds: TimeInterval?
     public var nextAttemptEarliestEpoch: TimeInterval?
     public var nextAttemptLatestEpoch: TimeInterval?
+    public var unacknowledgedSecurityEventCount: Int
     public var writtenAtEpoch: TimeInterval
 
     public init(
@@ -43,6 +44,7 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
         overdueThresholdSeconds: TimeInterval? = nil,
         nextAttemptEarliestEpoch: TimeInterval? = nil,
         nextAttemptLatestEpoch: TimeInterval? = nil,
+        unacknowledgedSecurityEventCount: Int = 0,
         writtenAtEpoch: TimeInterval
     ) {
         self.schemaVersion = 1
@@ -56,6 +58,7 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
         self.overdueThresholdSeconds = overdueThresholdSeconds
         self.nextAttemptEarliestEpoch = nextAttemptEarliestEpoch
         self.nextAttemptLatestEpoch = nextAttemptLatestEpoch
+        self.unacknowledgedSecurityEventCount = max(0, unacknowledgedSecurityEventCount)
         self.writtenAtEpoch = writtenAtEpoch
     }
 
@@ -71,6 +74,7 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
         case overdueThresholdSeconds
         case nextAttemptEarliestEpoch
         case nextAttemptLatestEpoch
+        case unacknowledgedSecurityEventCount
         case writtenAtEpoch
     }
 
@@ -89,6 +93,8 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
         overdueThresholdSeconds = try values.decodeIfPresent(TimeInterval.self, forKey: .overdueThresholdSeconds)
         nextAttemptEarliestEpoch = try values.decodeIfPresent(TimeInterval.self, forKey: .nextAttemptEarliestEpoch)
         nextAttemptLatestEpoch = try values.decodeIfPresent(TimeInterval.self, forKey: .nextAttemptLatestEpoch)
+        unacknowledgedSecurityEventCount =
+            try values.decodeIfPresent(Int.self, forKey: .unacknowledgedSecurityEventCount) ?? 0
         writtenAtEpoch = try values.decode(TimeInterval.self, forKey: .writtenAtEpoch)
     }
 
@@ -137,6 +143,28 @@ public enum DestinationSnapshotFile {
     public static func read(from url: URL) throws -> DestinationStatusSnapshot {
         let data = try Data(contentsOf: url)
         return try JSONDecoder().decode(DestinationStatusSnapshot.self, from: data)
+    }
+
+    public static func recordSecurityEvents(
+        _ count: Int,
+        writtenAtEpoch: TimeInterval,
+        at url: URL
+    ) throws {
+        guard count > 0 else { return }
+        var snapshot = try read(from: url)
+        snapshot.unacknowledgedSecurityEventCount += count
+        snapshot.writtenAtEpoch = writtenAtEpoch
+        try write(snapshot, to: url)
+    }
+
+    public static func acknowledgeSecurityEvents(
+        writtenAtEpoch: TimeInterval,
+        at url: URL
+    ) throws {
+        var snapshot = try read(from: url)
+        snapshot.unacknowledgedSecurityEventCount = 0
+        snapshot.writtenAtEpoch = writtenAtEpoch
+        try write(snapshot, to: url)
     }
 }
 

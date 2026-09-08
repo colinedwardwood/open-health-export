@@ -180,8 +180,9 @@ import Redaction
     #expect(MetricCatalog.stepCount.haRequiresAggregate)
     #expect(MetricCatalog.heartRate.haDeviceClass == nil)
     #expect(MetricCatalog.heartRate.haStateClass == "measurement")
-    #expect(MetricCatalog.activeEnergy.haDeviceClass == "energy")
+    #expect(MetricCatalog.activeEnergy.haDeviceClass == nil)
     #expect(MetricCatalog.activeEnergy.haStateClass == "total_increasing")
+    #expect(MetricCatalog.basalEnergy.haDeviceClass == nil)
     #expect(MetricCatalog.oxygenSaturation.haDeviceClass == nil)
     #expect(MetricCatalog.bodyMass.sensitivity == .sensitive)
     let json = try HADiscovery.encodeDeviceConfig(
@@ -401,6 +402,29 @@ import Redaction
     )
 }
 
+@Test func widgetSnapshotSecurityEventsPersistUntilExplicitAcknowledgement() throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-security-snapshot-\(UUID().uuidString).json")
+    try DestinationSnapshotFile.write(
+        DestinationStatusSnapshot(
+            destinationID: "local-file",
+            enabled: true,
+            state: .healthy,
+            unacknowledgedSecurityEventCount: 1,
+            writtenAtEpoch: 1
+        ),
+        to: url
+    )
+    try DestinationSnapshotFile.recordSecurityEvents(2, writtenAtEpoch: 2, at: url)
+    #expect(
+        try DestinationSnapshotFile.read(from: url).unacknowledgedSecurityEventCount == 3
+    )
+    try DestinationSnapshotFile.acknowledgeSecurityEvents(writtenAtEpoch: 3, at: url)
+    let acknowledged = try DestinationSnapshotFile.read(from: url)
+    #expect(acknowledged.unacknowledgedSecurityEventCount == 0)
+    #expect(acknowledged.writtenAtEpoch == 3)
+}
+
 @Test func exportRunWritesWidgetSnapshotAfterCommit() async throws {
     let metric = MetricID(rawValue: "heartRate")
     let page = SamplePage(
@@ -417,6 +441,16 @@ import Redaction
     let ledgerSealURL = dest.appendingPathComponent("ledger-head-seal.json")
     let ledgerSeal = HashLedgerSeal(secret: "test-device")
     let store = MemoryStateStore()
+    try DestinationSnapshotFile.write(
+        DestinationStatusSnapshot(
+            destinationID: "local-file",
+            enabled: true,
+            state: .noExportsYet,
+            unacknowledgedSecurityEventCount: 2,
+            writtenAtEpoch: 1
+        ),
+        to: snapshotURL
+    )
     let run = ExportRun(
         source: FixtureSource(pages: [page]),
         destination: .testing(LocalFileSink(directory: dest)),
@@ -433,6 +467,7 @@ import Redaction
     let snapshot = try DestinationSnapshotFile.read(from: snapshotURL)
     #expect(snapshot.lastOutcome == "success")
     #expect(snapshot.lastSuccessEpoch == 42)
+    #expect(snapshot.unacknowledgedSecurityEventCount == 2)
     #expect(snapshot.writtenAtEpoch == 42)
     let ledger = try await store.transact { try $0.loadLedger() }
     #expect(

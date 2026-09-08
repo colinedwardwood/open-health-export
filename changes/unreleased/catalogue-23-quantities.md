@@ -6,3 +6,6 @@ Blood glucose is corrected to the ratified canonical `mg/dL` unit and Home
 Assistant's real `blood_glucose_concentration` device class.
 Regenerate and re-pin the deterministic tier-zero corpus because catalogue
 order is an input to its metric rotation.
+Active and basal energy deliberately omit Home Assistant's `energy` device
+class, following the ratified synthesis: classifying calories into HA's Energy
+dashboard is actively confusing.

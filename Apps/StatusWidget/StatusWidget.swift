@@ -55,6 +55,10 @@ struct ExportStatusWidgetView: View {
         Group {
             if entry.snapshots.isEmpty {
                 empty
+            } else if family == .accessoryCircular {
+                accessoryCircular
+            } else if family == .accessoryRectangular {
+                accessoryRectangular
             } else if family == .systemMedium {
                 medium
             } else {
@@ -85,9 +89,14 @@ struct ExportStatusWidgetView: View {
                     .bold()
             }
             Spacer()
-            Text(destinationSummary)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if securityEventCount > 0 {
+                Label("\(securityEventCount) change", systemImage: "exclamationmark.shield.fill")
+                    .font(.caption)
+            } else {
+                Text(destinationSummary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -120,7 +129,52 @@ struct ExportStatusWidgetView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+            if securityEventCount > 0 {
+                Label(
+                    "\(securityEventCount) unacknowledged destination change",
+                    systemImage: "exclamationmark.shield.fill"
+                )
+                .font(.caption2)
+            }
         }
+    }
+
+    private var accessoryRectangular: some View {
+        let worst = worstSnapshot
+        let state = worst?.state(at: entry.date.timeIntervalSince1970) ?? .notSetUp
+        return HStack(spacing: 8) {
+            Image(systemName: securityEventCount > 0 ? "exclamationmark.shield.fill" : state.glyph)
+                .font(.title2)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(securityEventCount > 0 ? "Destination changed" : state.label)
+                    .font(.headline)
+                if let success = worst?.lastSuccessEpoch {
+                    HStack(spacing: 3) {
+                        Text("Last export")
+                        Text(Date(timeIntervalSince1970: success), style: .relative)
+                    }
+                    .font(.caption)
+                } else {
+                    Text("No exports yet")
+                        .font(.caption)
+                }
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var accessoryCircular: some View {
+        let state = worstSnapshot?.state(at: entry.date.timeIntervalSince1970) ?? .notSetUp
+        return VStack(spacing: 2) {
+            Image(systemName: securityEventCount > 0 ? "exclamationmark.shield.fill" : state.glyph)
+                .font(.title2)
+            Text(securityEventCount > 0 ? "Changed" : state.label)
+                .font(.caption2)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private var empty: some View {
@@ -148,6 +202,10 @@ struct ExportStatusWidgetView: View {
         entry.snapshots.count == 1
             ? (entry.snapshots.first?.destinationLabel ?? "Destination")
             : "\(entry.snapshots.count) destinations"
+    }
+
+    private var securityEventCount: Int {
+        entry.snapshots.reduce(0) { $0 + $1.unacknowledgedSecurityEventCount }
     }
 
     private var nextAttemptText: String? {
@@ -227,6 +285,11 @@ struct ExportStatusWidget: Widget {
         }
         .configurationDisplayName("Export status")
         .description("Shows destination status and time since the last export. Never shows health values.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([
+            .systemSmall,
+            .systemMedium,
+            .accessoryRectangular,
+            .accessoryCircular,
+        ])
     }
 }

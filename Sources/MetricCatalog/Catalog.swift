@@ -87,7 +87,7 @@ public enum MetricCatalog {
         usesHealthKitStatistics: true,
         sensitivity: .routine,
         haUnit: "kcal",
-        haDeviceClass: "energy",
+        haDeviceClass: nil,
         haStateClass: "total_increasing",
         haRequiresAggregate: true
     )
@@ -237,7 +237,7 @@ public enum MetricCatalog {
         usesHealthKitStatistics: true,
         sensitivity: .routine,
         haUnit: "kcal",
-        haDeviceClass: "energy",
+        haDeviceClass: nil,
         haStateClass: "total_increasing",
         haRequiresAggregate: true
     )

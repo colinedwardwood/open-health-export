@@ -4,3 +4,6 @@ Group container and reloads the widget after a terminal run. Widget timelines
 precompute stale and overdue transitions, plus two daily overdue-age entries,
 so status can worsen without another app wake. Thresholds remain absent until
 R-71 supplies a measured value; manual destinations do not invent one.
+Accessory rectangular/circular families use the same shape-and-text states.
+An unacknowledged destination-change count survives ordinary run updates and
+renders with a shield warning until explicitly acknowledged.
