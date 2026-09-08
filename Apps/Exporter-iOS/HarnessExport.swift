@@ -4,6 +4,7 @@ import CoreTemporal
 import CorrectnessEngine
 import DestinationTrust
 import DiagnosticBundle
+import EnginePorts
 import Foundation
 import HealthKitSource
 import MetricCatalog

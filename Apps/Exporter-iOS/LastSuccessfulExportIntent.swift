@@ -3,10 +3,10 @@ import Foundation
 import Watchdog
 
 struct DestinationStatusEntity: AppEntity {
-    static var typeDisplayRepresentation = TypeDisplayRepresentation(
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(
         name: "Export destination"
     )
-    static var defaultQuery = DestinationStatusEntityQuery()
+    static let defaultQuery = DestinationStatusEntityQuery()
 
     var id: String
 
@@ -75,11 +75,11 @@ struct DestinationStatusEntityQuery: EntityQuery {
 }
 
 struct LastSuccessfulExportIntent: AppIntent {
-    static var title: LocalizedStringResource = "Last successful export"
-    static var description = IntentDescription(
+    static let title: LocalizedStringResource = "Last successful export"
+    static let description = IntentDescription(
         "Returns value-free freshness and delivery status for every export destination."
     )
-    static var openAppWhenRun = false
+    static let openAppWhenRun = false
 
     func perform() async throws -> some IntentResult & ReturnsValue<[DestinationStatusEntity]> {
         .result(value: try await DestinationStatusEntityQuery().suggestedEntities())

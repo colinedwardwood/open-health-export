@@ -366,6 +366,61 @@ import Redaction
     #expect(bucket == DayBucket(year: 2024, month: 1, day: 1))
 }
 
+@Test func dailyBucketBoundsCoverSpringAndFallDSTExactly() throws {
+    let context = TemporalContext(
+        timeZoneIdentifier: "America/New_York",
+        localeIdentifier: "en_US_POSIX",
+        tzDatabaseVersion: "fixture-2024"
+    )
+    let spring = try #require(BucketKey.boundsP1D(day: "2024-03-10", context: context))
+    #expect(spring.bucketDurationSeconds == 23 * 60 * 60)
+    #expect(spring.bucketStart == "2024-03-10T05:00:00.000Z")
+    #expect(spring.bucketEnd == "2024-03-11T04:00:00.000Z")
+
+    let fall = try #require(BucketKey.boundsP1D(day: "2024-11-03", context: context))
+    #expect(fall.bucketDurationSeconds == 25 * 60 * 60)
+    #expect(fall.bucketStart == "2024-11-03T04:00:00.000Z")
+    #expect(fall.bucketEnd == "2024-11-04T05:00:00.000Z")
+}
+
+@Test func machineBucketOutputIgnoresHostileDisplayLocale() throws {
+    let english = TemporalContext(
+        timeZoneIdentifier: "Asia/Kathmandu",
+        localeIdentifier: "en_US_POSIX",
+        tzDatabaseVersion: "fixture-2024"
+    )
+    let arabic = TemporalContext(
+        timeZoneIdentifier: "Asia/Kathmandu",
+        localeIdentifier: "ar_EG",
+        tzDatabaseVersion: "fixture-2024"
+    )
+    #expect(
+        BucketKey.boundsP1D(day: "2024-06-01", context: english)
+            == BucketKey.boundsP1D(day: "2024-06-01", context: arabic)
+    )
+}
+
+@Test func nativeWireEncodingIsByteIdenticalAcrossOneHundredRuns() throws {
+    let payload = try NativeWire.encode(
+        samples: [heartSample("00000000-0000-0000-0000-000000000084")],
+        tombstones: [],
+        metric: MetricCatalog.heartRate.id,
+        batchID: BatchID(rawValue: "00000000-0000-4000-8000-000000000084"),
+        envelope: testEnvelope()
+    )
+    for _ in 0..<100 {
+        #expect(
+            try NativeWire.encode(
+                samples: [heartSample("00000000-0000-0000-0000-000000000084")],
+                tombstones: [],
+                metric: MetricCatalog.heartRate.id,
+                batchID: BatchID(rawValue: "00000000-0000-4000-8000-000000000084"),
+                envelope: testEnvelope()
+            ) == payload
+        )
+    }
+}
+
 @Test func memoryStoreCannotAdvanceCursorWithoutCommitBatch() async throws {
     let store = MemoryStateStore()
     let page = SamplePage(
