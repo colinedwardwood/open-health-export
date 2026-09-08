@@ -73,6 +73,20 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck HealthKit background delivery entitlement: ok")
+
+        let exporterInfo = apps.appendingPathComponent("Exporter-iOS/Info.plist")
+        let exporterInfoText = try String(contentsOf: exporterInfo, encoding: .utf8)
+        for required in [
+            "BGTaskSchedulerPermittedIdentifiers",
+            "app.openhealthexporter.refresh",
+            "app.openhealthexporter.processing",
+        ] where !exporterInfoText.contains(required) {
+            FileHandle.standardError.write(
+                Data("iOS background task configuration is missing \(required)\n".utf8)
+            )
+            exit(1)
+        }
+        print("policycheck iOS background task identifiers: ok")
         var healthOnMac: [String] = []
         if let appFiles = FileManager.default.enumerator(at: apps, includingPropertiesForKeys: nil) {
             for case let file as URL in appFiles where file.pathExtension == "swift" {

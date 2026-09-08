@@ -469,10 +469,14 @@ enum HarnessExport {
         return report.allowsEnablement
     }
 
-    static func startHealthObservers() async throws -> HealthKitObserverCoordinator {
+    static func wakeLedger() throws -> WakeLedger {
         let root = try applicationSupportRoot()
+        return WakeLedger(path: root.appendingPathComponent("wake-ledger.log").path)
+    }
+
+    static func startHealthObservers() async throws -> HealthKitObserverCoordinator {
         let coordinator = HealthKitObserverCoordinator(
-            wakeLedger: WakeLedger(path: root.appendingPathComponent("wake-ledger.log").path)
+            wakeLedger: try wakeLedger()
         )
         try await coordinator.start(
             metrics: [

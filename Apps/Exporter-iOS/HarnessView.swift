@@ -9,6 +9,7 @@ import MetricCatalog
 import SwiftUI
 
 struct HarnessView: View {
+    @Environment(\.scenePhase) private var scenePhase
     private enum Phase {
         case disclosure
         case ready
@@ -35,7 +36,6 @@ struct HarnessView: View {
     @State private var wipeArmed = false
     @State private var stopHeartRateArmed = false
     @State private var foregroundCatchUpStarted = false
-    @State private var healthObservers: HealthKitObserverCoordinator?
 
     var body: some View {
         NavigationStack {
@@ -92,6 +92,11 @@ struct HarnessView: View {
                     foregroundCatchUpStarted = true
                     await runLocalExport(trigger: .appForeground)
                 }
+            }
+            .onChange(of: scenePhase) { _, next in
+                guard next == .active else { return }
+                AppLifecycleCoordinator.shared.recordWake(.appForeground)
+                Task { await startHealthObserversIfEligible() }
             }
         }
         .task(id: disclosureAcknowledged) {
@@ -424,8 +429,7 @@ struct HarnessView: View {
             pairingPaste = ""
             disclosureAcknowledged = false
             foregroundCatchUpStarted = false
-            healthObservers?.stop()
-            healthObservers = nil
+            AppLifecycleCoordinator.shared.stopObservers()
             destinationStatusLines = HarnessExport.destinationStatusLines()
             ledgerLines = []
             await refreshLedgerIntegrity()
@@ -530,14 +534,8 @@ struct HarnessView: View {
 
     @MainActor
     private func startHealthObserversIfEligible() async {
-        guard disclosureAcknowledged,
-              HarnessExport.isLocalFileEnabled(),
-              healthObservers == nil
-        else {
-            return
-        }
         do {
-            healthObservers = try await HarnessExport.startHealthObservers()
+            try await AppLifecycleCoordinator.shared.startObserversIfEligible()
         } catch {
             status = "Background Health delivery registration failed: \(error.localizedDescription)"
         }

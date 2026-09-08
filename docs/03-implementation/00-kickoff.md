@@ -126,6 +126,11 @@ exactly-once completion receipt on every path. Until R-71 G1 resolves
 descriptor-observer background delivery, the app uses the documented
 one-observer-per-core-type fallback and coalesces serialized per-metric runs.
 The background-delivery entitlement is policy-checked.
+Application lifecycle ownership now records launch/foreground/BG-refresh/
+BG-processing wakes before fallible work, restores eligible observers from
+`didFinishLaunching`, and registers and resubmits both BG task classes. Their
+permitted identifiers are also policy-checked. HealthKit grant observation on
+every wake and the resulting timed R-44 purge remain open.
 New pending rows also carry a creation epoch. Foreground launch enforces the
 ratified seven-day TTL transactionally, records gap and ledger evidence,
 unlinks bytes after commit, re-seals the head and posts classified user copy.
