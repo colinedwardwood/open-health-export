@@ -186,6 +186,17 @@ public enum NativeWire {
         try encodeWorkout(workout, envelope: envelope)
     }
 
+    public static func encode(
+        _ tombstone: TombstoneRecord,
+        envelope: WireEnvelope
+    ) throws -> String {
+        try encodeTombstone(
+            tombstone,
+            metric: tombstone.metric,
+            envelope: envelope
+        )
+    }
+
     public static func encodeCanary(code: String, batchID: BatchID, envelope: WireEnvelope) throws -> Data {
         var canaryEnvelope = envelope
         canaryEnvelope.reason = "destinationTest"

@@ -3,7 +3,77 @@ import Foundation
 import MetricCatalog
 
 /// Seeded synthetic samples shared by `corpusgen` (R-82) and demo mode (R-114).
+public enum SyntheticCorpusTier: String, Sendable, Codable, CaseIterable {
+    case t0 = "T0"
+    case t1 = "T1"
+    case t2 = "T2"
+
+    public var defaultCount: Int {
+        switch self {
+        case .t0: 200
+        case .t1: 10_000_000
+        case .t2: 50_000_000
+        }
+    }
+}
+
+public struct SyntheticCategoryType: Sendable, Equatable {
+    public var metricID: String
+    public var healthKitIdentifier: String
+    public var value: Int
+    public var valueName: String
+
+    public init(
+        metricID: String,
+        healthKitIdentifier: String,
+        value: Int = 0,
+        valueName: String = "present"
+    ) {
+        self.metricID = metricID
+        self.healthKitIdentifier = healthKitIdentifier
+        self.value = value
+        self.valueName = valueName
+    }
+}
+
 public enum DemoCorpus {
+    public static let categoryTypes: [SyntheticCategoryType] = [
+        .init(metricID: "sleep_analysis", healthKitIdentifier: "HKCategoryTypeIdentifierSleepAnalysis", value: 3, valueName: "asleepDeep"),
+        .init(metricID: "mindful_session", healthKitIdentifier: "HKCategoryTypeIdentifierMindfulSession"),
+        .init(metricID: "menstrual_flow", healthKitIdentifier: "HKCategoryTypeIdentifierMenstrualFlow"),
+        .init(metricID: "intermenstrual_bleeding", healthKitIdentifier: "HKCategoryTypeIdentifierIntermenstrualBleeding"),
+        .init(metricID: "infrequent_menstrual_cycles", healthKitIdentifier: "HKCategoryTypeIdentifierInfrequentMenstrualCycles"),
+        .init(metricID: "irregular_menstrual_cycles", healthKitIdentifier: "HKCategoryTypeIdentifierIrregularMenstrualCycles"),
+        .init(metricID: "persistent_intermenstrual_bleeding", healthKitIdentifier: "HKCategoryTypeIdentifierPersistentIntermenstrualBleeding"),
+        .init(metricID: "prolonged_menstrual_periods", healthKitIdentifier: "HKCategoryTypeIdentifierProlongedMenstrualPeriods"),
+        .init(metricID: "cervical_mucus_quality", healthKitIdentifier: "HKCategoryTypeIdentifierCervicalMucusQuality"),
+        .init(metricID: "ovulation_test_result", healthKitIdentifier: "HKCategoryTypeIdentifierOvulationTestResult"),
+        .init(metricID: "progesterone_test_result", healthKitIdentifier: "HKCategoryTypeIdentifierProgesteroneTestResult"),
+        .init(metricID: "pregnancy", healthKitIdentifier: "HKCategoryTypeIdentifierPregnancy"),
+        .init(metricID: "pregnancy_test_result", healthKitIdentifier: "HKCategoryTypeIdentifierPregnancyTestResult"),
+        .init(metricID: "contraceptive", healthKitIdentifier: "HKCategoryTypeIdentifierContraceptive"),
+        .init(metricID: "lactation", healthKitIdentifier: "HKCategoryTypeIdentifierLactation"),
+        .init(metricID: "sexual_activity", healthKitIdentifier: "HKCategoryTypeIdentifierSexualActivity"),
+        .init(metricID: "high_heart_rate_event", healthKitIdentifier: "HKCategoryTypeIdentifierHighHeartRateEvent"),
+        .init(metricID: "low_heart_rate_event", healthKitIdentifier: "HKCategoryTypeIdentifierLowHeartRateEvent"),
+        .init(metricID: "irregular_heart_rhythm_event", healthKitIdentifier: "HKCategoryTypeIdentifierIrregularHeartRhythmEvent"),
+        .init(metricID: "audio_exposure_event", healthKitIdentifier: "HKCategoryTypeIdentifierHeadphoneAudioExposureEvent"),
+        .init(metricID: "environmental_audio_exposure_event", healthKitIdentifier: "HKCategoryTypeIdentifierEnvironmentalAudioExposureEvent"),
+        .init(metricID: "handwashing_event", healthKitIdentifier: "HKCategoryTypeIdentifierHandwashingEvent"),
+        .init(metricID: "toothbrushing_event", healthKitIdentifier: "HKCategoryTypeIdentifierToothbrushingEvent"),
+        .init(metricID: "appetite_changes", healthKitIdentifier: "HKCategoryTypeIdentifierAppetiteChanges"),
+        .init(metricID: "bladder_incontinence", healthKitIdentifier: "HKCategoryTypeIdentifierBladderIncontinence"),
+        .init(metricID: "bloating", healthKitIdentifier: "HKCategoryTypeIdentifierAbdominalCramps"),
+        .init(metricID: "chills", healthKitIdentifier: "HKCategoryTypeIdentifierChills"),
+        .init(metricID: "constipation", healthKitIdentifier: "HKCategoryTypeIdentifierConstipation"),
+        .init(metricID: "coughing", healthKitIdentifier: "HKCategoryTypeIdentifierCoughing"),
+        .init(metricID: "diarrhea", healthKitIdentifier: "HKCategoryTypeIdentifierDiarrhea"),
+        .init(metricID: "dizziness", healthKitIdentifier: "HKCategoryTypeIdentifierDizziness"),
+        .init(metricID: "dry_skin", healthKitIdentifier: "HKCategoryTypeIdentifierDrySkin"),
+        .init(metricID: "fatigue", healthKitIdentifier: "HKCategoryTypeIdentifierFatigue"),
+        .init(metricID: "fever", healthKitIdentifier: "HKCategoryTypeIdentifierFever"),
+    ]
+
     public static let sources: [SampleSourceIdentity] = [
         SampleSourceIdentity(
             name: "Synthetic Apple Watch",

@@ -262,6 +262,39 @@ struct PolicyCheck {
         let schema = try WireJSONSchema.load(Data(contentsOf: schemaURL))
         let corpusText = try String(contentsOf: corpus, encoding: .utf8)
         try WireJSONSchema.validateNDJSON(corpusText, schema: schema)
+        let corpusObjects = try corpusText.split(whereSeparator: \.isNewline).map {
+            try JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any]
+        }
+        guard let provenance = corpusObjects.first ?? nil,
+              provenance["synthetic"] as? Bool == true,
+              provenance["tier"] as? String == "T0",
+              provenance["seed"] as? Int == 1,
+              provenance["generatorVersion"] as? Int == 1,
+              provenance["recordCount"] as? Int == 200,
+              corpusObjects.count == 201
+        else {
+            FileHandle.standardError.write(
+                Data("tier-zero provenance or record count is invalid\n".utf8)
+            )
+            exit(1)
+        }
+        let corpusKinds = Set(corpusObjects.compactMap { $0?["kind"] as? String })
+        let requiredKinds: Set<String> = [
+            "sample.quantity", "sample.category", "sample.correlation", "workout",
+        ]
+        let sourceBundles = Set(corpusObjects.compactMap {
+            ($0?["source"] as? [String: Any])?["bundleId"] as? String
+        })
+        let declaredTypes = provenance["types"] as? [String] ?? []
+        guard corpusKinds.isSuperset(of: requiredKinds),
+              sourceBundles.count >= 6,
+              declaredTypes.count >= 60
+        else {
+            FileHandle.standardError.write(
+                Data("tier-zero structural/source/type coverage is incomplete\n".utf8)
+            )
+            exit(1)
+        }
 
         let receiverInput = try String(
             contentsOf: spec.appendingPathComponent("fixtures/receiver-sequence.ndjson"),

@@ -57,6 +57,33 @@ private func sleepCategory(value: Int = 3) -> CategoryRecord {
     try WireJSONSchema.validateNDJSON(corpus, schema: schema)
 }
 
+@Test func tierZeroCorpusDeclaresProvenanceSourcesSpansAndStructuralFamilies() throws {
+    let corpus = String(
+        decoding: try WireContractFixture.data("spec/v1.0.0/fixtures/tier0.ndjson"),
+        as: UTF8.self
+    )
+    let records = try corpus.split(whereSeparator: \.isNewline).map {
+        try #require(
+            JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any]
+        )
+    }
+    let header = try #require(records.first)
+    #expect(header["synthetic"] as? Bool == true)
+    #expect(header["generatorVersion"] as? Int == 1)
+    #expect(header["seed"] as? Int == 1)
+    #expect(header["tier"] as? String == "T0")
+    #expect(header["recordCount"] as? Int == 200)
+    #expect(records.count == 201)
+    let kinds = Set(records.compactMap { $0["kind"] as? String })
+    #expect(kinds.isSuperset(of: ["sample.quantity", "sample.category", "sample.correlation", "workout"]))
+    let sourceBundles = Set(records.compactMap {
+        ($0["source"] as? [String: Any])?["bundleId"] as? String
+    })
+    #expect(sourceBundles.count == 6)
+    let interval = try #require(records.first { $0["kind"] as? String == "sample.category" })
+    #expect(interval["start"] as? String != interval["end"] as? String)
+}
+
 @Test func categoryIntervalValidatesAndConvergesByUUID() throws {
     let category = sleepCategory()
     let line = try NativeWire.encode(category, envelope: testEnvelope())

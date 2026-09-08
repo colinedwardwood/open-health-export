@@ -78,3 +78,15 @@ import WireFormat
     #expect(Set(sources).count == 6)
     #expect(sources.allSatisfy { $0.contains("synthetic") || $0 == "com.apple.Health" })
 }
+
+@Test func syntheticCorpusTierScaleContractIsFrozen() {
+    #expect(SyntheticCorpusTier.t0.defaultCount == 200)
+    #expect(SyntheticCorpusTier.t1.defaultCount == 10_000_000)
+    #expect(SyntheticCorpusTier.t2.defaultCount == 50_000_000)
+    let generatedTypes = Set(
+        MetricCatalog.all.map(\.wireId)
+            + DemoCorpus.categoryTypes.map(\.metricID)
+            + ["blood_pressure", "workout"]
+    )
+    #expect(generatedTypes.count >= 60)
+}

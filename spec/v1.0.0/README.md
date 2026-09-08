@@ -6,7 +6,7 @@
     "tier0.ndjson": {
       "records": 200,
       "seed": 1,
-      "sha256": "e88430b1e69a5505a9db085ffe710fb372e170a13bb37e09c496511734972009"
+      "sha256": "6dda54d56568609d4505e33cc5bc5337032a9cd80e4f331b4512424257b59728"
     },
     "fix-catalogue.json": {
       "cases": 72,
@@ -30,6 +30,13 @@
     "policy": "B-class changes fail; A-class changes require a MINOR x-ohe-specVersion bump"
   },
   "receiver": "swift run receiver -- spec/v1.0.0/fixtures/receiver-sequence.ndjson",
+  "corpusgen": {
+    "T0": "swift run corpusgen --tier T0 --seed 1",
+    "T1": "swift run corpusgen --tier T1 --seed 1 (10,000,000 records)",
+    "T2": "swift run corpusgen --tier T2 --seed 1 (50,000,000 records)",
+    "coverage": "at least 60 quantity/category/structural types and 6 source identities",
+    "T2Pathologies": ["UUID replay", "tombstone", "retrograde measurement date", "source overlap"]
+  },
   "adjacency": "adjacency.json",
   "demo": {
     "field": "demo",
