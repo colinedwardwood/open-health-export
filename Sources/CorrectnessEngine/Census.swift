@@ -1,5 +1,6 @@
 import CoreDomain
 import EnginePorts
+import MetricCatalog
 
 /// Per-(metric, day) census: accumulate across pages; XOR digests so merges are order-independent.
 enum Census {
@@ -14,6 +15,17 @@ enum Census {
             }
             let fold = delta[day] ?? (0, 0)
             delta[day] = (fold.count + 1, fold.xor ^ sampleDigest(sample.key.uuid))
+        }
+        for category in page.categories {
+            let day = String(category.start.prefix(10))
+            if try tx.loadEmittedIndex(uuid: category.key.uuid) != nil {
+                continue
+            }
+            let fold = delta[day] ?? (0, 0)
+            delta[day] = (
+                fold.count + 1,
+                fold.xor ^ sampleDigest(category.key.uuid)
+            )
         }
 
         for tombstone in page.tombstones {
@@ -45,7 +57,9 @@ enum Census {
                     digest: String(digestXor, radix: 16)
                 )
             )
-            try tx.markDirty(metric: page.metric, day: day)
+            if MetricCatalog.declaration(for: page.metric) != nil {
+                try tx.markDirty(metric: page.metric, day: day)
+            }
         }
     }
 

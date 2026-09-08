@@ -133,6 +133,69 @@ enum SampleConversion {
     }
 }
 
+enum CategoryConversion {
+    static let sleepMetric = MetricID(rawValue: "sleep_analysis")
+
+    static func categoryType(for metric: MetricID) -> HKCategoryType? {
+        guard metric == sleepMetric else { return nil }
+        return HKCategoryType.categoryType(forIdentifier: .sleepAnalysis)
+    }
+
+    static func record(
+        from sample: HKCategorySample,
+        metric: MetricID,
+        context: TemporalContext
+    ) -> CategoryRecord {
+        let sourceRevision = sample.sourceRevision
+        let source = SampleSourceIdentity(
+            name: sourceRevision.source.name,
+            bundleIdentifier: sourceRevision.source.bundleIdentifier,
+            productType: sourceRevision.productType
+        )
+        let device = sample.device.map {
+            SampleDevice(
+                name: $0.name,
+                manufacturer: $0.manufacturer,
+                model: $0.model,
+                hardwareVersion: $0.hardwareVersion,
+                softwareVersion: $0.softwareVersion
+            )
+        }
+        return CategoryRecord(
+            key: RecordKey(uuid: sample.uuid.uuidString),
+            metric: metric,
+            healthKitIdentifier: sample.categoryType.identifier,
+            start: SampleConversion.formatUTC(sample.startDate),
+            end: SampleConversion.formatUTC(sample.endDate),
+            timeZoneOffsetMinutes: context.timeZone().secondsFromGMT(
+                for: sample.startDate
+            ) / 60,
+            timeZoneSource: .deviceCurrent,
+            categoryValue: sample.value,
+            categoryName: sleepName(sample.value),
+            durationSeconds: sample.endDate.timeIntervalSince(sample.startDate),
+            observedAt: SampleConversion.formatUTC(Date()),
+            source: source,
+            device: device,
+            wasUserEntered:
+                (sample.metadata?[HKMetadataKeyWasUserEntered] as? NSNumber)?.boolValue
+        )
+    }
+
+    static func sleepName(_ value: Int) -> String {
+        switch HKCategoryValueSleepAnalysis(rawValue: value) {
+        case .inBed: "inBed"
+        case .asleepUnspecified: "asleepUnspecified"
+        case .awake: "awake"
+        case .asleepCore: "asleepCore"
+        case .asleepDeep: "asleepDeep"
+        case .asleepREM: "asleepREM"
+        case nil: "unknown_\(value)"
+        @unknown default: "unknown_\(value)"
+        }
+    }
+}
+
 public enum HealthKitSourceError: Error, Sendable {
     case unavailable
     case unknownMetric(MetricID)
@@ -144,6 +207,8 @@ public enum HealthKitAuthorization {
         var types: Set<HKObjectType> = []
         for metric in metrics {
             if let type = SampleConversion.quantityType(for: metric) {
+                types.insert(type)
+            } else if let type = CategoryConversion.categoryType(for: metric) {
                 types.insert(type)
             }
         }
@@ -213,6 +278,81 @@ public final class HealthKitSampleSource: SampleSource, @unchecked Sendable {
                     returning: SamplePage(
                         samples: records,
                         tombstones: tombs,
+                        metric: metric,
+                        anchorBlob: blob,
+                        observedThrough: latest
+                    )
+                )
+            }
+            self.store.execute(query)
+        }
+    }
+}
+
+public final class HealthKitCategorySource: SampleSource, @unchecked Sendable {
+    private let store: HKHealthStore
+    private let context: TemporalContext
+    private let limit: Int
+
+    public init(
+        store: HKHealthStore = HKHealthStore(),
+        context: TemporalContext,
+        limit: Int = SamplePaging.defaultPageLimit
+    ) {
+        self.store = store
+        self.context = context
+        self.limit = limit
+    }
+
+    public func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage {
+        guard HKHealthStore.isHealthDataAvailable() else {
+            throw HealthKitSourceError.unavailable
+        }
+        guard let type = CategoryConversion.categoryType(for: metric) else {
+            throw HealthKitSourceError.unknownMetric(metric)
+        }
+        let anchor = try afterAnchor.flatMap(AnchorCoding.decode)
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKAnchoredObjectQuery(
+                type: type,
+                predicate: nil,
+                anchor: anchor,
+                limit: limit
+            ) { _, samples, deleted, newAnchor, error in
+                if let error {
+                    continuation.resume(
+                        throwing: HealthKitSourceError.queryFailed(
+                            error.localizedDescription
+                        )
+                    )
+                    return
+                }
+                let categories = (samples ?? []).compactMap { sample -> CategoryRecord? in
+                    guard let category = sample as? HKCategorySample else { return nil }
+                    return CategoryConversion.record(
+                        from: category,
+                        metric: metric,
+                        context: self.context
+                    )
+                }
+                let tombstones = (deleted ?? []).map {
+                    SampleConversion.tombstone(from: $0, metric: metric)
+                }
+                let blob: Data
+                do {
+                    blob = try newAnchor.map(AnchorCoding.encode) ?? Data()
+                } catch {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                let latest = categories.compactMap {
+                    SampleConversion.parseUTC($0.end)
+                }.max() ?? Date(timeIntervalSince1970: 0)
+                continuation.resume(
+                    returning: SamplePage(
+                        samples: [],
+                        categories: categories,
+                        tombstones: tombstones,
                         metric: metric,
                         anchorBlob: blob,
                         observedThrough: latest

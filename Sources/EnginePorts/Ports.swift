@@ -3,6 +3,7 @@ import Foundation
 
 public struct SamplePage: Sendable {
     public var samples: [SampleRecord]
+    public var categories: [CategoryRecord]
     public var tombstones: [TombstoneRecord]
     public var metric: MetricID
     public var anchorBlob: Data
@@ -10,12 +11,14 @@ public struct SamplePage: Sendable {
 
     public init(
         samples: [SampleRecord],
+        categories: [CategoryRecord] = [],
         tombstones: [TombstoneRecord],
         metric: MetricID,
         anchorBlob: Data,
         observedThrough: Date
     ) {
         self.samples = samples
+        self.categories = categories
         self.tombstones = tombstones
         self.metric = metric
         self.anchorBlob = anchorBlob

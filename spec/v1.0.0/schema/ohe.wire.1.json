@@ -7,6 +7,7 @@
     { "$ref": "#/$defs/header" },
     { "$ref": "#/$defs/footer" },
     { "$ref": "#/$defs/quantity" },
+    { "$ref": "#/$defs/category" },
     { "$ref": "#/$defs/tombstone" },
     { "$ref": "#/$defs/aggregate" },
     { "$ref": "#/$defs/canary" }
@@ -110,6 +111,40 @@
         "uuid": { "type": "string" },
         "v": { "type": "integer", "const": 1 },
         "value": { "type": "number" },
+        "wasUserEntered": { "type": "boolean" },
+        "demo": { "type": "boolean" }
+      }
+    },
+    "category": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "batchSeq", "categoryName", "categoryValue", "end", "hkIdentifier", "kind",
+        "metricId", "observedAt", "semantics", "start", "tzOffsetMinutes", "tzSource",
+        "uuid", "v"
+      ],
+      "properties": {
+        "kind": { "type": "string", "const": "sample.category", "x-ohe-open": false },
+        "batchSeq": { "type": "integer" },
+        "categoryName": { "type": "string", "x-ohe-open": true },
+        "categoryValue": { "type": "integer" },
+        "durationSeconds": { "type": "number" },
+        "end": { "type": "string" },
+        "hkIdentifier": { "type": "string", "x-ohe-open": true },
+        "metricId": { "type": "string", "x-ohe-open": true },
+        "observedAt": { "type": "string" },
+        "semantics": { "type": "string", "enum": ["curated", "unmapped"], "x-ohe-open": false },
+        "source": { "type": "object" },
+        "device": { "type": "object" },
+        "start": { "type": "string" },
+        "tzOffsetMinutes": { "type": "integer" },
+        "tzSource": {
+          "type": "string",
+          "enum": ["sampleMetadata", "inferred", "deviceCurrent", "unknown"],
+          "x-ohe-open": false
+        },
+        "uuid": { "type": "string" },
+        "v": { "type": "integer", "const": 1 },
         "wasUserEntered": { "type": "boolean" },
         "demo": { "type": "boolean" }
       }

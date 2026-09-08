@@ -1224,6 +1224,60 @@ func statisticsRecord(
     #expect(payload.contains("\"sampleCount\":1"))
 }
 
+@Test func categoryPageCommitsCensusAndEmittedIndexWithoutInventedAggregate() async throws {
+    let metric = MetricID(rawValue: "sleep_analysis")
+    let category = CategoryRecord(
+        key: RecordKey(uuid: "a3000000-0000-4000-8000-000000000001"),
+        metric: metric,
+        healthKitIdentifier: "HKCategoryTypeIdentifierSleepAnalysis",
+        start: "2024-01-01T22:00:00Z",
+        end: "2024-01-02T06:00:00Z",
+        timeZoneOffsetMinutes: 0,
+        timeZoneSource: .unknown,
+        categoryValue: 3,
+        categoryName: "asleepDeep",
+        durationSeconds: 28_800,
+        observedAt: "2024-01-02T08:00:00Z"
+    )
+    let page = SamplePage(
+        samples: [],
+        categories: [category],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0xA3]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let store = MemoryStateStore()
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-category-page-\(UUID().uuidString)")
+    let destinationURL = root.appendingPathComponent("destination")
+    try FileManager.default.createDirectory(
+        at: destinationURL,
+        withIntermediateDirectories: true
+    )
+    let run = ExportRun(
+        source: FixtureSource(pages: [page]),
+        destination: .testing(LocalFileSink(directory: destinationURL)),
+        store: store,
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    )
+    #expect(try await run.run().kind == .success)
+    #expect(try store.transaction.loadCensus(metric: metric, day: "2024-01-01")?.sampleCount == 1)
+    #expect(try store.transaction.loadEmittedIndex(uuid: category.key.uuid) != nil)
+    #expect(try store.transaction.dirtyDays(metric: metric).isEmpty)
+    let payloadURL = try #require(
+        FileManager.default.contentsOfDirectory(
+            at: destinationURL,
+            includingPropertiesForKeys: nil
+        ).first
+    )
+    let payload = try String(contentsOf: payloadURL, encoding: .utf8)
+    #expect(payload.contains("\"kind\":\"sample.category\""))
+    #expect(!payload.contains("\"kind\":\"aggregate\""))
+}
+
 @Test func writeAheadCursorPreventsRereadAfterCommit() async throws {
     let metric = MetricID(rawValue: "heartRate")
     let page = SamplePage(

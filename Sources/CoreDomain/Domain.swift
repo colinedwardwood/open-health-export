@@ -122,6 +122,55 @@ public struct SampleRecord: Sendable, Codable, Equatable {
     }
 }
 
+public struct CategoryRecord: Sendable, Codable, Equatable {
+    public var key: RecordKey
+    public var metric: MetricID
+    public var healthKitIdentifier: String
+    public var start: String
+    public var end: String
+    public var timeZoneOffsetMinutes: Int
+    public var timeZoneSource: TimeZoneSource
+    public var categoryValue: Int
+    public var categoryName: String
+    public var durationSeconds: Double?
+    public var observedAt: String
+    public var source: SampleSourceIdentity?
+    public var device: SampleDevice?
+    public var wasUserEntered: Bool?
+
+    public init(
+        key: RecordKey,
+        metric: MetricID,
+        healthKitIdentifier: String,
+        start: String,
+        end: String,
+        timeZoneOffsetMinutes: Int,
+        timeZoneSource: TimeZoneSource,
+        categoryValue: Int,
+        categoryName: String,
+        durationSeconds: Double? = nil,
+        observedAt: String,
+        source: SampleSourceIdentity? = nil,
+        device: SampleDevice? = nil,
+        wasUserEntered: Bool? = nil
+    ) {
+        self.key = key
+        self.metric = metric
+        self.healthKitIdentifier = healthKitIdentifier
+        self.start = start
+        self.end = end
+        self.timeZoneOffsetMinutes = timeZoneOffsetMinutes
+        self.timeZoneSource = timeZoneSource
+        self.categoryValue = categoryValue
+        self.categoryName = categoryName
+        self.durationSeconds = durationSeconds
+        self.observedAt = observedAt
+        self.source = source
+        self.device = device
+        self.wasUserEntered = wasUserEntered
+    }
+}
+
 public struct TombstoneRecord: Sendable, Codable, Equatable {
     public var key: RecordKey
     public var metric: MetricID

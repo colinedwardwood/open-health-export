@@ -64,6 +64,31 @@ import Testing
     #expect(record.wasUserEntered == true)
 }
 
+@Test func sleepCategoryPreservesItsEveningToMorningMeasurementSpan() {
+    let start = Date(timeIntervalSince1970: 1_704_146_400)
+    let end = start.addingTimeInterval(8 * 60 * 60)
+    let sample = HKCategorySample(
+        type: HKCategoryType(.sleepAnalysis),
+        value: HKCategoryValueSleepAnalysis.asleepDeep.rawValue,
+        start: start,
+        end: end
+    )
+    let record = CategoryConversion.record(
+        from: sample,
+        metric: CategoryConversion.sleepMetric,
+        context: .utc
+    )
+    #expect(record.key.uuid == sample.uuid.uuidString)
+    #expect(record.categoryName == "asleepDeep")
+    #expect(record.durationSeconds == 28_800)
+    #expect(record.start.hasPrefix("2024-01-01T22:00:00"))
+    #expect(record.end.hasPrefix("2024-01-02T06:00:00"))
+    #expect(
+        HealthKitAuthorization.readTypes(for: [CategoryConversion.sleepMetric])
+            .contains(HKCategoryType(.sleepAnalysis))
+    )
+}
+
 @Test func oxygenSaturationIsPercentNotAHumidityClass() {
     let start = Date(timeIntervalSince1970: 1_704_067_200)
     let quantity = HKQuantity(unit: .percent(), doubleValue: 0.98)

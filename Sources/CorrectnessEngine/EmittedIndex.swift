@@ -15,5 +15,17 @@ enum EmittedIndex {
                 )
             )
         }
+        for category in page.categories {
+            let day = String(category.start.prefix(10))
+            try tx.upsertEmittedIndex(
+                EmittedIndexRow(
+                    uuid: category.key.uuid,
+                    metric: page.metric,
+                    day: day,
+                    digest: Census.digestUUIDs([category.key.uuid]),
+                    batchID: batchID
+                )
+            )
+        }
     }
 }

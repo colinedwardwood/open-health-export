@@ -92,6 +92,7 @@ public enum NativeWire {
 
     public static func encode(
         samples: [SampleRecord],
+        categories: [CategoryRecord] = [],
         tombstones: [TombstoneRecord],
         aggregates: [AggregateRecord] = [],
         metric: MetricID,
@@ -103,6 +104,11 @@ public enum NativeWire {
                 (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
             }
             .map { try encodeQuantity($0, metric: metric, envelope: envelope) }
+        let categoryLines = try categories
+            .sorted { lhs, rhs in
+                (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
+            }
+            .map { try encodeCategory($0, envelope: envelope) }
         let tombLines = try tombstones
             .sorted { $0.key.uuid.lowercased() < $1.key.uuid.lowercased() }
             .map { try encodeTombstone($0, metric: metric, envelope: envelope) }
@@ -111,7 +117,7 @@ public enum NativeWire {
                 (lhs.bucketStart, lhs.bucketKey) < (rhs.bucketStart, rhs.bucketKey)
             }
             .map { try encodeAggregate($0, envelope: envelope) }
-        let records = sampleLines + tombLines + aggregateLines
+        let records = sampleLines + categoryLines + tombLines + aggregateLines
         var body = Data()
         for line in records {
             body.append(contentsOf: line.utf8)
@@ -127,6 +133,7 @@ public enum NativeWire {
         let footer = try encodeFooter(
             batchID: batchID,
             sampleCount: samples.count,
+            categoryCount: categories.count,
             tombstoneCount: tombstones.count,
             canaryCount: 0,
             digest: digest,
@@ -143,6 +150,10 @@ public enum NativeWire {
 
     public static func encode(_ sample: SampleRecord, envelope: WireEnvelope) throws -> String {
         try encodeQuantity(sample, metric: sample.metric, envelope: envelope)
+    }
+
+    public static func encode(_ category: CategoryRecord, envelope: WireEnvelope) throws -> String {
+        try encodeCategory(category, envelope: envelope)
     }
 
     public static func encodeCanary(code: String, batchID: BatchID, envelope: WireEnvelope) throws -> Data {
@@ -218,6 +229,7 @@ private extension NativeWire {
     static func encodeFooter(
         batchID: BatchID,
         sampleCount: Int,
+        categoryCount: Int = 0,
         tombstoneCount: Int,
         canaryCount: Int,
         digest: String,
@@ -226,6 +238,9 @@ private extension NativeWire {
         var counts: [String: CanonicalJSON] = [:]
         if sampleCount > 0 {
             counts["sample.quantity"] = .integer(sampleCount)
+        }
+        if categoryCount > 0 {
+            counts["sample.category"] = .integer(categoryCount)
         }
         if tombstoneCount > 0 {
             counts["tombstone"] = .integer(tombstoneCount)
@@ -270,7 +285,60 @@ private extension NativeWire {
         if envelope.demo {
             object["demo"] = .bool(true)
         }
-        if let source = sample.source {
+        appendProvenance(
+            source: sample.source,
+            device: sample.device,
+            wasUserEntered: sample.wasUserEntered,
+            to: &object
+        )
+        return try CanonicalJSON.object(object).serialized()
+    }
+
+    static func encodeCategory(
+        _ category: CategoryRecord,
+        envelope: WireEnvelope
+    ) throws -> String {
+        if category.end < category.start {
+            throw WireError.invertedInterval
+        }
+        var object: [String: CanonicalJSON] = [
+            "batchSeq": .integer(envelope.seq),
+            "categoryName": .string(category.categoryName),
+            "categoryValue": .integer(category.categoryValue),
+            "end": .string(category.end),
+            "hkIdentifier": .string(category.healthKitIdentifier),
+            "kind": .string("sample.category"),
+            "metricId": .string(category.metric.rawValue),
+            "observedAt": .string(category.observedAt),
+            "semantics": .string("unmapped"),
+            "start": .string(category.start),
+            "tzOffsetMinutes": .integer(category.timeZoneOffsetMinutes),
+            "tzSource": .string(category.timeZoneSource.rawValue),
+            "uuid": .string(category.key.uuid.lowercased()),
+            "v": .integer(1),
+        ]
+        if let durationSeconds = category.durationSeconds {
+            object["durationSeconds"] = .number(durationSeconds)
+        }
+        if envelope.demo {
+            object["demo"] = .bool(true)
+        }
+        appendProvenance(
+            source: category.source,
+            device: category.device,
+            wasUserEntered: category.wasUserEntered,
+            to: &object
+        )
+        return try CanonicalJSON.object(object).serialized()
+    }
+
+    static func appendProvenance(
+        source: SampleSourceIdentity?,
+        device: SampleDevice?,
+        wasUserEntered: Bool?,
+        to object: inout [String: CanonicalJSON]
+    ) {
+        if let source {
             var sourceObject: [String: CanonicalJSON] = [
                 "name": .string(source.name),
             ]
@@ -282,7 +350,7 @@ private extension NativeWire {
             }
             object["source"] = .object(sourceObject)
         }
-        if let device = sample.device {
+        if let device {
             var deviceObject: [String: CanonicalJSON] = [:]
             if let name = device.name { deviceObject["name"] = .string(name) }
             if let manufacturer = device.manufacturer {
@@ -299,10 +367,9 @@ private extension NativeWire {
                 object["device"] = .object(deviceObject)
             }
         }
-        if let wasUserEntered = sample.wasUserEntered {
+        if let wasUserEntered {
             object["wasUserEntered"] = .bool(wasUserEntered)
         }
-        return try CanonicalJSON.object(object).serialized()
     }
 
     static func encodeTombstone(_ tomb: TombstoneRecord, metric: MetricID, envelope: WireEnvelope) throws -> String {

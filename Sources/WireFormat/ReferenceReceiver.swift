@@ -3,11 +3,18 @@ import Foundation
 /// G3/G4/R-115: upsert-by-UUID, tombstones delete, unknown fields ignored.
 public struct ReferenceReceiver: Sendable, Equatable {
     public var quantities: [String: Double]
+    public var categories: [String: Int]
     public var tombstones: Set<String>
     public var ingested: Int
 
-    public init(quantities: [String: Double] = [:], tombstones: Set<String> = [], ingested: Int = 0) {
+    public init(
+        quantities: [String: Double] = [:],
+        categories: [String: Int] = [:],
+        tombstones: Set<String> = [],
+        ingested: Int = 0
+    ) {
         self.quantities = quantities
+        self.categories = categories
         self.tombstones = tombstones
         self.ingested = ingested
     }
@@ -31,12 +38,23 @@ public struct ReferenceReceiver: Sendable, Equatable {
                 throw JSONSchemaError.missingRequired("uuid")
             }
             quantities[uuid] = doubleValue(object["value"])
+            categories.removeValue(forKey: uuid)
+            tombstones.remove(uuid)
+        case "sample.category":
+            guard let uuid = object["uuid"] as? String,
+                  let value = object["categoryValue"] as? NSNumber
+            else {
+                throw JSONSchemaError.missingRequired("uuid")
+            }
+            categories[uuid] = value.intValue
+            quantities.removeValue(forKey: uuid)
             tombstones.remove(uuid)
         case "tombstone":
             guard let uuid = object["uuid"] as? String else {
                 throw JSONSchemaError.missingRequired("uuid")
             }
             quantities.removeValue(forKey: uuid)
+            categories.removeValue(forKey: uuid)
             tombstones.insert(uuid)
         default:
             break
@@ -44,11 +62,17 @@ public struct ReferenceReceiver: Sendable, Equatable {
     }
 
     public func expectedState() -> [String: Any] {
-        [
+        var state: [String: Any] = [
             "quantities": quantities.keys.sorted().reduce(into: [String: Double]()) { $0[$1] = quantities[$1] },
             "tombstones": tombstones.sorted(),
             "ingested": ingested,
         ]
+        if !categories.isEmpty {
+            state["categories"] = categories.keys.sorted().reduce(into: [String: Int]()) {
+                $0[$1] = categories[$1]
+            }
+        }
+        return state
     }
 
     private func isNumber(_ any: Any?) -> Bool {

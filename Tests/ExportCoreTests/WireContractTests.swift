@@ -27,6 +27,27 @@ private enum WireContractFixture {
     }
 }
 
+private func sleepCategory(value: Int = 3) -> CategoryRecord {
+    CategoryRecord(
+        key: RecordKey(uuid: "f0000000-0000-4000-8000-000000000001"),
+        metric: MetricID(rawValue: "sleep_analysis"),
+        healthKitIdentifier: "HKCategoryTypeIdentifierSleepAnalysis",
+        start: "2026-09-07T22:00:00Z",
+        end: "2026-09-08T06:00:00Z",
+        timeZoneOffsetMinutes: 60,
+        timeZoneSource: .sampleMetadata,
+        categoryValue: value,
+        categoryName: "asleepDeep",
+        durationSeconds: 28_800,
+        observedAt: "2026-09-08T08:00:00Z",
+        source: SampleSourceIdentity(
+            name: "Synthetic Apple Watch",
+            bundleIdentifier: "com.apple.health.synthetic.watch",
+            productType: "Watch6,18"
+        )
+    )
+}
+
 @Test func tierZeroCorpusValidatesAgainstCommittedJSONSchema() throws {
     let schema = try WireContractFixture.schema()
     let corpus = String(
@@ -34,6 +55,48 @@ private enum WireContractFixture {
         as: UTF8.self
     )
     try WireJSONSchema.validateNDJSON(corpus, schema: schema)
+}
+
+@Test func categoryIntervalValidatesAndConvergesByUUID() throws {
+    let category = sleepCategory()
+    let line = try NativeWire.encode(category, envelope: testEnvelope())
+    let object = try #require(
+        JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
+    )
+    #expect(object["kind"] as? String == "sample.category")
+    #expect(object["durationSeconds"] as? Double == 28_800)
+    try WireJSONSchema.validate(instance: object, schema: WireContractFixture.schema())
+
+    let batch = try NativeWire.encode(
+        samples: [],
+        categories: [category],
+        tombstones: [],
+        metric: category.metric,
+        batchID: BatchID(rawValue: "f0000000-0000-4000-8000-000000000002"),
+        envelope: testEnvelope()
+    )
+    var receiver = ReferenceReceiver()
+    for _ in 0 ..< 10 {
+        try receiver.ingest(ndjson: String(decoding: batch, as: UTF8.self))
+    }
+    #expect(receiver.categories == [category.key.uuid: 3])
+
+    let updated = try NativeWire.encode(
+        sleepCategory(value: 4),
+        envelope: testEnvelope()
+    )
+    try receiver.ingest(line: Data(updated.utf8))
+    #expect(receiver.categories[category.key.uuid] == 4)
+    let tombstone = try NativeWire.encode(
+        samples: [],
+        tombstones: [TombstoneRecord(key: category.key, metric: category.metric)],
+        metric: category.metric,
+        batchID: BatchID(rawValue: "f0000000-0000-4000-8000-000000000003"),
+        envelope: testEnvelope()
+    )
+    try receiver.ingest(ndjson: String(decoding: tombstone, as: UTF8.self))
+    #expect(receiver.categories.isEmpty)
+    #expect(receiver.tombstones == [category.key.uuid])
 }
 
 @Test func nativeBatchKindsValidateAgainstCommittedJSONSchema() throws {
