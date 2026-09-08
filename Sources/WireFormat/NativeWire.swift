@@ -14,6 +14,7 @@ public struct WireEnvelope: Sendable, Equatable {
     public var spec: String
     public var specVersion: String
     public var demo: Bool
+    public var completeThrough: String?
 
     public init(
         exporterId: String,
@@ -26,7 +27,8 @@ public struct WireEnvelope: Sendable, Equatable {
         mode: String = "samples",
         spec: String = "ohe.wire/1",
         specVersion: String = "1.0",
-        demo: Bool = false
+        demo: Bool = false,
+        completeThrough: String? = nil
     ) {
         self.exporterId = exporterId
         self.seq = seq
@@ -39,14 +41,27 @@ public struct WireEnvelope: Sendable, Equatable {
         self.spec = spec
         self.specVersion = specVersion
         self.demo = demo
+        self.completeThrough = completeThrough
     }
 }
 
 public enum NativeWire {
     public static func batchID(metric: MetricID, anchorBlob: Data) -> BatchID {
+        batchID(metric: metric, anchorBlob: anchorBlob, aggregateVersions: [])
+    }
+
+    public static func batchID(
+        metric: MetricID,
+        anchorBlob: Data,
+        aggregateVersions: [String]
+    ) -> BatchID {
         var material = Data(metric.rawValue.utf8)
         material.append(0)
         material.append(anchorBlob)
+        for version in aggregateVersions.sorted() {
+            material.append(0)
+            material.append(Data(version.utf8))
+        }
         let digest = SHA256.hash(material)
         let hex = digest.prefix(16).map { String(format: "%02x", $0) }.joined()
         let id = "\(hex.prefix(8))-\(hex.dropFirst(8).prefix(4))-\(hex.dropFirst(12).prefix(4))-\(hex.dropFirst(16).prefix(4))-\(hex.dropFirst(20))"
@@ -193,6 +208,9 @@ private extension NativeWire {
         ]
         if envelope.demo {
             object["demo"] = .bool(true)
+        }
+        if let completeThrough = envelope.completeThrough {
+            object["completeThrough"] = .string(completeThrough)
         }
         return try CanonicalJSON.object(object).serialized()
     }

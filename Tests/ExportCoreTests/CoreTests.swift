@@ -1126,6 +1126,104 @@ func statisticsRecord(
     )
 }
 
+@Test func retroactiveDirtyDayDrainsOnLaterEmptyDeltaRun() async throws {
+    let metric = MetricCatalog.stepCount.id
+    let retroactive = SampleRecord(
+        key: RecordKey(uuid: "a1000000-0000-4000-8000-000000000001"),
+        metric: metric,
+        start: "2024-01-01T12:00:00Z",
+        end: "2024-01-01T12:00:00Z",
+        timeZoneOffsetMinutes: 0,
+        timeZoneSource: .unknown,
+        value: 123,
+        unit: CanonicalUnit(symbol: "count"),
+        observedAt: "2024-02-01T00:00:00Z"
+    )
+    let page = SamplePage(
+        samples: [retroactive],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0xA1]),
+        observedThrough: Date(timeIntervalSince1970: 1_706_745_600)
+    )
+    let source = FixtureSource(pages: [page])
+    let store = MemoryStateStore()
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-retroactive-dirty-\(UUID().uuidString)")
+    let destinationURL = root.appendingPathComponent("destination")
+    try FileManager.default.createDirectory(
+        at: destinationURL,
+        withIntermediateDirectories: true
+    )
+    let first = ExportRun(
+        source: source,
+        destination: .testing(LocalFileSink(directory: destinationURL)),
+        store: store,
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch-first"),
+        envelope: testEnvelope(),
+        statistics: nil
+    )
+    #expect(try await first.run().kind == .success)
+    #expect(try store.transaction.dirtyDays(metric: metric) == ["2024-01-01"])
+
+    let second = ExportRun(
+        source: source,
+        destination: .testing(LocalFileSink(directory: destinationURL)),
+        store: store,
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch-second"),
+        envelope: testEnvelope(),
+        statistics: FixtureStatistics(
+            byDay: ["2024-01-01": statisticsRecord(metric: metric)]
+        )
+    )
+    #expect(try await second.run().kind == .success)
+    #expect(try store.transaction.dirtyDays(metric: metric).isEmpty)
+
+    let delivered = try FileManager.default.contentsOfDirectory(
+        at: destinationURL,
+        includingPropertiesForKeys: nil
+    ).filter { $0.pathExtension == "ndjson" }
+    #expect(delivered.count == 2)
+    let payloads = try delivered.map { try String(contentsOf: $0, encoding: .utf8) }
+    let aggregatePayload = try #require(payloads.first { $0.contains("\"kind\":\"aggregate\"") })
+    #expect(aggregatePayload.contains("\"completeThrough\":"))
+    #expect(aggregatePayload.contains("\"bucketStart\":\"2024-01-01T00:00:00.000Z\""))
+}
+
+@Test func persistedDiscreteDirtyDayRefetchesFullDayBeforeFold() async throws {
+    let metric = MetricCatalog.heartRate.id
+    let sample = heartSample("a2000000-0000-4000-8000-000000000001")
+    let store = MemoryStateStore()
+    try store.transaction.markDirty(metric: metric, day: "2024-01-01")
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-dirty-refetch-\(UUID().uuidString)")
+    let destinationURL = root.appendingPathComponent("destination")
+    try FileManager.default.createDirectory(
+        at: destinationURL,
+        withIntermediateDirectories: true
+    )
+    let run = ExportRun(
+        source: FixtureSource(pages: []),
+        destination: .testing(LocalFileSink(directory: destinationURL)),
+        store: store,
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch"),
+        envelope: testEnvelope(),
+        observations: FixtureDays(byDay: ["2024-01-01": [sample]])
+    )
+    #expect(try await run.run().kind == .success)
+    #expect(try store.transaction.dirtyDays(metric: metric).isEmpty)
+    let delivered = try FileManager.default.contentsOfDirectory(
+        at: destinationURL,
+        includingPropertiesForKeys: nil
+    ).filter { $0.pathExtension == "ndjson" }
+    let payload = try String(contentsOf: try #require(delivered.first), encoding: .utf8)
+    #expect(payload.contains("\"kind\":\"aggregate\""))
+    #expect(payload.contains("\"sampleCount\":1"))
+}
+
 @Test func writeAheadCursorPreventsRereadAfterCommit() async throws {
     let metric = MetricID(rawValue: "heartRate")
     let page = SamplePage(
@@ -1154,6 +1252,10 @@ func statisticsRecord(
     #expect(first.kind == .success)
     #expect(try store.transaction.loadCursor(metric: metric)?.anchorBlob == Data([0xAA]))
     #expect(store.transaction.cursors[metric]?.anchorBlob.prefix(4) == Data("OHEC".utf8))
+    let checkpoint = try CheckpointEnvelope.decoded(
+        try #require(store.transaction.cursors[metric]?.anchorBlob)
+    )
+    #expect(checkpoint.tzDatabaseVersion == TemporalContext.utc.tzDatabaseVersion)
     #expect(try store.transaction.pendingBatches().isEmpty)
     #expect(store.transaction.ledger.count == 3)
     let phases = store.transaction.ledger.map(\.outcomeKind)
@@ -1174,7 +1276,11 @@ func statisticsRecord(
         uuid: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     )
     #expect(indexed?.day == "2024-01-01")
-    #expect(indexed?.batchID == NativeWire.batchID(metric: metric, anchorBlob: Data([0xAA])))
+    let headerLine = try #require(payloadText.split(whereSeparator: \.isNewline).first)
+    let header = try #require(
+        JSONSerialization.jsonObject(with: Data(headerLine.utf8)) as? [String: Any]
+    )
+    #expect(indexed?.batchID.rawValue == header["batchId"] as? String)
 
     let second = try await run.run()
     #expect(second.kind == .successNothingDue)

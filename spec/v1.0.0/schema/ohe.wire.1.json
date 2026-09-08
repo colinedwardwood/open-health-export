@@ -22,6 +22,7 @@
       "properties": {
         "kind": { "type": "string", "const": "batch.header", "x-ohe-open": false },
         "batchId": { "type": "string" },
+        "completeThrough": { "type": "string" },
         "emittedAt": { "type": "string" },
         "exporterId": { "type": "string" },
         "mode": {

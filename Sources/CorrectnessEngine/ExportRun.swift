@@ -20,6 +20,7 @@ public struct ExportRun: Sendable {
     public var clock: any Clock
     public var temporal: TemporalContext
     public var statistics: (any StatisticsSource)?
+    public var observations: (any DayObservationSource)?
     public var trigger: RunTrigger
     public var snapshotURL: URL?
     public var externalStatusURL: URL?
@@ -41,6 +42,7 @@ public struct ExportRun: Sendable {
         clock: any Clock = SystemClock(),
         temporal: TemporalContext = .utc,
         statistics: (any StatisticsSource)? = nil,
+        observations: (any DayObservationSource)? = nil,
         trigger: RunTrigger = .manual,
         snapshotURL: URL? = nil,
         externalStatusURL: URL? = nil,
@@ -58,6 +60,7 @@ public struct ExportRun: Sendable {
         self.clock = clock
         self.temporal = temporal
         self.statistics = statistics
+        self.observations = observations
         self.trigger = trigger
         self.snapshotURL = snapshotURL
         self.externalStatusURL = externalStatusURL
@@ -95,21 +98,29 @@ public struct ExportRun: Sendable {
         #if DEBUG
         try faults.hit(.afterRead)
         #endif
-        if page.samples.isEmpty, page.tombstones.isEmpty {
+        let aggregates = try await drainPlans(for: page)
+        if page.samples.isEmpty, page.tombstones.isEmpty, aggregates.isEmpty {
             let outcome = RunOutcome.derive(from: RunTally(nothingDue: true))
             try await record(outcome: outcome, tally: RunTally(nothingDue: true), receipt: nil)
             return outcome
         }
 
-        let aggregates = try await drainPlans(for: page)
-        let batchID = NativeWire.batchID(metric: metric, anchorBlob: page.anchorBlob)
+        let batchID = NativeWire.batchID(
+            metric: metric,
+            anchorBlob: page.anchorBlob,
+            aggregateVersions: aggregates.map {
+                "\($0.record.bucketKey)#\($0.record.emitSeq)"
+            }
+        )
+        var wireEnvelope = envelope
+        wireEnvelope.completeThrough = page.observedThrough.ISO8601Format()
         let payload = try NativeWire.encode(
             samples: page.samples,
             tombstones: page.tombstones,
             aggregates: aggregates.map(\.record),
             metric: metric,
             batchID: batchID,
-            envelope: envelope
+            envelope: wireEnvelope
         )
         #if DEBUG
         try faults.hit(.afterTransform)
@@ -135,7 +146,7 @@ public struct ExportRun: Sendable {
                 advancing: CursorAdvance(
                     page: page,
                     epoch: effectiveEpoch,
-                    tzDatabaseVersion: envelope.producerVersion
+                    tzDatabaseVersion: temporal.tzDatabaseVersion
                 )
             )
             try Census.apply(page: page, to: tx)
@@ -210,8 +221,9 @@ public struct ExportRun: Sendable {
 
     private func drainPlans(for page: SamplePage) async throws -> [AggregateDayPlan] {
         var days = Set(page.samples.map { String($0.start.prefix(10)) })
-        let tombDays = try await store.transact { tx -> Set<String> in
+        let persistedDays = try await store.transact { tx -> Set<String> in
             var found: Set<String> = []
+            found.formUnion(try tx.dirtyDays(metric: metric))
             for tomb in page.tombstones {
                 if let row = try tx.loadEmittedIndex(uuid: tomb.key.uuid) {
                     found.insert(row.day)
@@ -219,11 +231,21 @@ public struct ExportRun: Sendable {
             }
             return found
         }
-        days.formUnion(tombDays)
+        days.formUnion(persistedDays)
+        var aggregateSamples = page.samples
+        if let observations {
+            var byUUID = Dictionary(uniqueKeysWithValues: page.samples.map { ($0.key.uuid, $0) })
+            for day in days {
+                for sample in try await observations.samples(metric: metric, day: day) {
+                    byUUID[sample.key.uuid] = sample
+                }
+            }
+            aggregateSamples = Array(byUUID.values)
+        }
         return try await AggregateResolver.plans(
             metric: metric,
             days: days,
-            samples: page.samples,
+            samples: aggregateSamples,
             statistics: statistics,
             store: store,
             context: temporal,

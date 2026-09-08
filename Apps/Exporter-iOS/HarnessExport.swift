@@ -104,6 +104,7 @@ enum HarnessExport {
                 ),
                 temporal: context,
                 statistics: statistics,
+                observations: observations,
                 trigger: trigger,
                 snapshotURL: StatusSnapshotLocation.url(destinationID: "local-file"),
                 externalStatusURL: dest.appendingPathComponent("status.json"),
@@ -253,6 +254,7 @@ enum HarnessExport {
             tzDatabaseVersion: "host"
         )
         let source = HealthKitSampleSource(context: context, limit: 1000)
+        let observations = HealthKitDayObservationSource(context: context, limit: 1000)
         let statistics = HealthKitStatisticsSource(context: context)
         let now = Date().ISO8601Format()
         let ledgerSeal = ledgerHeadSeal()
@@ -274,6 +276,7 @@ enum HarnessExport {
                 ),
                 temporal: context,
                 statistics: statistics,
+                observations: observations,
                 snapshotURL: StatusSnapshotLocation.url(destinationID: "companion"),
                 ledgerHeadSeal: ledgerSeal,
                 ledgerSealURL: ledgerSealURL
