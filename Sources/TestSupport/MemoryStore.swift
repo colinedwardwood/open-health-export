@@ -157,6 +157,13 @@ public final class MemoryTransaction: StateTransaction {
         typeStatus[status.metric] = status
     }
 
+    public func purgeMetricState(metric: MetricID) throws {
+        cursors.removeValue(forKey: metric)
+        census = census.filter { $0.value.metric != metric }
+        dirty.removeValue(forKey: metric)
+        emittedIndex = emittedIndex.filter { $0.value.metric != metric }
+    }
+
     public func wipe(atEpoch: TimeInterval) throws -> [String] {
         let urls = pending.values.map(\.payloadURL)
         let destroyedCount = ledger.count

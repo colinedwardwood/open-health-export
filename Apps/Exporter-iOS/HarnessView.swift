@@ -333,7 +333,12 @@ struct HarnessView: View {
         phase = .working
         status = "Working: Health authorisation."
         do {
-            try await HealthKitAuthorization.requestReadAccess()
+            try await HealthKitAuthorization.requestReadAccess(
+                metrics: [MetricCatalog.heartRate.id, MetricCatalog.stepCount.id]
+            )
+            try await HarnessExport.observeAuthorizationChanges()
+            try await HarnessExport.reenableCoreActivityAfterAuthorizationRequest()
+            await startHealthObserversIfEligible()
             status = "Ready. Health authorisation finished. Apple does not tell us whether you allowed or denied a type."
             phase = .ready
         } catch {

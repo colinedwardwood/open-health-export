@@ -22,11 +22,16 @@ final class AppLifecycleCoordinator {
 
     func startObserversIfEligible() async throws {
         guard UserDefaults.standard.bool(forKey: "disclosureAcknowledged"),
-              HarnessExport.isLocalFileEnabled(),
-              healthObservers == nil
+              HarnessExport.isLocalFileEnabled()
         else {
             return
         }
+        let revoked = try await HarnessExport.observeAuthorizationChanges()
+        if revoked {
+            stopObservers()
+            return
+        }
+        guard healthObservers == nil else { return }
         healthObservers = try await HarnessExport.startHealthObservers()
         BackgroundTaskCoordinator.submit()
     }

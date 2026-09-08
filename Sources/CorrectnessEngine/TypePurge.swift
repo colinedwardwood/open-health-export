@@ -34,8 +34,18 @@ public enum TypePurge {
                 )
             )
         }
+        let priorGeneration = try tx.loadTypeStatus(metric: metric)?.generation ?? 1
+        let nextGeneration = priorGeneration == UInt32.max
+            ? UInt32.max
+            : priorGeneration + 1
+        try tx.purgeMetricState(metric: metric)
         try tx.upsertTypeStatus(
-            TypeStatus(metric: metric, disabled: true, reason: reason)
+            TypeStatus(
+                metric: metric,
+                disabled: true,
+                reason: reason,
+                generation: nextGeneration
+            )
         )
         try tx.appendLedger(
             EgressEntry(
@@ -75,6 +85,20 @@ extension StateStore {
         }
         for path in urls {
             try? FileManager.default.removeItem(atPath: path)
+        }
+    }
+
+    public func reenableType(metric: MetricID, reason: String) async throws {
+        try await transact { tx in
+            let generation = try tx.loadTypeStatus(metric: metric)?.generation ?? 1
+            try tx.upsertTypeStatus(
+                TypeStatus(
+                    metric: metric,
+                    disabled: false,
+                    reason: reason,
+                    generation: generation
+                )
+            )
         }
     }
 }

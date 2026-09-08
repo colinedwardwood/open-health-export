@@ -66,8 +66,10 @@ public struct ExportRun: Sendable {
     }
 
     public func run() async throws -> RunOutcome {
-        if let status = try await store.transact({ try $0.loadTypeStatus(metric: metric) }),
-           status.disabled {
+        let typeStatus = try await store.transact {
+            try $0.loadTypeStatus(metric: metric)
+        }
+        if let typeStatus, typeStatus.disabled {
             let tally = RunTally(
                 failed: 1,
                 terminalError: .internalFault,
@@ -77,6 +79,7 @@ public struct ExportRun: Sendable {
             try await record(outcome: outcome, tally: tally, receipt: nil)
             return outcome
         }
+        let effectiveEpoch = max(epoch, typeStatus?.generation ?? epoch)
         let prior: CursorSnapshot?
         do {
             prior = try await store.transact { tx in
@@ -129,7 +132,7 @@ public struct ExportRun: Sendable {
                 pending,
                 advancing: CursorAdvance(
                     page: page,
-                    epoch: epoch,
+                    epoch: effectiveEpoch,
                     tzDatabaseVersion: envelope.producerVersion
                 )
             )

@@ -120,21 +120,27 @@ public enum HealthKitSourceError: Error, Sendable {
 }
 
 public enum HealthKitAuthorization {
-    public static func readTypes() -> Set<HKObjectType> {
+    public static func readTypes(for metrics: [MetricID]) -> Set<HKObjectType> {
         var types: Set<HKObjectType> = []
-        for declaration in MetricCatalog.all {
-            if let type = SampleConversion.quantityType(for: declaration.id) {
+        for metric in metrics {
+            if let type = SampleConversion.quantityType(for: metric) {
                 types.insert(type)
             }
         }
         return types
     }
 
-    public static func requestReadAccess(store: HKHealthStore = HKHealthStore()) async throws {
+    public static func requestReadAccess(
+        metrics: [MetricID],
+        store: HKHealthStore = HKHealthStore()
+    ) async throws {
         guard HKHealthStore.isHealthDataAvailable() else {
             throw HealthKitSourceError.unavailable
         }
-        try await store.requestAuthorization(toShare: Set<HKSampleType>(), read: readTypes())
+        try await store.requestAuthorization(
+            toShare: Set<HKSampleType>(),
+            read: readTypes(for: metrics)
+        )
     }
 }
 

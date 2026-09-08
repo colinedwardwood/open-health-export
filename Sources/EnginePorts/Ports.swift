@@ -74,11 +74,18 @@ public struct TypeStatus: Sendable, Equatable {
     public var metric: MetricID
     public var disabled: Bool
     public var reason: String
+    public var generation: UInt32
 
-    public init(metric: MetricID, disabled: Bool, reason: String) {
+    public init(
+        metric: MetricID,
+        disabled: Bool,
+        reason: String,
+        generation: UInt32 = 1
+    ) {
         self.metric = metric
         self.disabled = disabled
         self.reason = reason
+        self.generation = generation
     }
 }
 
@@ -252,6 +259,7 @@ public protocol StateTransaction: AnyObject {
     func loadJournal() throws -> [RunEvent]
     func loadTypeStatus(metric: MetricID) throws -> TypeStatus?
     func upsertTypeStatus(_ status: TypeStatus) throws
+    func purgeMetricState(metric: MetricID) throws
     /// Clears every table. Returns pending payload paths to unlink after COMMIT (R-43).
     func wipe(atEpoch: TimeInterval) throws -> [String]
 }

@@ -64,6 +64,7 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
             "ALTER TABLE ledger ADD COLUMN byte_count INTEGER NOT NULL DEFAULT 0;",
             "ALTER TABLE ledger ADD COLUMN detail TEXT NOT NULL DEFAULT '';",
             "ALTER TABLE ledger ADD COLUMN wall_time_epoch REAL NOT NULL DEFAULT 0;",
+            "ALTER TABLE type_status ADD COLUMN generation INTEGER NOT NULL DEFAULT 1;",
         ] {
             do { try exec(sql) } catch { _ = error }
         }
@@ -149,7 +150,8 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
             CREATE TABLE IF NOT EXISTS type_status (
                 metric TEXT PRIMARY KEY,
                 disabled INTEGER NOT NULL,
-                reason TEXT NOT NULL
+                reason TEXT NOT NULL,
+                generation INTEGER NOT NULL DEFAULT 1
             );
             PRAGMA user_version = 9;
             """)
@@ -595,7 +597,7 @@ private final class SQLiteTransaction: StateTransaction {
 
     func loadTypeStatus(metric: MetricID) throws -> TypeStatus? {
         let stmt = try store.prepare(
-            "SELECT disabled, reason FROM type_status WHERE metric = ? LIMIT 1;"
+            "SELECT disabled, reason, generation FROM type_status WHERE metric = ? LIMIT 1;"
         )
         defer { sqlite3_finalize(stmt) }
         bindText(stmt, 1, metric.rawValue)
@@ -603,19 +605,30 @@ private final class SQLiteTransaction: StateTransaction {
         return TypeStatus(
             metric: metric,
             disabled: sqlite3_column_int64(stmt, 0) != 0,
-            reason: text(stmt, 1)
+            reason: text(stmt, 1),
+            generation: UInt32(clamping: sqlite3_column_int64(stmt, 2))
         )
     }
 
     func upsertTypeStatus(_ status: TypeStatus) throws {
         let stmt = try store.prepare(
-            "INSERT INTO type_status (metric, disabled, reason) VALUES (?, ?, ?) ON CONFLICT(metric) DO UPDATE SET disabled = excluded.disabled, reason = excluded.reason;"
+            "INSERT INTO type_status (metric, disabled, reason, generation) VALUES (?, ?, ?, ?) ON CONFLICT(metric) DO UPDATE SET disabled = excluded.disabled, reason = excluded.reason, generation = excluded.generation;"
         )
         defer { sqlite3_finalize(stmt) }
         bindText(stmt, 1, status.metric.rawValue)
         sqlite3_bind_int64(stmt, 2, status.disabled ? 1 : 0)
         bindText(stmt, 3, status.reason)
+        sqlite3_bind_int64(stmt, 4, Int64(status.generation))
         try stepDone(stmt)
+    }
+
+    func purgeMetricState(metric: MetricID) throws {
+        for table in ["cursors", "census", "dirty", "emitted_index"] {
+            let stmt = try store.prepare("DELETE FROM \(table) WHERE metric = ?;")
+            defer { sqlite3_finalize(stmt) }
+            bindText(stmt, 1, metric.rawValue)
+            try stepDone(stmt)
+        }
     }
 
     func wipe(atEpoch: TimeInterval) throws -> [String] {

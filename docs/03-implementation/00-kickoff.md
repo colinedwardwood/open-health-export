@@ -130,7 +130,13 @@ Application lifecycle ownership now records launch/foreground/BG-refresh/
 BG-processing wakes before fallible work, restores eligible observers from
 `didFinishLaunching`, and registers and resubmits both BG task classes. Their
 permitted identifiers are also policy-checked. HealthKit grant observation on
-every wake and the resulting timed R-44 purge remain open.
+every launch, activation, observer callback, and BG task now persists request
+state and triggers R-44 only for the observable
+`unnecessary → shouldRequest` transition. The purge evicts and unlinks queued
+payloads, clears cursors and emitted-index rows, bumps per-type generation,
+disables background delivery, and records journal and ledger evidence. Empty
+reads remain explicitly non-evidence of denial. Device timing confirmation and
+the explicit-stop XCUITest remain open.
 New pending rows also carry a creation epoch. Foreground launch enforces the
 ratified seven-day TTL transactionally, records gap and ledger evidence,
 unlinks bytes after commit, re-seals the head and posts classified user copy.

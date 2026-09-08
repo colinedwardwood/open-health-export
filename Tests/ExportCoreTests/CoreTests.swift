@@ -2433,6 +2433,24 @@ private struct OneExportFault: ExportFaultInjector {
             ),
             advancing: CursorAdvance(page: stepPage, epoch: 1)
         )
+        try tx.upsertEmittedIndex(
+            EmittedIndexRow(
+                uuid: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                metric: heart,
+                day: "2024-01-01",
+                digest: "heart",
+                batchID: BatchID(rawValue: "h")
+            )
+        )
+        try tx.upsertEmittedIndex(
+            EmittedIndexRow(
+                uuid: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                metric: steps,
+                day: "2024-01-01",
+                digest: "steps",
+                batchID: BatchID(rawValue: "s")
+            )
+        )
     }
     try await store.purgeType(
         metric: heart,
@@ -2447,10 +2465,27 @@ private struct OneExportFault: ExportFaultInjector {
     let status = try await store.transact { try $0.loadTypeStatus(metric: heart) }
     #expect(status?.disabled == true)
     #expect(status?.reason == "revocation_observed")
+    #expect(status?.generation == 2)
+    #expect(try await store.transact { try $0.loadCursor(metric: heart) } == nil)
+    #expect(try await store.transact { try $0.loadCursor(metric: steps) } != nil)
+    #expect(
+        try await store.transact {
+            try $0.loadEmittedIndex(uuid: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+        } == nil
+    )
+    #expect(
+        try await store.transact {
+            try $0.loadEmittedIndex(uuid: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+        } != nil
+    )
     let journal = try await store.transact { try $0.loadJournal() }
     #expect(journal.last?.outcomeKind == "purged")
     let gaps = try await store.transact { try $0.loadGaps() }
     #expect(gaps.contains { $0.rangeDescription.hasPrefix("purged_by_revocation:") })
+    try await store.reenableType(metric: heart, reason: "user_requested")
+    let reenabled = try await store.transact { try $0.loadTypeStatus(metric: heart) }
+    #expect(reenabled?.disabled == false)
+    #expect(reenabled?.generation == 2)
 }
 
 private actor ResettableTestLedgerSeal: ResettableLedgerHeadSeal {
@@ -2511,4 +2546,32 @@ final class CountingSource: SampleSource, @unchecked Sendable {
     #expect(outcome.partialCause == "types_purged")
     #expect(source.pages == 0)
     #expect(try store.transaction.loadLedger().last?.outcomeKind == "run:failed")
+}
+
+@Test func reenabledTypeCommitsWithItsBumpedGeneration() async throws {
+    let metric = MetricCatalog.heartRate.id
+    let dest = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-generation-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+    let store = MemoryStateStore()
+    try await store.transact {
+        try $0.upsertTypeStatus(
+            TypeStatus(
+                metric: metric,
+                disabled: false,
+                reason: "user_requested",
+                generation: 4
+            )
+        )
+    }
+    let run = ExportRun(
+        source: CountingSource(),
+        destination: .testing(LocalFileSink(directory: dest)),
+        store: store,
+        metric: metric,
+        scratchDirectory: dest.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    )
+    _ = try await run.run()
+    #expect(try store.transaction.loadCursor(metric: metric)?.epoch == 4)
 }
