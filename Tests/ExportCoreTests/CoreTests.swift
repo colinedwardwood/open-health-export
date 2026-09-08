@@ -162,7 +162,11 @@ import Redaction
     let measurementForbidden: Set<String> = [
         "date", "enum", "energy", "gas", "monetary", "timestamp", "volume", "water",
     ]
-    #expect(MetricCatalog.all.count == 23)
+    #expect(MetricCatalog.all.count == 26)
+    #expect(MetricCatalog.height.haUnit == "cm")
+    #expect(MetricCatalog.height.haDeviceClass == "distance")
+    #expect(MetricCatalog.bodyFatPercentage.haDeviceClass == nil)
+    #expect(MetricCatalog.bodyMassIndex.haUnit == nil)
     #expect(MetricCatalog.bloodGlucose.wireUnit == "mg/dL")
     #expect(MetricCatalog.bloodGlucose.haDeviceClass == "blood_glucose_concentration")
     #expect(MetricCatalog.vo2Max.sensitivity == .sensitive)
@@ -415,7 +419,12 @@ import Redaction
         ),
         to: url
     )
-    try DestinationSnapshotFile.recordSecurityEvents(2, writtenAtEpoch: 2, at: url)
+    try DestinationSnapshotFile.recordSecurityEvents(
+        2,
+        destinationID: "local-file",
+        writtenAtEpoch: 2,
+        at: url
+    )
     #expect(
         try DestinationSnapshotFile.read(from: url).unacknowledgedSecurityEventCount == 3
     )
@@ -423,6 +432,23 @@ import Redaction
     let acknowledged = try DestinationSnapshotFile.read(from: url)
     #expect(acknowledged.unacknowledgedSecurityEventCount == 0)
     #expect(acknowledged.writtenAtEpoch == 3)
+}
+
+@Test func widgetSnapshotSecurityEventsCreateTheFileWhenMissing() throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-security-create-\(UUID().uuidString).json")
+    try DestinationSnapshotFile.recordSecurityEvents(
+        1,
+        destinationID: "local-file",
+        destinationLabel: "This iPhone",
+        writtenAtEpoch: 4,
+        at: url
+    )
+    let created = try DestinationSnapshotFile.read(from: url)
+    #expect(created.destinationID == "local-file")
+    #expect(created.destinationLabel == "This iPhone")
+    #expect(created.unacknowledgedSecurityEventCount == 1)
+    #expect(created.state == .noExportsYet)
 }
 
 @Test func exportRunWritesWidgetSnapshotAfterCommit() async throws {

@@ -147,12 +147,26 @@ public enum DestinationSnapshotFile {
 
     public static func recordSecurityEvents(
         _ count: Int,
+        destinationID: String,
+        destinationLabel: String? = nil,
         writtenAtEpoch: TimeInterval,
         at url: URL
     ) throws {
         guard count > 0 else { return }
-        var snapshot = try read(from: url)
-        snapshot.unacknowledgedSecurityEventCount += count
+        var snapshot: DestinationStatusSnapshot
+        if FileManager.default.fileExists(atPath: url.path) {
+            snapshot = try read(from: url)
+            snapshot.unacknowledgedSecurityEventCount += count
+        } else {
+            snapshot = DestinationStatusSnapshot(
+                destinationID: destinationID,
+                destinationLabel: destinationLabel,
+                enabled: true,
+                state: .noExportsYet,
+                unacknowledgedSecurityEventCount: count,
+                writtenAtEpoch: writtenAtEpoch
+            )
+        }
         snapshot.writtenAtEpoch = writtenAtEpoch
         try write(snapshot, to: url)
     }

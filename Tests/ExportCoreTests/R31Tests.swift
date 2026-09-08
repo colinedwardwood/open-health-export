@@ -49,6 +49,15 @@ func sampleIdentity(leaf: String, issuer: String = "issuer00") -> TLSIdentity {
     #expect(setup.state == .enabled)
 }
 
+@Test func destinationResumeEnabledDoesNotReEmitTrustEvents() throws {
+    var setup = DestinationSetup()
+    try setup.resumeEnabled(testReport: .passedLocalFile)
+    #expect(setup.state == .enabled)
+    #expect(setup.drainEvents().isEmpty)
+    _ = try setup.enable(sink: LocalFileSinkStub())
+    #expect(setup.drainEvents().isEmpty)
+}
+
 @Test func destinationCannotEnableUntilPathTestPasses() throws {
     var setup = DestinationSetup()
     try setup.recordPreview(Data("preview".utf8))
@@ -87,6 +96,34 @@ func sampleIdentity(leaf: String, issuer: String = "issuer00") -> TLSIdentity {
     )
     #expect(missing.verdict == .failed)
     #expect(missing.failingStep == .openFolder)
+}
+
+@Test func localFileDestinationEnableRequiresAPassingPathTest() throws {
+    let missing = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-enable-missing-\(UUID().uuidString)")
+    #expect(throws: SetupError.verificationRequired) {
+        _ = try LocalFileDestinationEnable.complete(
+            directory: missing,
+            exporterId: "exporter-1",
+            emittedAt: "2024-01-01T00:00:00Z"
+        )
+    }
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-enable-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let first = try LocalFileDestinationEnable.complete(
+        directory: directory,
+        exporterId: "exporter-1",
+        emittedAt: "2024-01-01T00:00:00Z"
+    )
+    #expect(first.report.verdict == .passed)
+    #expect(first.events == [
+        .canaryConfirmed,
+        .pinRecorded(groupedFingerprint: nil),
+        .destinationEnabled,
+    ])
+    let resume = try LocalFileDestinationEnable.resume(directory: directory, testReport: first.report)
+    _ = resume.sink
 }
 
 @Test func mqttQoS0TestIsNeverSuccess() {

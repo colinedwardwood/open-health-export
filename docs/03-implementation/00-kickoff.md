@@ -51,7 +51,7 @@ asks for camera permission before scanning and always keeps paste as a fallback.
 export one page, then forget pairing and pair again. Simulator has no camera and often an empty
 Health store.
 
-The catalogue has 23 curated quantity types, including activity totals, cardiac
+The catalogue has 26 curated quantity types, including activity totals, cardiac
 measurements, temperatures, body composition, hydration and blood pressure.
 HA state JSON is encoded separately from discovery and is not eligible for retain.
 Blood glucose is canonical `mg/dL` and uses HA's real
@@ -162,5 +162,11 @@ families show unacknowledged destination changes until explicit acknowledgement.
 The harness's fixed `Where your data goes` section renders those same
 destination snapshots and provides an egress-ledger view. Opening the ledger
 verifies the SHA-256 chain first and shows an explicit warning on a broken
-sequence; the visible rows are bounded to the latest 50 attempts.
+sequence; the visible rows are bounded to the latest 50 attempts. Launch also
+checks ledger integrity. Local archive enablement walks `DestinationSetup`
+through a real-path canary (R-25) and drains trust events into R-40 notices
+without repeating them on later launches. Unacknowledged destination changes
+can be cleared from that screen. The screen documents Apple's Hidden Apps
+recovery path (R-41). Two-tap controls stop one metric (R-44 explicit stop)
+and run `DestructiveWipe` (R-43).
 

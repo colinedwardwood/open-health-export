@@ -140,6 +140,19 @@ public struct DestinationSetup: Sendable {
         testReport = report
     }
 
+    /// Restores a previously enabled destination after process restart without
+    /// re-emitting trust events. The stored test report must still allow enablement.
+    public mutating func resumeEnabled(testReport: DestinationTestReport) throws {
+        guard state == .draft else {
+            throw SetupError.illegalTransition(from: state, to: .enabled)
+        }
+        guard testReport.allowsEnablement else {
+            throw SetupError.verificationRequired
+        }
+        self.testReport = testReport
+        state = .enabled
+    }
+
     public mutating func enable(sink: any DestinationSink) throws -> VerifiedDestination {
         guard state != .halted else { throw SetupError.notEnabled }
         guard state == .pinned || state == .enabled else {

@@ -39,7 +39,8 @@ enum HarnessExport {
         try fm.createDirectory(at: scratch, withIntermediateDirectories: true)
 
         let store = try SQLiteStateStore(path: sqliteURL.path)
-        let sink = LocalFileSink(directory: dest)
+        let (verified, events) = try verifiedLocalFile(root: root, destinationDirectory: dest)
+        try await emitTrustNotices(events)
         let context = TemporalContext(
             timeZoneIdentifier: "UTC",
             localeIdentifier: "en_US_POSIX",
@@ -55,7 +56,7 @@ enum HarnessExport {
         for metric in [MetricCatalog.heartRate.id, MetricCatalog.stepCount.id] {
             let run = ExportRun(
                 source: source,
-                destination: .testing(sink),
+                destination: verified,
                 store: store,
                 metric: metric,
                 scratchDirectory: scratch,
@@ -175,7 +176,9 @@ enum HarnessExport {
             let last = snapshot.lastSuccessEpoch.map {
                 Date(timeIntervalSince1970: $0).formatted(date: .abbreviated, time: .shortened)
             } ?? "never"
-            return "\(snapshot.destinationLabel): \(snapshot.state.rawValue) · last success \(last)"
+            let changes = snapshot.unacknowledgedSecurityEventCount
+            let changeSuffix = changes > 0 ? " · \(changes) unacknowledged change(s)" : ""
+            return "\(snapshot.destinationLabel): \(snapshot.state.rawValue) · last success \(last)\(changeSuffix)"
         }
     }
 
@@ -212,7 +215,113 @@ enum HarnessExport {
         return lines
     }
 
+    static func ledgerIntegrityLine() async throws -> String {
+        let lines = try await ledgerLines()
+        return lines.first ?? "Ledger has not been written yet."
+    }
+
+    static func acknowledgeDestinationChanges() throws {
+        let now = Date().timeIntervalSince1970
+        for snapshot in StatusSnapshotLocation.readAll() where snapshot.unacknowledgedSecurityEventCount > 0 {
+            guard let url = StatusSnapshotLocation.url(destinationID: snapshot.destinationID) else {
+                continue
+            }
+            try DestinationSnapshotFile.acknowledgeSecurityEvents(writtenAtEpoch: now, at: url)
+        }
+        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+    }
+
+    static func enableLocalFileDestination() async throws -> [String] {
+        let root = try applicationSupportRoot()
+        let dest = root.appendingPathComponent("exports", isDirectory: true)
+        try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+        try? FileManager.default.removeItem(at: localFileTestReportURL(root: root))
+        let (_, events) = try verifiedLocalFile(root: root, destinationDirectory: dest)
+        try await emitTrustNotices(events)
+        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+        return destinationStatusLines()
+    }
+
+    static func stopExportingHeartRate() async throws {
+        let root = try applicationSupportRoot()
+        let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+        try await store.purgeType(
+            metric: MetricCatalog.heartRate.id,
+            reason: "explicit_stop",
+            destination: "local-file",
+            atEpoch: Date().timeIntervalSince1970
+        )
+    }
+
+    static func wipeEverything() async throws {
+        let root = try applicationSupportRoot()
+        let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+        try await DestructiveWipe.perform(
+            store: store,
+            secretStores: [KeychainSecretStore(service: "app.openhealthexporter.ios.psk")],
+            ledgerSeal: resettableLedgerHeadSeal(),
+            ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
+            atEpoch: Date().timeIntervalSince1970
+        )
+        try? FileManager.default.removeItem(at: localFileTestReportURL(root: root))
+        try await vault().forget()
+        if let directory = StatusSnapshotLocation.directory() {
+            try? FileManager.default.removeItem(at: directory)
+        }
+        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+    }
+
+    private static func verifiedLocalFile(
+        root: URL,
+        destinationDirectory: URL
+    ) throws -> (VerifiedDestination, [TrustEvent]) {
+        let reportURL = localFileTestReportURL(root: root)
+        if let saved = try? Data(contentsOf: reportURL),
+           let report = try? JSONDecoder().decode(DestinationTestReport.self, from: saved),
+           report.allowsEnablement {
+            return (
+                try LocalFileDestinationEnable.resume(
+                    directory: destinationDirectory,
+                    testReport: report
+                ),
+                []
+            )
+        }
+        let completed = try LocalFileDestinationEnable.complete(
+            directory: destinationDirectory,
+            exporterId: try installationID(),
+            emittedAt: Date().ISO8601Format()
+        )
+        try JSONEncoder().encode(completed.report).write(to: reportURL, options: .atomic)
+        if let snapshotURL = StatusSnapshotLocation.url(destinationID: "local-file") {
+            try DestinationSnapshotFile.recordSecurityEvents(
+                completed.events.count,
+                destinationID: "local-file",
+                destinationLabel: "This iPhone → Archive folder",
+                writtenAtEpoch: Date().timeIntervalSince1970,
+                at: snapshotURL
+            )
+        }
+        return (completed.destination, completed.events)
+    }
+
+    private static func emitTrustNotices(_ events: [TrustEvent]) async throws {
+        guard !events.isEmpty else { return }
+        let notifier = LocalUserNotifier()
+        for event in events {
+            try await notifier.notify(TrustNotice.notice(for: event, destination: "local-file"))
+        }
+    }
+
+    private static func localFileTestReportURL(root: URL) -> URL {
+        root.appendingPathComponent("local-file-test.json")
+    }
+
     private static func ledgerHeadSeal() -> any LedgerHeadSeal {
+        resettableLedgerHeadSeal()
+    }
+
+    private static func resettableLedgerHeadSeal() -> any ResettableLedgerHeadSeal {
         #if targetEnvironment(simulator)
         SecureEnclaveLedgerSeal(useSecureEnclave: false, permanent: true)
         #else

@@ -153,6 +153,9 @@ import Testing
         (MetricCatalog.dietaryWater, .liter(), 0.25, 250),
         (MetricCatalog.bloodPressureSystolic, .millimeterOfMercury(), 120, 120),
         (MetricCatalog.bloodPressureDiastolic, .millimeterOfMercury(), 80, 80),
+        (MetricCatalog.height, .meter(), 1.78, 1.78),
+        (MetricCatalog.bodyFatPercentage, .percent(), 0.185, 18.5),
+        (MetricCatalog.bodyMassIndex, .count(), 22.4, 22.4),
     ]
     for (declaration, sourceUnit, sourceValue, expected) in fixtures {
         guard let type = SampleConversion.quantityType(for: declaration.id) else {

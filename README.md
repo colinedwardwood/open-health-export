@@ -34,6 +34,11 @@ Requires [XcodeGen](https://github.com/yonaskolb/XcodeGen). The `.xcodeproj` is 
 not committed. Run on a physical iPhone (REF-B or iPhone XR) for a populated Health store.
 Acknowledge the locked-device disclosure before Health permission.
 
+If this app disappears from the Home Screen, that is an iOS feature we cannot
+prevent. Our binary has no stealth mode, alternate icons, or second name. Check
+Settings → Apps → Hidden Apps, Screen Time, Battery, and App Store purchase
+history. Apple's guide: <https://support.apple.com/guide/personal-safety/lock-or-hide-apps-on-your-iphone-ipsd0be4c185/web>.
+
 On the wire, destinations receive **`ohe.wire/1` NDJSON** (see `docs/02-design/03-wire-format-spec.md`).
 HTTPS POSTs that file with `Idempotency-Key` and `Content-Type: application/x-ndjson; profile="ohe.wire/1"`.
 JSON document, CSV, and the Health Auto Export profile are specified but not emitted yet.

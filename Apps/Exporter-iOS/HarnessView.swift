@@ -29,6 +29,9 @@ struct HarnessView: View {
     @State private var diagnosticShareURL: URL?
     @State private var destinationStatusLines: [String] = []
     @State private var ledgerLines: [String] = []
+    @State private var ledgerWarning = ""
+    @State private var wipeArmed = false
+    @State private var stopHeartRateArmed = false
 
     var body: some View {
         NavigationStack {
@@ -64,7 +67,10 @@ struct HarnessView: View {
         .onAppear {
             timeToFirstFrameMS = LaunchMark.millisecondsToNow()
             destinationStatusLines = HarnessExport.destinationStatusLines()
-            Task { await restorePairing() }
+            Task {
+                await restorePairing()
+                await refreshLedgerIntegrity()
+            }
         }
         .sheet(isPresented: $showScanner) {
             PairingScanner(
@@ -118,6 +124,19 @@ struct HarnessView: View {
 
             Text("Where your data goes")
                 .font(.headline)
+            if !ledgerWarning.isEmpty {
+                Text(ledgerWarning)
+                    .font(.footnote)
+                    .foregroundStyle(ledgerWarning.hasPrefix("WARNING") ? .red : .secondary)
+                    .accessibilityLabel("Ledger status: \(ledgerWarning)")
+            }
+            Text("Your health data is sent only to destinations listed here. This is what the app records about its own use, not independent proof.")
+                .font(.footnote)
+            Button("Enable local archive folder (R-25 test)") {
+                Task { await enableLocalFile() }
+            }
+            .disabled(phase == .working)
+            .accessibilityHint("Writes a canary file, reads it back, then enables the local-file destination.")
             Button("Refresh destination status") {
                 destinationStatusLines = HarnessExport.destinationStatusLines()
             }
@@ -126,6 +145,16 @@ struct HarnessView: View {
                     .font(.footnote)
                     .textSelection(.enabled)
             }
+            Button("Acknowledge destination changes") {
+                do {
+                    try HarnessExport.acknowledgeDestinationChanges()
+                    destinationStatusLines = HarnessExport.destinationStatusLines()
+                    status = "Ready. Unacknowledged destination changes were cleared."
+                } catch {
+                    status = "Failed: \(error.localizedDescription)"
+                }
+            }
+            .disabled(phase == .working)
             Button("Verify and show egress ledger") {
                 Task { await loadLedger() }
             }
@@ -136,6 +165,32 @@ struct HarnessView: View {
                     .font(.system(.footnote, design: .monospaced))
                     .textSelection(.enabled)
             }
+
+            Text("If someone else set this up")
+                .font(.headline)
+            Text("iOS can hide this app. We cannot prevent that, and we do not offer stealth mode, alternate icons, or a second name. Check Settings → Apps → Hidden Apps, Screen Time, Battery, and App Store purchase history. Apple's Personal Safety guide: https://support.apple.com/guide/personal-safety/lock-or-hide-apps-on-your-iphone-ipsd0be4c185/web")
+                .font(.footnote)
+
+            Text("Stop and delete")
+                .font(.headline)
+            Button(stopHeartRateArmed ? "Confirm: stop exporting heart rate" : "Stop exporting heart rate") {
+                if stopHeartRateArmed {
+                    Task { await stopHeartRate() }
+                } else {
+                    stopHeartRateArmed = true
+                    status = "Ready. Tap again to purge queued heart-rate payloads and disable that type."
+                }
+            }
+            .disabled(phase == .working)
+            Button(wipeArmed ? "Confirm: delete credentials and ledger identity" : "Delete everything on this device") {
+                if wipeArmed {
+                    Task { await wipeDevice() }
+                } else {
+                    wipeArmed = true
+                    status = "Ready. Tap again to destroy credentials, pairing, and the ledger signing identity."
+                }
+            }
+            .disabled(phase == .working)
 
             Text("Diagnostics")
                 .font(.headline)
@@ -233,6 +288,7 @@ struct HarnessView: View {
         status = "Working: verifying egress ledger."
         do {
             ledgerLines = try await HarnessExport.ledgerLines()
+            ledgerWarning = ledgerLines.first ?? ""
             status = "Ready. The ledger includes attempts and failures; it contains counts, not health values."
         } catch {
             ledgerLines = []
@@ -290,11 +346,72 @@ struct HarnessView: View {
         do {
             results = try await HarnessExport.runOnePageEachMetric()
             destinationStatusLines = HarnessExport.destinationStatusLines()
+            await refreshLedgerIntegrity()
             status = "Ready. Local export finished. Outcome kinds are engine-derived, not assigned by this screen."
         } catch {
             status = "Failed: \(error.localizedDescription)"
         }
         phase = .ready
+    }
+
+    @MainActor
+    private func enableLocalFile() async {
+        phase = .working
+        status = "Working: local-folder destination test."
+        wipeArmed = false
+        do {
+            destinationStatusLines = try await HarnessExport.enableLocalFileDestination()
+            await refreshLedgerIntegrity()
+            status = "Ready. Local archive passed write/read/confirm and is enabled."
+        } catch {
+            status = "Failed: \(error.localizedDescription)"
+        }
+        phase = .ready
+    }
+
+    @MainActor
+    private func stopHeartRate() async {
+        phase = .working
+        status = "Working: type purge."
+        do {
+            try await HarnessExport.stopExportingHeartRate()
+            stopHeartRateArmed = false
+            await refreshLedgerIntegrity()
+            status = "Ready. Heart rate is disabled and queued payloads for that type were purged."
+        } catch {
+            status = "Failed: \(error.localizedDescription)"
+        }
+        phase = .ready
+    }
+
+    @MainActor
+    private func wipeDevice() async {
+        phase = .working
+        status = "Working: destructive wipe."
+        do {
+            try await HarnessExport.wipeEverything()
+            wipeArmed = false
+            stopHeartRateArmed = false
+            pairing = nil
+            sas = ""
+            pairingPaste = ""
+            destinationStatusLines = HarnessExport.destinationStatusLines()
+            ledgerLines = []
+            await refreshLedgerIntegrity()
+            status = "Ready. Credentials and the previous ledger identity were destroyed."
+        } catch {
+            status = "Failed: \(error.localizedDescription)"
+        }
+        phase = .ready
+    }
+
+    @MainActor
+    private func refreshLedgerIntegrity() async {
+        do {
+            ledgerWarning = try await HarnessExport.ledgerIntegrityLine()
+        } catch {
+            ledgerWarning = "WARNING: \(error.localizedDescription)"
+        }
     }
 
     @MainActor

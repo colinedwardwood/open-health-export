@@ -332,6 +332,51 @@ public enum MetricCatalog {
         haRequiresAggregate: false
     )
 
+    public static let height = MetricDeclaration(
+        id: MetricID(rawValue: "height"),
+        wireId: "height",
+        hkIdentifier: "HKQuantityTypeIdentifierHeight",
+        canonicalUnit: CanonicalUnit(symbol: "m"),
+        wireUnit: "m",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .sensitive,
+        haUnit: "cm",
+        haDeviceClass: "distance",
+        haStateClass: "measurement",
+        haRequiresAggregate: false
+    )
+
+    public static let bodyFatPercentage = MetricDeclaration(
+        id: MetricID(rawValue: "bodyFatPercentage"),
+        wireId: "body_fat_percentage",
+        hkIdentifier: "HKQuantityTypeIdentifierBodyFatPercentage",
+        canonicalUnit: CanonicalUnit(symbol: "%"),
+        wireUnit: "%",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .sensitive,
+        haUnit: "%",
+        haDeviceClass: nil,
+        haStateClass: "measurement",
+        haRequiresAggregate: false
+    )
+
+    public static let bodyMassIndex = MetricDeclaration(
+        id: MetricID(rawValue: "bodyMassIndex"),
+        wireId: "body_mass_index",
+        hkIdentifier: "HKQuantityTypeIdentifierBodyMassIndex",
+        canonicalUnit: CanonicalUnit(symbol: "count"),
+        wireUnit: "count",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .sensitive,
+        haUnit: nil,
+        haDeviceClass: nil,
+        haStateClass: "measurement",
+        haRequiresAggregate: false
+    )
+
     public static let leanBodyMass = MetricDeclaration(
         id: MetricID(rawValue: "leanBodyMass"),
         wireId: "lean_body_mass",
@@ -412,6 +457,9 @@ public enum MetricCatalog {
         heartRateVariabilitySDNN,
         bodyTemperature,
         basalBodyTemperature,
+        height,
+        bodyFatPercentage,
+        bodyMassIndex,
         leanBodyMass,
         dietaryWater,
         bloodPressureSystolic,

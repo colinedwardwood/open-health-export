@@ -146,5 +146,21 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck ambient clocks: ok")
+        var disguise: [String] = []
+        if let files = FileManager.default.enumerator(at: apps, includingPropertiesForKeys: nil) {
+            for case let file as URL in files {
+                let name = file.lastPathComponent
+                guard name == "Info.plist" || file.pathExtension == "plist" else { continue }
+                let text = try String(contentsOf: file, encoding: .utf8)
+                if text.contains("CFBundleAlternateIcons") {
+                    disguise.append("\(file.path): CFBundleAlternateIcons")
+                }
+            }
+        }
+        if !disguise.isEmpty {
+            FileHandle.standardError.write(Data((disguise.joined(separator: "\n") + "\n").utf8))
+            exit(1)
+        }
+        print("policycheck no alternate icons: ok")
     }
 }

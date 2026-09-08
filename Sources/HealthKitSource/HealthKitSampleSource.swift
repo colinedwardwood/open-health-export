@@ -49,7 +49,9 @@ enum SampleConversion {
             return .kilocalorie()
         case MetricCatalog.bodyMass.id, MetricCatalog.leanBodyMass.id:
             return .gramUnit(with: .kilo)
-        case MetricCatalog.oxygenSaturation.id:
+        case MetricCatalog.height.id:
+            return .meter()
+        case MetricCatalog.oxygenSaturation.id, MetricCatalog.bodyFatPercentage.id:
             return .percent()
         case MetricCatalog.walkingRunningDistance.id, MetricCatalog.cyclingDistance.id:
             return .meter()
@@ -74,7 +76,7 @@ enum SampleConversion {
 
     static func canonicalValue(_ hkValue: Double, metric: MetricID) -> Double {
         switch metric {
-        case MetricCatalog.oxygenSaturation.id:
+        case MetricCatalog.oxygenSaturation.id, MetricCatalog.bodyFatPercentage.id:
             return hkValue * 100
         case MetricCatalog.walkingRunningDistance.id, MetricCatalog.cyclingDistance.id:
             return hkValue / 1000
