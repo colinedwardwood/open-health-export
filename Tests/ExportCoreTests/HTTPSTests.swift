@@ -425,3 +425,20 @@ private func writeHTTPSPayload() throws -> (URL, BatchID) {
         )
     }
 }
+
+@Test func systemHTTPTransportFactoryHonorsThePersistedAllowlistBeforeProbing() async throws {
+    let url = try #require(URL(string: "http://receiver.example/export"))
+    let transport = try SystemHTTPTransport.make(
+        probing: url,
+        allowedHosts: ["receiver.example"],
+        allowInsecureHTTP: true
+    )
+    #expect(try await transport.identityProbe() == nil)
+    #expect(throws: EgressError.notAllowlisted("receiver.example")) {
+        _ = try SystemHTTPTransport.make(
+            probing: url,
+            allowedHosts: ["other.example"],
+            allowInsecureHTTP: true
+        )
+    }
+}

@@ -27,6 +27,10 @@ struct HarnessView: View {
     @State private var pairingPaste = ""
     @State private var pairing: PairingSession?
     @State private var sas = ""
+    @State private var httpsURL = ""
+    @State private var httpsBearer = ""
+    @State private var allowInsecureHTTP = false
+    @State private var httpsTestLines: [String] = []
     @State private var showScanner = false
     @State private var diagnosticPreview = ""
     @State private var diagnosticPayload: Data?
@@ -290,6 +294,37 @@ struct HarnessView: View {
             }
             .disabled(phase == .working)
             .accessibilityHint("Writes a canary file, reads it back, then enables the local-file destination.")
+            TextField("HTTPS destination URL", text: $httpsURL)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.URL)
+                .accessibilityIdentifier("https-url")
+            SecureField("Bearer token (optional)", text: $httpsBearer)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .accessibilityIdentifier("https-bearer")
+            Toggle("Allow plain HTTP (unsafe)", isOn: $allowInsecureHTTP)
+                .accessibilityIdentifier("https-insecure")
+            if allowInsecureHTTP {
+                Text("Plain HTTP exposes health exports to anyone able to observe this network.")
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
+            Button("Test, pin, and enable HTTPS destination") {
+                Task { await enableHTTPS() }
+            }
+            .disabled(phase == .working || httpsURL.isEmpty)
+            .accessibilityIdentifier("https-enable")
+            Button("Export one page (HTTPS destination)") {
+                Task { await runHTTPSExport() }
+            }
+            .disabled(phase == .working)
+            .accessibilityIdentifier("https-export")
+            ForEach(Array(httpsTestLines.enumerated()), id: \.offset) { _, line in
+                Text(line)
+                    .font(.footnote)
+                    .textSelection(.enabled)
+            }
             Button("Refresh destination status") {
                 destinationStatusLines = HarnessExport.destinationStatusLines()
             }
@@ -888,6 +923,42 @@ struct HarnessView: View {
             await startHealthObserversIfEligible()
             await refreshLedgerIntegrity()
             status = "Ready. Local archive passed write/read/confirm and is enabled."
+        } catch {
+            status = "Failed: \(error.localizedDescription)"
+        }
+        phase = .ready
+    }
+
+    @MainActor
+    private func enableHTTPS() async {
+        phase = .working
+        status = "Working: HTTPS destination test and identity pin."
+        do {
+            httpsTestLines = try await HarnessExport.enableHTTPSDestination(
+                urlString: httpsURL,
+                allowInsecureHTTP: allowInsecureHTTP,
+                bearer: httpsBearer.isEmpty ? nil : httpsBearer
+            )
+            httpsBearer = ""
+            destinationStatusLines = HarnessExport.destinationStatusLines()
+            await refreshLedgerIntegrity()
+            status = "Ready. Network destination passed its real-path test and is enabled."
+        } catch {
+            httpsTestLines = []
+            status = "Failed: \(error.localizedDescription)"
+        }
+        phase = .ready
+    }
+
+    @MainActor
+    private func runHTTPSExport() async {
+        phase = .working
+        status = "Working: HTTPS export."
+        do {
+            results = try await HarnessExport.runHTTPSDestination()
+            destinationStatusLines = HarnessExport.destinationStatusLines()
+            await refreshLedgerIntegrity()
+            status = "Ready. HTTPS export finished."
         } catch {
             status = "Failed: \(error.localizedDescription)"
         }

@@ -11,6 +11,7 @@ import MetricCatalog
 import NetEgress
 import RunJournal
 import SinkCompanion
+import SinkHTTP
 import SinkLocalFile
 import StorageSQLite
 import UIKit
@@ -22,6 +23,17 @@ private struct CompanionVerificationRecord: Codable {
     var serviceName: String
     var macInstallationID: String
     var report: DestinationTestReport
+}
+
+private struct HTTPSVerificationRecord: Codable {
+    var urlString: String
+    var allowedHosts: [String]
+    var allowInsecureHTTP: Bool
+    var report: DestinationTestReport
+    var leafSPKISha256: String?
+    var issuerSPKISha256: String?
+    var firstSeen: String
+    var hasBearer: Bool
 }
 
 private actor ObserverExportGate {
@@ -694,6 +706,190 @@ enum HarnessExport {
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
     }
 
+    static func enableHTTPSDestination(
+        urlString: String,
+        allowInsecureHTTP: Bool,
+        bearer: String?
+    ) async throws -> [String] {
+        guard let host = URL(string: urlString)?.host?.lowercased(), !host.isEmpty else {
+            throw EgressError.invalidURL
+        }
+        let allowedHosts: Set<String> = [host]
+        let destination = try HTTPSDestination(
+            urlString: urlString,
+            allowedHosts: allowedHosts,
+            allowInsecureHTTP: allowInsecureHTTP,
+            authorizationBearer: bearer
+        )
+        let transport = try SystemHTTPTransport.make(
+            probing: destination.url,
+            allowedHosts: allowedHosts,
+            allowInsecureHTTP: allowInsecureHTTP
+        )
+        let now = Date().ISO8601Format()
+        let completed = try await HTTPSDestinationEnable.complete(
+            destination: destination,
+            transport: transport,
+            exporterID: try installationID(),
+            emittedAt: now
+        )
+        let record = HTTPSVerificationRecord(
+            urlString: destination.url.absoluteString,
+            allowedHosts: allowedHosts.sorted(),
+            allowInsecureHTTP: allowInsecureHTTP,
+            report: completed.report,
+            leafSPKISha256: completed.identity?.leafSPKISha256,
+            issuerSPKISha256: completed.identity?.issuerSPKISha256,
+            firstSeen: now,
+            hasBearer: bearer != nil
+        )
+        let root = try applicationSupportRoot()
+        let bearerStore = KeychainSecretStore(
+            service: "app.openhealthexporter.ios.https"
+        )
+        let bearerHandle = SecretHandle(rawValue: "bearer")
+        if let bearer {
+            try await bearerStore.store(Array(bearer.utf8), handle: bearerHandle)
+        } else {
+            try? await bearerStore.delete(bearerHandle)
+        }
+        try JSONEncoder().encode(record).write(
+            to: root.appendingPathComponent("https-destination.json"),
+            options: .atomic
+        )
+        if let snapshotURL = StatusSnapshotLocation.url(destinationID: "https") {
+            try DestinationSnapshotFile.recordSecurityEvents(
+                completed.events.count,
+                destinationID: "https",
+                destinationLabel: host,
+                writtenAtEpoch: Date().timeIntervalSince1970,
+                at: snapshotURL
+            )
+        }
+        try await emitTrustNotices(completed.events, destination: host)
+        if allowInsecureHTTP {
+            let store = try SQLiteStateStore(
+                path: root.appendingPathComponent("state.sqlite").path
+            )
+            try await store.transact { tx in
+                try tx.appendLedger(
+                    EgressEntry(
+                        destination: host,
+                        sampleCount: 0,
+                        outcomeKind: "security:insecure_http_enabled",
+                        detail: "explicit_user_opt_in",
+                        wallTimeEpoch: Date().timeIntervalSince1970
+                    )
+                )
+            }
+        }
+        var lines = completed.report.steps.map {
+            "\($0.name.rawValue): \($0.outcome.rawValue)"
+        }
+        if let identity = completed.identity {
+            lines.append("TLS \(identity.tlsVersion) · \(identity.cipherSuite)")
+            lines.append("Leaf SPKI \(identity.groupedLeafFingerprint)")
+            lines.append("Subject \(identity.leafSubject)")
+            lines.append("Issuer \(identity.leafIssuer)")
+        } else {
+            lines.append("Plain HTTP enabled by explicit opt-in.")
+        }
+        return lines
+    }
+
+    static func runHTTPSDestination() async throws -> [String] {
+        let root = try applicationSupportRoot()
+        let data = try Data(
+            contentsOf: root.appendingPathComponent("https-destination.json")
+        )
+        let saved = try JSONDecoder().decode(HTTPSVerificationRecord.self, from: data)
+        let allowedHosts = Set(saved.allowedHosts)
+        let bearer: String?
+        if saved.hasBearer {
+            bearer = String(
+                decoding: try await KeychainSecretStore(
+                    service: "app.openhealthexporter.ios.https"
+                ).load(SecretHandle(rawValue: "bearer")),
+                as: UTF8.self
+            )
+        } else {
+            bearer = nil
+        }
+        let destination = try HTTPSDestination(
+            urlString: saved.urlString,
+            allowedHosts: allowedHosts,
+            allowInsecureHTTP: saved.allowInsecureHTTP,
+            authorizationBearer: bearer
+        )
+        let base = try SystemHTTPTransport.make(
+            probing: destination.url,
+            allowedHosts: allowedHosts,
+            allowInsecureHTTP: saved.allowInsecureHTTP
+        )
+        let transport: any HTTPTransport
+        if let leaf = saved.leafSPKISha256, let issuer = saved.issuerSPKISha256 {
+            transport = PinningHTTPTransport(
+                inner: base,
+                pin: PinRecord(
+                    leafSPKISha256: leaf,
+                    issuerSPKISha256: issuer,
+                    firstSeen: saved.firstSeen,
+                    policy: .leaf
+                )
+            )
+        } else {
+            transport = base
+        }
+        var setup = DestinationSetup()
+        try setup.resumeEnabled(testReport: saved.report)
+        let verified = try setup.enable(
+            sink: HTTPSSink(destination: destination, transport: transport)
+        )
+        let store = try SQLiteStateStore(
+            path: root.appendingPathComponent("state.sqlite").path
+        )
+        let scratch = root.appendingPathComponent("scratch", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: scratch,
+            withIntermediateDirectories: true
+        )
+        let context = TemporalContext(
+            timeZoneIdentifier: "UTC",
+            localeIdentifier: "en_US_POSIX",
+            tzDatabaseVersion: "host"
+        )
+        let source = HealthKitAnchoredSource(context: context, limit: 1000)
+        let now = Date().ISO8601Format()
+        let exporterID = try installationID()
+        var lines: [String] = []
+        for metric in selectedMetrics() {
+            let outcome = try await ExportRun(
+                source: source,
+                destination: verified,
+                store: store,
+                metric: metric,
+                scratchDirectory: scratch,
+                destinationName: "https",
+                envelope: WireEnvelope(
+                    exporterId: exporterID,
+                    seq: 1,
+                    emittedAt: now,
+                    observedAt: now
+                ),
+                temporal: context,
+                statistics: HealthKitStatisticsSource(context: context),
+                observations: HealthKitDayObservationSource(context: context),
+                trigger: .manual,
+                snapshotURL: StatusSnapshotLocation.url(destinationID: "https"),
+                ledgerHeadSeal: ledgerHeadSeal(),
+                ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json")
+            ).run()
+            lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
+        }
+        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+        return lines
+    }
+
     static func enableLocalFileDestination() async throws -> [String] {
         let root = try applicationSupportRoot()
         let dest = root.appendingPathComponent("exports", isDirectory: true)
@@ -743,7 +939,10 @@ enum HarnessExport {
         let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
         try await DestructiveWipe.perform(
             store: store,
-            secretStores: [KeychainSecretStore(service: "app.openhealthexporter.ios.psk")],
+            secretStores: [
+                KeychainSecretStore(service: "app.openhealthexporter.ios.psk"),
+                KeychainSecretStore(service: "app.openhealthexporter.ios.https"),
+            ],
             ledgerSeal: resettableLedgerHeadSeal(),
             ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
             atEpoch: Date().timeIntervalSince1970

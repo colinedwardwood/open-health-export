@@ -31,4 +31,52 @@ public enum SystemHTTPTransport {
     public static func make() -> any HTTPTransport {
         URLSessionHTTPTransport()
     }
+
+    public static func make(
+        probing url: URL,
+        allowedHosts: Set<String>,
+        allowInsecureHTTP: Bool = false
+    ) throws -> any HTTPTransport {
+        #if canImport(Network)
+        let endpoint = try StreamEndpoint.parse(
+            url.absoluteString,
+            allowedHosts: allowedHosts,
+            allowInsecure: allowInsecureHTTP
+        )
+        return IdentityProbingHTTPTransport(
+            http: URLSessionHTTPTransport(),
+            endpoint: endpoint
+        )
+        #else
+        _ = try EgressURL.parse(
+            url.absoluteString,
+            allowedHosts: allowedHosts,
+            allowInsecureHTTP: allowInsecureHTTP
+        )
+        return URLSessionHTTPTransport()
+        #endif
+    }
 }
+
+#if canImport(Network)
+private struct IdentityProbingHTTPTransport: HTTPTransport {
+    var http: URLSessionHTTPTransport
+    var endpoint: StreamEndpoint
+
+    func execute(_ request: OutboundHTTPRequest) async throws -> OutboundHTTPResponse {
+        try await http.execute(request)
+    }
+
+    func identityProbe() async throws -> TLSIdentity? {
+        guard endpoint.usesTLS else { return nil }
+        let stream = NWByteStream(
+            endpoint: endpoint,
+            options: .init(failFastOnWaiting: true)
+        )
+        try await stream.open()
+        let identity = await stream.identity()
+        await stream.close()
+        return identity
+    }
+}
+#endif
