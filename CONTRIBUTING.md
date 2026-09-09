@@ -47,7 +47,8 @@ reproduced verbatim in `COPYING`.
 
 ## Rules
 
-- No real health data in the repo, issues, or CI, including your own.
+- No real health data in the repo, issues, or CI, including your own. If that happens, follow
+  the incident steps in `SECURITY.md`.
 - No new runtime dependency without an ADR and a Linux-build check.
 - Changelog fragment in `changes/unreleased/` for user-visible changes.
 - Frozen `spec/` versions are not edited in place.
