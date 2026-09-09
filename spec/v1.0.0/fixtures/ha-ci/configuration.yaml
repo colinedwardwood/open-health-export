@@ -10,9 +10,5 @@ homeassistant:
   currency: USD
   country: US
 
-http:
-  server_port: 8123
-  use_x_forwarded_for: false
-
 recorder:
   commit_interval: 1

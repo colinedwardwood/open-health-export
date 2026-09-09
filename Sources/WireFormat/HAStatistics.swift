@@ -72,9 +72,9 @@ public struct HAEntitySnapshot: Sendable, Equatable {
 
 public enum HAStatisticsContract {
     public static let measurementForbiddenDeviceClasses: Set<String> = [
-        "date", "enum", "energy", "gas", "monetary", "timestamp", "volume", "water",
+        "date", "enum", "timestamp",
     ]
-    public static let invalidEnergyMeasurementEntityID = "sensor.ohe_invalid_energy_measurement"
+    public static let invalidMeasurementEntityID = "sensor.ohe_invalid_enum_measurement"
 
     /// Attributes posted on `/api/states/<entity_id>`. Nil catalogue fields are omitted, not empty.
     public static func restAttributes(for item: HAStatisticsCase) -> [String: Any] {

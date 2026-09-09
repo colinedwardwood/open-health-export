@@ -110,16 +110,16 @@ import WireFormat
     #expect(HAStatisticsContract.entityMatches(snapshot, expected: heart))
 }
 
-@Test func haStatisticsRejectsInvalidMeasurementAndEnumCombinations() {
+@Test func haStatisticsRejectsNonNumericMeasurementDeviceClasses() {
     #expect(
-        !HAStatisticsContract.statisticsWouldRecord(stateClass: "measurement", deviceClass: "energy")
+        HAStatisticsContract.statisticsWouldRecord(stateClass: "measurement", deviceClass: "energy")
     )
     #expect(
         !HAStatisticsContract.statisticsWouldRecord(stateClass: "measurement", deviceClass: "enum")
     )
     #expect(
-        HARecorder.statisticsDuringPeriod(
-            entityID: "sensor.bad",
+        !HARecorder.statisticsDuringPeriod(
+            entityID: "sensor.volume",
             states: [1, 2],
             stateClass: "measurement",
             deviceClass: "volume"

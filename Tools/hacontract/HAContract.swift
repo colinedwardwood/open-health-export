@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import MetricCatalog
 import NetEgress
 import WireFormat
@@ -35,13 +38,13 @@ struct HAContract {
                 token: token
             )
         }
-        try await client.putState(
-            entityID: HAStatisticsContract.invalidEnergyMeasurementEntityID,
-            state: 1,
+        try await client.putStringState(
+            entityID: HAStatisticsContract.invalidMeasurementEntityID,
+            state: "one",
             attributes: [
-                "unit_of_measurement": "kWh",
-                "device_class": "energy",
+                "device_class": "enum",
                 "state_class": "measurement",
+                "options": ["1", "2"],
             ],
             token: token
         )
@@ -54,13 +57,13 @@ struct HAContract {
                 token: token
             )
         }
-        try await client.putState(
-            entityID: HAStatisticsContract.invalidEnergyMeasurementEntityID,
-            state: 2,
+        try await client.putStringState(
+            entityID: HAStatisticsContract.invalidMeasurementEntityID,
+            state: "two",
             attributes: [
-                "unit_of_measurement": "kWh",
-                "device_class": "energy",
+                "device_class": "enum",
                 "state_class": "measurement",
+                "options": ["1", "2"],
             ],
             token: token
         )
@@ -98,7 +101,7 @@ struct HAContract {
         var last: [String: [HAStatisticsRow]] = [:]
         while ContinuousClock.now < deadline {
             last = try await client.statistics(
-                entityIDs: cases.map(\.entityID) + [HAStatisticsContract.invalidEnergyMeasurementEntityID],
+                entityIDs: cases.map(\.entityID) + [HAStatisticsContract.invalidMeasurementEntityID],
                 token: token
             )
             let missing = cases.filter {
@@ -122,6 +125,24 @@ struct HAContract {
                 )
                 exit(1)
             }
+            if shouldRecord,
+               item.statistic == "sum",
+               !rows.contains(where: { $0.sum != nil })
+            {
+                FileHandle.standardError.write(
+                    Data("rung 4: no sum statistic for \(item.entityID)\n".utf8)
+                )
+                exit(1)
+            }
+            if shouldRecord,
+               item.statistic == "mean",
+               !rows.contains(where: { $0.mean != nil })
+            {
+                FileHandle.standardError.write(
+                    Data("rung 4: no mean statistic for \(item.entityID)\n".utf8)
+                )
+                exit(1)
+            }
             if !shouldRecord, !rows.isEmpty {
                 FileHandle.standardError.write(
                     Data("rung 4: unexpected statistics for \(item.entityID)\n".utf8)
@@ -129,9 +150,9 @@ struct HAContract {
                 exit(1)
             }
         }
-        if !(last[HAStatisticsContract.invalidEnergyMeasurementEntityID] ?? []).isEmpty {
+        if !(last[HAStatisticsContract.invalidMeasurementEntityID] ?? []).isEmpty {
             FileHandle.standardError.write(
-                Data("rung 4: energy+measurement produced statistics\n".utf8)
+                Data("rung 4: enum+measurement produced statistics\n".utf8)
             )
             exit(1)
         }
@@ -221,6 +242,22 @@ struct HAClient {
             token: token,
             body: [
                 "state": formattedState(state),
+                "attributes": attributes,
+            ]
+        )
+    }
+
+    func putStringState(
+        entityID: String,
+        state: String,
+        attributes: [String: Any],
+        token: String
+    ) async throws {
+        _ = try await postJSON(
+            path: "/api/states/\(entityID)",
+            token: token,
+            body: [
+                "state": state,
                 "attributes": attributes,
             ]
         )
@@ -342,43 +379,33 @@ private func replacingNull(_ object: [String: Any]) -> [String: Any] {
     }
 }
 
-/// Tiny RFC 6455 client for HA's `/api/websocket`.
 struct HAWebSocket {
     var base: URL
 
     func statisticsDuringPeriod(entityIDs: [String], token: String) async throws -> [String: [HAStatisticsRow]] {
-        let host = base.host ?? "127.0.0.1"
-        let port = UInt16(base.port ?? 8123)
-        let stream = POSIXByteStream(endpoint: try StreamEndpoint(host: host, port: port, usesTLS: false))
-        try await stream.open()
-        let key = Data((0 ..< 16).map { _ in UInt8.random(in: 0 ... 255) }).base64EncodedString()
-        let handshake = """
-        GET /api/websocket HTTP/1.1\r
-        Host: \(host):\(port)\r
-        Upgrade: websocket\r
-        Connection: Upgrade\r
-        Sec-WebSocket-Key: \(key)\r
-        Sec-WebSocket-Version: 13\r
-        \r
-        """
-        try await stream.send(Data(handshake.utf8))
-        var header = Data()
-        while header.range(of: Data("\r\n\r\n".utf8)) == nil {
-            header.append(try await stream.receive(max: 4096))
-            if header.count > 16_384 { throw EgressError.transport("websocket handshake") }
+        guard var components = URLComponents(url: base, resolvingAgainstBaseURL: false) else {
+            throw EgressError.invalidURL
         }
-        let split = header.range(of: Data("\r\n\r\n".utf8))!
-        var leftover = Data(header[split.upperBound...])
-        _ = try await nextJSON(stream: stream, leftover: &leftover)
-        try await sendJSON(stream: stream, object: ["type": "auth", "access_token": token])
-        let authed = try await nextJSON(stream: stream, leftover: &leftover)
+        components.scheme = components.scheme == "https" ? "wss" : "ws"
+        components.path = "/api/websocket"
+        guard let websocketURL = components.url else { throw EgressError.invalidURL }
+        let task = URLSession(configuration: .ephemeral).webSocketTask(with: websocketURL)
+        task.resume()
+        defer { task.cancel(with: .normalClosure, reason: nil) }
+
+        let required = try await receiveJSON(task)
+        guard required["type"] as? String == "auth_required" else {
+            throw EgressError.transport("websocket did not request authentication")
+        }
+        try await sendJSON(task, object: ["type": "auth", "access_token": token])
+        let authed = try await receiveJSON(task)
         guard authed["type"] as? String == "auth_ok" else {
             throw EgressError.transport("websocket auth")
         }
         let start = ISO8601DateFormatter().string(from: Date().addingTimeInterval(-6 * 3600))
         let end = ISO8601DateFormatter().string(from: Date().addingTimeInterval(3600))
         try await sendJSON(
-            stream: stream,
+            task,
             object: [
                 "id": 1,
                 "type": "recorder/statistics_during_period",
@@ -388,31 +415,52 @@ struct HAWebSocket {
                 "period": "5minute",
             ]
         )
-        let result = try await nextResult(stream: stream, leftover: &leftover, id: 1)
-        await stream.close()
+        let result = try await nextResult(task, id: 1)
         let payload = (result["result"] as? [String: Any]) ?? [:]
         var mapped: [String: [HAStatisticsRow]] = [:]
         for id in entityIDs {
-            let encoded = try JSONSerialization.data(
-                withJSONObject: ["id": 1, "type": "result", "success": true, "result": [id: payload[id] ?? []]]
-            )
-            mapped[id] = try HARecorder.parseWebSocketResult(encoded, entityID: id)
+            let rawRows = payload[id] as? [[String: Any]] ?? []
+            mapped[id] = rawRows.compactMap { row in
+                guard let start = timestamp(row["start"]) else { return nil }
+                return HAStatisticsRow(
+                    start: start,
+                    end: timestamp(row["end"]) ?? start,
+                    mean: number(row["mean"]),
+                    sum: number(row["sum"])
+                )
+            }
         }
         return mapped
     }
 
-    private func sendJSON(stream: POSIXByteStream, object: [String: Any]) async throws {
+    private func number(_ value: Any?) -> Double? {
+        if value is NSNull { return nil }
+        return (value as? NSNumber)?.doubleValue
+    }
+
+    private func timestamp(_ value: Any?) -> String? {
+        if let string = value as? String { return string }
+        guard let epoch = number(value) else { return nil }
+        return ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: epoch))
+    }
+
+    private func sendJSON(
+        _ task: URLSessionWebSocketTask,
+        object: [String: Any]
+    ) async throws {
         let payload = try JSONSerialization.data(withJSONObject: object)
-        try await stream.send(mask(payload))
+        guard let string = String(data: payload, encoding: .utf8) else {
+            throw EgressError.transport("websocket JSON encoding")
+        }
+        try await task.send(.string(string))
     }
 
     private func nextResult(
-        stream: POSIXByteStream,
-        leftover: inout Data,
+        _ task: URLSessionWebSocketTask,
         id: Int
     ) async throws -> [String: Any] {
         while true {
-            let object = try await nextJSON(stream: stream, leftover: &leftover)
+            let object = try await receiveJSON(task)
             if object["type"] as? String == "result",
                (object["id"] as? Int ?? (object["id"] as? NSNumber)?.intValue) == id {
                 return object
@@ -420,79 +468,21 @@ struct HAWebSocket {
         }
     }
 
-    private func nextJSON(stream: POSIXByteStream, leftover: inout Data) async throws -> [String: Any] {
-        while true {
-            if let frame = try decodeFrame(leftover) {
-                leftover.removeSubrange(0 ..< frame.consumed)
-                if frame.opcode == 0x9 {
-                    try await stream.send(pong(frame.payload))
-                    continue
-                }
-                if frame.opcode == 0x1 {
-                    return try JSONSerialization.jsonObject(with: frame.payload) as? [String: Any] ?? [:]
-                }
-                continue
-            }
-            leftover.append(try await stream.receive(max: 4096))
+    private func receiveJSON(
+        _ task: URLSessionWebSocketTask
+    ) async throws -> [String: Any] {
+        let data: Data
+        switch try await task.receive() {
+        case .string(let string):
+            data = Data(string.utf8)
+        case .data(let received):
+            data = received
+        @unknown default:
+            throw EgressError.transport("unknown websocket message")
         }
-    }
-
-    private func pong(_ payload: Data) -> Data {
-        mask(payload, opcode: 0xA)
-    }
-
-    private func mask(_ payload: Data, opcode: UInt8 = 0x1) -> Data {
-        var header = Data()
-        header.append(0x80 | opcode)
-        let maskKey: [UInt8] = (0 ..< 4).map { _ in UInt8.random(in: 0 ... 255) }
-        let length = payload.count
-        if length <= 125 {
-            header.append(0x80 | UInt8(length))
-        } else if length <= 65535 {
-            header.append(0x80 | 126)
-            header.append(UInt8((length >> 8) & 0xFF))
-            header.append(UInt8(length & 0xFF))
-        } else {
-            header.append(0x80 | 127)
-            var big = UInt64(length).bigEndian
-            withUnsafeBytes(of: &big) { header.append(contentsOf: $0) }
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw EgressError.transport("websocket JSON decoding")
         }
-        header.append(contentsOf: maskKey)
-        var masked = [UInt8](payload)
-        for i in masked.indices {
-            masked[i] ^= maskKey[i % 4]
-        }
-        header.append(contentsOf: masked)
-        return header
-    }
-
-    private func decodeFrame(_ buffer: Data) throws -> (opcode: UInt8, payload: Data, consumed: Int)? {
-        guard buffer.count >= 2 else { return nil }
-        let bytes = [UInt8](buffer)
-        let opcode = bytes[0] & 0x0F
-        let masked = bytes[1] & 0x80 != 0
-        var length = Int(bytes[1] & 0x7F)
-        var offset = 2
-        if length == 126 {
-            guard buffer.count >= 4 else { return nil }
-            length = Int(bytes[2]) << 8 | Int(bytes[3])
-            offset = 4
-        } else if length == 127 {
-            guard buffer.count >= 10 else { return nil }
-            length = bytes[2...9].reduce(0) { ($0 << 8) | Int($1) }
-            offset = 10
-        }
-        var maskKey = [UInt8](repeating: 0, count: 4)
-        if masked {
-            guard buffer.count >= offset + 4 else { return nil }
-            maskKey = Array(bytes[offset ..< offset + 4])
-            offset += 4
-        }
-        guard buffer.count >= offset + length else { return nil }
-        var payload = Array(bytes[offset ..< offset + length])
-        if masked {
-            for i in payload.indices { payload[i] ^= maskKey[i % 4] }
-        }
-        return (opcode, Data(payload), offset + length)
+        return object
     }
 }
