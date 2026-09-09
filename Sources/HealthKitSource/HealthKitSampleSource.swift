@@ -552,6 +552,15 @@ public enum HealthKitSourceError: Error, Sendable {
     case unavailable
     case unknownMetric(MetricID)
     case queryFailed(String)
+
+    static func classifiedQueryError(_ error: Error) -> any Error {
+        let nsError = error as NSError
+        if nsError.domain == HKErrorDomain,
+           nsError.code == HKError.Code.errorDatabaseInaccessible.rawValue {
+            return DestinationSendError.deviceLocked
+        }
+        return queryFailed(error.localizedDescription)
+    }
 }
 
 public enum HealthKitAuthorization {
@@ -681,9 +690,7 @@ public final class HealthKitStructuredSource: SampleSource, @unchecked Sendable 
             ) { _, samples, deleted, newAnchor, error in
                 if let error {
                     continuation.resume(
-                        throwing: HealthKitSourceError.queryFailed(
-                            error.localizedDescription
-                        )
+                        throwing: HealthKitSourceError.classifiedQueryError(error)
                     )
                     return
                 }
@@ -768,7 +775,9 @@ public final class HealthKitSampleSource: SampleSource, @unchecked Sendable {
                 limit: limit
             ) { _, samples, deleted, newAnchor, error in
                 if let error {
-                    continuation.resume(throwing: HealthKitSourceError.queryFailed(error.localizedDescription))
+                    continuation.resume(
+                        throwing: HealthKitSourceError.classifiedQueryError(error)
+                    )
                     return
                 }
                 // Convert before the continuation resumes — no HK* leaves this callback.
@@ -833,9 +842,7 @@ public final class HealthKitCategorySource: SampleSource, @unchecked Sendable {
             ) { _, samples, deleted, newAnchor, error in
                 if let error {
                     continuation.resume(
-                        throwing: HealthKitSourceError.queryFailed(
-                            error.localizedDescription
-                        )
+                        throwing: HealthKitSourceError.classifiedQueryError(error)
                     )
                     return
                 }
@@ -908,9 +915,7 @@ public final class HealthKitCorrelationSource: SampleSource, @unchecked Sendable
             ) { _, samples, deleted, newAnchor, error in
                 if let error {
                     continuation.resume(
-                        throwing: HealthKitSourceError.queryFailed(
-                            error.localizedDescription
-                        )
+                        throwing: HealthKitSourceError.classifiedQueryError(error)
                     )
                     return
                 }
@@ -1015,7 +1020,7 @@ public final class HealthKitDayObservationSource: DayObservationSource, @uncheck
             ) { _, samples, _, newAnchor, error in
                 if let error {
                     continuation.resume(
-                        throwing: HealthKitSourceError.queryFailed(error.localizedDescription)
+                        throwing: HealthKitSourceError.classifiedQueryError(error)
                     )
                     return
                 }
@@ -1123,7 +1128,7 @@ public final class HealthKitStatisticsSource: StatisticsSource, @unchecked Senda
             query.initialResultsHandler = { _, collection, error in
                 if let error {
                     continuation.resume(
-                        throwing: HealthKitSourceError.queryFailed(error.localizedDescription)
+                        throwing: HealthKitSourceError.classifiedQueryError(error)
                     )
                     return
                 }

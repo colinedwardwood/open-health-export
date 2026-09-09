@@ -94,7 +94,23 @@ public struct ExportRun: Sendable {
             try await record(outcome: outcome, tally: tally, receipt: nil)
             throw error
         }
-        let page = try await source.page(metric: metric, afterAnchor: prior?.anchorBlob)
+        let page: SamplePage
+        do {
+            page = try await source.page(metric: metric, afterAnchor: prior?.anchorBlob)
+        } catch {
+            let errorClass = (error as? DestinationSendError)?.errorClass ?? .internalFault
+            let tally = RunTally(
+                failed: 1,
+                terminalError: errorClass,
+                partialCause: errorClass.rawValue
+            )
+            let outcome = RunOutcome.derive(from: tally)
+            try await record(outcome: outcome, tally: tally, receipt: nil)
+            if errorClass == .deviceLocked {
+                return outcome
+            }
+            throw error
+        }
         #if DEBUG
         try faults.hit(.afterRead)
         #endif

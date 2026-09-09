@@ -22,6 +22,12 @@ import Darwin
 import Glibc
 #endif
 
+private struct DeviceLockedSource: SampleSource {
+    func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage {
+        throw DestinationSendError.deviceLocked
+    }
+}
+
 @Test func errorClassManifestIsInBijectionWithTheEnum() {
     let keys = ErrorClass.allCases.map { ErrorClassManifest.record(for: $0).userCopyKey }
     #expect(Set(keys).count == ErrorClass.allCases.count)
@@ -39,6 +45,31 @@ import Glibc
     )
     #expect(!ErrorClassManifest.record(for: .deviceLocked).scheduleFailure)
     #expect(ErrorClassManifest.record(for: .budgetExhausted).scheduleFailure)
+}
+
+@Test func lockedStoreReadRecordsBlockedJournalOutcome() async throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-store-locked-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = MemoryStateStore()
+    let run = ExportRun(
+        source: DeviceLockedSource(),
+        destination: .testing(LocalFileSink(directory: root)),
+        store: store,
+        metric: MetricCatalog.heartRate.id,
+        scratchDirectory: root,
+        envelope: testEnvelope(),
+        trigger: .bgProcessing
+    )
+
+    let outcome = try await run.run()
+
+    #expect(outcome.kind == .blockedDeviceLocked)
+    let event = try #require(store.transaction.journal.last)
+    #expect(event.outcomeKind == RunOutcome.Kind.blockedDeviceLocked.rawValue)
+    #expect(event.errorClass == ErrorClass.deviceLocked.rawValue)
+    #expect(event.trigger == .bgProcessing)
+    #expect(store.transaction.pending.isEmpty)
 }
 
 @Test func diagnosticBundleIsBoundedManifestDerivedAndRedacted() throws {
