@@ -58,7 +58,7 @@ public enum DemoCorpus {
         .init(metricID: "low_heart_rate_event", healthKitIdentifier: "HKCategoryTypeIdentifierLowHeartRateEvent"),
         .init(metricID: "irregular_heart_rhythm_event", healthKitIdentifier: "HKCategoryTypeIdentifierIrregularHeartRhythmEvent"),
         .init(metricID: "audio_exposure_event", healthKitIdentifier: "HKCategoryTypeIdentifierHeadphoneAudioExposureEvent"),
-        .init(metricID: "environmental_audio_exposure_event", healthKitIdentifier: "HKCategoryTypeIdentifierEnvironmentalAudioExposureEvent"),
+        .init(metricID: "environmental_audio_exposure_event", healthKitIdentifier: "HKCategoryTypeIdentifierAudioExposureEvent"),
         .init(metricID: "handwashing_event", healthKitIdentifier: "HKCategoryTypeIdentifierHandwashingEvent"),
         .init(metricID: "toothbrushing_event", healthKitIdentifier: "HKCategoryTypeIdentifierToothbrushingEvent"),
         .init(metricID: "appetite_changes", healthKitIdentifier: "HKCategoryTypeIdentifierAppetiteChanges"),

@@ -6,6 +6,7 @@ import EnginePorts
 import Foundation
 import MetricCatalog
 import Testing
+import WireFormat
 @testable import HealthKitSource
 
 @Test func conversionHappensWithoutAuthorization() {
@@ -87,6 +88,21 @@ import Testing
         HealthKitAuthorization.readTypes(for: [CategoryConversion.sleepMetric])
             .contains(HKCategoryType(.sleepAnalysis))
     )
+}
+
+@Test func everyDeclaredCategoryMetricResolvesToItsHealthKitType() {
+    #expect(
+        Set(CategoryConversion.identifiers.keys.map(\.rawValue))
+            == Set(DemoCorpus.categoryTypes.map(\.metricID))
+    )
+    for category in DemoCorpus.categoryTypes {
+        let metric = MetricID(rawValue: category.metricID)
+        let type = CategoryConversion.categoryType(for: metric)
+        #expect(type?.identifier == category.healthKitIdentifier)
+        if let type {
+            #expect(HealthKitAuthorization.readTypes(for: [metric]).contains(type))
+        }
+    }
 }
 
 @Test func bloodPressureCorrelationKeepsComponentUUIDsAndCanonicalValues() {

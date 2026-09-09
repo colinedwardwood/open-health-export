@@ -135,10 +135,48 @@ enum SampleConversion {
 
 enum CategoryConversion {
     static let sleepMetric = MetricID(rawValue: "sleep_analysis")
+    static let identifiers: [MetricID: String] = [
+        sleepMetric: "HKCategoryTypeIdentifierSleepAnalysis",
+        MetricID(rawValue: "mindful_session"): "HKCategoryTypeIdentifierMindfulSession",
+        MetricID(rawValue: "menstrual_flow"): "HKCategoryTypeIdentifierMenstrualFlow",
+        MetricID(rawValue: "intermenstrual_bleeding"): "HKCategoryTypeIdentifierIntermenstrualBleeding",
+        MetricID(rawValue: "infrequent_menstrual_cycles"): "HKCategoryTypeIdentifierInfrequentMenstrualCycles",
+        MetricID(rawValue: "irregular_menstrual_cycles"): "HKCategoryTypeIdentifierIrregularMenstrualCycles",
+        MetricID(rawValue: "persistent_intermenstrual_bleeding"): "HKCategoryTypeIdentifierPersistentIntermenstrualBleeding",
+        MetricID(rawValue: "prolonged_menstrual_periods"): "HKCategoryTypeIdentifierProlongedMenstrualPeriods",
+        MetricID(rawValue: "cervical_mucus_quality"): "HKCategoryTypeIdentifierCervicalMucusQuality",
+        MetricID(rawValue: "ovulation_test_result"): "HKCategoryTypeIdentifierOvulationTestResult",
+        MetricID(rawValue: "progesterone_test_result"): "HKCategoryTypeIdentifierProgesteroneTestResult",
+        MetricID(rawValue: "pregnancy"): "HKCategoryTypeIdentifierPregnancy",
+        MetricID(rawValue: "pregnancy_test_result"): "HKCategoryTypeIdentifierPregnancyTestResult",
+        MetricID(rawValue: "contraceptive"): "HKCategoryTypeIdentifierContraceptive",
+        MetricID(rawValue: "lactation"): "HKCategoryTypeIdentifierLactation",
+        MetricID(rawValue: "sexual_activity"): "HKCategoryTypeIdentifierSexualActivity",
+        MetricID(rawValue: "high_heart_rate_event"): "HKCategoryTypeIdentifierHighHeartRateEvent",
+        MetricID(rawValue: "low_heart_rate_event"): "HKCategoryTypeIdentifierLowHeartRateEvent",
+        MetricID(rawValue: "irregular_heart_rhythm_event"): "HKCategoryTypeIdentifierIrregularHeartRhythmEvent",
+        MetricID(rawValue: "audio_exposure_event"): "HKCategoryTypeIdentifierHeadphoneAudioExposureEvent",
+        MetricID(rawValue: "environmental_audio_exposure_event"): "HKCategoryTypeIdentifierAudioExposureEvent",
+        MetricID(rawValue: "handwashing_event"): "HKCategoryTypeIdentifierHandwashingEvent",
+        MetricID(rawValue: "toothbrushing_event"): "HKCategoryTypeIdentifierToothbrushingEvent",
+        MetricID(rawValue: "appetite_changes"): "HKCategoryTypeIdentifierAppetiteChanges",
+        MetricID(rawValue: "bladder_incontinence"): "HKCategoryTypeIdentifierBladderIncontinence",
+        MetricID(rawValue: "bloating"): "HKCategoryTypeIdentifierAbdominalCramps",
+        MetricID(rawValue: "chills"): "HKCategoryTypeIdentifierChills",
+        MetricID(rawValue: "constipation"): "HKCategoryTypeIdentifierConstipation",
+        MetricID(rawValue: "coughing"): "HKCategoryTypeIdentifierCoughing",
+        MetricID(rawValue: "diarrhea"): "HKCategoryTypeIdentifierDiarrhea",
+        MetricID(rawValue: "dizziness"): "HKCategoryTypeIdentifierDizziness",
+        MetricID(rawValue: "dry_skin"): "HKCategoryTypeIdentifierDrySkin",
+        MetricID(rawValue: "fatigue"): "HKCategoryTypeIdentifierFatigue",
+        MetricID(rawValue: "fever"): "HKCategoryTypeIdentifierFever",
+    ]
 
     static func categoryType(for metric: MetricID) -> HKCategoryType? {
-        guard metric == sleepMetric else { return nil }
-        return HKCategoryType.categoryType(forIdentifier: .sleepAnalysis)
+        guard let identifier = identifiers[metric] else { return nil }
+        return HKCategoryType.categoryType(
+            forIdentifier: HKCategoryTypeIdentifier(rawValue: identifier)
+        )
     }
 
     static func record(
@@ -172,7 +210,9 @@ enum CategoryConversion {
             ) / 60,
             timeZoneSource: .deviceCurrent,
             categoryValue: sample.value,
-            categoryName: sleepName(sample.value),
+            categoryName: metric == sleepMetric
+                ? sleepName(sample.value)
+                : "raw_\(sample.value)",
             durationSeconds: sample.endDate.timeIntervalSince(sample.startDate),
             observedAt: SampleConversion.formatUTC(Date()),
             source: source,
