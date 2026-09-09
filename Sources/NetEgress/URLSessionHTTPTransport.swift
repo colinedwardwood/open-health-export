@@ -43,6 +43,10 @@ public final class URLSessionHTTPTransport: HTTPTransport, @unchecked Sendable {
         }
         return OutboundHTTPResponse(status: http.statusCode, body: data, headers: headers)
     }
+
+    public func applyingPin(_ pin: PinRecord) -> any HTTPTransport {
+        URLSessionHTTPTransport(pin: pin)
+    }
 }
 
 /// Redirects are not followed: a 3xx host is not re-checked against the allowlist (T-04).
@@ -136,6 +140,10 @@ private struct IdentityProbingHTTPTransport: HTTPTransport {
 
     func execute(_ request: OutboundHTTPRequest) async throws -> OutboundHTTPResponse {
         try await http.execute(request)
+    }
+
+    func applyingPin(_ pin: PinRecord) -> any HTTPTransport {
+        IdentityProbingHTTPTransport(http: URLSessionHTTPTransport(pin: pin), endpoint: endpoint)
     }
 
     func identityProbe() async throws -> TLSIdentity? {

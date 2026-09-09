@@ -34,10 +34,13 @@ public struct OutboundHTTPResponse: Sendable {
 public protocol HTTPTransport: Sendable {
     func execute(_ request: OutboundHTTPRequest) async throws -> OutboundHTTPResponse
     func identityProbe() async throws -> TLSIdentity?
+    /// System transports return a pin-aware `URLSession`. Test fakes keep themselves.
+    func applyingPin(_ pin: PinRecord) -> any HTTPTransport
 }
 
 public extension HTTPTransport {
     func identityProbe() async throws -> TLSIdentity? { nil }
+    func applyingPin(_ pin: PinRecord) -> any HTTPTransport { self }
 }
 
 public enum EgressError: Error, Equatable {
