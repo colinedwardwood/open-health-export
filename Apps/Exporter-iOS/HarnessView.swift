@@ -43,6 +43,7 @@ struct HarnessView: View {
     @State private var destinationStatusLines: [String] = []
     @State private var ledgerLines: [String] = []
     @State private var ledgerWarning = ""
+    @State private var wakeAttribution = ""
     @State private var queueEvictionGaps: [GapRecord] = []
     @State private var wipeArmed = false
     @State private var stopHeartRateArmed = false
@@ -121,6 +122,7 @@ struct HarnessView: View {
                 try? await HarnessExport.recordNotificationSuppressionIfNeeded()
                 await restorePairing()
                 await refreshLedgerIntegrity()
+                await refreshWakeAttribution()
                 await refreshSecurityAdvisory()
                 await refreshQueueGaps()
                 if disclosureAcknowledged,
@@ -281,6 +283,11 @@ struct HarnessView: View {
             Text(FreshnessTarget.provisionalDisclosure)
                 .font(.footnote)
                 .accessibilityIdentifier("freshness-target")
+            if !wakeAttribution.isEmpty {
+                Text(wakeAttribution)
+                    .font(.footnote)
+                    .accessibilityIdentifier("wake-attribution")
+            }
             if !ledgerWarning.isEmpty {
                 Text(ledgerWarning)
                     .font(.footnote)
@@ -870,6 +877,7 @@ struct HarnessView: View {
             results = try await HarnessExport.runOnePageEachMetric(trigger: trigger)
             destinationStatusLines = HarnessExport.destinationStatusLines()
             await refreshLedgerIntegrity()
+            await refreshWakeAttribution()
             await refreshQueueGaps()
             status = "Ready. Local export finished. Outcome kinds are engine-derived, not assigned by this screen."
         } catch {
@@ -897,6 +905,11 @@ struct HarnessView: View {
     @MainActor
     private func refreshQueueGaps() async {
         queueEvictionGaps = (try? await HarnessExport.queueEvictionGaps()) ?? []
+    }
+
+    @MainActor
+    private func refreshWakeAttribution() async {
+        wakeAttribution = (try? await HarnessExport.wakeAttributionLine()) ?? ""
     }
 
     @MainActor
@@ -958,6 +971,7 @@ struct HarnessView: View {
             results = try await HarnessExport.runHTTPSDestination()
             destinationStatusLines = HarnessExport.destinationStatusLines()
             await refreshLedgerIntegrity()
+            await refreshWakeAttribution()
             status = "Ready. HTTPS export finished."
         } catch {
             status = "Failed: \(error.localizedDescription)"

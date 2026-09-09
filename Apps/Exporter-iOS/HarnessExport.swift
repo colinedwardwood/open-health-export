@@ -695,6 +695,32 @@ enum HarnessExport {
         return lines.first ?? "Ledger has not been written yet."
     }
 
+    static func wakeAttributionLine() async throws -> String {
+        let snapshots = StatusSnapshotLocation.readAll()
+        guard let expected = snapshots.compactMap(\.nextAttemptLatestEpoch).min() else {
+            return "Wake attribution: no measured delivery deadline is configured."
+        }
+        let root = try applicationSupportRoot()
+        let store = try SQLiteStateStore(
+            path: root.appendingPathComponent("state.sqlite").path
+        )
+        let journal = try await store.transact { try $0.loadJournal() }
+        let attribution = WakeAttribution.classify(
+            wakes: try wakeLedger().records(),
+            lastJournal: journal.last,
+            nowEpoch: Date().timeIntervalSince1970,
+            expectedWakeByEpoch: expected
+        )
+        switch attribution {
+        case .none:
+            return "Wake attribution: no overdue scheduling or execution failure."
+        case .scheduling:
+            return "Wake attribution: iOS did not wake the app by the measured deadline."
+        case .execution:
+            return "Wake attribution: the app woke, but export did not finish successfully."
+        }
+    }
+
     static func acknowledgeDestinationChanges() throws {
         let now = Date().timeIntervalSince1970
         for snapshot in StatusSnapshotLocation.readAll() where snapshot.unacknowledgedSecurityEventCount > 0 {
