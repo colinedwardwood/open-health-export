@@ -67,7 +67,7 @@ enum HarnessExport {
             path: root.appendingPathComponent("state.sqlite").path
         )
         let result = try await AdvisoryClient.fetch(
-            transport: URLSessionHTTPTransport(),
+            transport: SystemHTTPTransport.make(),
             store: store,
             state: state,
             now: Date(),

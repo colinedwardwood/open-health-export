@@ -26,3 +26,9 @@ public struct URLSessionHTTPTransport: HTTPTransport {
         return OutboundHTTPResponse(status: http.statusCode, body: data)
     }
 }
+
+public enum SystemHTTPTransport {
+    public static func make() -> any HTTPTransport {
+        URLSessionHTTPTransport()
+    }
+}
