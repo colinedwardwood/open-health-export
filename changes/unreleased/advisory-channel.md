@@ -6,4 +6,6 @@ are off. The iOS foreground path now performs the scheduled fetch through the pi
 query-free request, persists its schedule state, and renders verified items or stale/disabled
 copy without coupling advisory availability to export. Every successful local export also
 cancels and reschedules the overdue notification from the persisted destination threshold;
-before R-71 supplies that threshold, no deadline is invented.
+before R-71 supplies that threshold, no deadline is invented. Foreground launches probe
+notification settings and ledger only the transition to denied as a suppression security
+event, incrementing destination snapshots so the in-app and widget paths remain honest.

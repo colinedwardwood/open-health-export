@@ -223,6 +223,27 @@ private let checkInstant = Date(timeIntervalSince1970: 1_767_225_600) // 2026-01
     #expect(OverdueNotificationSchedule.fireEpoch(snapshot: snapshot) == nil)
 }
 
+@Test func notificationSuppressionRecordsOnlyTheTransitionToDenied() {
+    #expect(
+        NotificationSuppression.shouldRecord(
+            previouslyDenied: false,
+            currentlyDenied: true
+        )
+    )
+    #expect(
+        !NotificationSuppression.shouldRecord(
+            previouslyDenied: true,
+            currentlyDenied: true
+        )
+    )
+    #expect(
+        !NotificationSuppression.shouldRecord(
+            previouslyDenied: true,
+            currentlyDenied: false
+        )
+    )
+}
+
 @Test func watchdogEscalatesOnWidgetWhenNotificationsAreDenied() async throws {
     let snapshot = DestinationStatusSnapshot(
         destinationID: "local-file",

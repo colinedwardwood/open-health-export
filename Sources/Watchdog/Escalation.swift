@@ -44,6 +44,15 @@ public enum OverdueNotificationSchedule {
     }
 }
 
+public enum NotificationSuppression {
+    public static func shouldRecord(
+        previouslyDenied: Bool,
+        currentlyDenied: Bool
+    ) -> Bool {
+        currentlyDenied && !previouslyDenied
+    }
+}
+
 public enum Escalation {
     public static func plan(
         snapshot: DestinationStatusSnapshot,

@@ -339,6 +339,49 @@ enum HarnessExport {
         }
     }
 
+    static func recordNotificationSuppressionIfNeeded() async throws {
+        let denied = await LocalUserNotifier().authorizationDenied()
+        let defaults = UserDefaults.standard
+        let key = "ohe.notificationsPreviouslyDenied"
+        let previouslyDenied = defaults.bool(forKey: key)
+        defer { defaults.set(denied, forKey: key) }
+        guard NotificationSuppression.shouldRecord(
+            previouslyDenied: previouslyDenied,
+            currentlyDenied: denied
+        ) else {
+            return
+        }
+        let root = try applicationSupportRoot()
+        let store = try SQLiteStateStore(
+            path: root.appendingPathComponent("state.sqlite").path
+        )
+        try await store.transact { tx in
+            try tx.appendLedger(
+                EgressEntry(
+                    destination: "local-notifications",
+                    sampleCount: 0,
+                    outcomeKind: "security:notifications_denied",
+                    detail: "watchdog_escalation_suppressed",
+                    wallTimeEpoch: Date().timeIntervalSince1970
+                )
+            )
+        }
+        for snapshot in StatusSnapshotLocation.readAll() {
+            if let url = StatusSnapshotLocation.url(
+                destinationID: snapshot.destinationID
+            ) {
+                try DestinationSnapshotFile.recordSecurityEvents(
+                    1,
+                    destinationID: snapshot.destinationID,
+                    destinationLabel: snapshot.destinationLabel,
+                    writtenAtEpoch: Date().timeIntervalSince1970,
+                    at: url
+                )
+            }
+        }
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
     static func reExportQueueGap(_ gap: GapRecord) async throws -> RunOutcome {
         let root = try applicationSupportRoot()
         let dest = root.appendingPathComponent("exports", isDirectory: true)

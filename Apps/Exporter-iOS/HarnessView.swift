@@ -110,6 +110,7 @@ struct HarnessView: View {
                 } catch {
                     status = "Failed to enforce queue expiry: \(error.localizedDescription)"
                 }
+                try? await HarnessExport.recordNotificationSuppressionIfNeeded()
                 await restorePairing()
                 await refreshLedgerIntegrity()
                 await refreshSecurityAdvisory()
@@ -138,6 +139,7 @@ struct HarnessView: View {
             guard next == .active else { return }
             AppLifecycleCoordinator.shared.recordWake(.appForeground)
             Task {
+                try? await HarnessExport.recordNotificationSuppressionIfNeeded()
                 await startHealthObserversIfEligible()
                 await refreshSecurityAdvisory()
             }

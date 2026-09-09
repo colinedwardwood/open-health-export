@@ -5,6 +5,11 @@ import Watchdog
 
 /// Platform R-40 notifier. Copy is resolved from `NoticeCopy`, never composed here.
 final class LocalUserNotifier: UserNotifier, Sendable {
+    func authorizationDenied() async -> Bool {
+        await UNUserNotificationCenter.current().notificationSettings()
+            .authorizationStatus == .denied
+    }
+
     func notify(_ notice: UserNotice) async throws -> NoticeDelivery {
         let copy = NoticeCopy.render(notice)
         let center = UNUserNotificationCenter.current()
