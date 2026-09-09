@@ -32,3 +32,34 @@ public struct DestinationMonitoringStatus: Sendable, Equatable, Codable {
         errorClass = snapshot.errorClass
     }
 }
+
+public struct WidgetStatusRoute: Sendable, Equatable {
+    public static let scheme = "openhealthexporter"
+    public static let host = "status"
+
+    public var destinationID: String?
+
+    public init(destinationID: String? = nil) {
+        self.destinationID = destinationID
+    }
+
+    public init?(url: URL) {
+        guard url.scheme == Self.scheme, url.host == Self.host else { return nil }
+        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        destinationID = components?.queryItems?
+            .first(where: { $0.name == "destination" })?
+            .value
+    }
+
+    public var url: URL {
+        var components = URLComponents()
+        components.scheme = Self.scheme
+        components.host = Self.host
+        if let destinationID {
+            components.queryItems = [
+                URLQueryItem(name: "destination", value: destinationID),
+            ]
+        }
+        return components.url!
+    }
+}

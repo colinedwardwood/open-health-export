@@ -71,6 +71,17 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(export.isEnabled)
     }
 
+    func testDestinationSectionExposesTheEmptyStateAndRefreshControl() {
+        enterControls()
+        let title = scrollToHittable(app.staticTexts["destination-title"])
+        XCTAssertEqual(title.label, "Where your data goes")
+        XCTAssertTrue(app.buttons["destination-refresh"].exists)
+        XCTAssertEqual(
+            app.staticTexts["destination-empty"].label,
+            "No destination snapshots yet."
+        )
+    }
+
     private func enterControls() {
         let disclosure = app.buttons["disclosure-continue"]
         XCTAssertTrue(disclosure.waitForExistence(timeout: 5))

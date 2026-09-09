@@ -7,6 +7,7 @@ import EnginePorts
 import HealthKitSource
 import MetricCatalog
 import SwiftUI
+import Watchdog
 import WireFormat
 
 struct HarnessView: View {
@@ -109,6 +110,18 @@ struct HarnessView: View {
                 }
             }
         }
+        .onOpenURL { url in
+            guard let route = WidgetStatusRoute(url: url) else { return }
+            destinationStatusLines = HarnessExport.destinationStatusLines()
+            if disclosureAcknowledged {
+                phase = .ready
+                status = route.destinationID.map {
+                    "Ready. Opened destination status for \($0) from the widget."
+                } ?? "Ready. Opened destination status from the widget."
+            } else {
+                status = "Review the disclosure before opening destination status."
+            }
+        }
         .onChange(of: scenePhase) { _, next in
             guard next == .active else { return }
             AppLifecycleCoordinator.shared.recordWake(.appForeground)
@@ -196,6 +209,7 @@ struct HarnessView: View {
 
             Text("Where your data goes")
                 .font(.headline)
+                .accessibilityIdentifier("destination-title")
             if !ledgerWarning.isEmpty {
                 Text(ledgerWarning)
                     .font(.footnote)
@@ -212,10 +226,16 @@ struct HarnessView: View {
             Button("Refresh destination status") {
                 destinationStatusLines = HarnessExport.destinationStatusLines()
             }
-            ForEach(Array(destinationStatusLines.enumerated()), id: \.offset) { _, line in
+            .accessibilityIdentifier("destination-refresh")
+            ForEach(Array(destinationStatusLines.enumerated()), id: \.offset) { index, line in
                 Text(line)
                     .font(.footnote)
                     .textSelection(.enabled)
+                    .accessibilityIdentifier(
+                        line == "No destination snapshots yet."
+                            ? "destination-empty"
+                            : "destination-status-\(index)"
+                    )
             }
             Button("Acknowledge destination changes") {
                 do {

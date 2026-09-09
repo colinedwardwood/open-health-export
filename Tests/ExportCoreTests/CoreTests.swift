@@ -806,6 +806,16 @@ import Glibc
     #expect(snapshot.state(at: 1_200) == .overdue)
 }
 
+@Test func widgetStatusRouteRoundTripsDestinationAndRejectsOtherURLs() {
+    let route = WidgetStatusRoute(destinationID: "archive folder/primary")
+    #expect(
+        WidgetStatusRoute(url: route.url)
+            == WidgetStatusRoute(destinationID: "archive folder/primary")
+    )
+    #expect(WidgetStatusRoute(url: URL(string: "https://example.com/status")!) == nil)
+    #expect(WidgetStatusRoute(url: URL(string: "openhealthexporter://other")!) == nil)
+}
+
 @Test func widgetTimelineDoesNotInventThresholdsBeforeR71() {
     let snapshot = DestinationStatusSnapshot(
         destinationID: "manual",

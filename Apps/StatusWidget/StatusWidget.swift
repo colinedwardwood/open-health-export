@@ -216,13 +216,7 @@ struct ExportStatusWidgetView: View {
     }
 
     private var statusURL: URL? {
-        var components = URLComponents()
-        components.scheme = "openhealthexporter"
-        components.host = "status"
-        if let destinationID = worstSnapshot?.destinationID {
-            components.queryItems = [URLQueryItem(name: "destination", value: destinationID)]
-        }
-        return components.url
+        WidgetStatusRoute(destinationID: worstSnapshot?.destinationID).url
     }
 }
 
