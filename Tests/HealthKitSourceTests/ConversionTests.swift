@@ -153,6 +153,39 @@ import Testing
     )
 }
 
+@Test func structuredHealthKitTypesAreAuthorizedAndStateOfMindConverts() {
+    let readTypes = HealthKitAuthorization.readTypes(
+        for: [
+            WorkoutConversion.metric,
+            ECGConversion.metric,
+            AudiogramConversion.metric,
+            StateOfMindConversion.metric,
+        ]
+    )
+    #expect(readTypes.contains(HKWorkoutType.workoutType()))
+    #expect(readTypes.contains(HKObjectType.electrocardiogramType()))
+    #expect(readTypes.contains(HKObjectType.audiogramSampleType()))
+    #expect(readTypes.contains(HKObjectType.stateOfMindType()))
+
+    let date = Date(timeIntervalSince1970: 1_704_067_200)
+    let sample = HKStateOfMind(
+        date: date,
+        kind: .momentaryEmotion,
+        valence: 0.5,
+        labels: [.happy],
+        associations: [.health]
+    )
+    let converted = StateOfMindConversion.record(from: sample, context: .utc)
+    #expect(converted.key.uuid == sample.uuid.uuidString)
+    #expect(converted.valence == 0.5)
+    #expect(converted.kindOfEntry == "raw_1")
+    #expect(converted.labels == ["raw_\(HKStateOfMind.Label.happy.rawValue)"])
+    #expect(
+        converted.associations
+            == ["raw_\(HKStateOfMind.Association.health.rawValue)"]
+    )
+}
+
 @Test func oxygenSaturationIsPercentNotAHumidityClass() {
     let start = Date(timeIntervalSince1970: 1_704_067_200)
     let quantity = HKQuantity(unit: .percent(), doubleValue: 0.98)

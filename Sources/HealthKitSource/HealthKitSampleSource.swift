@@ -388,6 +388,124 @@ enum ECGConversion {
         @unknown default: "unrecognized"
         }
     }
+
+    static func record(
+        from sample: HKElectrocardiogram,
+        context: TemporalContext
+    ) -> ECGRecord {
+        ECGRecord(
+            key: RecordKey(uuid: sample.uuid.uuidString),
+            start: SampleConversion.formatUTC(sample.startDate),
+            end: SampleConversion.formatUTC(sample.endDate),
+            timeZoneOffsetMinutes: context.timeZone().secondsFromGMT(
+                for: sample.startDate
+            ) / 60,
+            timeZoneSource: .deviceCurrent,
+            classification: classificationName(sample.classification),
+            averageHeartRate: sample.averageHeartRate?.doubleValue(
+                for: HKUnit.count().unitDivided(by: .minute())
+            ),
+            samplingHz: sample.samplingFrequency?.doubleValue(for: .hertz()) ?? 0,
+            voltageCount: sample.numberOfVoltageMeasurements,
+            symptomsStatus: symptomsName(sample.symptomsStatus),
+            observedAt: SampleConversion.formatUTC(Date()),
+            source: sourceIdentity(sample.sourceRevision),
+            device: deviceIdentity(sample.device),
+            wasUserEntered:
+                (sample.metadata?[HKMetadataKeyWasUserEntered] as? NSNumber)?.boolValue
+        )
+    }
+
+    static func symptomsName(_ value: HKElectrocardiogram.SymptomsStatus) -> String {
+        switch value {
+        case .notSet: "notSet"
+        case .none: "none"
+        case .present: "present"
+        @unknown default: "unknown"
+        }
+    }
+}
+
+enum AudiogramConversion {
+    static let metric = MetricID(rawValue: "audiogram")
+
+    static func record(
+        from sample: HKAudiogramSample,
+        context: TemporalContext
+    ) -> AudiogramRecord {
+        let unit = HKUnit.decibelHearingLevel()
+        return AudiogramRecord(
+            key: RecordKey(uuid: sample.uuid.uuidString),
+            start: SampleConversion.formatUTC(sample.startDate),
+            end: SampleConversion.formatUTC(sample.endDate),
+            timeZoneOffsetMinutes: context.timeZone().secondsFromGMT(
+                for: sample.startDate
+            ) / 60,
+            timeZoneSource: .deviceCurrent,
+            sensitivityPoints: sample.sensitivityPoints.map {
+                AudiogramSensitivityPoint(
+                    frequencyHz: $0.frequency.doubleValue(for: .hertz()),
+                    leftEarDbHL: $0.leftEarSensitivity?.doubleValue(for: unit),
+                    rightEarDbHL: $0.rightEarSensitivity?.doubleValue(for: unit)
+                )
+            },
+            observedAt: SampleConversion.formatUTC(Date()),
+            source: sourceIdentity(sample.sourceRevision),
+            device: deviceIdentity(sample.device),
+            wasUserEntered:
+                (sample.metadata?[HKMetadataKeyWasUserEntered] as? NSNumber)?.boolValue
+        )
+    }
+}
+
+@available(iOS 18.0, macOS 15.0, *)
+enum StateOfMindConversion {
+    static let metric = MetricID(rawValue: "state_of_mind")
+
+    static func record(
+        from sample: HKStateOfMind,
+        context: TemporalContext
+    ) -> StateOfMindRecord {
+        StateOfMindRecord(
+            key: RecordKey(uuid: sample.uuid.uuidString),
+            start: SampleConversion.formatUTC(sample.startDate),
+            end: SampleConversion.formatUTC(sample.endDate),
+            timeZoneOffsetMinutes: context.timeZone().secondsFromGMT(
+                for: sample.startDate
+            ) / 60,
+            timeZoneSource: .deviceCurrent,
+            kindOfEntry: "raw_\(sample.kind.rawValue)",
+            valence: sample.valence,
+            valenceClassification: "raw_\(sample.valenceClassification.rawValue)",
+            labels: sample.labels.map { "raw_\($0.rawValue)" },
+            associations: sample.associations.map { "raw_\($0.rawValue)" },
+            observedAt: SampleConversion.formatUTC(Date()),
+            source: sourceIdentity(sample.sourceRevision),
+            device: deviceIdentity(sample.device),
+            wasUserEntered:
+                (sample.metadata?[HKMetadataKeyWasUserEntered] as? NSNumber)?.boolValue
+        )
+    }
+}
+
+private func sourceIdentity(_ revision: HKSourceRevision) -> SampleSourceIdentity {
+    SampleSourceIdentity(
+        name: revision.source.name,
+        bundleIdentifier: revision.source.bundleIdentifier,
+        productType: revision.productType
+    )
+}
+
+private func deviceIdentity(_ device: HKDevice?) -> SampleDevice? {
+    device.map {
+        SampleDevice(
+            name: $0.name,
+            manufacturer: $0.manufacturer,
+            model: $0.model,
+            hardwareVersion: $0.hardwareVersion,
+            softwareVersion: $0.softwareVersion
+        )
+    }
 }
 
 public enum HealthKitSourceError: Error, Sendable {
@@ -410,6 +528,11 @@ public enum HealthKitAuthorization {
                 types.insert(HKWorkoutType.workoutType())
             } else if metric == ECGConversion.metric {
                 types.insert(HKObjectType.electrocardiogramType())
+            } else if metric == AudiogramConversion.metric {
+                types.insert(HKObjectType.audiogramSampleType())
+            } else if #available(iOS 18.0, macOS 15.0, *),
+                      metric == StateOfMindConversion.metric {
+                types.insert(HKObjectType.stateOfMindType())
             }
         }
         return types
@@ -426,6 +549,155 @@ public enum HealthKitAuthorization {
             toShare: Set<HKSampleType>(),
             read: readTypes(for: metrics)
         )
+    }
+}
+
+/// Routes each metric to the HealthKit sample family that owns its anchored query.
+public final class HealthKitAnchoredSource: SampleSource, @unchecked Sendable {
+    private let store: HKHealthStore
+    private let context: TemporalContext
+    private let limit: Int
+
+    public init(
+        store: HKHealthStore = HKHealthStore(),
+        context: TemporalContext,
+        limit: Int = SamplePaging.defaultPageLimit
+    ) {
+        self.store = store
+        self.context = context
+        self.limit = limit
+    }
+
+    public func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage {
+        if SampleConversion.quantityType(for: metric) != nil {
+            return try await HealthKitSampleSource(
+                store: store,
+                context: context,
+                limit: limit
+            ).page(metric: metric, afterAnchor: afterAnchor)
+        }
+        if CategoryConversion.categoryType(for: metric) != nil {
+            return try await HealthKitCategorySource(
+                store: store,
+                context: context,
+                limit: limit
+            ).page(metric: metric, afterAnchor: afterAnchor)
+        }
+        if CorrelationConversion.correlationType(for: metric) != nil {
+            return try await HealthKitCorrelationSource(
+                store: store,
+                context: context,
+                limit: limit
+            ).page(metric: metric, afterAnchor: afterAnchor)
+        }
+        return try await HealthKitStructuredSource(
+            store: store,
+            context: context,
+            limit: limit
+        ).page(metric: metric, afterAnchor: afterAnchor)
+    }
+}
+
+public final class HealthKitStructuredSource: SampleSource, @unchecked Sendable {
+    private let store: HKHealthStore
+    private let context: TemporalContext
+    private let limit: Int
+
+    public init(
+        store: HKHealthStore = HKHealthStore(),
+        context: TemporalContext,
+        limit: Int = SamplePaging.defaultPageLimit
+    ) {
+        self.store = store
+        self.context = context
+        self.limit = limit
+    }
+
+    public func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage {
+        guard HKHealthStore.isHealthDataAvailable() else {
+            throw HealthKitSourceError.unavailable
+        }
+        let type: HKSampleType
+        if metric == WorkoutConversion.metric {
+            type = HKWorkoutType.workoutType()
+        } else if metric == ECGConversion.metric {
+            type = HKObjectType.electrocardiogramType()
+        } else if metric == AudiogramConversion.metric {
+            type = HKObjectType.audiogramSampleType()
+        } else if #available(iOS 18.0, macOS 15.0, *),
+                  metric == StateOfMindConversion.metric {
+            type = HKObjectType.stateOfMindType()
+        } else {
+            throw HealthKitSourceError.unknownMetric(metric)
+        }
+
+        let anchor = try afterAnchor.flatMap(AnchorCoding.decode)
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKAnchoredObjectQuery(
+                type: type,
+                predicate: nil,
+                anchor: anchor,
+                limit: limit
+            ) { _, samples, deleted, newAnchor, error in
+                if let error {
+                    continuation.resume(
+                        throwing: HealthKitSourceError.queryFailed(
+                            error.localizedDescription
+                        )
+                    )
+                    return
+                }
+                let input = samples ?? []
+                let workouts = input.compactMap {
+                    ($0 as? HKWorkout).map {
+                        WorkoutConversion.record(from: $0, context: self.context)
+                    }
+                }
+                let electrocardiograms = input.compactMap {
+                    ($0 as? HKElectrocardiogram).map {
+                        ECGConversion.record(from: $0, context: self.context)
+                    }
+                }
+                let audiograms = input.compactMap {
+                    ($0 as? HKAudiogramSample).map {
+                        AudiogramConversion.record(from: $0, context: self.context)
+                    }
+                }
+                var minds: [StateOfMindRecord] = []
+                if #available(iOS 18.0, macOS 15.0, *) {
+                    minds = input.compactMap {
+                        ($0 as? HKStateOfMind).map {
+                            StateOfMindConversion.record(from: $0, context: self.context)
+                        }
+                    }
+                }
+                let blob: Data
+                do {
+                    blob = try newAnchor.map(AnchorCoding.encode) ?? Data()
+                } catch {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                let latest = input.map(\.endDate).max()
+                    ?? Date(timeIntervalSince1970: 0)
+                continuation.resume(
+                    returning: SamplePage(
+                        samples: [],
+                        workouts: workouts,
+                        minds: minds,
+                        electrocardiograms: electrocardiograms,
+                        audiograms: audiograms,
+                        tombstones: (deleted ?? []).map {
+                            SampleConversion.tombstone(from: $0, metric: metric)
+                        },
+                        metric: metric,
+                        anchorBlob: blob,
+                        observedThrough: latest
+                    )
+                )
+            }
+            self.store.execute(query)
+        }
     }
 }
 

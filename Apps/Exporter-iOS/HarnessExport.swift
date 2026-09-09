@@ -79,7 +79,7 @@ enum HarnessExport {
             localeIdentifier: "en_US_POSIX",
             tzDatabaseVersion: "host"
         )
-        let source = HealthKitSampleSource(context: context, limit: 1000)
+        let source = HealthKitAnchoredSource(context: context, limit: 1000)
         let observations = HealthKitDayObservationSource(context: context, limit: 1000)
         let statistics = HealthKitStatisticsSource(context: context)
         let now = Date().ISO8601Format()
@@ -253,7 +253,7 @@ enum HarnessExport {
             localeIdentifier: "en_US_POSIX",
             tzDatabaseVersion: "host"
         )
-        let source = HealthKitSampleSource(context: context, limit: 1000)
+        let source = HealthKitAnchoredSource(context: context, limit: 1000)
         let observations = HealthKitDayObservationSource(context: context, limit: 1000)
         let statistics = HealthKitStatisticsSource(context: context)
         let now = Date().ISO8601Format()
