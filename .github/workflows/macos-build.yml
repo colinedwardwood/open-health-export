@@ -11,10 +11,23 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Install XcodeGen
-        run: brew install xcodegen
+      - name: Install build and broker tools
+        run: brew install xcodegen mosquitto
       - name: Test Darwin package targets
         run: swift test
+      - name: Test MQTT against Mosquitto on Darwin
+        env:
+          OHE_MQTT_BROKER: mqtt://127.0.0.1:1883
+        run: |
+          mosquitto \
+            -c spec/v1.0.0/fixtures/mosquitto/mosquitto.conf \
+            -d
+          for i in $(seq 1 30); do
+            nc -z 127.0.0.1 1883 && break
+            test "$i" -lt 30 || exit 1
+            sleep 1
+          done
+          swift test --filter mosquittoQoS
       - name: Generate Xcode project
         run: xcodegen generate
       - name: Build iOS exporter and widget
