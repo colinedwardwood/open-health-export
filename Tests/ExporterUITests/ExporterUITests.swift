@@ -22,6 +22,13 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(app.buttons["health-request"].waitForExistence(timeout: 2))
     }
 
+    func testDisclosureAndMainControlsPassAccessibilityAudit() throws {
+        XCTAssertTrue(app.buttons["disclosure-continue"].waitForExistence(timeout: 5))
+        try app.performAccessibilityAudit()
+        enterControls()
+        try app.performAccessibilityAudit()
+    }
+
     func testDiagnosticShareDoesNotExistBeforeFullPreviewConfirmation() {
         enterControls()
         let build = scrollToHittable(app.buttons["diagnostic-build"])
