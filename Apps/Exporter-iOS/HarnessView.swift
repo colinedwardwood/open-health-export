@@ -274,6 +274,9 @@ struct HarnessView: View {
             Text("Where your data goes")
                 .font(.headline)
                 .accessibilityIdentifier("destination-title")
+            Text(FreshnessTarget.provisionalDisclosure)
+                .font(.footnote)
+                .accessibilityIdentifier("freshness-target")
             if !ledgerWarning.isEmpty {
                 Text(ledgerWarning)
                     .font(.footnote)

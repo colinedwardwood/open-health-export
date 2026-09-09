@@ -58,6 +58,9 @@ user-visible foreground launch, never during export, and is disableable in the a
 carries marketing major.minor in `User-Agent` and nothing else identifying. Block it at your
 resolver if you do not want the fetch.
 
+Freshness target: pending R-71 device evidence. The overdue alarm floor is
+**6 hours**; this is not a delivery promise.
+
 ## Status
 
 `seeking-maintainers` — v1 is not yet released and the project currently has one maintainer.

@@ -232,6 +232,12 @@ private actor ToggleDestinationSink: DestinationSink {
     #expect(AdvisoryStaleness.staleCopy == "security advisories are stale")
 }
 
+@Test func provisionalFreshnessCopyNamesTheRatifiedFloorWithoutAPromise() {
+    #expect(FreshnessTarget.alarmFloor == 6 * 60 * 60)
+    #expect(FreshnessTarget.provisionalDisclosure.contains("6 hours"))
+    #expect(FreshnessTarget.provisionalDisclosure.contains("not a delivery promise"))
+}
+
 @Test func overdueNotificationScheduleUsesLastSuccessAndNeverInventsAThreshold() {
     var snapshot = DestinationStatusSnapshot(
         destinationID: "local-file",

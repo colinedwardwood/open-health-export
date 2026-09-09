@@ -40,6 +40,8 @@ public enum FreshnessTarget {
     public static let minimumSpan: TimeInterval = 14 * 24 * 60 * 60
     public static let alarmFloor: TimeInterval = 6 * 60 * 60
     public static let alarmCap: TimeInterval = 48 * 60 * 60
+    public static let provisionalDisclosure =
+        "Freshness target pending R-71 evidence. The overdue alarm floor is 6 hours; this is not a delivery promise."
 
     /// Device-local p95 becomes eligible only with ≥100 observations spanning ≥14 days.
     public static func localP95(observations: [FreshnessObservation]) -> TimeInterval? {

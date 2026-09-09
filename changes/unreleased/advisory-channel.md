@@ -12,3 +12,5 @@ event, incrementing destination snapshots so the in-app and widget paths remain 
 Export and reconcile snapshot rewrites preserve configured thresholds and retry windows;
 a synthetic-clock integration now proves repeated missed windows retain one overdue
 deadline and the next success clears staleness.
+Until R-71 evidence exists, the app and README visibly name the ratified six-hour
+alarm floor while explicitly stating that it is not a delivery promise.
