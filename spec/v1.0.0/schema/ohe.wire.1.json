@@ -10,6 +10,14 @@
     { "$ref": "#/$defs/category" },
     { "$ref": "#/$defs/correlation" },
     { "$ref": "#/$defs/workout" },
+    { "$ref": "#/$defs/stateOfMind" },
+    { "$ref": "#/$defs/ecg" },
+    { "$ref": "#/$defs/audiogram" },
+    { "$ref": "#/$defs/medicationDose" },
+    { "$ref": "#/$defs/ecgVoltage" },
+    { "$ref": "#/$defs/heartbeat" },
+    { "$ref": "#/$defs/workoutRoute" },
+    { "$ref": "#/$defs/workoutMetric" },
     { "$ref": "#/$defs/tombstone" },
     { "$ref": "#/$defs/aggregate" },
     { "$ref": "#/$defs/canary" }
@@ -207,6 +215,205 @@
           "enum": ["sampleMetadata", "inferred", "deviceCurrent", "unknown"],
           "x-ohe-open": false
         },
+        "uuid": { "type": "string" },
+        "v": { "type": "integer", "const": 1 }
+      }
+    },
+    "stateOfMind": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "associations", "batchSeq", "end", "kind", "kindOfEntry", "labels",
+        "metricId", "observedAt", "start", "tzOffsetMinutes", "tzSource",
+        "uuid", "v", "valence", "valenceClassification"
+      ],
+      "properties": {
+        "kind": { "type": "string", "const": "sample.stateOfMind", "x-ohe-open": false },
+        "associations": { "type": "array" },
+        "batchSeq": { "type": "integer" },
+        "end": { "type": "string" },
+        "kindOfEntry": {
+          "type": "string",
+          "enum": ["dailyMood", "momentaryEmotion"],
+          "x-ohe-open": false
+        },
+        "labels": { "type": "array" },
+        "metricId": { "type": "string", "x-ohe-open": true },
+        "observedAt": { "type": "string" },
+        "start": { "type": "string" },
+        "tzOffsetMinutes": { "type": "integer" },
+        "tzSource": {
+          "type": "string",
+          "enum": ["sampleMetadata", "inferred", "deviceCurrent", "unknown"],
+          "x-ohe-open": false
+        },
+        "uuid": { "type": "string" },
+        "v": { "type": "integer", "const": 1 },
+        "valence": { "type": "number" },
+        "valenceClassification": { "type": "string", "x-ohe-open": true }
+      }
+    },
+    "ecg": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "batchSeq", "classification", "end", "kind", "metricId", "observedAt",
+        "samplingHz", "start", "tzOffsetMinutes", "tzSource", "uuid", "v",
+        "voltageCount"
+      ],
+      "properties": {
+        "kind": { "type": "string", "const": "sample.ecg", "x-ohe-open": false },
+        "averageHeartRate": { "type": "number" },
+        "batchSeq": { "type": "integer" },
+        "classification": { "type": "string", "x-ohe-open": true },
+        "end": { "type": "string" },
+        "metricId": { "type": "string", "x-ohe-open": true },
+        "observedAt": { "type": "string" },
+        "samplingHz": { "type": "number" },
+        "start": { "type": "string" },
+        "symptomsStatus": { "type": "string", "x-ohe-open": true },
+        "tzOffsetMinutes": { "type": "integer" },
+        "tzSource": {
+          "type": "string",
+          "enum": ["sampleMetadata", "inferred", "deviceCurrent", "unknown"],
+          "x-ohe-open": false
+        },
+        "uuid": { "type": "string" },
+        "v": { "type": "integer", "const": 1 },
+        "voltageCount": { "type": "integer" }
+      }
+    },
+    "audiogram": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "batchSeq", "end", "kind", "metricId", "observedAt", "sensitivityPoints",
+        "start", "tzOffsetMinutes", "tzSource", "uuid", "v"
+      ],
+      "properties": {
+        "kind": { "type": "string", "const": "sample.audiogram", "x-ohe-open": false },
+        "batchSeq": { "type": "integer" },
+        "end": { "type": "string" },
+        "metricId": { "type": "string", "x-ohe-open": true },
+        "observedAt": { "type": "string" },
+        "sensitivityPoints": { "type": "array" },
+        "start": { "type": "string" },
+        "tzOffsetMinutes": { "type": "integer" },
+        "tzSource": {
+          "type": "string",
+          "enum": ["sampleMetadata", "inferred", "deviceCurrent", "unknown"],
+          "x-ohe-open": false
+        },
+        "uuid": { "type": "string" },
+        "v": { "type": "integer", "const": 1 }
+      }
+    },
+    "medicationDose": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "batchSeq", "end", "kind", "medicationName", "metricId", "observedAt",
+        "start", "status", "tzOffsetMinutes", "tzSource", "uuid", "v"
+      ],
+      "properties": {
+        "kind": { "type": "string", "const": "medicationDose", "x-ohe-open": false },
+        "batchSeq": { "type": "integer" },
+        "doseQuantity": { "type": "number" },
+        "doseUnit": { "type": "string" },
+        "end": { "type": "string" },
+        "medicationName": { "type": "string" },
+        "metricId": { "type": "string", "x-ohe-open": true },
+        "observedAt": { "type": "string" },
+        "scheduledAt": { "type": "string" },
+        "start": { "type": "string" },
+        "status": { "type": "string", "x-ohe-open": true },
+        "tzOffsetMinutes": { "type": "integer" },
+        "tzSource": {
+          "type": "string",
+          "enum": ["sampleMetadata", "inferred", "deviceCurrent", "unknown"],
+          "x-ohe-open": false
+        },
+        "uuid": { "type": "string" },
+        "v": { "type": "integer", "const": 1 }
+      }
+    },
+    "ecgVoltage": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "batchSeq", "chunkIndex", "kind", "parentUuid", "samplingHz",
+        "startIndex", "uuid", "v", "voltages"
+      ],
+      "properties": {
+        "kind": { "type": "string", "const": "series.ecgVoltage", "x-ohe-open": false },
+        "batchSeq": { "type": "integer" },
+        "chunkCount": { "type": "integer" },
+        "chunkIndex": { "type": "integer" },
+        "parentUuid": { "type": "string" },
+        "samplingHz": { "type": "number" },
+        "startIndex": { "type": "integer" },
+        "unit": { "type": "string" },
+        "uuid": { "type": "string" },
+        "v": { "type": "integer", "const": 1 },
+        "voltages": { "type": "array" }
+      }
+    },
+    "heartbeat": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "batchSeq", "chunkIndex", "intervalsMs", "kind", "parentUuid",
+        "precededByGap", "startIndex", "uuid", "v"
+      ],
+      "properties": {
+        "kind": { "type": "string", "const": "series.heartbeat", "x-ohe-open": false },
+        "batchSeq": { "type": "integer" },
+        "chunkCount": { "type": "integer" },
+        "chunkIndex": { "type": "integer" },
+        "intervalsMs": { "type": "array" },
+        "parentUuid": { "type": "string" },
+        "precededByGap": { "type": "array" },
+        "startIndex": { "type": "integer" },
+        "uuid": { "type": "string" },
+        "v": { "type": "integer", "const": 1 }
+      }
+    },
+    "workoutRoute": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "batchSeq", "chunkIndex", "kind", "parentUuid", "points", "startIndex",
+        "uuid", "v"
+      ],
+      "properties": {
+        "kind": { "type": "string", "const": "series.workoutRoute", "x-ohe-open": false },
+        "batchSeq": { "type": "integer" },
+        "chunkCount": { "type": "integer" },
+        "chunkIndex": { "type": "integer" },
+        "parentUuid": { "type": "string" },
+        "points": { "type": "array" },
+        "startIndex": { "type": "integer" },
+        "uuid": { "type": "string" },
+        "v": { "type": "integer", "const": 1 }
+      }
+    },
+    "workoutMetric": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "batchSeq", "chunkIndex", "kind", "metricId", "parentUuid", "points",
+        "startIndex", "unit", "uuid", "v"
+      ],
+      "properties": {
+        "kind": { "type": "string", "const": "series.workoutMetric", "x-ohe-open": false },
+        "batchSeq": { "type": "integer" },
+        "chunkCount": { "type": "integer" },
+        "chunkIndex": { "type": "integer" },
+        "metricId": { "type": "string", "x-ohe-open": true },
+        "parentUuid": { "type": "string" },
+        "points": { "type": "array" },
+        "startIndex": { "type": "integer" },
+        "unit": { "type": "string" },
         "uuid": { "type": "string" },
         "v": { "type": "integer", "const": 1 }
       }

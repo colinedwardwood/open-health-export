@@ -6,6 +6,11 @@ public struct SamplePage: Sendable {
     public var categories: [CategoryRecord]
     public var correlations: [CorrelationRecord]
     public var workouts: [WorkoutRecord]
+    public var minds: [StateOfMindRecord]
+    public var electrocardiograms: [ECGRecord]
+    public var audiograms: [AudiogramRecord]
+    public var medicationDoses: [MedicationDoseRecord]
+    public var series: [SeriesRecord]
     public var tombstones: [TombstoneRecord]
     public var metric: MetricID
     public var anchorBlob: Data
@@ -16,6 +21,11 @@ public struct SamplePage: Sendable {
         categories: [CategoryRecord] = [],
         correlations: [CorrelationRecord] = [],
         workouts: [WorkoutRecord] = [],
+        minds: [StateOfMindRecord] = [],
+        electrocardiograms: [ECGRecord] = [],
+        audiograms: [AudiogramRecord] = [],
+        medicationDoses: [MedicationDoseRecord] = [],
+        series: [SeriesRecord] = [],
         tombstones: [TombstoneRecord],
         metric: MetricID,
         anchorBlob: Data,
@@ -25,10 +35,34 @@ public struct SamplePage: Sendable {
         self.categories = categories
         self.correlations = correlations
         self.workouts = workouts
+        self.minds = minds
+        self.electrocardiograms = electrocardiograms
+        self.audiograms = audiograms
+        self.medicationDoses = medicationDoses
+        self.series = series
         self.tombstones = tombstones
         self.metric = metric
         self.anchorBlob = anchorBlob
         self.observedThrough = observedThrough
+    }
+
+    public var hasRecords: Bool {
+        !samples.isEmpty || !categories.isEmpty || !correlations.isEmpty
+            || !workouts.isEmpty || !minds.isEmpty || !electrocardiograms.isEmpty
+            || !audiograms.isEmpty || !medicationDoses.isEmpty || !series.isEmpty
+            || !tombstones.isEmpty
+    }
+
+    public var censusKeys: [(uuid: String, day: String)] {
+        samples.map { ($0.key.uuid, String($0.start.prefix(10))) }
+            + categories.map { ($0.key.uuid, String($0.start.prefix(10))) }
+            + correlations.map { ($0.key.uuid, String($0.start.prefix(10))) }
+            + workouts.map { ($0.key.uuid, String($0.start.prefix(10))) }
+            + minds.map { ($0.key.uuid, String($0.start.prefix(10))) }
+            + electrocardiograms.map { ($0.key.uuid, String($0.start.prefix(10))) }
+            + audiograms.map { ($0.key.uuid, String($0.start.prefix(10))) }
+            + medicationDoses.map { ($0.key.uuid, String($0.start.prefix(10))) }
+            + series.map { ($0.uuid, String($0.parentStart.prefix(10))) }
     }
 }
 

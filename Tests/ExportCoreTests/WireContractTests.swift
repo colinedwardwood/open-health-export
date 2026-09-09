@@ -75,7 +75,10 @@ private func sleepCategory(value: Int = 3) -> CategoryRecord {
     #expect(header["recordCount"] as? Int == 200)
     #expect(records.count == 201)
     let kinds = Set(records.compactMap { $0["kind"] as? String })
-    #expect(kinds.isSuperset(of: ["sample.quantity", "sample.category", "sample.correlation", "workout"]))
+    #expect(kinds.isSuperset(of: [
+        "sample.quantity", "sample.category", "sample.correlation", "workout",
+        "sample.stateOfMind", "series.ecgVoltage", "sample.audiogram", "medicationDose",
+    ]))
     let sourceBundles = Set(records.compactMap {
         ($0["source"] as? [String: Any])?["bundleId"] as? String
     })
@@ -205,6 +208,202 @@ private func sleepCategory(value: Int = 3) -> CategoryRecord {
     try receiver.ingest(ndjson: String(decoding: batch, as: UTF8.self))
     #expect(receiver.structuralRecords[correlation.key.uuid] == "sample.correlation")
     #expect(receiver.structuralRecords[workout.key.uuid] == "workout")
+}
+
+@Test func seriesChunkUUIDsAreStableNameBasedV5() {
+    #expect(
+        UUIDV5.seriesNamespace.uuidString.lowercased()
+            == "048b296e-c52c-5961-87a7-6327aaa124bd"
+    )
+    #expect(
+        UUIDV5.seriesChunk(
+            parentUUID: "f2000000-0000-4000-8000-000000000001",
+            kind: "series.ecgVoltage",
+            chunkIndex: 0
+        ) == "73e310e7-f22f-5a9f-98b2-bd8b189ceeda"
+    )
+}
+
+@Test func structuredFamiliesValidateAndConvergeIncludingOrphanSeries() throws {
+    let schema = try WireContractFixture.schema()
+    let mind = StateOfMindRecord(
+        key: RecordKey(uuid: "f4000000-0000-4000-8000-000000000001"),
+        start: "2026-09-08T12:00:00Z",
+        end: "2026-09-08T12:00:00Z",
+        timeZoneOffsetMinutes: 0,
+        timeZoneSource: .unknown,
+        kindOfEntry: "momentaryEmotion",
+        valence: 0.4,
+        valenceClassification: "pleasant",
+        labels: ["happy", "excited"],
+        associations: ["community", "family"],
+        observedAt: "2026-09-08T12:01:00Z"
+    )
+    let ecg = ECGRecord(
+        key: RecordKey(uuid: "f5000000-0000-4000-8000-000000000001"),
+        start: "2026-09-08T12:02:00Z",
+        end: "2026-09-08T12:02:30Z",
+        timeZoneOffsetMinutes: 0,
+        timeZoneSource: .unknown,
+        classification: "sinusRhythm",
+        averageHeartRate: 64,
+        samplingHz: 512,
+        voltageCount: 3,
+        symptomsStatus: "none",
+        observedAt: "2026-09-08T12:03:00Z"
+    )
+    let voltages = SeriesRecord(
+        parentUUID: ecg.key.uuid,
+        parentStart: ecg.start,
+        chunkIndex: 0,
+        chunkCount: 1,
+        startIndex: 0,
+        payload: .ecgVoltage(voltages: [12, -8, 4], samplingHz: 512)
+    )
+    let orphanRoute = SeriesRecord(
+        parentUUID: "f6000000-0000-4000-8000-000000000099",
+        parentStart: "2026-09-08T07:00:00Z",
+        chunkIndex: 0,
+        startIndex: 0,
+        payload: .workoutRoute(
+            points: [
+                WorkoutRoutePoint(
+                    timestamp: "2026-09-08T07:00:00Z",
+                    latitude: 51.50735123,
+                    longitude: -0.12775845
+                ),
+            ]
+        )
+    )
+    let audiogram = AudiogramRecord(
+        key: RecordKey(uuid: "f7000000-0000-4000-8000-000000000001"),
+        start: "2026-09-08T12:04:00Z",
+        end: "2026-09-08T12:04:00Z",
+        timeZoneOffsetMinutes: 0,
+        timeZoneSource: .unknown,
+        sensitivityPoints: [
+            AudiogramSensitivityPoint(frequencyHz: 2000, rightEarDbHL: 15),
+            AudiogramSensitivityPoint(frequencyHz: 500, leftEarDbHL: 10, rightEarDbHL: 12),
+        ],
+        observedAt: "2026-09-08T12:05:00Z"
+    )
+    let dose = MedicationDoseRecord(
+        key: RecordKey(uuid: "f8000000-0000-4000-8000-000000000001"),
+        start: "2026-09-08T12:06:00Z",
+        end: "2026-09-08T12:06:00Z",
+        timeZoneOffsetMinutes: 0,
+        timeZoneSource: .unknown,
+        medicationName: "Synthetic lisinopril",
+        doseQuantity: 10,
+        doseUnit: "mg",
+        status: "taken",
+        observedAt: "2026-09-08T12:07:00Z"
+    )
+    let heartbeat = SeriesRecord(
+        parentUUID: "f2000000-0000-4000-8000-000000000001",
+        parentStart: "2026-09-08T07:00:00Z",
+        chunkIndex: 0,
+        startIndex: 0,
+        payload: .heartbeat(intervalsMs: [812, 790], precededByGap: [false, true])
+    )
+    let workoutMetric = SeriesRecord(
+        parentUUID: "f2000000-0000-4000-8000-000000000001",
+        parentStart: "2026-09-08T07:00:00Z",
+        chunkIndex: 0,
+        startIndex: 0,
+        payload: .workoutMetric(
+            metricId: "heart_rate",
+            unit: "bpm",
+            points: [SeriesMetricPoint(timestamp: "2026-09-08T07:01:00Z", value: 148)]
+        )
+    )
+    for line in [
+        try NativeWire.encode(mind, envelope: testEnvelope()),
+        try NativeWire.encode(ecg, envelope: testEnvelope()),
+        try NativeWire.encode(voltages, envelope: testEnvelope()),
+        try NativeWire.encode(orphanRoute, envelope: testEnvelope()),
+        try NativeWire.encode(audiogram, envelope: testEnvelope()),
+        try NativeWire.encode(dose, envelope: testEnvelope()),
+        try NativeWire.encode(heartbeat, envelope: testEnvelope()),
+        try NativeWire.encode(workoutMetric, envelope: testEnvelope()),
+    ] {
+        let object = try #require(
+            JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
+        )
+        try WireJSONSchema.validate(instance: object, schema: schema)
+    }
+    let mindObject = try #require(
+        JSONSerialization.jsonObject(
+            with: Data(try NativeWire.encode(mind, envelope: testEnvelope()).utf8)
+        ) as? [String: Any]
+    )
+    #expect(mindObject["labels"] as? [String] == ["excited", "happy"])
+    let routeObject = try #require(
+        JSONSerialization.jsonObject(
+            with: Data(try NativeWire.encode(orphanRoute, envelope: testEnvelope()).utf8)
+        ) as? [String: Any]
+    )
+    let points = try #require(routeObject["points"] as? [[String: Any]])
+    #expect(points[0]["lat"] as? Double == 51.5073512)
+    #expect(voltages.uuid == UUIDV5.seriesChunk(
+        parentUUID: ecg.key.uuid,
+        kind: "series.ecgVoltage",
+        chunkIndex: 0
+    ))
+
+    let batch = try NativeWire.encode(
+        samples: [],
+        minds: [mind],
+        electrocardiograms: [ecg],
+        audiograms: [audiogram],
+        medicationDoses: [dose],
+        series: [voltages, orphanRoute],
+        tombstones: [],
+        metric: MetricID(rawValue: "structural"),
+        batchID: BatchID(rawValue: "f9000000-0000-4000-8000-000000000001"),
+        envelope: testEnvelope()
+    )
+    var receiver = ReferenceReceiver()
+    try receiver.ingest(ndjson: String(decoding: batch, as: UTF8.self))
+    #expect(receiver.structuralRecords[mind.key.uuid] == "sample.stateOfMind")
+    #expect(receiver.structuralRecords[ecg.key.uuid] == "sample.ecg")
+    #expect(receiver.structuralRecords[voltages.uuid] == "series.ecgVoltage")
+    #expect(receiver.structuralRecords[orphanRoute.uuid] == "series.workoutRoute")
+    #expect(receiver.structuralRecords[dose.key.uuid] == "medicationDose")
+    let ecgLine = try NativeWire.encode(ecg, envelope: testEnvelope())
+    #expect(ecgLine.contains("\"classification\":\"sinusRhythm\""))
+    #expect(!ecgLine.contains("diagnos"))
+}
+
+@Test func medicationDoseTombstoneIsTerminalInTheReferenceReceiver() throws {
+    let dose = MedicationDoseRecord(
+        key: RecordKey(uuid: "fa000000-0000-4000-8000-000000000001"),
+        start: "2026-09-08T12:06:00Z",
+        end: "2026-09-08T12:06:00Z",
+        timeZoneOffsetMinutes: 0,
+        timeZoneSource: .unknown,
+        medicationName: "Synthetic lisinopril",
+        status: "taken",
+        observedAt: "2026-09-08T12:07:00Z"
+    )
+    var receiver = ReferenceReceiver()
+    try receiver.ingest(line: Data(try NativeWire.encode(dose, envelope: testEnvelope()).utf8))
+    try receiver.ingest(
+        ndjson: String(
+            decoding: try NativeWire.encode(
+                samples: [],
+                tombstones: [TombstoneRecord(key: dose.key, metric: dose.metric)],
+                metric: dose.metric,
+                batchID: BatchID(rawValue: "fa000000-0000-4000-8000-000000000002"),
+                envelope: testEnvelope()
+            ),
+            as: UTF8.self
+        )
+    )
+    #expect(receiver.structuralRecords[dose.key.uuid] == nil)
+    #expect(receiver.tombstones.contains(dose.key.uuid))
+    try receiver.ingest(line: Data(try NativeWire.encode(dose, envelope: testEnvelope()).utf8))
+    #expect(receiver.structuralRecords[dose.key.uuid] == nil)
 }
 
 @Test func nativeBatchKindsValidateAgainstCommittedJSONSchema() throws {

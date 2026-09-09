@@ -35,6 +35,11 @@ public struct ReferenceReceiver: Sendable, Equatable {
             throw JSONSchemaError.missingKind
         }
         ingested += 1
+        if let uuid = object["uuid"] as? String,
+           tombstones.contains(uuid),
+           kind != "tombstone" {
+            return
+        }
         switch kind {
         case "sample.quantity":
             guard let uuid = object["uuid"] as? String, isNumber(object["value"]) else {
@@ -52,7 +57,10 @@ public struct ReferenceReceiver: Sendable, Equatable {
             categories[uuid] = value.intValue
             quantities.removeValue(forKey: uuid)
             tombstones.remove(uuid)
-        case "sample.correlation", "workout":
+        case "sample.correlation", "workout",
+             "sample.stateOfMind", "sample.ecg", "sample.audiogram", "medicationDose",
+             "series.ecgVoltage", "series.heartbeat", "series.workoutRoute",
+             "series.workoutMetric":
             guard let uuid = object["uuid"] as? String else {
                 throw JSONSchemaError.missingRequired("uuid")
             }

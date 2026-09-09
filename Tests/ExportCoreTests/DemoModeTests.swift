@@ -86,7 +86,8 @@ import WireFormat
     let generatedTypes = Set(
         MetricCatalog.all.map(\.wireId)
             + DemoCorpus.categoryTypes.map(\.metricID)
-            + ["blood_pressure", "workout"]
+            + ["blood_pressure", "workout", "state_of_mind",
+               "electrocardiogram", "audiogram", "medication_dose"]
     )
     #expect(generatedTypes.count >= 60)
 }

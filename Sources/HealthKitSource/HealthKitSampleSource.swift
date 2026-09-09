@@ -372,6 +372,24 @@ enum WorkoutConversion {
     }
 }
 
+enum ECGConversion {
+    static let metric = MetricID(rawValue: "electrocardiogram")
+
+    static func classificationName(_ value: HKElectrocardiogram.Classification) -> String {
+        switch value {
+        case .notSet: "notSet"
+        case .sinusRhythm: "sinusRhythm"
+        case .atrialFibrillation: "atrialFibrillation"
+        case .inconclusiveLowHeartRate: "inconclusiveLowHeartRate"
+        case .inconclusiveHighHeartRate: "inconclusiveHighHeartRate"
+        case .inconclusivePoorReading: "inconclusivePoorReading"
+        case .inconclusiveOther: "inconclusiveOther"
+        case .unrecognized: "unrecognized"
+        @unknown default: "unrecognized"
+        }
+    }
+}
+
 public enum HealthKitSourceError: Error, Sendable {
     case unavailable
     case unknownMetric(MetricID)
@@ -390,6 +408,8 @@ public enum HealthKitAuthorization {
                 types.insert(type)
             } else if metric == WorkoutConversion.metric {
                 types.insert(HKWorkoutType.workoutType())
+            } else if metric == ECGConversion.metric {
+                types.insert(HKObjectType.electrocardiogramType())
             }
         }
         return types

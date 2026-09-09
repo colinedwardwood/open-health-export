@@ -7,47 +7,13 @@ enum Census {
     static func apply(page: SamplePage, to tx: any StateTransaction) throws {
         var delta: [String: (count: Int, xor: UInt64)] = [:]
 
-        for sample in page.samples {
-            let day = String(sample.start.prefix(10))
-            if try tx.loadEmittedIndex(uuid: sample.key.uuid) != nil {
+        for entry in page.censusKeys {
+            if try tx.loadEmittedIndex(uuid: entry.uuid) != nil {
                 // Already counted on a prior page; re-send must not inflate the census.
                 continue
             }
-            let fold = delta[day] ?? (0, 0)
-            delta[day] = (fold.count + 1, fold.xor ^ sampleDigest(sample.key.uuid))
-        }
-        for category in page.categories {
-            let day = String(category.start.prefix(10))
-            if try tx.loadEmittedIndex(uuid: category.key.uuid) != nil {
-                continue
-            }
-            let fold = delta[day] ?? (0, 0)
-            delta[day] = (
-                fold.count + 1,
-                fold.xor ^ sampleDigest(category.key.uuid)
-            )
-        }
-        for correlation in page.correlations {
-            let day = String(correlation.start.prefix(10))
-            if try tx.loadEmittedIndex(uuid: correlation.key.uuid) != nil {
-                continue
-            }
-            let fold = delta[day] ?? (0, 0)
-            delta[day] = (
-                fold.count + 1,
-                fold.xor ^ sampleDigest(correlation.key.uuid)
-            )
-        }
-        for workout in page.workouts {
-            let day = String(workout.start.prefix(10))
-            if try tx.loadEmittedIndex(uuid: workout.key.uuid) != nil {
-                continue
-            }
-            let fold = delta[day] ?? (0, 0)
-            delta[day] = (
-                fold.count + 1,
-                fold.xor ^ sampleDigest(workout.key.uuid)
-            )
+            let fold = delta[entry.day] ?? (0, 0)
+            delta[entry.day] = (fold.count + 1, fold.xor ^ sampleDigest(entry.uuid))
         }
 
         for tombstone in page.tombstones {

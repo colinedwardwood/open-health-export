@@ -99,9 +99,7 @@ public struct ExportRun: Sendable {
         try faults.hit(.afterRead)
         #endif
         let aggregates = try await drainPlans(for: page)
-        if page.samples.isEmpty, page.categories.isEmpty,
-           page.correlations.isEmpty, page.workouts.isEmpty,
-           page.tombstones.isEmpty, aggregates.isEmpty {
+        if !page.hasRecords, aggregates.isEmpty {
             let outcome = RunOutcome.derive(from: RunTally(nothingDue: true))
             try await record(outcome: outcome, tally: RunTally(nothingDue: true), receipt: nil)
             return outcome
@@ -121,6 +119,11 @@ public struct ExportRun: Sendable {
             categories: page.categories,
             correlations: page.correlations,
             workouts: page.workouts,
+            minds: page.minds,
+            electrocardiograms: page.electrocardiograms,
+            audiograms: page.audiograms,
+            medicationDoses: page.medicationDoses,
+            series: page.series,
             tombstones: page.tombstones,
             aggregates: aggregates.map(\.record),
             metric: metric,
@@ -135,9 +138,7 @@ public struct ExportRun: Sendable {
         )
         try FileWriteKit.writeAtomically(payload, to: payloadURL)
 
-        let recordCount = page.samples.count + page.categories.count
-            + page.correlations.count + page.workouts.count
-            + page.tombstones.count + aggregates.count
+        let recordCount = page.censusKeys.count + page.tombstones.count + aggregates.count
         let pending = PendingBatch(
             id: batchID,
             payloadURL: payloadURL.path,
@@ -229,8 +230,7 @@ public struct ExportRun: Sendable {
     private func drainPlans(for page: SamplePage) async throws -> [AggregateDayPlan] {
         var days = Set(page.samples.map { String($0.start.prefix(10)) })
         days.formUnion(page.categories.map { String($0.start.prefix(10)) })
-        days.formUnion(page.correlations.map { String($0.start.prefix(10)) })
-        days.formUnion(page.workouts.map { String($0.start.prefix(10)) })
+        days.formUnion(page.censusKeys.map(\.day))
         let persistedDays = try await store.transact { tx -> Set<String> in
             var found: Set<String> = []
             found.formUnion(try tx.dirtyDays(metric: metric))

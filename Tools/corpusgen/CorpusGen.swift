@@ -63,7 +63,8 @@ struct CorpusGen {
                     Set(
                         MetricCatalog.all.map(\.wireId)
                             + DemoCorpus.categoryTypes.map(\.metricID)
-                            + ["blood_pressure", "workout"]
+                            + ["blood_pressure", "workout", "state_of_mind",
+                               "electrocardiogram", "audiogram", "medication_dose"]
                     )
                 ).sorted(),
             ],
@@ -184,6 +185,97 @@ struct CorpusGen {
                         ),
                     ],
                     hasRoute: index % 200 == 2,
+                    seriesIncluded: index % 200 == 2 ? ["workoutRoute"] : [],
+                    observedAt: sample.observedAt,
+                    source: provenance.source,
+                    device: provenance.device,
+                    wasUserEntered: provenance.wasUserEntered
+                ),
+                envelope: envelope
+            )
+        case 3:
+            let provenance = Self.provenance(
+                sourceIndex: (index / 100) % DemoCorpus.sources.count
+            )
+            return try NativeWire.encode(
+                StateOfMindRecord(
+                    key: RecordKey(uuid: fixtureUUID(family: 6, index: index)),
+                    start: sample.start,
+                    end: sample.end,
+                    timeZoneOffsetMinutes: sample.timeZoneOffsetMinutes,
+                    timeZoneSource: sample.timeZoneSource,
+                    kindOfEntry: index.isMultiple(of: 200) ? "dailyMood" : "momentaryEmotion",
+                    valence: Double((index % 21) - 10) / 10,
+                    valenceClassification: "pleasant",
+                    labels: ["content", "happy"],
+                    associations: ["community"],
+                    observedAt: sample.observedAt,
+                    source: provenance.source,
+                    device: provenance.device,
+                    wasUserEntered: provenance.wasUserEntered
+                ),
+                envelope: envelope
+            )
+        case 4:
+            let parent = fixtureUUID(family: 7, index: index)
+            return try NativeWire.encode(
+                SeriesRecord(
+                    parentUUID: parent,
+                    parentStart: sample.start,
+                    chunkIndex: 0,
+                    chunkCount: 1,
+                    startIndex: 0,
+                    payload: .ecgVoltage(
+                        voltages: [Double(index % 50), -Double(index % 17)],
+                        samplingHz: 512
+                    )
+                ),
+                envelope: envelope
+            )
+        case 5:
+            let provenance = Self.provenance(
+                sourceIndex: (index / 100) % DemoCorpus.sources.count
+            )
+            return try NativeWire.encode(
+                AudiogramRecord(
+                    key: RecordKey(uuid: fixtureUUID(family: 8, index: index)),
+                    start: sample.start,
+                    end: sample.end,
+                    timeZoneOffsetMinutes: sample.timeZoneOffsetMinutes,
+                    timeZoneSource: sample.timeZoneSource,
+                    sensitivityPoints: [
+                        AudiogramSensitivityPoint(
+                            frequencyHz: 500,
+                            leftEarDbHL: 10,
+                            rightEarDbHL: 12
+                        ),
+                        AudiogramSensitivityPoint(
+                            frequencyHz: 2000,
+                            leftEarDbHL: 15
+                        ),
+                    ],
+                    observedAt: sample.observedAt,
+                    source: provenance.source,
+                    device: provenance.device,
+                    wasUserEntered: provenance.wasUserEntered
+                ),
+                envelope: envelope
+            )
+        case 6:
+            let provenance = Self.provenance(
+                sourceIndex: (index / 100) % DemoCorpus.sources.count
+            )
+            return try NativeWire.encode(
+                MedicationDoseRecord(
+                    key: RecordKey(uuid: fixtureUUID(family: 9, index: index)),
+                    start: sample.start,
+                    end: sample.end,
+                    timeZoneOffsetMinutes: sample.timeZoneOffsetMinutes,
+                    timeZoneSource: sample.timeZoneSource,
+                    medicationName: "Synthetic lisinopril",
+                    doseQuantity: 10,
+                    doseUnit: "mg",
+                    status: "taken",
                     observedAt: sample.observedAt,
                     source: provenance.source,
                     device: provenance.device,

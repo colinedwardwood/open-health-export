@@ -95,6 +95,11 @@ public enum NativeWire {
         categories: [CategoryRecord] = [],
         correlations: [CorrelationRecord] = [],
         workouts: [WorkoutRecord] = [],
+        minds: [StateOfMindRecord] = [],
+        electrocardiograms: [ECGRecord] = [],
+        audiograms: [AudiogramRecord] = [],
+        medicationDoses: [MedicationDoseRecord] = [],
+        series: [SeriesRecord] = [],
         tombstones: [TombstoneRecord],
         aggregates: [AggregateRecord] = [],
         metric: MetricID,
@@ -119,6 +124,32 @@ public enum NativeWire {
                 (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
             }
             .map { try encodeWorkout($0, envelope: envelope) }
+        let mindLines = try minds
+            .sorted { lhs, rhs in
+                (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
+            }
+            .map { try encodeStateOfMind($0, envelope: envelope) }
+        let ecgLines = try electrocardiograms
+            .sorted { lhs, rhs in
+                (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
+            }
+            .map { try encodeECG($0, envelope: envelope) }
+        let audiogramLines = try audiograms
+            .sorted { lhs, rhs in
+                (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
+            }
+            .map { try encodeAudiogram($0, envelope: envelope) }
+        let doseLines = try medicationDoses
+            .sorted { lhs, rhs in
+                (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
+            }
+            .map { try encodeMedicationDose($0, envelope: envelope) }
+        let seriesLines = try series
+            .sorted { lhs, rhs in
+                (lhs.parentUUID.lowercased(), lhs.payload.wireKind, lhs.chunkIndex)
+                    < (rhs.parentUUID.lowercased(), rhs.payload.wireKind, rhs.chunkIndex)
+            }
+            .map { try encodeSeries($0, envelope: envelope) }
         let tombLines = try tombstones
             .sorted { $0.key.uuid.lowercased() < $1.key.uuid.lowercased() }
             .map { try encodeTombstone($0, metric: metric, envelope: envelope) }
@@ -128,7 +159,8 @@ public enum NativeWire {
             }
             .map { try encodeAggregate($0, envelope: envelope) }
         let records = sampleLines + categoryLines + correlationLines
-            + workoutLines + tombLines + aggregateLines
+            + workoutLines + mindLines + ecgLines + audiogramLines + doseLines
+            + seriesLines + tombLines + aggregateLines
         var body = Data()
         for line in records {
             body.append(contentsOf: line.utf8)
@@ -144,6 +176,10 @@ public enum NativeWire {
                     + categories.map(\.metric.rawValue)
                     + correlations.map(\.metric.rawValue)
                     + workouts.map(\.metric.rawValue)
+                    + minds.map(\.metric.rawValue)
+                    + electrocardiograms.map(\.metric.rawValue)
+                    + audiograms.map(\.metric.rawValue)
+                    + medicationDoses.map(\.metric.rawValue)
             ).sorted(),
             recordCount: records.count
         )
@@ -153,6 +189,14 @@ public enum NativeWire {
             categoryCount: categories.count,
             correlationCount: correlations.count,
             workoutCount: workouts.count,
+            mindCount: minds.count,
+            ecgCount: electrocardiograms.count,
+            audiogramCount: audiograms.count,
+            medicationCount: medicationDoses.count,
+            seriesCounts: Dictionary(
+                grouping: series,
+                by: { $0.payload.wireKind }
+            ).mapValues(\.count),
             tombstoneCount: tombstones.count,
             canaryCount: 0,
             digest: digest,
@@ -184,6 +228,26 @@ public enum NativeWire {
 
     public static func encode(_ workout: WorkoutRecord, envelope: WireEnvelope) throws -> String {
         try encodeWorkout(workout, envelope: envelope)
+    }
+
+    public static func encode(_ mind: StateOfMindRecord, envelope: WireEnvelope) throws -> String {
+        try encodeStateOfMind(mind, envelope: envelope)
+    }
+
+    public static func encode(_ ecg: ECGRecord, envelope: WireEnvelope) throws -> String {
+        try encodeECG(ecg, envelope: envelope)
+    }
+
+    public static func encode(_ audiogram: AudiogramRecord, envelope: WireEnvelope) throws -> String {
+        try encodeAudiogram(audiogram, envelope: envelope)
+    }
+
+    public static func encode(_ dose: MedicationDoseRecord, envelope: WireEnvelope) throws -> String {
+        try encodeMedicationDose(dose, envelope: envelope)
+    }
+
+    public static func encode(_ series: SeriesRecord, envelope: WireEnvelope) throws -> String {
+        try encodeSeries(series, envelope: envelope)
     }
 
     public static func encode(
@@ -273,6 +337,11 @@ private extension NativeWire {
         categoryCount: Int = 0,
         correlationCount: Int = 0,
         workoutCount: Int = 0,
+        mindCount: Int = 0,
+        ecgCount: Int = 0,
+        audiogramCount: Int = 0,
+        medicationCount: Int = 0,
+        seriesCounts: [String: Int] = [:],
         tombstoneCount: Int,
         canaryCount: Int,
         digest: String,
@@ -290,6 +359,21 @@ private extension NativeWire {
         }
         if workoutCount > 0 {
             counts["workout"] = .integer(workoutCount)
+        }
+        if mindCount > 0 {
+            counts["sample.stateOfMind"] = .integer(mindCount)
+        }
+        if ecgCount > 0 {
+            counts["sample.ecg"] = .integer(ecgCount)
+        }
+        if audiogramCount > 0 {
+            counts["sample.audiogram"] = .integer(audiogramCount)
+        }
+        if medicationCount > 0 {
+            counts["medicationDose"] = .integer(medicationCount)
+        }
+        for (kind, count) in seriesCounts.sorted(by: { $0.key < $1.key }) where count > 0 {
+            counts[kind] = .integer(count)
         }
         if tombstoneCount > 0 {
             counts["tombstone"] = .integer(tombstoneCount)
@@ -479,6 +563,217 @@ private extension NativeWire {
             to: &object
         )
         return try CanonicalJSON.object(object).serialized()
+    }
+
+    static func encodeStateOfMind(
+        _ mind: StateOfMindRecord,
+        envelope: WireEnvelope
+    ) throws -> String {
+        if mind.end < mind.start { throw WireError.invertedInterval }
+        var object: [String: CanonicalJSON] = [
+            "associations": .array(mind.associations.sorted().map { .string($0) }),
+            "batchSeq": .integer(envelope.seq),
+            "end": .string(mind.end),
+            "kind": .string("sample.stateOfMind"),
+            "kindOfEntry": .string(mind.kindOfEntry),
+            "labels": .array(mind.labels.sorted().map { .string($0) }),
+            "metricId": .string(mind.metric.rawValue),
+            "observedAt": .string(mind.observedAt),
+            "start": .string(mind.start),
+            "tzOffsetMinutes": .integer(mind.timeZoneOffsetMinutes),
+            "tzSource": .string(mind.timeZoneSource.rawValue),
+            "uuid": .string(mind.key.uuid.lowercased()),
+            "v": .integer(1),
+            "valence": .number(mind.valence),
+            "valenceClassification": .string(mind.valenceClassification),
+        ]
+        if envelope.demo { object["demo"] = .bool(true) }
+        appendProvenance(
+            source: mind.source,
+            device: mind.device,
+            wasUserEntered: mind.wasUserEntered,
+            to: &object
+        )
+        return try CanonicalJSON.object(object).serialized()
+    }
+
+    static func encodeECG(_ ecg: ECGRecord, envelope: WireEnvelope) throws -> String {
+        if ecg.end < ecg.start { throw WireError.invertedInterval }
+        var object: [String: CanonicalJSON] = [
+            "batchSeq": .integer(envelope.seq),
+            "classification": .string(ecg.classification),
+            "end": .string(ecg.end),
+            "kind": .string("sample.ecg"),
+            "metricId": .string(ecg.metric.rawValue),
+            "observedAt": .string(ecg.observedAt),
+            "samplingHz": .number(ecg.samplingHz),
+            "start": .string(ecg.start),
+            "tzOffsetMinutes": .integer(ecg.timeZoneOffsetMinutes),
+            "tzSource": .string(ecg.timeZoneSource.rawValue),
+            "uuid": .string(ecg.key.uuid.lowercased()),
+            "v": .integer(1),
+            "voltageCount": .integer(ecg.voltageCount),
+        ]
+        if let averageHeartRate = ecg.averageHeartRate {
+            object["averageHeartRate"] = .number(averageHeartRate)
+        }
+        if let symptomsStatus = ecg.symptomsStatus {
+            object["symptomsStatus"] = .string(symptomsStatus)
+        }
+        if envelope.demo { object["demo"] = .bool(true) }
+        appendProvenance(
+            source: ecg.source,
+            device: ecg.device,
+            wasUserEntered: ecg.wasUserEntered,
+            to: &object
+        )
+        return try CanonicalJSON.object(object).serialized()
+    }
+
+    static func encodeAudiogram(
+        _ audiogram: AudiogramRecord,
+        envelope: WireEnvelope
+    ) throws -> String {
+        if audiogram.end < audiogram.start { throw WireError.invertedInterval }
+        let points: [CanonicalJSON] = audiogram.sensitivityPoints
+            .sorted { $0.frequencyHz < $1.frequencyHz }
+            .map { point in
+                var object: [String: CanonicalJSON] = [
+                    "frequencyHz": .number(point.frequencyHz),
+                ]
+                if let leftEarDbHL = point.leftEarDbHL {
+                    object["leftEarDbHL"] = .number(leftEarDbHL)
+                }
+                if let rightEarDbHL = point.rightEarDbHL {
+                    object["rightEarDbHL"] = .number(rightEarDbHL)
+                }
+                if let leftEarMasked = point.leftEarMasked {
+                    object["leftEarMasked"] = .bool(leftEarMasked)
+                }
+                if let rightEarMasked = point.rightEarMasked {
+                    object["rightEarMasked"] = .bool(rightEarMasked)
+                }
+                return .object(object)
+            }
+        var object: [String: CanonicalJSON] = [
+            "batchSeq": .integer(envelope.seq),
+            "end": .string(audiogram.end),
+            "kind": .string("sample.audiogram"),
+            "metricId": .string(audiogram.metric.rawValue),
+            "observedAt": .string(audiogram.observedAt),
+            "sensitivityPoints": .array(points),
+            "start": .string(audiogram.start),
+            "tzOffsetMinutes": .integer(audiogram.timeZoneOffsetMinutes),
+            "tzSource": .string(audiogram.timeZoneSource.rawValue),
+            "uuid": .string(audiogram.key.uuid.lowercased()),
+            "v": .integer(1),
+        ]
+        if envelope.demo { object["demo"] = .bool(true) }
+        appendProvenance(
+            source: audiogram.source,
+            device: audiogram.device,
+            wasUserEntered: audiogram.wasUserEntered,
+            to: &object
+        )
+        return try CanonicalJSON.object(object).serialized()
+    }
+
+    static func encodeMedicationDose(
+        _ dose: MedicationDoseRecord,
+        envelope: WireEnvelope
+    ) throws -> String {
+        if dose.end < dose.start { throw WireError.invertedInterval }
+        var object: [String: CanonicalJSON] = [
+            "batchSeq": .integer(envelope.seq),
+            "end": .string(dose.end),
+            "kind": .string("medicationDose"),
+            "medicationName": .string(dose.medicationName),
+            "metricId": .string(dose.metric.rawValue),
+            "observedAt": .string(dose.observedAt),
+            "start": .string(dose.start),
+            "status": .string(dose.status),
+            "tzOffsetMinutes": .integer(dose.timeZoneOffsetMinutes),
+            "tzSource": .string(dose.timeZoneSource.rawValue),
+            "uuid": .string(dose.key.uuid.lowercased()),
+            "v": .integer(1),
+        ]
+        if let doseQuantity = dose.doseQuantity {
+            object["doseQuantity"] = .number(doseQuantity)
+        }
+        if let doseUnit = dose.doseUnit {
+            object["doseUnit"] = .string(doseUnit)
+        }
+        if let scheduledAt = dose.scheduledAt {
+            object["scheduledAt"] = .string(scheduledAt)
+        }
+        if envelope.demo { object["demo"] = .bool(true) }
+        appendProvenance(
+            source: dose.source,
+            device: dose.device,
+            wasUserEntered: dose.wasUserEntered,
+            to: &object
+        )
+        return try CanonicalJSON.object(object).serialized()
+    }
+
+    static func encodeSeries(_ series: SeriesRecord, envelope: WireEnvelope) throws -> String {
+        var object: [String: CanonicalJSON] = [
+            "batchSeq": .integer(envelope.seq),
+            "chunkIndex": .integer(series.chunkIndex),
+            "kind": .string(series.payload.wireKind),
+            "parentUuid": .string(series.parentUUID.lowercased()),
+            "startIndex": .integer(series.startIndex),
+            "uuid": .string(series.uuid),
+            "v": .integer(1),
+        ]
+        if let chunkCount = series.chunkCount {
+            object["chunkCount"] = .integer(chunkCount)
+        }
+        if envelope.demo { object["demo"] = .bool(true) }
+        switch series.payload {
+        case .ecgVoltage(let voltages, let samplingHz):
+            object["samplingHz"] = .number(samplingHz)
+            object["unit"] = .string("uV")
+            object["voltages"] = .array(voltages.map { .number($0) })
+        case .heartbeat(let intervalsMs, let precededByGap):
+            object["intervalsMs"] = .array(intervalsMs.map { .number($0) })
+            object["precededByGap"] = .array(precededByGap.map { .bool($0) })
+        case .workoutRoute(let points):
+            object["points"] = .array(points.map { point in
+                var row: [String: CanonicalJSON] = [
+                    "lat": .number(roundedCoordinate(point.latitude)),
+                    "lon": .number(roundedCoordinate(point.longitude)),
+                    "t": .string(point.timestamp),
+                ]
+                if let altitudeM = point.altitudeM { row["altitudeM"] = .number(altitudeM) }
+                if let horizontalAccuracyM = point.horizontalAccuracyM {
+                    row["horizontalAccuracyM"] = .number(horizontalAccuracyM)
+                }
+                if let verticalAccuracyM = point.verticalAccuracyM {
+                    row["verticalAccuracyM"] = .number(verticalAccuracyM)
+                }
+                if let speedMps = point.speedMps { row["speedMps"] = .number(speedMps) }
+                if let speedAccuracyMps = point.speedAccuracyMps {
+                    row["speedAccuracyMps"] = .number(speedAccuracyMps)
+                }
+                if let courseDeg = point.courseDeg { row["courseDeg"] = .number(courseDeg) }
+                if let courseAccuracyDeg = point.courseAccuracyDeg {
+                    row["courseAccuracyDeg"] = .number(courseAccuracyDeg)
+                }
+                return .object(row)
+            })
+        case .workoutMetric(let metricId, let unit, let points):
+            object["metricId"] = .string(metricId)
+            object["unit"] = .string(unit)
+            object["points"] = .array(points.map {
+                .object(["t": .string($0.timestamp), "value": .number($0.value)])
+            })
+        }
+        return try CanonicalJSON.object(object).serialized()
+    }
+
+    static func roundedCoordinate(_ value: Double) -> Double {
+        (value * 10_000_000).rounded() / 10_000_000
     }
 
     static func appendProvenance(

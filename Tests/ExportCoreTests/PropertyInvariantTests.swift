@@ -42,15 +42,18 @@ private func propertySample(uuid: String, value: Double, minute: Int) -> SampleR
         var rng = PropertyRNG(seed: UInt64(seed))
         var model: [String: SampleRecord] = [:]
         var deltaReceiver = ReferenceReceiver()
+        var retired: Set<String> = []
 
         for sequence in 1 ... 80 {
             let slot = Int(rng.next() % 24)
             let uuid = propertyUUID(slot)
+            if retired.contains(uuid) { continue }
             let delete = rng.next() % 4 == 0 && model[uuid] != nil
             let samples: [SampleRecord]
             let tombstones: [TombstoneRecord]
             if delete {
                 model.removeValue(forKey: uuid)
+                retired.insert(uuid)
                 samples = []
                 tombstones = [
                     TombstoneRecord(

@@ -140,6 +140,19 @@ import Testing
     #expect(converted.hasRoute == false)
 }
 
+@Test func electrocardiogramClassificationNamesStayVerbatim() {
+    #expect(
+        ECGConversion.classificationName(.sinusRhythm) == "sinusRhythm"
+    )
+    #expect(
+        ECGConversion.classificationName(.atrialFibrillation) == "atrialFibrillation"
+    )
+    #expect(
+        HealthKitAuthorization.readTypes(for: [ECGConversion.metric])
+            .contains(HKObjectType.electrocardiogramType())
+    )
+}
+
 @Test func oxygenSaturationIsPercentNotAHumidityClass() {
     let start = Date(timeIntervalSince1970: 1_704_067_200)
     let quantity = HKQuantity(unit: .percent(), doubleValue: 0.98)
