@@ -60,6 +60,27 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Measurements"].exists == false)
     }
 
+    func testDataBrowserShowsAnExplicitEmptySearchState() {
+        enterControls()
+        let search = scrollToHittable(app.textFields["browser-search"])
+        search.tap()
+        search.typeText("no-such-health-type")
+        XCTAssertTrue(app.staticTexts["browser-empty"].waitForExistence(timeout: 2))
+        XCTAssertEqual(
+            app.staticTexts["browser-empty"].label,
+            "No data types match your search."
+        )
+    }
+
+    func testDataBrowserOpensMetricDetailAndOffersNavigationBack() {
+        enterControls()
+        let row = scrollToHittable(app.buttons["browser-row-heart_rate"])
+        row.tap()
+        XCTAssertTrue(app.buttons["browser-back"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["browser-load-health"].exists)
+        XCTAssertEqual(app.staticTexts["browser-title"].label, "Heart Rate")
+    }
+
     func testDemoExportStaysDisabledUntilTypedConfirmation() {
         enterControls()
         let export = scrollToHittable(app.buttons["demo-export"])

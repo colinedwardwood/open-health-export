@@ -505,6 +505,7 @@ struct HarnessView: View {
                     Task { await loadBrowserSamples(metric: detail.metric) }
                 }
                 .disabled(browserLoadingHealth)
+                .accessibilityIdentifier("browser-load-health")
                 dataBrowserDetail(detail)
             } else {
                 if browserSelecting {
@@ -523,9 +524,13 @@ struct HarnessView: View {
                     let adding = browserSelection.subtracting(browserBaseline)
                     let removing = browserBaseline.subtracting(browserSelection)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Review changes").font(.headline)
+                        Text("Review changes")
+                            .font(.headline)
+                            .accessibilityIdentifier("browser-review-title")
                         Text("Adding \(adding.count) types")
+                            .accessibilityIdentifier("browser-review-adding")
                         Text("Removing \(removing.count) types")
+                            .accessibilityIdentifier("browser-review-removing")
                         if !removing.isEmpty {
                             Text("Removing a type does not delete data already sent to Archive folder.")
                                 .font(.footnote)
@@ -535,6 +540,7 @@ struct HarnessView: View {
                             browserBaseline = browserSelection
                             browserReviewVisible = false
                         }
+                        .accessibilityIdentifier("browser-review-continue")
                     }
                 }
                 if let pendingSensitiveMetric {
@@ -553,6 +559,12 @@ struct HarnessView: View {
                 TextField("Search types", text: $browserSearch)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
+                    .accessibilityIdentifier("browser-search")
+                if rows.isEmpty {
+                    Text("No data types match your search.")
+                        .font(.footnote)
+                        .accessibilityIdentifier("browser-empty")
+                }
                 ForEach(rows) { row in
                     Button {
                         if browserSelecting {
@@ -589,6 +601,7 @@ struct HarnessView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("\(row.title), \(row.subtitle)")
+                    .accessibilityIdentifier("browser-row-\(row.metric.rawValue)")
                 }
             }
         }
@@ -599,10 +612,13 @@ struct HarnessView: View {
         if let latest = detail.latest {
             Text("Latest").font(.caption)
             Text("\(DataBrowser.formatValue(latest.value)) \(detail.exportUnit)")
+                .accessibilityIdentifier("browser-detail-latest")
             Text(latest.start).font(.footnote)
             Text("Source: \(latest.source?.name ?? "Unknown")").font(.footnote)
         } else {
-            Text(DataBrowser.emptyDetailCopy).font(.footnote)
+            Text(DataBrowser.emptyDetailCopy)
+                .font(.footnote)
+                .accessibilityIdentifier("browser-detail-empty")
         }
         Text("Exported to").font(.caption)
         if detail.destinations.isEmpty {
