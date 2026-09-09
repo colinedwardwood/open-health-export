@@ -38,3 +38,25 @@ jobs:
           test "$first" = "$second"
           printf 'tier=T1 records=10000000 sha256=%s first_s=%s second_s=%s\n' \
             "$first" "$first_seconds" "$second_seconds"
+  tier-two-pathologies:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc
+        with:
+          swift-version: "6.3.3"
+      - name: Build release corpus generator
+        run: swift build -c release --product corpusgen
+      - name: Exercise fifty-million-record pathological tier
+        shell: bash
+        run: |
+          set -euo pipefail
+          digest="$(
+            .build/release/corpusgen --tier T2 --seed 1 |
+              sha256sum |
+              cut -d' ' -f1
+          )"
+          test "${#digest}" -eq 64
+          printf 'tier=T2 records=50000000 sha256=%s\n' "$digest"

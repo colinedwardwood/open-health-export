@@ -6,4 +6,5 @@ synthetic status. Generated coverage spans at least 60 types and six source iden
 deterministic replay and tombstone pathologies. T0 now includes category, correlation, and workout
 records in addition to quantity points. A scheduled CI gate streams T1 twice through SHA-256,
 requires identical digests, and enforces the ten-minute generation ceiling on each run without
-materializing the multi-gigabyte corpus.
+materializing the multi-gigabyte corpus. A manual CI job similarly streams the complete
+50-million-record T2 replay/tombstone pathology tier through SHA-256.
