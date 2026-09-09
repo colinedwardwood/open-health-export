@@ -8,6 +8,11 @@ let linuxCore: [Target] = [
         pkgConfig: "sqlite3",
         providers: [.apt(["libsqlite3-dev"])]
     ),
+    .systemLibrary(
+        name: "CZlib",
+        pkgConfig: "zlib",
+        providers: [.apt(["zlib1g-dev"])]
+    ),
     .target(name: "CoreDomain"),
     .target(name: "CoreTemporal", dependencies: ["CoreDomain"]),
     .target(name: "EnginePorts", dependencies: ["CoreDomain", "CoreTemporal"]),
@@ -27,6 +32,7 @@ let linuxCore: [Target] = [
     .target(name: "DiagnosticBundle", dependencies: ["EnginePorts", "Redaction", "CoreDomain"]),
     .target(
         name: "FileWriteKit",
+        dependencies: ["CZlib"],
         linkerSettings: [.linkedLibrary("z")]
     ),
     .target(name: "SinkLocalFile", dependencies: ["EnginePorts", "FileWriteKit", "CoreDomain", "WireFormat", "DestinationTrust"]),

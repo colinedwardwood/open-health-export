@@ -160,3 +160,137 @@ func mosquittoQoS1SurvivesBrokerRestart() async throws {
     try await waitUntilListening()
     try await publishOnce(clientID: "ohe-r90-restart-2")
 }
+
+#if canImport(Network)
+@Test(.enabled(if: mosquittoExecutable() != nil))
+func mosquittoQoS1PublishesOverPinnedTestCATLS() async throws {
+    let binary = try #require(mosquittoExecutable())
+    let material = try MosquittoTLSMaterial.generate()
+    defer { try? FileManager.default.removeItem(at: material.directory) }
+    let port = UInt16(19_830 + (ProcessInfo.processInfo.processIdentifier % 1_000))
+    let conf = material.directory.appendingPathComponent("tls.conf")
+    try """
+    listener \(port)
+    protocol mqtt
+    allow_anonymous true
+    persistence false
+    log_type error
+    cafile \(material.caCert.path)
+    certfile \(material.serverCert.path)
+    keyfile \(material.serverKey.path)
+    require_certificate false
+    """.write(to: conf, atomically: true, encoding: .utf8)
+    let broker = try startMosquitto(binary: binary, conf: conf)
+    defer { if broker.isRunning { broker.terminate() } }
+    try await waitForMosquitto(port: port)
+
+    let (file, batchID) = try writeMQTTPayload()
+    let destination = try MQTTDestination(
+        urlString: "mqtts://127.0.0.1:\(port)",
+        allowedHosts: ["127.0.0.1"],
+        clientID: "ohe-r90-tls-ca",
+        topic: "ohe/health"
+    )
+    let sink = try MQTTSink.overNetwork(destination: destination, pin: material.pin)
+    let receipt = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
+    #expect(receipt.accepted == 1)
+    #expect(receipt.unconfirmed == 0)
+
+    let wrong = PinRecord(
+        leafSPKISha256: String(repeating: "ab", count: 32),
+        issuerSPKISha256: String(repeating: "cd", count: 32),
+        firstSeen: "2024-01-01T00:00:00Z",
+        policy: .leaf
+    )
+    let rejected = try MQTTSink.overNetwork(destination: destination, pin: wrong)
+    await #expect(throws: StreamError.pinMismatch) {
+        _ = try await rejected.send(fileHandle: file.path, idempotencyKey: batchID)
+    }
+}
+
+@Test(.enabled(if: mosquittoExecutable() != nil))
+func mosquittoQoS1RequiresTheCAIssuedClientCertificate() async throws {
+    let binary = try #require(mosquittoExecutable())
+    let material = try MosquittoTLSMaterial.generate()
+    defer { try? FileManager.default.removeItem(at: material.directory) }
+    let port = UInt16(20_830 + (ProcessInfo.processInfo.processIdentifier % 1_000))
+    let conf = material.directory.appendingPathComponent("mtls.conf")
+    try """
+    listener \(port)
+    protocol mqtt
+    allow_anonymous true
+    persistence false
+    log_type error
+    cafile \(material.caCert.path)
+    certfile \(material.serverCert.path)
+    keyfile \(material.serverKey.path)
+    require_certificate true
+    """.write(to: conf, atomically: true, encoding: .utf8)
+    let broker = try startMosquitto(binary: binary, conf: conf)
+    defer { if broker.isRunning { broker.terminate() } }
+    try await waitForMosquitto(port: port)
+
+    let (file, batchID) = try writeMQTTPayload()
+    let withoutClient = try MQTTDestination(
+        urlString: "mqtts://127.0.0.1:\(port)",
+        allowedHosts: ["127.0.0.1"],
+        clientID: "ohe-r90-mtls-none",
+        topic: "ohe/health"
+    )
+    let missing = try MQTTSink.overNetwork(destination: withoutClient, pin: material.pin)
+    await #expect(throws: (any Error).self) {
+        _ = try await missing.send(fileHandle: file.path, idempotencyKey: batchID)
+    }
+
+    let rogue = try MQTTDestination(
+        urlString: "mqtts://127.0.0.1:\(port)",
+        allowedHosts: ["127.0.0.1"],
+        clientID: "ohe-r90-mtls-rogue",
+        topic: "ohe/health",
+        clientPKCS12: material.roguePKCS12,
+        clientPKCS12Password: "test"
+    )
+    let rogueSink = try MQTTSink.overNetwork(destination: rogue, pin: material.pin)
+    await #expect(throws: (any Error).self) {
+        _ = try await rogueSink.send(fileHandle: file.path, idempotencyKey: batchID)
+    }
+
+    let destination = try MQTTDestination(
+        urlString: "mqtts://127.0.0.1:\(port)",
+        allowedHosts: ["127.0.0.1"],
+        clientID: "ohe-r90-mtls-ok",
+        topic: "ohe/health",
+        clientPKCS12: material.clientPKCS12,
+        clientPKCS12Password: "test"
+    )
+    let sink = try MQTTSink.overNetwork(destination: destination, pin: material.pin)
+    let receipt = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
+    #expect(receipt.accepted == 1)
+}
+
+private func startMosquitto(binary: String, conf: URL) throws -> Process {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: binary)
+    process.arguments = ["-c", conf.path]
+    process.standardOutput = FileHandle.nullDevice
+    process.standardError = FileHandle.nullDevice
+    try process.run()
+    return process
+}
+
+private func waitForMosquitto(port: UInt16) async throws {
+    for _ in 0 ..< 50 {
+        let stream = POSIXByteStream(
+            endpoint: try StreamEndpoint(host: "127.0.0.1", port: port, usesTLS: false)
+        )
+        do {
+            try await stream.open()
+            await stream.close()
+            return
+        } catch {
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+    }
+    throw MQTTError.truncated
+}
+#endif

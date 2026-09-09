@@ -1,5 +1,5 @@
+import CZlib
 import Foundation
-import zlib
 
 public enum GzipError: Error, Equatable {
     case deflate

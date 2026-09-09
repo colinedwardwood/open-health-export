@@ -33,19 +33,23 @@ public actor NWByteStream: ByteStream {
         public var failFastOnWaiting: Bool
         /// Set for the Mac companion: TLS 1.3 PSK from pairing, no certificates involved.
         public var preSharedKey: PreSharedKey?
+        /// Optional PKCS#12 client certificate for brokers that require mTLS. Not SE-backed.
+        public var clientIdentity: TLSClientIdentity?
 
         public init(
             pin: PinRecord? = nil,
             requireTLS13: Bool = false,
             connectTimeout: Duration = .seconds(10),
             failFastOnWaiting: Bool = false,
-            preSharedKey: PreSharedKey? = nil
+            preSharedKey: PreSharedKey? = nil,
+            clientIdentity: TLSClientIdentity? = nil
         ) {
             self.pin = pin
             self.requireTLS13 = requireTLS13
             self.connectTimeout = connectTimeout
             self.failFastOnWaiting = failFastOnWaiting
             self.preSharedKey = preSharedKey
+            self.clientIdentity = clientIdentity
         }
     }
 
@@ -257,6 +261,11 @@ public actor NWByteStream: ByteStream {
             options.requireTLS13 ? .TLSv13 : .TLSv12
         )
         sec_protocol_options_set_tls_server_name(security, host)
+        if let clientIdentity = options.clientIdentity,
+           let local = try? clientIdentity.makeSecIdentity()
+        {
+            sec_protocol_options_set_local_identity(security, local)
+        }
         let observation = self.observation
         let pin = options.pin
         sec_protocol_options_set_verify_block(security, { metadata, trustRef, complete in

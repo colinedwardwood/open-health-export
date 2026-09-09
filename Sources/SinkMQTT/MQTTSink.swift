@@ -17,6 +17,9 @@ public struct MQTTDestination: Sendable {
     public var qos: MQTTQoS
     public var username: String?
     public var password: String?
+    /// PKCS#12 bytes for MQTTS client certificates. Not Secure Enclave material (SEC-68).
+    public var clientPKCS12: Data?
+    public var clientPKCS12Password: String?
 
     public init(
         urlString: String,
@@ -26,7 +29,9 @@ public struct MQTTDestination: Sendable {
         topic: String,
         qos: MQTTQoS = .atLeastOnce,
         username: String? = nil,
-        password: String? = nil
+        password: String? = nil,
+        clientPKCS12: Data? = nil,
+        clientPKCS12Password: String? = nil
     ) throws {
         self.url = try EgressURL.parse(
             urlString,
@@ -39,6 +44,8 @@ public struct MQTTDestination: Sendable {
         self.qos = qos
         self.username = username
         self.password = password
+        self.clientPKCS12 = clientPKCS12
+        self.clientPKCS12Password = clientPKCS12Password
     }
 
     public var confirmsDelivery: Bool { qos != .atMostOnce }
@@ -181,14 +188,28 @@ extension MQTTSink {
         let endpoint = try streamEndpoint(for: destination)
         if endpoint.usesTLS {
             #if canImport(Network)
+            var clientIdentity: TLSClientIdentity?
+            if let pkcs12 = destination.clientPKCS12 {
+                clientIdentity = try TLSClientIdentity(
+                    pkcs12: pkcs12,
+                    password: destination.clientPKCS12Password ?? ""
+                )
+            }
             let stream = NWByteStream(
                 endpoint: endpoint,
-                options: NWByteStream.Options(pin: pin, failFastOnWaiting: true)
+                options: NWByteStream.Options(
+                    pin: pin,
+                    failFastOnWaiting: true,
+                    clientIdentity: clientIdentity
+                )
             )
             return MQTTSink(destination: destination, pipe: ByteStreamMQTTPipe(stream: stream))
             #else
             throw StreamError.unsupportedPlatform
             #endif
+        }
+        if destination.clientPKCS12 != nil {
+            throw StreamError.unsupportedPlatform
         }
         return MQTTSink(
             destination: destination,
