@@ -406,7 +406,101 @@ struct PolicyCheck {
                 exit(1)
             }
         }
-        print("policycheck schema, corpus, receiver, and freeze gate: ok")
+        try checkG1Fixtures(spec: spec)
+        try checkFaultSeamsAbsentOutsideDebug(root: root)
+        print("policycheck schema, corpus, receiver, freeze, G1, and R-83 source gate: ok")
+    }
+
+    static func checkG1Fixtures(spec: URL) throws {
+        let g1 = spec.appendingPathComponent("fixtures/g1")
+        let input = try Data(contentsOf: g1.appendingPathComponent("logical-input.json"))
+        let artifacts = try FrozenEncoder.artifacts(fromLogicalInput: input)
+        if ProcessInfo.processInfo.environment["WRITE_G1"] == "1" {
+            try artifacts.ndjson.write(to: g1.appendingPathComponent("expected.ndjson"))
+            try artifacts.json.write(to: g1.appendingPathComponent("expected.json"))
+            try artifacts.prettyJSON.write(to: g1.appendingPathComponent("expected.pretty.json"))
+            let csvDir = g1.appendingPathComponent("expected.csv")
+            try FileManager.default.createDirectory(at: csvDir, withIntermediateDirectories: true)
+            try artifacts.csvQuantity.write(to: csvDir.appendingPathComponent(artifacts.csvFileName))
+            try artifacts.csvMeta.write(to: csvDir.appendingPathComponent("_meta.json"))
+        }
+        let expectedNDJSON = try Data(contentsOf: g1.appendingPathComponent("expected.ndjson"))
+        let expectedJSON = try Data(contentsOf: g1.appendingPathComponent("expected.json"))
+        let expectedPretty = try Data(contentsOf: g1.appendingPathComponent("expected.pretty.json"))
+        let csvDir = g1.appendingPathComponent("expected.csv")
+        let expectedCSV = try Data(contentsOf: csvDir.appendingPathComponent(artifacts.csvFileName))
+        let expectedMeta = try Data(contentsOf: csvDir.appendingPathComponent("_meta.json"))
+        guard artifacts.ndjson == expectedNDJSON,
+              artifacts.json == expectedJSON,
+              artifacts.prettyJSON == expectedPretty,
+              artifacts.csvQuantity == expectedCSV,
+              artifacts.csvMeta == expectedMeta
+        else {
+            FileHandle.standardError.write(Data("G1 frozen encoder output drifted\n".utf8))
+            exit(1)
+        }
+        try WireJSONSchema.validateNDJSON(
+            String(decoding: artifacts.ndjson, as: UTF8.self),
+            schema: try WireJSONSchema.load(
+                Data(contentsOf: spec.appendingPathComponent("schema/ohe.wire.1.json"))
+            )
+        )
+        let tzIdentity = try String(
+            contentsOf: spec.appendingPathComponent("fixtures/tz-database-version.txt"),
+            encoding: .utf8
+        ).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard tzIdentity == "2024a" else {
+            FileHandle.standardError.write(Data("injected tz-database identity must stay 2024a\n".utf8))
+            exit(1)
+        }
+        print("policycheck G1 fixtures and injected tzdata identity: ok")
+    }
+
+    static func checkFaultSeamsAbsentOutsideDebug(root: URL) throws {
+        let engine = root.appendingPathComponent("Sources/CorrectnessEngine")
+        guard let files = FileManager.default.enumerator(at: engine, includingPropertiesForKeys: nil) else {
+            FileHandle.standardError.write(Data("CorrectnessEngine missing\n".utf8))
+            exit(1)
+        }
+        var hits: [String] = []
+        for case let file as URL in files where file.pathExtension == "swift" {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            let stripped = withoutDebugCompilationBlocks(text)
+            if stripped.contains("ExportFaultLocation") || stripped.contains("ExportFaultInjector") {
+                hits.append(file.path)
+            }
+        }
+        if !hits.isEmpty {
+            FileHandle.standardError.write(
+                Data(("R-83 fault seams visible outside #if DEBUG:\n" + hits.joined(separator: "\n") + "\n").utf8)
+            )
+            exit(1)
+        }
+        print("policycheck R-83 seams stay inside DEBUG: ok")
+    }
+
+    static func withoutDebugCompilationBlocks(_ text: String) -> String {
+        var emitted = ""
+        var stack: [Bool] = []
+        for line in text.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("#if DEBUG") {
+                stack.append(true)
+                continue
+            }
+            if trimmed.hasPrefix("#if") {
+                stack.append(false)
+                continue
+            }
+            if trimmed.hasPrefix("#endif") {
+                if !stack.isEmpty { _ = stack.removeLast() }
+                continue
+            }
+            if stack.contains(true) { continue }
+            emitted.append(contentsOf: line)
+            emitted.append("\n")
+        }
+        return emitted
     }
 
     static func checkAdjacency(root: URL) throws {

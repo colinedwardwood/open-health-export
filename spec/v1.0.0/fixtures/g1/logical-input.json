@@ -1,0 +1,21 @@
+{
+  "batchId": "a1000000-0000-4000-8000-000000000001",
+  "completeThrough": "2024-01-01T00:00:00Z",
+  "emittedAt": "2024-01-01T00:00:00Z",
+  "exporterId": "00000000-0000-4000-8000-0000000000e1",
+  "observedAt": "2024-01-01T00:00:00Z",
+  "samples": [
+    {
+      "end": "2024-01-01T12:00:00Z",
+      "metric": "heartRate",
+      "observedAt": "2024-01-01T12:00:00Z",
+      "start": "2024-01-01T12:00:00Z",
+      "tzOffsetMinutes": 0,
+      "tzSource": "unknown",
+      "unit": "count/min",
+      "uuid": "a1000000-0000-4000-8000-000000000002",
+      "value": 60
+    }
+  ],
+  "seq": 1
+}

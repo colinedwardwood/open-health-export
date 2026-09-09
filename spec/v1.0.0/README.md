@@ -8,6 +8,10 @@
       "seed": 1,
       "sha256": "8313b7a761132295c38557f2e2c56cd2aedc8ecb93b0633d73802977d6751f9c"
     },
+    "g1": {
+      "role": "R-84/G1 frozen encoder triple: logical-input.json plus expected.ndjson/json/csv",
+      "injectedTzDatabase": "fixtures/tz-database-version.txt"
+    },
     "fix-catalogue.json": {
       "cases": 72,
       "role": "Stage 4 FIX-* meta-test input; every t0 ID has a Linux witness"

@@ -16,6 +16,15 @@ jobs:
         run: swift test
       - name: Import policy
         run: swift run policycheck
+      - name: Release objects omit R-83 fault seams
+        run: |
+          swift build -c release --target CorrectnessEngine
+          if find .build -path '*release*CorrectnessEngine.build*' -name '*.o' -print0 \
+            | xargs -0 strings \
+            | grep -F afterEnqueueBeforeDestinationWrite; then
+            echo "R-83 seam string leaked into release objects"
+            exit 1
+          fi
       - name: Reproduce committed tier-zero corpus
         run: |
           swift run corpusgen --seed 1 --count 200 > /tmp/tier0.ndjson

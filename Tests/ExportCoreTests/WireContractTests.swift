@@ -582,3 +582,24 @@ private func sleepCategory(value: Int = 3) -> CategoryRecord {
     #expect(receiver.quantities.count == 1)
     #expect(receiver.tombstones.count == 1)
 }
+
+@Test func g1FrozenEncoderMatchesCommittedTriple() throws {
+    let input = try WireContractFixture.data("spec/v1.0.0/fixtures/g1/logical-input.json")
+    let artifacts = try FrozenEncoder.artifacts(fromLogicalInput: input)
+    let expectedNDJSON = try WireContractFixture.data("spec/v1.0.0/fixtures/g1/expected.ndjson")
+    let expectedJSON = try WireContractFixture.data("spec/v1.0.0/fixtures/g1/expected.json")
+    let expectedPretty = try WireContractFixture.data("spec/v1.0.0/fixtures/g1/expected.pretty.json")
+    let expectedCSV = try WireContractFixture.data(
+        "spec/v1.0.0/fixtures/g1/expected.csv/\(artifacts.csvFileName)"
+    )
+    let expectedMeta = try WireContractFixture.data("spec/v1.0.0/fixtures/g1/expected.csv/_meta.json")
+    #expect(artifacts.ndjson == expectedNDJSON)
+    #expect(artifacts.json == expectedJSON)
+    #expect(artifacts.prettyJSON == expectedPretty)
+    #expect(artifacts.csvQuantity == expectedCSV)
+    #expect(artifacts.csvMeta == expectedMeta)
+    let again = try FrozenEncoder.artifacts(fromLogicalInput: input)
+    #expect(again.ndjson == artifacts.ndjson)
+    #expect(again.json == artifacts.json)
+    #expect(again.csvQuantity == artifacts.csvQuantity)
+}

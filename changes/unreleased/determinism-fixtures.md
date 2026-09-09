@@ -3,3 +3,7 @@ Add automated R-10/R-84 fixtures for the 23-hour spring-forward day, the
 time zone, and one hundred repeated encodes of the same native payload. Machine
 bucket boundaries and wire bytes must remain identical where the fixture says
 they are invariant.
+
+G1 commits a single-sample logical input and byte-compares native NDJSON, JSON,
+pretty JSON, and quantity CSV against frozen encoder output. Injected tzdata
+identity is `2024a`; host zoneinfo is not a fail gate.

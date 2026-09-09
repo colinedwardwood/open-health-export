@@ -556,6 +556,35 @@ import Glibc
     }
 }
 
+@Test func injectedTzDatabaseIdentityIsCommitted2024a() throws {
+    let url = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .appendingPathComponent("spec/v1.0.0/fixtures/tz-database-version.txt")
+    let version = try String(contentsOf: url, encoding: .utf8)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    #expect(version == "2024a")
+    let utc = TemporalContext(
+        timeZoneIdentifier: "UTC",
+        localeIdentifier: "en_US_POSIX",
+        tzDatabaseVersion: version
+    )
+    let fixed = TemporalContext(
+        timeZoneIdentifier: "Etc/GMT-5",
+        localeIdentifier: "en_US_POSIX",
+        tzDatabaseVersion: version
+    )
+    let date = Date(timeIntervalSince1970: 1_704_067_200)
+    #expect(DayBucket.containing(date, context: utc) == DayBucket(year: 2024, month: 1, day: 1))
+    let utcBounds = try #require(BucketKey.boundsP1D(day: "2024-01-01", context: utc))
+    let fixedBounds = try #require(BucketKey.boundsP1D(day: "2024-01-01", context: fixed))
+    #expect(utcBounds.bucketDurationSeconds == 24 * 60 * 60)
+    #expect(fixedBounds.bucketDurationSeconds == 24 * 60 * 60)
+    #expect(utcBounds.bucketStart == "2024-01-01T00:00:00.000Z")
+    #expect(utcBounds.bucketEnd == "2024-01-02T00:00:00.000Z")
+}
+
 @Test func dayBucketIsDeterministicUnderFrozenClock() {
     let date = Date(timeIntervalSince1970: 1_704_067_200) // 2024-01-01 00:00 UTC
     let context = TemporalContext(

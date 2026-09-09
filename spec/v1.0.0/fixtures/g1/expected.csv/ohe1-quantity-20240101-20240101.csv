@@ -1,0 +1,2 @@
+uuid,metricId,hkIdentifier,semantics,startUtc,endUtc,tzOffsetMinutes,tzId,tzSource,value,unit,count,sourceName,sourceBundleId,deviceName,wasUserEntered,quality,observedAt,exporterId,batchSeq
+a1000000-0000-4000-8000-000000000002,heart_rate,HKQuantityTypeIdentifierHeartRate,curated,2024-01-01T12:00:00Z,2024-01-01T12:00:00Z,0,,unknown,60,bpm,,,,,,,2024-01-01T12:00:00Z,00000000-0000-4000-8000-0000000000e1,1
