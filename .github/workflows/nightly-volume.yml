@@ -1,0 +1,40 @@
+name: nightly-volume
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 5 * * *"
+jobs:
+  tier-one-corpus:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc
+        with:
+          swift-version: "6.3.3"
+      - name: Build release corpus generator
+        run: swift build -c release --product corpusgen
+      - name: Generate ten million records reproducibly
+        shell: bash
+        run: |
+          set -euo pipefail
+          started=$SECONDS
+          first="$(
+            .build/release/corpusgen --tier T1 --seed 1 |
+              sha256sum |
+              cut -d' ' -f1
+          )"
+          first_seconds=$((SECONDS - started))
+          test "$first_seconds" -le 600
+
+          started=$SECONDS
+          second="$(
+            .build/release/corpusgen --tier T1 --seed 1 |
+              sha256sum |
+              cut -d' ' -f1
+          )"
+          second_seconds=$((SECONDS - started))
+          test "$second_seconds" -le 600
+          test "$first" = "$second"
+          printf 'tier=T1 records=10000000 sha256=%s first_s=%s second_s=%s\n' \
+            "$first" "$first_seconds" "$second_seconds"
