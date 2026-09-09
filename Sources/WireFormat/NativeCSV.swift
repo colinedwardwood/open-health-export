@@ -50,13 +50,15 @@ enum NativeCSV {
             )
         }
         let quantity = Data((rows.joined(separator: "\r\n") + "\r\n").utf8)
-        let parsed = try NativeJSON.document(fromNDJSON: ndjson)
-        let wrapper = try JSONSerialization.jsonObject(with: parsed.canonical) as? [String: Any] ?? [:]
-        let meta = try CanonicalJSON.object([
-            "csvDropsMetadata": .bool(true),
-            "footer": try CanonicalJSON.parse(wrapper["footer"] ?? NSNull()),
-            "header": try CanonicalJSON.parse(wrapper["header"] ?? NSNull()),
-        ]).serialized() + "\n"
+        let text = String(decoding: ndjson, as: UTF8.self)
+        let lines = text.split(omittingEmptySubsequences: true, whereSeparator: \.isNewline).map(String.init)
+        var headerLine = ""
+        var footerLine = ""
+        for line in lines {
+            if line.contains("\"kind\":\"batch.header\"") { headerLine = line }
+            if line.contains("\"kind\":\"batch.footer\"") { footerLine = line }
+        }
+        let meta = "{\"csvDropsMetadata\":true,\"footer\":\(footerLine),\"header\":\(headerLine)}\n"
         return (quantity, Data(meta.utf8), fileName)
     }
 

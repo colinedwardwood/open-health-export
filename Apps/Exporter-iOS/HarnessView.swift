@@ -172,10 +172,12 @@ struct HarnessView: View {
             TextField("Type local-file to confirm demo export", text: $demoConfirmName)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
+                .accessibilityIdentifier("demo-confirm")
             Button("Export demo dataset (every catalogue metric)") {
                 Task { await runDemoExport() }
             }
             .disabled(phase == .working || demoConfirmName != "local-file")
+            .accessibilityIdentifier("demo-export")
             .accessibilityHint("Exports synthetic samples marked demo:true into a DEMO- prefixed local folder.")
             Button("Send sample destination-enabled notice") {
                 Task { await sendSampleNotice() }
@@ -446,20 +448,24 @@ struct HarnessView: View {
             HStack {
                 Text(selectedDetail?.title ?? "Data")
                     .font(.headline)
+                    .accessibilityIdentifier("browser-title")
                 Spacer()
                 if selectedDetail != nil {
                     Button("Back") { selectedBrowserMetric = nil }
+                        .accessibilityIdentifier("browser-back")
                 } else if browserSelecting {
                     Button("Review changes") {
                         browserSelecting = false
                         browserReviewVisible = true
                     }
+                    .accessibilityIdentifier("browser-review")
                 } else {
                     Button("Select") {
                         browserBaseline = browserSelection
                         browserSelecting = true
                         browserReviewVisible = false
                     }
+                    .accessibilityIdentifier("browser-select")
                 }
             }
             Text(
@@ -488,7 +494,9 @@ struct HarnessView: View {
                             draft.invertRoutine(MetricCatalog.all.map(\.id))
                             browserSelection = draft.selected
                         }
+                        .accessibilityIdentifier("browser-invert-routine")
                         Button("Clear all") { browserSelection.removeAll() }
+                            .accessibilityIdentifier("browser-clear-all")
                     }
                 }
                 if browserReviewVisible {

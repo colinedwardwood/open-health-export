@@ -1,8 +1,12 @@
 import CoreDomain
 import CorrectnessEngine
+import EnginePorts
+import FileWriteKit
 import Foundation
 import MetricCatalog
+import SinkLocalFile
 import Testing
+import TestSupport
 import WireFormat
 
 private struct PropertyRNG {
@@ -139,5 +143,89 @@ private func propertySample(uuid: String, value: Double, minute: Int) -> SampleR
         )
         #expect(abs((mean.value ?? 0) * Double(count) - expected) < 0.000_001)
         #expect(mean.sampleCount == count)
+    }
+}
+
+@Test func statefulCommandModelConvergesWithEngineForSeededSequences() async throws {
+    for seed in 1 ... 20 {
+        var rng = PropertyRNG(seed: UInt64(seed))
+        var model: [String: SampleRecord] = [:]
+        var retired: Set<String> = []
+        let metric = MetricCatalog.heartRate.id
+        let store = MemoryStateStore()
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ohe-model-\(seed)-\(UUID().uuidString)")
+        let destination = root.appendingPathComponent("destination")
+        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+        var receiver = ReferenceReceiver()
+        var previousEpoch: UInt32 = 0
+        var pages: [SamplePage] = []
+
+        for step in 1 ... 24 {
+            let slot = Int(rng.next() % 12)
+            let uuid = propertyUUID(slot)
+            if retired.contains(uuid) { continue }
+            let delete = rng.next() % 5 == 0 && model[uuid] != nil
+            let samples: [SampleRecord]
+            let tombstones: [TombstoneRecord]
+            if delete {
+                model.removeValue(forKey: uuid)
+                retired.insert(uuid)
+                samples = []
+                tombstones = [
+                    TombstoneRecord(key: RecordKey(uuid: uuid), metric: metric),
+                ]
+            } else {
+                let sample = propertySample(
+                    uuid: uuid,
+                    value: Double(rng.next() % 10_000) / 10,
+                    minute: step
+                )
+                model[uuid] = sample
+                samples = [sample]
+                tombstones = []
+            }
+            pages.append(
+                SamplePage(
+                    samples: samples,
+                    tombstones: tombstones,
+                    metric: metric,
+                    anchorBlob: Data([UInt8(step)]),
+                    observedThrough: Date(timeIntervalSince1970: TimeInterval(step))
+                )
+            )
+            var envelope = testEnvelope()
+            envelope.seq = step
+            let run = ExportRun(
+                source: FixtureSource(pages: pages),
+                destination: .testing(LocalFileSink(directory: destination)),
+                store: store,
+                metric: metric,
+                scratchDirectory: root.appendingPathComponent("scratch-\(step)"),
+                envelope: envelope
+            )
+            let outcome = try await run.run()
+            #expect(outcome.kind == .success, "seed \(seed) step \(step)")
+            let cursor = try await store.transact { try $0.loadCursor(metric: metric) }
+            let epoch = cursor?.epoch ?? 0
+            #expect(epoch >= previousEpoch, "P5 cursor regression seed \(seed)")
+            previousEpoch = epoch
+            #expect(try await store.transact { try $0.pendingBatches() }.isEmpty)
+        }
+
+        let delivered = try FileManager.default.contentsOfDirectory(
+            at: destination,
+            includingPropertiesForKeys: nil
+        ).filter { $0.pathExtension == "ndjson" }
+        for url in delivered.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+            try receiver.ingest(ndjson: String(contentsOf: url, encoding: .utf8))
+        }
+        #expect(
+            Set(receiver.quantities.keys) == Set(model.keys),
+            "P4 live set diverged for seed \(seed)"
+        )
+        for uuid in retired {
+            #expect(receiver.quantities[uuid] == nil, "P7 tombstone not terminal seed \(seed)")
+        }
     }
 }

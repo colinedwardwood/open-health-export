@@ -47,6 +47,30 @@ final class ExporterUITests: XCTestCase {
         )
     }
 
+    func testDataBrowserSelectAndEmptyMeasurementsAreVisibleAfterDisclosure() {
+        enterControls()
+        XCTAssertTrue(app.staticTexts["browser-title"].waitForExistence(timeout: 2))
+        XCTAssertEqual(app.staticTexts["browser-title"].label, "Data")
+        XCTAssertTrue(app.buttons["browser-select"].exists)
+        XCTAssertFalse(app.buttons["browser-review"].exists)
+        app.buttons["browser-select"].tap()
+        XCTAssertTrue(app.buttons["browser-invert-routine"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["browser-clear-all"].exists)
+        XCTAssertTrue(app.buttons["browser-review"].exists)
+        XCTAssertTrue(app.staticTexts["Measurements"].exists == false)
+    }
+
+    func testDemoExportStaysDisabledUntilTypedConfirmation() {
+        enterControls()
+        let export = scrollToHittable(app.buttons["demo-export"])
+        XCTAssertFalse(export.isEnabled)
+        let field = app.textFields["demo-confirm"]
+        XCTAssertTrue(field.waitForExistence(timeout: 2))
+        field.tap()
+        field.typeText("local-file")
+        XCTAssertTrue(export.isEnabled)
+    }
+
     private func enterControls() {
         let disclosure = app.buttons["disclosure-continue"]
         XCTAssertTrue(disclosure.waitForExistence(timeout: 5))

@@ -741,8 +741,8 @@ private extension NativeWire {
         case .workoutRoute(let points):
             object["points"] = .array(points.map { point in
                 var row: [String: CanonicalJSON] = [
-                    "lat": .number(roundedCoordinate(point.latitude)),
-                    "lon": .number(roundedCoordinate(point.longitude)),
+                    "lat": .jsonNumber(coordinateToken(point.latitude)),
+                    "lon": .jsonNumber(coordinateToken(point.longitude)),
                     "t": .string(point.timestamp),
                 ]
                 if let altitudeM = point.altitudeM { row["altitudeM"] = .number(altitudeM) }
@@ -774,6 +774,10 @@ private extension NativeWire {
 
     static func roundedCoordinate(_ value: Double) -> Double {
         (value * 10_000_000).rounded() / 10_000_000
+    }
+
+    static func coordinateToken(_ value: Double) -> String {
+        String(format: "%.7f", roundedCoordinate(value))
     }
 
     static func appendProvenance(

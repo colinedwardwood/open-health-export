@@ -25,8 +25,7 @@ enum NativeJSON {
         }
         guard let headerLine, let footerLine else { throw WireError.utf8 }
         let canonical = "{\"footer\":\(footerLine),\"header\":\(headerLine),\"records\":[\(recordLines.joined(separator: ","))]}\n"
-        let parsed = try JSONSerialization.jsonObject(with: Data(canonical.utf8))
-        let pretty = try CanonicalJSON.parse(parsed).prettySerialized()
+        let pretty = CanonicalJSON.prettyPrint(canonical)
         return (Data(canonical.utf8), Data(pretty.utf8))
     }
 }

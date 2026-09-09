@@ -1,0 +1,1 @@
+Pretty-print G1 JSON and CSV meta from canonical tokens so Linux JSONSerialization cannot turn `true` into `1`. Route coordinates serialize as seven-decimal literals. A seeded command model checks live UUID sets against the engine.

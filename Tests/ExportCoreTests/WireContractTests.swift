@@ -338,13 +338,9 @@ private func sleepCategory(value: Int = 3) -> CategoryRecord {
         ) as? [String: Any]
     )
     #expect(mindObject["labels"] as? [String] == ["excited", "happy"])
-    let routeObject = try #require(
-        JSONSerialization.jsonObject(
-            with: Data(try NativeWire.encode(orphanRoute, envelope: testEnvelope()).utf8)
-        ) as? [String: Any]
-    )
-    let points = try #require(routeObject["points"] as? [[String: Any]])
-    #expect(points[0]["lat"] as? Double == 51.5073512)
+    let routeLine = try NativeWire.encode(orphanRoute, envelope: testEnvelope())
+    #expect(routeLine.contains("\"lat\":51.5073512"))
+    #expect(routeLine.contains("\"lon\":-0.1277585"))
     #expect(voltages.uuid == UUIDV5.seriesChunk(
         parentUUID: ecg.key.uuid,
         kind: "series.ecgVoltage",

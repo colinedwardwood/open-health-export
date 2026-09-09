@@ -9,6 +9,8 @@ enum CanonicalJSON {
     case string(String)
     case integer(Int)
     case number(Double)
+    /// Already-canonical JSON number token (fixed decimal coordinates).
+    case jsonNumber(String)
     case bool(Bool)
     case null
 
@@ -18,10 +20,64 @@ enum CanonicalJSON {
         return out
     }
 
-    func prettySerialized() throws -> String {
+    /// Pretty-print already-canonical JSON without re-parsing numbers or booleans.
+    static func prettyPrint(_ compact: String) -> String {
+        let source = compact.trimmingCharacters(in: .newlines)
         var out = ""
-        try writePretty(to: &out, indent: 0)
-        out.append("\n")
+        var indent = 0
+        var inString = false
+        var escape = false
+        var i = source.startIndex
+        while i < source.endIndex {
+            let ch = source[i]
+            if inString {
+                out.append(ch)
+                if escape {
+                    escape = false
+                } else if ch == "\\" {
+                    escape = true
+                } else if ch == "\"" {
+                    inString = false
+                }
+                i = source.index(after: i)
+                continue
+            }
+            switch ch {
+            case "\"":
+                inString = true
+                out.append(ch)
+            case "{", "[":
+                out.append(ch)
+                let next = source.index(after: i)
+                if next < source.endIndex {
+                    let closer: Character = ch == "{" ? "}" : "]"
+                    if source[next] != closer {
+                        indent += 2
+                        out.append("\n")
+                        out.append(String(repeating: " ", count: indent))
+                    }
+                }
+            case "}", "]":
+                let opened: Character = ch == "}" ? "{" : "["
+                if out.last == opened {
+                    out.append(ch)
+                } else {
+                    indent = max(0, indent - 2)
+                    out.append("\n")
+                    out.append(String(repeating: " ", count: indent))
+                    out.append(ch)
+                }
+            case ":":
+                out.append(": ")
+            case ",":
+                out.append(",\n")
+                out.append(String(repeating: " ", count: indent))
+            default:
+                out.append(ch)
+            }
+            i = source.index(after: i)
+        }
+        if !out.hasSuffix("\n") { out.append("\n") }
         return out
     }
 
@@ -69,6 +125,8 @@ enum CanonicalJSON {
             out.append(String(value))
         case .number(let value):
             out.append(try Self.renderNumber(value))
+        case .jsonNumber(let token):
+            out.append(token)
         case .string(let value):
             out.append("\"")
             out.append(Self.escape(value))
@@ -97,7 +155,7 @@ enum CanonicalJSON {
         let pad = String(repeating: " ", count: indent)
         let inner = String(repeating: " ", count: indent + 2)
         switch self {
-        case .null, .bool, .integer, .number, .string:
+        case .null, .bool, .integer, .number, .jsonNumber, .string:
             try write(to: &out)
         case .array(let items):
             if items.isEmpty {
