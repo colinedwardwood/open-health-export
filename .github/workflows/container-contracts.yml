@@ -15,6 +15,11 @@ jobs:
           swift-version: "6.3.3"
       - name: Start Mosquitto
         run: |
+          for attempt in $(seq 1 5); do
+            docker pull eclipse-mosquitto:2.0.22 && break
+            test "$attempt" -lt 5 || exit 1
+            sleep $((attempt * 10))
+          done
           docker run -d --name ohe-mosquitto \
             -p 1883:1883 \
             -v "$PWD/spec/v1.0.0/fixtures/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf" \
@@ -38,6 +43,11 @@ jobs:
           swift-version: "6.3.3"
       - name: Start Home Assistant 2026.8.3
         run: |
+          for attempt in $(seq 1 5); do
+            docker pull ghcr.io/home-assistant/home-assistant:2026.8.3 && break
+            test "$attempt" -lt 5 || exit 1
+            sleep $((attempt * 10))
+          done
           docker run -d --name ohe-ha \
             -p 8123:8123 \
             -v "$PWD/spec/v1.0.0/fixtures/ha-ci:/config" \
@@ -64,6 +74,11 @@ jobs:
           swift-version: "6.3.3"
       - name: Start Home Assistant 2025.9.4
         run: |
+          for attempt in $(seq 1 5); do
+            docker pull ghcr.io/home-assistant/home-assistant:2025.9.4 && break
+            test "$attempt" -lt 5 || exit 1
+            sleep $((attempt * 10))
+          done
           docker run -d --name ohe-ha \
             -p 8123:8123 \
             -v "$PWD/spec/v1.0.0/fixtures/ha-ci:/config" \
