@@ -35,6 +35,7 @@ struct HarnessView: View {
     @State private var destinationStatusLines: [String] = []
     @State private var ledgerLines: [String] = []
     @State private var ledgerWarning = ""
+    @State private var queueEvictionGaps: [GapRecord] = []
     @State private var wipeArmed = false
     @State private var stopHeartRateArmed = false
     @State private var demoConfirmName = ""
@@ -108,6 +109,7 @@ struct HarnessView: View {
                 await restorePairing()
                 await refreshLedgerIntegrity()
                 await refreshSecurityAdvisory()
+                await refreshQueueGaps()
                 if disclosureAcknowledged,
                    !foregroundCatchUpStarted,
                    HarnessExport.isLocalFileEnabled() {
@@ -195,6 +197,22 @@ struct HarnessView: View {
             .disabled(phase == .working || !HarnessExport.isLocalFileEnabled())
             .accessibilityIdentifier("full-reconcile")
             .accessibilityHint("Compares every available day without advancing HealthKit anchors.")
+            if !queueEvictionGaps.isEmpty {
+                Text("Data gaps")
+                    .font(.headline)
+                Text("These queued date ranges were evicted to keep storage bounded.")
+                    .font(.footnote)
+                ForEach(Array(queueEvictionGaps.enumerated()), id: \.offset) { index, gap in
+                    Button(
+                        "Re-export \(gap.metric.rawValue) "
+                            + "\(gap.rangeStartDay ?? "unknown")–\(gap.rangeEndDay ?? "unknown")"
+                    ) {
+                        Task { await reExportQueueGap(gap) }
+                    }
+                    .disabled(phase == .working)
+                    .accessibilityIdentifier("gap-reexport-\(index)")
+                }
+            }
             Text("DEMO MODE — synthetic data")
                 .font(.headline)
                 .foregroundStyle(.orange)
@@ -775,6 +793,7 @@ struct HarnessView: View {
             results = try await HarnessExport.runOnePageEachMetric(trigger: trigger)
             destinationStatusLines = HarnessExport.destinationStatusLines()
             await refreshLedgerIntegrity()
+            await refreshQueueGaps()
             status = "Ready. Local export finished. Outcome kinds are engine-derived, not assigned by this screen."
         } catch {
             status = "Failed: \(error.localizedDescription)"
@@ -792,6 +811,25 @@ struct HarnessView: View {
             destinationStatusLines = HarnessExport.destinationStatusLines()
             await refreshLedgerIntegrity()
             status = "Ready. Full reconciliation finished without advancing anchored cursors."
+        } catch {
+            status = "Failed: \(error.localizedDescription)"
+        }
+        phase = .ready
+    }
+
+    @MainActor
+    private func refreshQueueGaps() async {
+        queueEvictionGaps = (try? await HarnessExport.queueEvictionGaps()) ?? []
+    }
+
+    @MainActor
+    private func reExportQueueGap(_ gap: GapRecord) async {
+        phase = .working
+        status = "Working: re-exporting an evicted date range."
+        do {
+            let outcome = try await HarnessExport.reExportQueueGap(gap)
+            await refreshLedgerIntegrity()
+            status = "Ready. Gap re-export finished: \(outcome.kind.rawValue)."
         } catch {
             status = "Failed: \(error.localizedDescription)"
         }

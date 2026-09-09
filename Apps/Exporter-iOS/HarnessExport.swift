@@ -295,6 +295,74 @@ enum HarnessExport {
         return lines
     }
 
+    static func queueEvictionGaps() async throws -> [GapRecord] {
+        let root = try applicationSupportRoot()
+        let store = try SQLiteStateStore(
+            path: root.appendingPathComponent("state.sqlite").path
+        )
+        return try await store.transact {
+            try $0.loadGaps().filter {
+                $0.rangeDescription.hasPrefix("queue_eviction:")
+                    && $0.rangeStartDay != nil
+                    && $0.rangeEndDay != nil
+            }
+        }
+    }
+
+    static func reExportQueueGap(_ gap: GapRecord) async throws -> RunOutcome {
+        let root = try applicationSupportRoot()
+        let dest = root.appendingPathComponent("exports", isDirectory: true)
+        let scratch = root.appendingPathComponent("scratch", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: dest,
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: scratch,
+            withIntermediateDirectories: true
+        )
+        let store = try SQLiteStateStore(
+            path: root.appendingPathComponent("state.sqlite").path
+        )
+        let (verified, events) = try verifiedLocalFile(
+            root: root,
+            destinationDirectory: dest
+        )
+        try await emitTrustNotices(events)
+        let context = TemporalContext(
+            timeZoneIdentifier: "UTC",
+            localeIdentifier: "en_US_POSIX",
+            tzDatabaseVersion: "host"
+        )
+        let now = Date().ISO8601Format()
+        let outcome = try await ReconcileSweep(
+            observations: HealthKitDayObservationSource(
+                context: context,
+                limit: 1000
+            ),
+            destination: verified,
+            store: store,
+            metric: gap.metric,
+            scratchDirectory: scratch,
+            destinationName: "local-file",
+            envelope: WireEnvelope(
+                exporterId: try installationID(),
+                seq: 1,
+                emittedAt: now,
+                observedAt: now
+            ),
+            temporal: context,
+            statistics: HealthKitStatisticsSource(context: context),
+            trigger: .manual,
+            snapshotURL: StatusSnapshotLocation.url(destinationID: "local-file"),
+            externalStatusURL: dest.appendingPathComponent("status.json"),
+            ledgerHeadSeal: ledgerHeadSeal(),
+            ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json")
+        ).run(gap: gap)
+        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+        return outcome
+    }
+
     static func runDemoDataset(typedDestinationName: String) async throws -> [String] {
         try DemoExportGate.confirmSending(to: "local-file", typed: typedDestinationName)
         let fm = FileManager.default

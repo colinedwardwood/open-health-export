@@ -10,6 +10,8 @@ import WireFormat
 
 public enum ReconcileSweepError: Error, Equatable {
     case fullHistoryRangeUnavailable
+    case gapRangeUnavailable
+    case gapMetricMismatch
 }
 
 /// R-08 trailing-window apply. Plans from stored census vs date-ranged observations, then
@@ -91,6 +93,22 @@ public struct ReconcileSweep: Sendable {
         )
     }
 
+    public func run(gap: GapRecord) async throws -> RunOutcome {
+        guard gap.metric == metric else {
+            throw ReconcileSweepError.gapMetricMismatch
+        }
+        guard let startDay = gap.rangeStartDay,
+              let endDay = gap.rangeEndDay
+        else {
+            throw ReconcileSweepError.gapRangeUnavailable
+        }
+        return try await run(
+            days: ReconcilePlanner.days(from: startDay, through: endDay),
+            throughDay: endDay,
+            reason: "gap_reexport"
+        )
+    }
+
     private func run(
         days: [String],
         throughDay: String,
@@ -168,7 +186,9 @@ public struct ReconcileSweep: Sendable {
             expectedRecords: recordCount,
             byteCount: payload.count,
             metric: metric,
-            createdAtEpoch: clock.now().timeIntervalSince1970
+            createdAtEpoch: clock.now().timeIntervalSince1970,
+            rangeStartDay: days.first,
+            rangeEndDay: days.last
         )
         let victims = try await store.transact { tx in
             let evicted = try QueueAdmission.makeRoom(for: pending.byteCount, on: tx)

@@ -47,7 +47,14 @@ public enum QueueAdmission {
                 victim.id,
                 recording: GapRecord(
                     batchID: victim.id,
-                    rangeDescription: "queue_eviction:\(victim.byteCount)"
+                    rangeDescription: [
+                        "queue_eviction",
+                        victim.rangeStartDay ?? "unknown",
+                        victim.rangeEndDay ?? "unknown",
+                    ].joined(separator: ":"),
+                    metric: victim.metric,
+                    rangeStartDay: victim.rangeStartDay,
+                    rangeEndDay: victim.rangeEndDay
                 )
             )
         }

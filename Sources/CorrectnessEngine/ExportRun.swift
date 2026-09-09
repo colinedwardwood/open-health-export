@@ -155,13 +155,26 @@ public struct ExportRun: Sendable {
         try FileWriteKit.writeAtomically(payload, to: payloadURL)
 
         let recordCount = page.censusKeys.count + page.tombstones.count + aggregates.count
+        var rangeDays = page.censusKeys.map(\.day)
+        rangeDays.append(
+            contentsOf: aggregates.map { String($0.record.bucketStart.prefix(10)) }
+        )
+        let tombstoneDays = try await store.transact { tx in
+            try page.tombstones.compactMap {
+                try tx.loadEmittedIndex(uuid: $0.key.uuid)?.day
+            }
+        }
+        rangeDays.append(contentsOf: tombstoneDays)
+        let fallbackDay = String(page.observedThrough.ISO8601Format().prefix(10))
         let pending = PendingBatch(
             id: batchID,
             payloadURL: payloadURL.path,
             expectedRecords: recordCount,
             byteCount: payload.count,
             metric: metric,
-            createdAtEpoch: clock.now().timeIntervalSince1970
+            createdAtEpoch: clock.now().timeIntervalSince1970,
+            rangeStartDay: rangeDays.min() ?? fallbackDay,
+            rangeEndDay: rangeDays.max() ?? fallbackDay
         )
         let victims = try await store.transact { tx in
             let evicted = try QueueAdmission.makeRoom(for: pending.byteCount, on: tx)

@@ -1847,7 +1847,10 @@ private func runUntilProcessExitSeam() async throws {
                 id: BatchID(rawValue: "old"),
                 payloadURL: "/tmp/old",
                 expectedRecords: 1,
-                byteCount: 8
+                byteCount: 8,
+                metric: metric,
+                rangeStartDay: "2024-01-01",
+                rangeEndDay: "2024-01-02"
             ),
             advancing: CursorAdvance(page: page, epoch: 1)
         )
@@ -1865,7 +1868,11 @@ private func runUntilProcessExitSeam() async throws {
     }
     #expect(victims.map(\.id.rawValue) == ["old"])
     #expect(try store.transaction.pendingBatches().map(\.id.rawValue) == ["new"])
-    #expect(store.transaction.gaps.map(\.rangeDescription) == ["queue_eviction:8"])
+    #expect(
+        store.transaction.gaps.map(\.rangeDescription)
+            == ["queue_eviction:2024-01-01:2024-01-02"]
+    )
+    #expect(store.transaction.gaps.first?.metric == metric)
     await #expect(throws: QueueAdmissionError.blocked) {
         try await store.transact { tx in
             _ = try QueueAdmission.makeRoom(
@@ -1935,7 +1942,7 @@ private func runUntilProcessExitSeam() async throws {
     #expect(ledger[0].outcomeKind == "queue_ttl_expired")
 }
 
-@Test func sqlitePendingBatchPersistsCreationEpoch() async throws {
+@Test func sqlitePendingBatchAndGapPersistReExportRange() async throws {
     let url = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-pending-age-\(UUID().uuidString).sqlite")
     let store = try SQLiteStateStore(path: url.path)
@@ -1945,10 +1952,25 @@ private func runUntilProcessExitSeam() async throws {
         expectedRecords: 1,
         byteCount: 2,
         metric: MetricCatalog.heartRate.id,
-        createdAtEpoch: 123
+        createdAtEpoch: 123,
+        rangeStartDay: "2024-01-01",
+        rangeEndDay: "2024-01-02"
     )
     try await store.transact { try $0.enqueuePending(pending) }
     #expect(try await store.transact { try $0.pendingBatches() } == [pending])
+    let gap = GapRecord(
+        batchID: pending.id,
+        rangeDescription: "queue_eviction:2024-01-01:2024-01-02",
+        metric: pending.metric,
+        rangeStartDay: pending.rangeStartDay,
+        rangeEndDay: pending.rangeEndDay
+    )
+    try await store.transact { try $0.evict(pending.id, recording: gap) }
+    let restored = try #require(try await store.transact { try $0.loadGaps().first })
+    #expect(restored.batchID == gap.batchID)
+    #expect(restored.metric == gap.metric)
+    #expect(restored.rangeStartDay == gap.rangeStartDay)
+    #expect(restored.rangeEndDay == gap.rangeEndDay)
 }
 
 @Test func sqlitePersistsEmittedIndexOnCommit() async throws {
@@ -2280,6 +2302,44 @@ private func runUntilProcessExitSeam() async throws {
     #expect(payload.contains("\"reason\":\"full_reconcile\""))
     #expect(payload.contains(old.key.uuid))
     #expect(payload.contains(recent.key.uuid))
+}
+
+@Test func queueGapReExportReadsTheRecordedEvictedWindow() async throws {
+    let metric = MetricCatalog.heartRate.id
+    var sample = heartSample("cccccccc-cccc-cccc-cccc-cccccccccccc")
+    sample.start = "2024-01-15T10:00:00Z"
+    sample.end = sample.start
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-gap-reexport-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let store = MemoryStateStore()
+    let outcome = try await ReconcileSweep(
+        observations: FixtureDays(byDay: ["2024-01-15": [sample]]),
+        destination: .testing(LocalFileSink(directory: root)),
+        store: store,
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    ).run(
+        gap: GapRecord(
+            batchID: BatchID(rawValue: "evicted"),
+            rangeDescription: "queue_eviction:2024-01-15:2024-01-15",
+            metric: metric,
+            rangeStartDay: "2024-01-15",
+            rangeEndDay: "2024-01-15"
+        )
+    )
+
+    #expect(outcome.kind == .success)
+    let payload = try FileManager.default.contentsOfDirectory(
+        at: root,
+        includingPropertiesForKeys: nil
+    ).filter { $0.pathExtension == "ndjson" }
+        .map { try String(contentsOf: $0, encoding: .utf8) }
+        .joined()
+    #expect(payload.contains("\"reason\":\"gap_reexport\""))
+    #expect(payload.contains(sample.key.uuid))
 }
 
 @Test func reconcileSweepRepairsAbsenceWithoutAdvancingCursor() async throws {

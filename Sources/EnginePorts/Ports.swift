@@ -95,6 +95,8 @@ public struct PendingBatch: Sendable, Equatable {
     public var byteCount: Int
     public var metric: MetricID
     public var createdAtEpoch: TimeInterval?
+    public var rangeStartDay: String?
+    public var rangeEndDay: String?
 
     public init(
         id: BatchID,
@@ -102,7 +104,9 @@ public struct PendingBatch: Sendable, Equatable {
         expectedRecords: Int = 0,
         byteCount: Int = 0,
         metric: MetricID = MetricID(rawValue: ""),
-        createdAtEpoch: TimeInterval? = nil
+        createdAtEpoch: TimeInterval? = nil,
+        rangeStartDay: String? = nil,
+        rangeEndDay: String? = nil
     ) {
         self.id = id
         self.payloadURL = payloadURL
@@ -110,6 +114,8 @@ public struct PendingBatch: Sendable, Equatable {
         self.byteCount = byteCount
         self.metric = metric
         self.createdAtEpoch = createdAtEpoch
+        self.rangeStartDay = rangeStartDay
+        self.rangeEndDay = rangeEndDay
     }
 }
 
@@ -152,9 +158,22 @@ public enum AuthGrant: String, Sendable, Equatable {
 public struct GapRecord: Sendable {
     public var batchID: BatchID
     public var rangeDescription: String
-    public init(batchID: BatchID, rangeDescription: String) {
+    public var metric: MetricID
+    public var rangeStartDay: String?
+    public var rangeEndDay: String?
+
+    public init(
+        batchID: BatchID,
+        rangeDescription: String,
+        metric: MetricID = MetricID(rawValue: ""),
+        rangeStartDay: String? = nil,
+        rangeEndDay: String? = nil
+    ) {
         self.batchID = batchID
         self.rangeDescription = rangeDescription
+        self.metric = metric
+        self.rangeStartDay = rangeStartDay
+        self.rangeEndDay = rangeEndDay
     }
 }
 

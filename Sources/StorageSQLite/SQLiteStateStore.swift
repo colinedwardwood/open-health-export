@@ -54,6 +54,11 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
             "ALTER TABLE pending_batches ADD COLUMN byte_count INTEGER NOT NULL DEFAULT 0;",
             "ALTER TABLE pending_batches ADD COLUMN metric TEXT NOT NULL DEFAULT '';",
             "ALTER TABLE pending_batches ADD COLUMN created_at_epoch REAL;",
+            "ALTER TABLE pending_batches ADD COLUMN range_start_day TEXT;",
+            "ALTER TABLE pending_batches ADD COLUMN range_end_day TEXT;",
+            "ALTER TABLE gaps ADD COLUMN metric TEXT NOT NULL DEFAULT '';",
+            "ALTER TABLE gaps ADD COLUMN range_start_day TEXT;",
+            "ALTER TABLE gaps ADD COLUMN range_end_day TEXT;",
             "ALTER TABLE journal ADD COLUMN trigger TEXT NOT NULL DEFAULT 'manual';",
             "ALTER TABLE journal ADD COLUMN samples_read INTEGER NOT NULL DEFAULT 0;",
             "ALTER TABLE journal ADD COLUMN samples_committed INTEGER NOT NULL DEFAULT 0;",
@@ -128,7 +133,9 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 expected_records INTEGER NOT NULL,
                 byte_count INTEGER NOT NULL DEFAULT 0,
                 metric TEXT NOT NULL DEFAULT '',
-                created_at_epoch REAL
+                created_at_epoch REAL,
+                range_start_day TEXT,
+                range_end_day TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_pending_metric ON pending_batches (metric);
             CREATE TABLE IF NOT EXISTS deliveries (
@@ -137,7 +144,10 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
             );
             CREATE TABLE IF NOT EXISTS gaps (
                 batch_id TEXT PRIMARY KEY,
-                range_description TEXT NOT NULL
+                range_description TEXT NOT NULL,
+                metric TEXT NOT NULL DEFAULT '',
+                range_start_day TEXT,
+                range_end_day TEXT
             );
             CREATE TABLE IF NOT EXISTS emitted_index (
                 uuid TEXT PRIMARY KEY,
@@ -252,7 +262,7 @@ private final class SQLiteTransaction: StateTransaction {
 
     func enqueuePending(_ batch: PendingBatch) throws {
         let pending = try store.prepare(
-            "INSERT INTO pending_batches (batch_id, payload_url, expected_records, byte_count, metric, created_at_epoch) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(batch_id) DO UPDATE SET payload_url = excluded.payload_url, expected_records = excluded.expected_records, byte_count = excluded.byte_count, metric = excluded.metric, created_at_epoch = COALESCE(pending_batches.created_at_epoch, excluded.created_at_epoch);"
+            "INSERT INTO pending_batches (batch_id, payload_url, expected_records, byte_count, metric, created_at_epoch, range_start_day, range_end_day) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(batch_id) DO UPDATE SET payload_url = excluded.payload_url, expected_records = excluded.expected_records, byte_count = excluded.byte_count, metric = excluded.metric, created_at_epoch = COALESCE(pending_batches.created_at_epoch, excluded.created_at_epoch), range_start_day = excluded.range_start_day, range_end_day = excluded.range_end_day;"
         )
         defer { sqlite3_finalize(pending) }
         bindText(pending, 1, batch.id.rawValue)
@@ -265,6 +275,8 @@ private final class SQLiteTransaction: StateTransaction {
         } else {
             sqlite3_bind_null(pending, 6)
         }
+        bindOptionalText(pending, 7, batch.rangeStartDay)
+        bindOptionalText(pending, 8, batch.rangeEndDay)
         try stepDone(pending)
     }
 
@@ -289,7 +301,7 @@ private final class SQLiteTransaction: StateTransaction {
 
     func pendingBatches() throws -> [PendingBatch] {
         let stmt = try store.prepare(
-            "SELECT batch_id, payload_url, expected_records, byte_count, metric, created_at_epoch FROM pending_batches ORDER BY rowid;"
+            "SELECT batch_id, payload_url, expected_records, byte_count, metric, created_at_epoch, range_start_day, range_end_day FROM pending_batches ORDER BY rowid;"
         )
         defer { sqlite3_finalize(stmt) }
         var batches: [PendingBatch] = []
@@ -303,7 +315,9 @@ private final class SQLiteTransaction: StateTransaction {
                     metric: MetricID(rawValue: text(stmt, 4)),
                     createdAtEpoch: sqlite3_column_type(stmt, 5) == SQLITE_NULL
                         ? nil
-                        : sqlite3_column_double(stmt, 5)
+                        : sqlite3_column_double(stmt, 5),
+                    rangeStartDay: optionalText(stmt, 6),
+                    rangeEndDay: optionalText(stmt, 7)
                 )
             )
         }
@@ -318,14 +332,19 @@ private final class SQLiteTransaction: StateTransaction {
     }
 
     func loadGaps() throws -> [GapRecord] {
-        let stmt = try store.prepare("SELECT batch_id, range_description FROM gaps ORDER BY rowid;")
+        let stmt = try store.prepare(
+            "SELECT batch_id, range_description, metric, range_start_day, range_end_day FROM gaps ORDER BY rowid;"
+        )
         defer { sqlite3_finalize(stmt) }
         var gaps: [GapRecord] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
             gaps.append(
                 GapRecord(
                     batchID: BatchID(rawValue: text(stmt, 0)),
-                    rangeDescription: text(stmt, 1)
+                    rangeDescription: text(stmt, 1),
+                    metric: MetricID(rawValue: text(stmt, 2)),
+                    rangeStartDay: optionalText(stmt, 3),
+                    rangeEndDay: optionalText(stmt, 4)
                 )
             )
         }
@@ -343,11 +362,14 @@ private final class SQLiteTransaction: StateTransaction {
             throw error
         }
         let stmt = try store.prepare(
-            "INSERT INTO gaps (batch_id, range_description) VALUES (?, ?) ON CONFLICT(batch_id) DO UPDATE SET range_description = excluded.range_description;"
+            "INSERT INTO gaps (batch_id, range_description, metric, range_start_day, range_end_day) VALUES (?, ?, ?, ?, ?) ON CONFLICT(batch_id) DO UPDATE SET range_description = excluded.range_description, metric = excluded.metric, range_start_day = excluded.range_start_day, range_end_day = excluded.range_end_day;"
         )
         defer { sqlite3_finalize(stmt) }
         bindText(stmt, 1, batchID.rawValue)
         bindText(stmt, 2, recording.rangeDescription)
+        bindText(stmt, 3, recording.metric.rawValue)
+        bindOptionalText(stmt, 4, recording.rangeStartDay)
+        bindOptionalText(stmt, 5, recording.rangeEndDay)
         try stepDone(stmt)
     }
 
@@ -677,6 +699,18 @@ private final class SQLiteTransaction: StateTransaction {
         sqlite3_bind_text(stmt, index, value, -1, sqliteTransient)
     }
 
+    private func bindOptionalText(
+        _ stmt: OpaquePointer,
+        _ index: Int32,
+        _ value: String?
+    ) {
+        if let value {
+            bindText(stmt, index, value)
+        } else {
+            sqlite3_bind_null(stmt, index)
+        }
+    }
+
     private func bindBlob(_ stmt: OpaquePointer, _ index: Int32, _ data: Data) {
         data.withUnsafeBytes { raw in
             _ = sqlite3_bind_blob(stmt, index, raw.baseAddress, Int32(data.count), sqliteTransient)
@@ -692,6 +726,11 @@ private final class SQLiteTransaction: StateTransaction {
     private func text(_ stmt: OpaquePointer, _ index: Int32) -> String {
         guard let value = sqlite3_column_text(stmt, index) else { return "" }
         return String(cString: value)
+    }
+
+    private func optionalText(_ stmt: OpaquePointer, _ index: Int32) -> String? {
+        guard sqlite3_column_type(stmt, index) != SQLITE_NULL else { return nil }
+        return text(stmt, index)
     }
 
     private func stepDone(_ stmt: OpaquePointer) throws {
