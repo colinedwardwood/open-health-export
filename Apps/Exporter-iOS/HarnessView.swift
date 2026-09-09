@@ -54,6 +54,10 @@ struct HarnessView: View {
     @State private var liveBrowserSamples: [MetricID: [SampleRecord]] = [:]
     @State private var browserLoadingHealth = false
     @State private var foregroundCatchUpStarted = false
+    @AppStorage("ohe.browserOnlyWithData")
+    private var browserOnlyWithData = true
+    @AppStorage("ohe.browserDemoMode")
+    private var browserDemoMode = false
     @AppStorage("ohe.advisoryEnabled")
     private var advisoryEnabled = true
     @State private var advisoryBanner: String?
@@ -557,16 +561,26 @@ struct HarnessView: View {
         let samples = MetricCatalog.all.enumerated().map { index, declaration in
             DemoCorpus.sample(at: index, seed: 1, declaration: declaration)
         }
-        let latest = Dictionary(uniqueKeysWithValues: samples.map { ($0.metric, $0) })
+        let demoLatest = Dictionary(
+            uniqueKeysWithValues: samples.map { ($0.metric, $0) }
+        )
+        let liveLatest = Dictionary(
+            uniqueKeysWithValues: liveBrowserSamples.compactMap { metric, samples in
+                samples.sorted { $0.start > $1.start }.first.map { (metric, $0) }
+            }
+        )
+        let latest = browserDemoMode ? demoLatest : liveLatest
         let rows = DataBrowser.rows(
             latest: latest,
             exported: browserSelection,
-            search: browserSearch
+            search: browserSearch,
+            onlyWithData: browserOnlyWithData && !browserSelecting
         )
         let selectedDetail = selectedBrowserMetric.flatMap { metric in
             let live = liveBrowserSamples[metric]
-            let detailSamples = live ?? samples.filter { $0.metric == metric }
-            let detailNow = live == nil
+            let detailSamples = live
+                ?? (browserDemoMode ? samples.filter { $0.metric == metric } : [])
+            let detailNow = live == nil && browserDemoMode
                 ? detailSamples.first.flatMap { ISO8601DateFormatter().date(from: $0.start) }
                     ?? Date(timeIntervalSince1970: 0)
                 : Date()
@@ -604,13 +618,13 @@ struct HarnessView: View {
                 }
             }
             Text(
-                selectedBrowserMetric.flatMap { liveBrowserSamples[$0] } == nil
+                browserDemoMode
                     ? "Demo values. This is what App Review sees without HealthKit history."
                     : "Health values read on this iPhone."
             )
                 .font(.footnote)
                 .foregroundColor(
-                    selectedBrowserMetric.flatMap { liveBrowserSamples[$0] } == nil
+                    browserDemoMode
                         ? .orange
                         : .secondary
                 )
@@ -670,6 +684,10 @@ struct HarnessView: View {
                     }
                     .disabled(sensitiveDestinationConfirmation != "Archive folder")
                 }
+                Toggle("Only types with data", isOn: $browserOnlyWithData)
+                    .accessibilityIdentifier("browser-only-with-data")
+                Toggle("Show demo values", isOn: $browserDemoMode)
+                    .accessibilityIdentifier("browser-demo-mode")
                 TextField("Search types", text: $browserSearch)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()

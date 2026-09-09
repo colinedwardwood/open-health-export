@@ -9,6 +9,8 @@ final class ExporterUITests: XCTestCase {
         app.launchArguments = [
             "-ohe.disclosureAcknowledged", "false",
             "-ohe.advisoryEnabled", "false",
+            "-ohe.browserDemoMode", "true",
+            "-ohe.browserOnlyWithData", "true",
         ]
         app.launch()
     }
