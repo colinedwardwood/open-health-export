@@ -421,7 +421,7 @@ struct HarnessView: View {
             localeIdentifier: "en_US_POSIX",
             tzDatabaseVersion: "host"
         )
-        let source = HealthKitAnchoredSource(context: context, limit: 10_000)
+        let source = HealthKitSampleSource(context: context, limit: 10_000)
         var lines: [String] = []
         for metric in [MetricCatalog.heartRate.id, MetricCatalog.stepCount.id] {
             do {
