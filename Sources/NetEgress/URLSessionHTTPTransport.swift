@@ -25,6 +25,7 @@ public final class URLSessionHTTPTransport: HTTPTransport, @unchecked Sendable {
     public func execute(_ request: OutboundHTTPRequest) async throws -> OutboundHTTPResponse {
         EgressAttemptLog.record(kind: .http, host: request.url.host ?? request.url.absoluteString)
         var urlRequest = URLRequest(url: request.url)
+        urlRequest.timeoutInterval = 30
         urlRequest.httpMethod = request.method
         for (name, value) in request.headers {
             urlRequest.setValue(value, forHTTPHeaderField: name)

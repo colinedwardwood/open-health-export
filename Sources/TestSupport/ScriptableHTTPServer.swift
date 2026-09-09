@@ -182,6 +182,21 @@ public final class ScriptableHTTPServer: @unchecked Sendable {
                 if listenFD < 0 { return }
                 continue
             }
+            var timeout = timeval(tv_sec: 15, tv_usec: 0)
+            _ = setsockopt(
+                client,
+                SOL_SOCKET,
+                SO_RCVTIMEO,
+                &timeout,
+                socklen_t(MemoryLayout<timeval>.size)
+            )
+            _ = setsockopt(
+                client,
+                SOL_SOCKET,
+                SO_SNDTIMEO,
+                &timeout,
+                socklen_t(MemoryLayout<timeval>.size)
+            )
             handle(client: client)
         }
     }

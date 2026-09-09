@@ -8,6 +8,8 @@ import Glibc
 
 /// Plaintext TCP stream for Linux Mosquitto (R-90) and other non-TLS dials.
 /// TLS stays on `NWByteStream` (Darwin). A pin is ignored here because there is no handshake.
+/// Blocking `connect`/`send`/`recv` run on a libdispatch queue so they cannot stall Swift's
+/// cooperative thread pool (Linux CI `swift test` otherwise deadlocks).
 public actor POSIXByteStream: ByteStream {
     private let endpoint: StreamEndpoint
     private var fd: Int32 = -1
@@ -21,34 +23,44 @@ public actor POSIXByteStream: ByteStream {
     public func open() async throws {
         if fd >= 0 { return }
         if endpoint.usesTLS { throw StreamError.unsupportedPlatform }
-        fd = try Self.connect(host: endpoint.host, port: endpoint.port)
+        let host = endpoint.host
+        let port = endpoint.port
+        fd = try await Self.offPool { try Self.connect(host: host, port: port) }
     }
 
     public func send(_ data: Data) async throws {
         try await open()
-        try data.withUnsafeBytes { raw in
-            var sent = 0
-            let total = raw.count
-            let base = raw.bindMemory(to: UInt8.self).baseAddress!
-            while sent < total {
-                let n = DarwinOrGlibc.send(fd, base + sent, total - sent, 0)
-                if n <= 0 { throw StreamError.transport("send") }
-                sent += n
+        let socket = fd
+        try await Self.offPool {
+            try data.withUnsafeBytes { raw in
+                var sent = 0
+                let total = raw.count
+                let base = raw.bindMemory(to: UInt8.self).baseAddress!
+                while sent < total {
+                    try Self.wait(fd: socket, events: Int16(POLLOUT))
+                    let n = DarwinOrGlibc.send(socket, base + sent, total - sent, 0)
+                    if n <= 0 { throw StreamError.transport("send") }
+                    sent += n
+                }
             }
         }
     }
 
     public func receive(max: Int) async throws -> Data {
         try await open()
-        var buffer = [UInt8](repeating: 0, count: max)
-        let n = buffer.withUnsafeMutableBytes { raw in
-            DarwinOrGlibc.recv(fd, raw.baseAddress, raw.count, 0)
+        let socket = fd
+        return try await Self.offPool {
+            try Self.wait(fd: socket, events: Int16(POLLIN))
+            var buffer = [UInt8](repeating: 0, count: max)
+            let n = buffer.withUnsafeMutableBytes { raw in
+                DarwinOrGlibc.recv(socket, raw.baseAddress, raw.count, 0)
+            }
+            if n == 0 { throw StreamError.closedByPeer }
+            if n < 0 {
+                throw StreamError.transport("recv: \(String(cString: strerror(errno)))")
+            }
+            return Data(buffer.prefix(Int(n)))
         }
-        if n == 0 { throw StreamError.closedByPeer }
-        if n < 0 {
-            throw StreamError.transport("recv: \(String(cString: strerror(errno)))")
-        }
-        return Data(buffer.prefix(Int(n)))
     }
 
     public func close() async {
@@ -56,6 +68,27 @@ public actor POSIXByteStream: ByteStream {
             DarwinOrGlibc.closeSocket(fd)
             fd = -1
         }
+    }
+
+    private static func offPool<T: Sendable>(
+        _ work: @escaping @Sendable () throws -> T
+    ) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    continuation.resume(returning: try work())
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    private static func wait(fd: Int32, events: Int16, milliseconds: Int32 = 10_000) throws {
+        var fds = [pollfd(fd: fd, events: events, revents: 0)]
+        let ready = poll(&fds, nfds_t(1), milliseconds)
+        if ready == 0 { throw StreamError.transport("io timeout") }
+        if ready < 0 { throw StreamError.transport("poll") }
     }
 
     private static func connect(host: String, port: UInt16) throws -> Int32 {
@@ -82,21 +115,7 @@ public actor POSIXByteStream: ByteStream {
             if socketFD >= 0 {
                 let connected = DarwinOrGlibc.connect(socketFD, current.pointee.ai_addr, current.pointee.ai_addrlen)
                 if connected == 0 {
-                    var timeout = timeval(tv_sec: 10, tv_usec: 0)
-                    _ = setsockopt(
-                        socketFD,
-                        SOL_SOCKET,
-                        SO_RCVTIMEO,
-                        &timeout,
-                        socklen_t(MemoryLayout<timeval>.size)
-                    )
-                    _ = setsockopt(
-                        socketFD,
-                        SOL_SOCKET,
-                        SO_SNDTIMEO,
-                        &timeout,
-                        socklen_t(MemoryLayout<timeval>.size)
-                    )
+                    Self.applyIOTimeout(socketFD)
                     return socketFD
                 }
                 DarwinOrGlibc.closeSocket(socketFD)
@@ -105,6 +124,24 @@ public actor POSIXByteStream: ByteStream {
             cursor = current.pointee.ai_next
         }
         throw lastError
+    }
+
+    private static func applyIOTimeout(_ socketFD: Int32) {
+        var timeout = timeval(tv_sec: 10, tv_usec: 0)
+        _ = setsockopt(
+            socketFD,
+            SOL_SOCKET,
+            SO_RCVTIMEO,
+            &timeout,
+            socklen_t(MemoryLayout<timeval>.size)
+        )
+        _ = setsockopt(
+            socketFD,
+            SOL_SOCKET,
+            SO_SNDTIMEO,
+            &timeout,
+            socklen_t(MemoryLayout<timeval>.size)
+        )
     }
 }
 

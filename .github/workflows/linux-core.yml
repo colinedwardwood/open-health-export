@@ -2,9 +2,13 @@ name: linux-core
 on:
   push:
   pull_request:
+concurrency:
+  group: linux-core-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   export-core:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc # v3
@@ -19,6 +23,7 @@ jobs:
       - name: Build Linux core
         run: swift build --target CoreDomain && swift build --target CorrectnessEngine
       - name: Test
+        timeout-minutes: 30
         run: swift test
       - name: Stream T0 through the schema pipeline
         run: swift run pipelinecheck < spec/v1.0.0/fixtures/tier0.ndjson
