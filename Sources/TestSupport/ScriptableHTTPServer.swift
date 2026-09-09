@@ -24,6 +24,7 @@ public final class ScriptableHTTPServer: @unchecked Sendable {
         public var delayNanoseconds: UInt64
         public var chunkSize: Int?
         public var closeAfterBodyBytes: Int?
+        public var slowLorisNanosecondsPerByte: UInt64
 
         public init(
             status: Int = 204,
@@ -32,7 +33,8 @@ public final class ScriptableHTTPServer: @unchecked Sendable {
             body: Data = Data(),
             delayNanoseconds: UInt64 = 0,
             chunkSize: Int? = nil,
-            closeAfterBodyBytes: Int? = nil
+            closeAfterBodyBytes: Int? = nil,
+            slowLorisNanosecondsPerByte: UInt64 = 0
         ) {
             self.status = status
             self.reason = reason ?? HTTPStatus.reason(status)
@@ -41,6 +43,7 @@ public final class ScriptableHTTPServer: @unchecked Sendable {
             self.delayNanoseconds = delayNanoseconds
             self.chunkSize = chunkSize
             self.closeAfterBodyBytes = closeAfterBodyBytes
+            self.slowLorisNanosecondsPerByte = slowLorisNanosecondsPerByte
         }
 
         public static func json(_ object: [String: Any], status: Int = 200) throws -> Script {
@@ -262,11 +265,26 @@ public final class ScriptableHTTPServer: @unchecked Sendable {
         if let limit = script.closeAfterBodyBytes {
             let headerCount = Data(head.utf8).count
             let keep = min(outgoing.count, headerCount + max(0, limit))
-            _ = try POSIXSockets.send(fd, outgoing.prefix(keep))
+            try send(fd: fd, Data(outgoing.prefix(keep)), pace: script.slowLorisNanosecondsPerByte)
             POSIXSockets.shutdown(fd)
             return
         }
-        _ = try POSIXSockets.send(fd, outgoing)
+        try send(fd: fd, outgoing, pace: script.slowLorisNanosecondsPerByte)
+    }
+
+    private func send(fd: Int32, _ data: Data, pace: UInt64) throws {
+        if pace == 0 {
+            _ = try POSIXSockets.send(fd, data)
+            return
+        }
+        for byte in data {
+            _ = try POSIXSockets.send(fd, Data([byte]))
+            var spec = timespec(
+                tv_sec: Int(pace / 1_000_000_000),
+                tv_nsec: Int(pace % 1_000_000_000)
+            )
+            _ = nanosleep(&spec, nil)
+        }
     }
 
     private func chunked(_ data: Data, size: Int) -> Data {

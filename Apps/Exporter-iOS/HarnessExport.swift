@@ -44,6 +44,8 @@ private struct MQTTVerificationRecord: Codable {
     var clientID: String
     var topic: String
     var report: DestinationTestReport
+    var hasClientPKCS12: Bool?
+    var clientPKCS12Password: String?
 }
 
 private actor ObserverExportGate {
@@ -832,18 +834,24 @@ enum HarnessExport {
         urlString: String,
         allowInsecure: Bool,
         clientID: String,
-        topic: String
+        topic: String,
+        clientPKCS12: Data? = nil,
+        clientPKCS12Password: String? = nil
     ) async throws -> [String] {
         guard let host = URL(string: urlString)?.host?.lowercased(), !host.isEmpty else {
             throw EgressError.invalidURL
         }
         let allowedHosts: Set<String> = [host]
+        let exporterID = try installationID()
         let destination = try MQTTDestination(
             urlString: urlString,
             allowedHosts: allowedHosts,
             allowInsecure: allowInsecure,
             clientID: clientID,
-            topic: topic
+            topic: topic,
+            clientPKCS12: clientPKCS12,
+            clientPKCS12Password: clientPKCS12Password,
+            exporterID: exporterID
         )
         let sink = try MQTTSink.overNetwork(destination: destination, pin: nil)
         let now = Date().ISO8601Format()
@@ -859,9 +867,17 @@ enum HarnessExport {
             allowInsecure: allowInsecure,
             clientID: clientID,
             topic: topic,
-            report: completed.report
+            report: completed.report,
+            hasClientPKCS12: clientPKCS12 != nil,
+            clientPKCS12Password: clientPKCS12Password
         )
         let root = try applicationSupportRoot()
+        let pkcs12URL = root.appendingPathComponent("mqtt-client.p12")
+        if let clientPKCS12 {
+            try clientPKCS12.write(to: pkcs12URL, options: .atomic)
+        } else {
+            try? FileManager.default.removeItem(at: pkcs12URL)
+        }
         try JSONEncoder().encode(record).write(
             to: root.appendingPathComponent("mqtt-destination.json"),
             options: .atomic
@@ -902,12 +918,17 @@ enum HarnessExport {
         )
         let saved = try JSONDecoder().decode(MQTTVerificationRecord.self, from: data)
         let allowedHosts = Set(saved.allowedHosts)
+        let pkcs12URL = root.appendingPathComponent("mqtt-client.p12")
+        let pkcs12 = (saved.hasClientPKCS12 == true) ? try Data(contentsOf: pkcs12URL) : nil
         let destination = try MQTTDestination(
             urlString: saved.urlString,
             allowedHosts: allowedHosts,
             allowInsecure: saved.allowInsecure,
             clientID: saved.clientID,
-            topic: saved.topic
+            topic: saved.topic,
+            clientPKCS12: pkcs12,
+            clientPKCS12Password: saved.clientPKCS12Password,
+            exporterID: try installationID()
         )
         let sink = try MQTTSink.overNetwork(destination: destination, pin: nil)
         var setup = DestinationSetup()

@@ -230,6 +230,31 @@ import WireFormat
     try MQTTTopic.validate(String(repeating: "c", count: MQTTTopic.maximumUTF8Count))
 }
 
+@Test func mqttTopicTemplateRendersExporterAndBatchAndRejectsWildcards() async throws {
+    #expect(try MQTTTopicTemplate.render("ohe/health", values: [:]) == "ohe/health")
+    #expect(
+        try MQTTTopicTemplate.render(
+            "ohe/{{exporterId|raw}}/{{batchId|raw}}",
+            values: ["exporterId": "phone-1", "batchId": "b1"]
+        ) == "ohe/phone-1/b1"
+    )
+    #expect(throws: MQTTError.badTopic) {
+        try MQTTTopicTemplate.render("ohe/{{exporterId|raw}}/#", values: ["exporterId": "phone-1"])
+    }
+    let (file, batchID) = try writeMQTTPayload()
+    let broker = LoopbackMQTTBroker()
+    let destination = try MQTTDestination(
+        urlString: "mqtts://broker.example:8883",
+        allowedHosts: ["broker.example"],
+        clientID: "c1",
+        topic: "ohe/{{exporterId|raw}}/health",
+        exporterID: "phone-1A7B"
+    )
+    let sink = MQTTSink(destination: destination, pipe: broker)
+    _ = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
+    #expect(await broker.lastPublishTopic == "ohe/phone-1A7B/health")
+}
+
 func writeMQTTPayload() throws -> (URL, BatchID) {
     let sample = heartSample("00000000-0000-0000-0000-000000000001")
     let batchID = BatchID(rawValue: "0192f3c1-0000-0000-0000-00000000000a")

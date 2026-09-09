@@ -20,6 +20,8 @@ public struct MQTTDestination: Sendable {
     /// PKCS#12 bytes for MQTTS client certificates. Not Secure Enclave material (SEC-68).
     public var clientPKCS12: Data?
     public var clientPKCS12Password: String?
+    /// Used when `topic` is an AR-21 template (`{{exporterId|raw}}`, `{{batchId|raw}}`).
+    public var exporterID: String?
 
     public init(
         urlString: String,
@@ -31,7 +33,8 @@ public struct MQTTDestination: Sendable {
         username: String? = nil,
         password: String? = nil,
         clientPKCS12: Data? = nil,
-        clientPKCS12Password: String? = nil
+        clientPKCS12Password: String? = nil,
+        exporterID: String? = nil
     ) throws {
         self.url = try EgressURL.parse(
             urlString,
@@ -46,6 +49,18 @@ public struct MQTTDestination: Sendable {
         self.password = password
         self.clientPKCS12 = clientPKCS12
         self.clientPKCS12Password = clientPKCS12Password
+        self.exporterID = exporterID
+    }
+
+    public func resolvedTopic(batchID: String) throws -> String {
+        try MQTTTopicTemplate.render(
+            topic,
+            values: [
+                "batchId": batchID,
+                "idempotencyKey": batchID,
+                "exporterId": exporterID ?? "",
+            ]
+        )
     }
 
     public var confirmsDelivery: Bool { qos != .atMostOnce }
@@ -151,7 +166,7 @@ public struct MQTTSink: DestinationSink, Sendable {
         let session = MQTTSession(pipe: pipe)
         try await session.connect(destination: destination)
         try await session.publish(
-            topic: destination.topic,
+            topic: try destination.resolvedTopic(batchID: idempotencyKey.rawValue),
             payload: payload,
             qos: destination.qos,
             retain: false

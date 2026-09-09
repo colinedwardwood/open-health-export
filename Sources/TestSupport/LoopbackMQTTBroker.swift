@@ -5,6 +5,7 @@ import SinkMQTT
 public actor LoopbackMQTTBroker: MQTTBytePipe {
     private var outbox = Data()
     private var waiters: [CheckedContinuation<Data, Error>] = []
+    public private(set) var lastPublishTopic: String?
 
     public init() {}
 
@@ -17,6 +18,7 @@ public actor LoopbackMQTTBroker: MQTTBytePipe {
             case .connect:
                 enqueue(Data([0x20, 0x02, 0x00, 0x00]))
             case .publish:
+                lastPublishTopic = try MQTTCodec.decodePublishTopic(body: packet.body)
                 if let id = try MQTTCodec.decodePublishPacketID(flags: packet.flags, body: packet.body) {
                     enqueue(Data([0x40, 0x02, UInt8(id >> 8), UInt8(id & 0xFF)]))
                 }

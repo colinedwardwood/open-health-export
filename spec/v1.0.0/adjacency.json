@@ -207,6 +207,7 @@
         "EnginePorts",
         "MQTTCodec",
         "NetEgress",
+        "RequestTemplate",
         "WireFormat"
       ]
     },

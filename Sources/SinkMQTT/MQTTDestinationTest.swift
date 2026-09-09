@@ -21,7 +21,7 @@ public enum MQTTDestinationTest {
 
         do {
             try await session.publish(
-                topic: destination.topic,
+                topic: try destination.resolvedTopic(batchID: "canary"),
                 payload: canary,
                 qos: destination.qos
             )

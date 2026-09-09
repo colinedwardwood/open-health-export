@@ -587,6 +587,34 @@ private func writeHTTPSPayload() throws -> (URL, BatchID) {
     #expect(recorded.contains { $0.headers["x-test"] == "latency" })
 }
 
+@Test func scriptableHTTPServerSlowLorisDelaysEachResponseByte() async throws {
+    let server = ScriptableHTTPServer()
+    try server.start()
+    defer { server.stop() }
+    server.enqueue(
+        ScriptableHTTPServer.Script(
+            status: 204,
+            slowLorisNanosecondsPerByte: 2_000_000
+        )
+    )
+    let transport = URLSessionHTTPTransport()
+    let body = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-slowloris-\(UUID().uuidString)")
+    try Data("ping".utf8).write(to: body)
+    let clock = ContinuousClock()
+    let elapsed = try await clock.measure {
+        _ = try await transport.execute(
+            OutboundHTTPRequest(
+                method: "POST",
+                url: server.origin.appendingPathComponent("slow"),
+                headers: [:],
+                bodyFile: body
+            )
+        )
+    }
+    #expect(elapsed >= .milliseconds(40))
+}
+
 @Test func httpsSinkDeliversOverLoopbackHTTPAndHonoursQueued401ThenSuccess() async throws {
     let server = ScriptableHTTPServer()
     try server.start()

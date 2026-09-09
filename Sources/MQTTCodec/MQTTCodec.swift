@@ -155,6 +155,11 @@ public enum MQTTCodec {
         return UInt16(bytes[0]) << 8 | UInt16(bytes[1])
     }
 
+    public static func decodePublishTopic(body: Data) throws -> String {
+        var i = 0
+        return try readMQTTString(body, start: &i).0
+    }
+
     public static func decodePublishPacketID(flags: UInt8, body: Data) throws -> UInt16? {
         let qos = (flags >> 1) & 0b11
         guard qos > 0 else { return nil }

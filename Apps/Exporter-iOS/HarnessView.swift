@@ -7,6 +7,7 @@ import EnginePorts
 import HealthKitSource
 import MetricCatalog
 import SwiftUI
+import UniformTypeIdentifiers
 import Watchdog
 import WireFormat
 
@@ -35,6 +36,10 @@ struct HarnessView: View {
     @State private var mqttClientID = "ohe-iphone"
     @State private var mqttTopic = "ohe/health"
     @State private var allowInsecureMQTT = false
+    @State private var mqttPKCS12Name = "No client certificate"
+    @State private var mqttPKCS12Data: Data?
+    @State private var mqttPKCS12Password = ""
+    @State private var pickingMQTTPKCS12 = false
     @State private var mqttTestLines: [String] = []
     @State private var showScanner = false
     @State private var diagnosticPreview = ""
@@ -182,6 +187,27 @@ struct HarnessView: View {
                 }
             )
         }
+        .fileImporter(
+            isPresented: $pickingMQTTPKCS12,
+            allowedContentTypes: mqttPKCS12Types,
+            allowsMultipleSelection: false
+        ) { result in
+            guard case .success(let urls) = result, let url = urls.first else { return }
+            let accessed = url.startAccessingSecurityScopedResource()
+            defer {
+                if accessed { url.stopAccessingSecurityScopedResource() }
+            }
+            do {
+                mqttPKCS12Data = try Data(contentsOf: url)
+                mqttPKCS12Name = url.lastPathComponent
+            } catch {
+                status = "Failed: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private var mqttPKCS12Types: [UTType] {
+        ["p12", "pfx"].compactMap { UTType(filenameExtension: $0) } + [.data]
     }
 
     private var disclosure: some View {
@@ -360,10 +386,31 @@ struct HarnessView: View {
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .accessibilityIdentifier("mqtt-client-id")
-            TextField("MQTT topic", text: $mqttTopic)
+            TextField("MQTT topic template", text: $mqttTopic)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .accessibilityIdentifier("mqtt-topic")
+            Text("Use {{exporterId|raw}} and {{batchId|raw}} if the broker needs a templated topic.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Button("Choose MQTT client PKCS#12") {
+                pickingMQTTPKCS12 = true
+            }
+            .accessibilityIdentifier("mqtt-pkcs12")
+            Text(mqttPKCS12Name)
+                .font(.footnote)
+                .accessibilityIdentifier("mqtt-pkcs12-name")
+            SecureField("PKCS#12 password", text: $mqttPKCS12Password)
+                .textContentType(.password)
+                .accessibilityIdentifier("mqtt-pkcs12-password")
+            if mqttPKCS12Data != nil {
+                Button("Clear client certificate") {
+                    mqttPKCS12Data = nil
+                    mqttPKCS12Name = "No client certificate"
+                    mqttPKCS12Password = ""
+                }
+                .accessibilityIdentifier("mqtt-pkcs12-clear")
+            }
             Toggle("Allow plain MQTT (unsafe)", isOn: $allowInsecureMQTT)
                 .accessibilityIdentifier("mqtt-insecure")
             if allowInsecureMQTT {
@@ -1070,7 +1117,9 @@ struct HarnessView: View {
                 urlString: mqttURL,
                 allowInsecure: allowInsecureMQTT,
                 clientID: mqttClientID,
-                topic: mqttTopic
+                topic: mqttTopic,
+                clientPKCS12: mqttPKCS12Data,
+                clientPKCS12Password: mqttPKCS12Password.isEmpty ? nil : mqttPKCS12Password
             )
             destinationStatusLines = HarnessExport.destinationStatusLines()
             await refreshLedgerIntegrity()
