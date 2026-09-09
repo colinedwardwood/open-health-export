@@ -440,7 +440,7 @@ private struct DeviceLockedSource: SampleSource {
     #expect(discardedOutcome.kind != .success)
 }
 
-@Test func defaultLocalFileExportMakesNoAttributableNetworkDials() async throws {
+@Test func p16DefaultLocalFileExportMakesNoAttributableNetworkDials() async throws {
     let recorder = EgressAttemptLog.Recorder()
     try await EgressAttemptLog.$recorder.withValue(recorder) {
         let dest = FileManager.default.temporaryDirectory
@@ -1792,6 +1792,43 @@ private func runUntilProcessExitSeam() async throws {
     }
 }
 
+@Test func p14PriorSQLiteSchemaMigratesWithoutResettingTheCursor() async throws {
+    let path = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-legacy-\(UUID().uuidString).sqlite")
+        .path
+    let metric = MetricID(rawValue: "heartRate")
+    let checkpoint = CheckpointEnvelope(
+        tzDatabaseVersion: "2024a",
+        epoch: 4,
+        adapterAnchor: Data([0x11, 0x22])
+    )
+    try SQLiteV1Fixture.write(
+        path: path,
+        metric: metric,
+        checkpoint: checkpoint,
+        runID: "legacy-run"
+    )
+    let store = try SQLiteStateStore(path: path)
+    let snap = try await store.transact { try $0.loadCursor(metric: metric) }
+    #expect(snap?.epoch == 4)
+    #expect(snap?.anchorBlob == Data([0x11, 0x22]))
+    let journal = try await store.transact { try $0.loadJournal() }
+    #expect(journal.map(\.runID.rawValue) == ["legacy-run"])
+    #expect(journal.first?.outcomeKind == "success")
+    #expect(journal.first?.trigger == .manual)
+}
+
+@Test func p12CheckpointBytesDoNotEmbedSampleIdentifiers() {
+    let canary = "ffffffff-ffff-4fff-8fff-ffffffffffff"
+    let envelope = CheckpointEnvelope(
+        tzDatabaseVersion: "2024a",
+        epoch: 1,
+        adapterAnchor: Data([0x00, 0x01, 0x02])
+    )
+    let bytes = envelope.encoded()
+    #expect(String(decoding: bytes, as: UTF8.self).contains(canary) == false)
+}
+
 @Test func sqlitePersistsCursorAndCensus() async throws {
     let path = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-test-\(UUID().uuidString).sqlite")
@@ -1848,6 +1885,17 @@ private func runUntilProcessExitSeam() async throws {
     #expect(restored.tzDatabaseVersion == "2024a")
     #expect(restored.epoch == 9)
     #expect(restored.adapterAnchor == Data([0xAB, 0xCD]))
+    #expect(
+        envelope.encoded() == Data([
+            0x4F, 0x48, 0x45, 0x43,
+            0x01,
+            0x00, 0x05,
+            0x32, 0x30, 0x32, 0x34, 0x61,
+            0x00, 0x00, 0x00, 0x09,
+            0x00, 0x00, 0x00, 0x02,
+            0xAB, 0xCD,
+        ])
+    )
     #expect(throws: CheckpointError.corrupt) {
         _ = try CheckpointEnvelope.decoded(Data("nope".utf8))
     }

@@ -282,6 +282,13 @@
       "dependencies": []
     },
     {
+      "name": "pipelinecheck",
+      "type": "executable",
+      "dependencies": [
+        "WireFormat"
+      ]
+    },
+    {
       "name": "policycheck",
       "type": "executable",
       "dependencies": [

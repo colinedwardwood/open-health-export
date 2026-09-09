@@ -88,6 +88,11 @@ let linuxCore: [Target] = [
         dependencies: ["CompanionWire", "MQTTCodec", "WireFormat"],
         path: "Tools/wirefuzz"
     ),
+    .executableTarget(
+        name: "pipelinecheck",
+        dependencies: ["WireFormat"],
+        path: "Tools/pipelinecheck"
+    ),
     .testTarget(
         name: "ExportCoreTests",
         dependencies: [
@@ -163,6 +168,7 @@ var products: [Product] = [
     .executable(name: "receiver", targets: ["receiver"]),
     .executable(name: "hacontract", targets: ["hacontract"]),
     .executable(name: "wirefuzz", targets: ["wirefuzz"]),
+    .executable(name: "pipelinecheck", targets: ["pipelinecheck"]),
     .library(name: "SinkMQTT", targets: ["MQTTCodec", "SinkMQTT"]),
 ]
 

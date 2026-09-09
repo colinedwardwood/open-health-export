@@ -16,6 +16,8 @@ jobs:
         run: swift build --target CoreDomain && swift build --target CorrectnessEngine
       - name: Test
         run: swift test
+      - name: Stream T0 through the schema pipeline
+        run: swift run pipelinecheck < spec/v1.0.0/fixtures/tier0.ndjson
       - name: Import policy
         run: swift run policycheck
       - name: Release objects omit R-83 fault seams

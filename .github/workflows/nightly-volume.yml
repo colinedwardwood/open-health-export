@@ -13,7 +13,7 @@ jobs:
         with:
           swift-version: "6.3.3"
       - name: Build release corpus generator
-        run: swift build -c release --product corpusgen
+        run: swift build -c release --product corpusgen --product pipelinecheck
       - name: Generate ten million records reproducibly
         shell: bash
         run: |
@@ -38,6 +38,10 @@ jobs:
           test "$first" = "$second"
           printf 'tier=T1 records=10000000 sha256=%s first_s=%s second_s=%s\n' \
             "$first" "$first_seconds" "$second_seconds"
+      - name: Validate a T1 prefix through the schema pipeline
+        run: |
+          .build/release/corpusgen --tier T1 --seed 1 --count 5000 |
+            .build/release/pipelinecheck
   tier-two-pathologies:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
