@@ -51,6 +51,8 @@ struct HarnessView: View {
     @State private var foregroundCatchUpStarted = false
     @AppStorage("ohe.advisoryEnabled")
     private var advisoryEnabled = true
+    @State private var advisoryBanner: String?
+    @State private var advisoryItems: [AdvisoryItem] = []
 
     var body: some View {
         NavigationStack {
@@ -102,6 +104,7 @@ struct HarnessView: View {
                 }
                 await restorePairing()
                 await refreshLedgerIntegrity()
+                await refreshSecurityAdvisory()
                 if disclosureAcknowledged,
                    !foregroundCatchUpStarted,
                    HarnessExport.isLocalFileEnabled() {
@@ -125,7 +128,13 @@ struct HarnessView: View {
         .onChange(of: scenePhase) { _, next in
             guard next == .active else { return }
             AppLifecycleCoordinator.shared.recordWake(.appForeground)
-            Task { await startHealthObserversIfEligible() }
+            Task {
+                await startHealthObserversIfEligible()
+                await refreshSecurityAdvisory()
+            }
+        }
+        .onChange(of: advisoryEnabled) {
+            Task { await refreshSecurityAdvisory() }
         }
         .task(id: disclosureAcknowledged) {
             await startHealthObserversIfEligible()
@@ -206,6 +215,24 @@ struct HarnessView: View {
             Text("This is the sole built-in host. The app never sends Health data there. Fetch happens only on a visible foreground launch, never during export.")
                 .font(.footnote)
             Toggle("Fetch security advisories", isOn: $advisoryEnabled)
+            if let advisoryBanner {
+                Text(advisoryBanner)
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+                    .accessibilityIdentifier("advisory-banner")
+            }
+            ForEach(advisoryItems, id: \.id) { item in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(item.severity.uppercased()): \(item.id)")
+                        .font(.subheadline)
+                    Text(item.description)
+                        .font(.footnote)
+                    Text(item.url)
+                        .font(.footnote)
+                        .textSelection(.enabled)
+                }
+                .accessibilityIdentifier("advisory-\(item.id)")
+            }
 
             Text("Where your data goes")
                 .font(.headline)
@@ -436,6 +463,20 @@ struct HarnessView: View {
         results = lines
         status = "Ready. R-70 finished. Copy the lines below into the findings doc. Simulator stores are often empty; use REF-B or the XR for a real number."
         phase = .ready
+    }
+
+    @MainActor
+    private func refreshSecurityAdvisory() async {
+        do {
+            let presentation = try await HarnessExport.fetchSecurityAdvisory(
+                enabled: advisoryEnabled
+            )
+            advisoryBanner = presentation.banner
+            advisoryItems = presentation.items
+        } catch {
+            advisoryBanner = AdvisoryStaleness.staleCopy
+            advisoryItems = []
+        }
     }
 
     private var dataBrowser: some View {

@@ -45,6 +45,53 @@ private actor ObserverExportGate {
 }
 
 enum HarnessExport {
+    @MainActor
+    static func fetchSecurityAdvisory(enabled: Bool) async throws -> AdvisoryPresentation {
+        let defaults = UserDefaults.standard
+        let state = AdvisoryState(
+            enabled: enabled,
+            lastAttemptEpoch: defaults.object(
+                forKey: "ohe.advisoryLastAttemptEpoch"
+            ) as? TimeInterval,
+            lastVerifiedEpoch: defaults.object(
+                forKey: "ohe.advisoryLastVerifiedEpoch"
+            ) as? TimeInterval,
+            lastSeenSeq: defaults.integer(forKey: "ohe.advisoryLastSeenSeq")
+        )
+        let root = try applicationSupportRoot()
+        let emptyBody = root.appendingPathComponent("advisory-request-body")
+        if !FileManager.default.fileExists(atPath: emptyBody.path) {
+            try Data().write(to: emptyBody, options: .atomic)
+        }
+        let store = try SQLiteStateStore(
+            path: root.appendingPathComponent("state.sqlite").path
+        )
+        let result = try await AdvisoryClient.fetch(
+            transport: URLSessionHTTPTransport(),
+            store: store,
+            state: state,
+            now: Date(),
+            marketingVersion: Bundle.main.object(
+                forInfoDictionaryKey: "CFBundleShortVersionString"
+            ) as? String ?? "0.0.0",
+            foregroundVisible: true,
+            emptyBody: emptyBody
+        )
+        defaults.set(
+            result.state.lastAttemptEpoch,
+            forKey: "ohe.advisoryLastAttemptEpoch"
+        )
+        defaults.set(
+            result.state.lastVerifiedEpoch,
+            forKey: "ohe.advisoryLastVerifiedEpoch"
+        )
+        defaults.set(
+            result.state.lastSeenSeq,
+            forKey: "ohe.advisoryLastSeenSeq"
+        )
+        return result.presentation
+    }
+
     static func installationID() throws -> String {
         let root = try applicationSupportRoot()
         let exporterURL = root.appendingPathComponent("exporter-id")
