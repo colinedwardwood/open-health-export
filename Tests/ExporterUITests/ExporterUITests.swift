@@ -29,6 +29,34 @@ final class ExporterUITests: XCTestCase {
         try app.performAccessibilityAudit()
     }
 
+    func testBrowserEmptyAndDetailStatesPassAccessibilityAudit() throws {
+        enterControls()
+        let search = scrollToHittable(app.textFields["browser-search"])
+        search.tap()
+        search.typeText("no-such-health-type")
+        XCTAssertTrue(app.staticTexts["browser-empty"].waitForExistence(timeout: 2))
+        try app.performAccessibilityAudit()
+        search.tap()
+        app.buttons["Clear text"].tap()
+        let row = scrollToHittable(app.buttons["browser-row-heart_rate"])
+        row.tap()
+        XCTAssertTrue(app.buttons["browser-back"].waitForExistence(timeout: 2))
+        try app.performAccessibilityAudit()
+    }
+
+    func testAccessibilityExtraExtraExtraLargeContentSize() throws {
+        app.terminate()
+        app.launchArguments += [
+            "-UIPreferredContentSizeCategoryName",
+            "UICTContentSizeCategoryAccessibilityExtraExtraExtraLarge",
+        ]
+        app.launch()
+        XCTAssertTrue(app.buttons["disclosure-continue"].waitForExistence(timeout: 5))
+        try app.performAccessibilityAudit()
+        enterControls()
+        try app.performAccessibilityAudit()
+    }
+
     func testDiagnosticShareDoesNotExistBeforeFullPreviewConfirmation() {
         enterControls()
         let build = scrollToHittable(app.buttons["diagnostic-build"])
