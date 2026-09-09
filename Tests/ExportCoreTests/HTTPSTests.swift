@@ -385,3 +385,43 @@ private func writeHTTPSPayload() throws -> (URL, BatchID) {
     #expect(report.verdict == .failed)
     #expect(report.failingStep == .readResponse)
 }
+
+@Test func httpsDestinationEnableRequiresTheRealPathTestAndPinsTLS() async throws {
+    let destination = try HTTPSDestination(
+        urlString: "https://receiver.example/export",
+        allowedHosts: ["receiver.example"]
+    )
+    let identity = sampleIdentity(leaf: "aaaabbbbccccdddd")
+    let transport = RecordingHTTPTransport(
+        response: OutboundHTTPResponse(status: 204, body: Data()),
+        tls: identity
+    )
+    let enabled = try await HTTPSDestinationEnable.complete(
+        destination: destination,
+        transport: transport,
+        exporterID: "00000000-0000-4000-8000-000000000025",
+        emittedAt: "2026-01-01T00:00:00Z"
+    )
+    #expect(enabled.report.allowsEnablement)
+    #expect(enabled.identity == identity)
+    #expect(
+        enabled.events == [
+            .canaryConfirmed,
+            .pinRecorded(groupedFingerprint: TLSIdentity.grouped(identity.leafSPKISha256)),
+            .destinationEnabled,
+        ]
+    )
+
+    let rejected = RecordingHTTPTransport(
+        response: OutboundHTTPResponse(status: 401, body: Data()),
+        tls: identity
+    )
+    await #expect(throws: SetupError.verificationRequired) {
+        _ = try await HTTPSDestinationEnable.complete(
+            destination: destination,
+            transport: rejected,
+            exporterID: "00000000-0000-4000-8000-000000000025",
+            emittedAt: "2026-01-01T00:00:00Z"
+        )
+    }
+}
