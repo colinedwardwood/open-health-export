@@ -21,7 +21,7 @@ final class AppLifecycleCoordinator {
     }
 
     func startObserversIfEligible() async throws {
-        guard UserDefaults.standard.bool(forKey: "disclosureAcknowledged"),
+        guard UserDefaults.standard.bool(forKey: "ohe.disclosureAcknowledged"),
               HarnessExport.isLocalFileEnabled()
         else {
             return
