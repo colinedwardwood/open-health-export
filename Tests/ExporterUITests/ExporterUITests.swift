@@ -130,6 +130,19 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(export.isEnabled)
     }
 
+    func testDisclosurePassesAccessibilityAuditInPseudoLocaleAndRTL() throws {
+        app.terminate()
+        app.launchArguments += [
+            "-NSDoubleLocalizedStrings", "YES",
+            "-NSForceRightToLeftWritingDirection", "YES",
+        ]
+        app.launch()
+        XCTAssertTrue(app.buttons["disclosure-continue"].waitForExistence(timeout: 5))
+        try app.performAccessibilityAudit()
+        enterControls()
+        try app.performAccessibilityAudit()
+    }
+
     func testDestinationSectionExposesTheEmptyStateAndRefreshControl() {
         enterControls()
         let title = scrollToHittable(app.staticTexts["destination-title"])

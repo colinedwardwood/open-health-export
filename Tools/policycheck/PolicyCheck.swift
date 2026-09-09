@@ -229,9 +229,77 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck no alternate icons: ok")
+        try checkStringCatalog(root: root)
         try checkAdjacency(root: root)
         try checkHealthKitSymbolsStayInAdapter(sources: sources)
         try checkSpecArtifacts(root: root)
+    }
+
+    static func checkStringCatalog(root: URL) throws {
+        let catalogURL = root.appendingPathComponent("Apps/Localizable.xcstrings")
+        let data = try Data(contentsOf: catalogURL)
+        guard
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            json["sourceLanguage"] as? String == "en",
+            let strings = json["strings"] as? [String: Any]
+        else {
+            FileHandle.standardError.write(Data("Apps/Localizable.xcstrings is missing or not English\n".utf8))
+            exit(1)
+        }
+        let shipped = ["en"]
+        for language in shipped {
+            var translated = 0
+            for value in strings.values {
+                let entry = value as? [String: Any]
+                let locales = entry?["localizations"] as? [String: Any]
+                let unit = (locales?[language] as? [String: Any])?["stringUnit"] as? [String: Any]
+                if unit?["state"] as? String == "translated" || unit?["state"] as? String == "needs_review" {
+                    translated += 1
+                }
+            }
+            let ratio = strings.isEmpty ? 0.0 : Double(translated) / Double(strings.count)
+            if ratio < 0.95 {
+                FileHandle.standardError.write(
+                    Data("string catalog \(language) completeness \(ratio) is below 0.95\n".utf8)
+                )
+                exit(1)
+            }
+        }
+
+        let apps = root.appendingPathComponent("Apps")
+        let patterns = [
+            #"(?:Text|Button|Label|TextField|SecureField|Toggle|Section|Picker|navigationTitle|configurationDisplayName|description)\(\s*"([^"\\]*)""#,
+            #"\? "([^"\\]*)" : "([^"\\]*)""#,
+            #"\?\? "([^"\\]*)""#,
+            #"case \.[A-Za-z]+: "([^"\\]*)""#,
+        ].map { try! NSRegularExpression(pattern: $0) }
+        var missing: [String] = []
+        if let files = FileManager.default.enumerator(at: apps, includingPropertiesForKeys: nil) {
+            for case let file as URL in files where file.pathExtension == "swift" {
+                let text = try String(contentsOf: file, encoding: .utf8)
+                let ns = text as NSString
+                let range = NSRange(location: 0, length: ns.length)
+                for pattern in patterns {
+                    for match in pattern.matches(in: text, range: range) {
+                        for index in 1 ..< match.numberOfRanges {
+                            let captured = match.range(at: index)
+                            guard captured.location != NSNotFound else { continue }
+                            let key = ns.substring(with: captured)
+                            if key.isEmpty { continue }
+                            if key == key.lowercased() { continue }
+                            if strings[key] == nil {
+                                missing.append("\(file.lastPathComponent): \(key)")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if !missing.isEmpty {
+            FileHandle.standardError.write(Data((missing.joined(separator: "\n") + "\n").utf8))
+            exit(1)
+        }
+        print("policycheck string catalog covers app UI literals: ok")
     }
 
     static func checkSponsorGating(root: URL) throws {
