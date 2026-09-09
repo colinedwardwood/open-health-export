@@ -17,7 +17,8 @@ public enum MQTTDestinationEnable {
     ) async throws -> (
         destination: VerifiedDestination,
         events: [TrustEvent],
-        report: DestinationTestReport
+        report: DestinationTestReport,
+        identity: TLSIdentity?
     ) {
         let canary = try NativeWire.encodeCanary(
             code: canaryCode,
@@ -33,11 +34,17 @@ public enum MQTTDestinationEnable {
         try setup.recordPreview(canary)
         try setup.markCanarySent(code: canaryCode)
         try setup.confirmCanary(canaryCode)
+        let observed: TLSIdentity?
+        if let identity {
+            observed = identity
+        } else {
+            observed = await pipe.identity()
+        }
         if destination.url.scheme?.lowercased() == "mqtts" {
-            guard let identity else {
+            guard let observed else {
                 throw EgressError.transport("mqtts destination returned no TLS identity")
             }
-            try setup.recordPin(from: identity, at: emittedAt, policy: pinPolicy)
+            try setup.recordPin(from: observed, at: emittedAt, policy: pinPolicy)
         } else {
             try setup.pinWithoutTLS()
         }
@@ -50,7 +57,7 @@ public enum MQTTDestinationEnable {
         let verified = try setup.enable(
             sink: MQTTSink(destination: destination, pipe: pipe)
         )
-        return (verified, setup.drainEvents(), report)
+        return (verified, setup.drainEvents(), report, observed)
     }
 
     public static func resume(

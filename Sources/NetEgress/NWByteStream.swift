@@ -309,8 +309,9 @@ public actor NWByteStream: ByteStream {
                 }
                 return
             }
-            var trustError: CFError?
-            complete(SecTrustEvaluateWithError(trust, &trustError))
+            // First use: capture the leaf and accept it so DestinationSetup can pin
+            // (R-31). System trust cannot TOFU a self-signed home broker.
+            complete(true)
         }, queue)
         return NWParameters(tls: tls)
     }

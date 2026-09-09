@@ -18,4 +18,9 @@ public struct ByteStreamMQTTPipe: MQTTBytePipe {
         try await stream.open()
         return try await stream.receive(max: max)
     }
+
+    public func identity() async -> TLSIdentity? {
+        try? await stream.open()
+        return await stream.identity()
+    }
 }

@@ -8,6 +8,11 @@ import WireFormat
 public protocol MQTTBytePipe: Sendable {
     func send(_ data: Data) async throws
     func receive(max: Int) async throws -> Data
+    func identity() async -> TLSIdentity?
+}
+
+public extension MQTTBytePipe {
+    func identity() async -> TLSIdentity? { nil }
 }
 
 public struct MQTTDestination: Sendable {

@@ -35,6 +35,8 @@ struct HarnessView: View {
     @State private var mqttURL = ""
     @State private var mqttClientID = "ohe-iphone"
     @State private var mqttTopic = "ohe/health"
+    @State private var mqttUsername = ""
+    @State private var mqttPassword = ""
     @State private var allowInsecureMQTT = false
     @State private var mqttPKCS12Name = "No client certificate"
     @State private var mqttPKCS12Data: Data?
@@ -411,6 +413,13 @@ struct HarnessView: View {
                 }
                 .accessibilityIdentifier("mqtt-pkcs12-clear")
             }
+            TextField("MQTT username", text: $mqttUsername)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .accessibilityIdentifier("mqtt-username")
+            SecureField("MQTT password", text: $mqttPassword)
+                .textContentType(.password)
+                .accessibilityIdentifier("mqtt-password")
             Toggle("Allow plain MQTT (unsafe)", isOn: $allowInsecureMQTT)
                 .accessibilityIdentifier("mqtt-insecure")
             if allowInsecureMQTT {
@@ -1119,7 +1128,9 @@ struct HarnessView: View {
                 clientID: mqttClientID,
                 topic: mqttTopic,
                 clientPKCS12: mqttPKCS12Data,
-                clientPKCS12Password: mqttPKCS12Password.isEmpty ? nil : mqttPKCS12Password
+                clientPKCS12Password: mqttPKCS12Password.isEmpty ? nil : mqttPKCS12Password,
+                username: mqttUsername.isEmpty ? nil : mqttUsername,
+                password: mqttPassword.isEmpty ? nil : mqttPassword
             )
             destinationStatusLines = HarnessExport.destinationStatusLines()
             await refreshLedgerIntegrity()

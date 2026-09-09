@@ -46,6 +46,11 @@ private struct MQTTVerificationRecord: Codable {
     var report: DestinationTestReport
     var hasClientPKCS12: Bool?
     var clientPKCS12Password: String?
+    var username: String?
+    var hasPassword: Bool?
+    var leafSPKISha256: String?
+    var issuerSPKISha256: String?
+    var firstSeen: String?
 }
 
 private actor ObserverExportGate {
@@ -836,7 +841,9 @@ enum HarnessExport {
         clientID: String,
         topic: String,
         clientPKCS12: Data? = nil,
-        clientPKCS12Password: String? = nil
+        clientPKCS12Password: String? = nil,
+        username: String? = nil,
+        password: String? = nil
     ) async throws -> [String] {
         guard let host = URL(string: urlString)?.host?.lowercased(), !host.isEmpty else {
             throw EgressError.invalidURL
@@ -851,7 +858,9 @@ enum HarnessExport {
             topic: topic,
             clientPKCS12: clientPKCS12,
             clientPKCS12Password: clientPKCS12Password,
-            exporterID: exporterID
+            exporterID: exporterID,
+            username: username,
+            password: password
         )
         let sink = try MQTTSink.overNetwork(destination: destination, pin: nil)
         let now = Date().ISO8601Format()
@@ -869,7 +878,12 @@ enum HarnessExport {
             topic: topic,
             report: completed.report,
             hasClientPKCS12: clientPKCS12 != nil,
-            clientPKCS12Password: clientPKCS12Password
+            clientPKCS12Password: clientPKCS12Password,
+            username: username,
+            hasPassword: password != nil,
+            leafSPKISha256: completed.identity?.leafSPKISha256,
+            issuerSPKISha256: completed.identity?.issuerSPKISha256,
+            firstSeen: now
         )
         let root = try applicationSupportRoot()
         let pkcs12URL = root.appendingPathComponent("mqtt-client.p12")
@@ -877,6 +891,15 @@ enum HarnessExport {
             try clientPKCS12.write(to: pkcs12URL, options: .atomic)
         } else {
             try? FileManager.default.removeItem(at: pkcs12URL)
+        }
+        let passwordStore = KeychainSecretStore(
+            service: "app.openhealthexporter.mqtt"
+        )
+        let passwordHandle = SecretHandle(rawValue: "mqtt_password")
+        if let password {
+            try await passwordStore.store(Array(password.utf8), handle: passwordHandle)
+        } else {
+            try? await passwordStore.delete(passwordHandle)
         }
         try JSONEncoder().encode(record).write(
             to: root.appendingPathComponent("mqtt-destination.json"),
@@ -909,6 +932,12 @@ enum HarnessExport {
             }
         }
         return completed.report.steps.map { "\($0.name.rawValue): \($0.outcome.rawValue)" }
+            + (completed.identity.map {
+                [
+                    "TLS \($0.tlsVersion) · \($0.cipherSuite)",
+                    "Leaf SPKI \($0.groupedLeafFingerprint)",
+                ]
+            } ?? ["Plain MQTT enabled by explicit opt-in."])
     }
 
     static func runMQTTDestination() async throws -> [String] {
@@ -920,17 +949,41 @@ enum HarnessExport {
         let allowedHosts = Set(saved.allowedHosts)
         let pkcs12URL = root.appendingPathComponent("mqtt-client.p12")
         let pkcs12 = (saved.hasClientPKCS12 == true) ? try Data(contentsOf: pkcs12URL) : nil
+        let password: String?
+        if saved.hasPassword == true {
+            password = String(
+                decoding: try await KeychainSecretStore(
+                    service: "app.openhealthexporter.mqtt"
+                ).load(SecretHandle(rawValue: "mqtt_password")),
+                as: UTF8.self
+            )
+        } else {
+            password = nil
+        }
         let destination = try MQTTDestination(
             urlString: saved.urlString,
             allowedHosts: allowedHosts,
             allowInsecure: saved.allowInsecure,
             clientID: saved.clientID,
             topic: saved.topic,
+            username: saved.username,
+            password: password,
             clientPKCS12: pkcs12,
             clientPKCS12Password: saved.clientPKCS12Password,
             exporterID: try installationID()
         )
-        let sink = try MQTTSink.overNetwork(destination: destination, pin: nil)
+        let pin: PinRecord?
+        if let leaf = saved.leafSPKISha256, let issuer = saved.issuerSPKISha256 {
+            pin = PinRecord(
+                leafSPKISha256: leaf,
+                issuerSPKISha256: issuer,
+                firstSeen: saved.firstSeen ?? "1970-01-01T00:00:00Z",
+                policy: .leaf
+            )
+        } else {
+            pin = nil
+        }
+        let sink = try MQTTSink.overNetwork(destination: destination, pin: pin)
         var setup = DestinationSetup()
         try setup.resumeEnabled(testReport: saved.report)
         let verified = try setup.enable(sink: sink)
