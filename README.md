@@ -60,5 +60,5 @@ resolver if you do not want the fetch.
 
 ## Status
 
-`maintained` — v1 not yet released. Minimum iOS 18.0. Mac companion is a notarised Developer ID
-app, not Mac App Store.
+`seeking-maintainers` — v1 is not yet released and the project currently has one maintainer.
+Minimum iOS 18.0. Mac companion is a notarised Developer ID app, not Mac App Store.

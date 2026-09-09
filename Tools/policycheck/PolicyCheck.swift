@@ -145,6 +145,7 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck no third-party runtime package: ok")
+        try checkSponsorGating(root: root)
         let requiredPrivacyManifests = [
             apps.appendingPathComponent("Exporter-iOS/PrivacyInfo.xcprivacy"),
             apps.appendingPathComponent("StatusWidget/PrivacyInfo.xcprivacy"),
@@ -213,6 +214,69 @@ struct PolicyCheck {
         try checkAdjacency(root: root)
         try checkHealthKitSymbolsStayInAdapter(sources: sources)
         try checkSpecArtifacts(root: root)
+    }
+
+    static func checkSponsorGating(root: URL) throws {
+        let forbidden = [
+            "storekit",
+            "sponsor",
+            "donat",
+            "patron",
+            "supporter",
+            "backer",
+            "premium",
+            "entitlementreceipt",
+        ]
+        let roots = [
+            root.appendingPathComponent("Sources"),
+            root.appendingPathComponent("Apps"),
+        ]
+        var hits: [String] = []
+        for scanRoot in roots {
+            guard let files = FileManager.default.enumerator(
+                at: scanRoot,
+                includingPropertiesForKeys: nil
+            ) else {
+                continue
+            }
+            for case let file as URL in files {
+                guard let values = try? file.resourceValues(
+                    forKeys: [.isRegularFileKey]
+                ),
+                    values.isRegularFile == true,
+                    let text = try? String(contentsOf: file, encoding: .utf8)
+                else {
+                    continue
+                }
+                let folded = text.lowercased()
+                for token in forbidden where folded.contains(token) {
+                    hits.append(
+                        "\(file.path.replacingOccurrences(of: root.path + "/", with: "")): \(token)"
+                    )
+                }
+            }
+        }
+        for relative in ["Package.swift", "project.yml"] {
+            let file = root.appendingPathComponent(relative)
+            let folded = try String(contentsOf: file, encoding: .utf8)
+                .lowercased()
+            for token in forbidden where folded.contains(token) {
+                hits.append("\(relative): \(token)")
+            }
+        }
+        if !hits.isEmpty {
+            FileHandle.standardError.write(
+                Data(
+                    (
+                        "R-110 sponsor-gating token in shipped source:\n"
+                            + hits.sorted().joined(separator: "\n")
+                            + "\n"
+                    ).utf8
+                )
+            )
+            exit(1)
+        }
+        print("policycheck no sponsor-gated feature or StoreKit reference: ok")
     }
 
     static func checkHealthKitSymbolsStayInAdapter(sources: URL) throws {
