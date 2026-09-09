@@ -173,6 +173,47 @@ import WireFormat
     #expect(outcome.kind == .unknownAck)
 }
 
+@Test func mqttDestinationEnableCompletesOverLoopback() async throws {
+    let broker = LoopbackMQTTBroker()
+    let destination = try MQTTDestination(
+        urlString: "mqtt://broker.example:1883",
+        allowedHosts: ["broker.example"],
+        allowInsecure: true,
+        clientID: "c1",
+        topic: "ohe/health"
+    )
+    let completed = try await MQTTDestinationEnable.complete(
+        destination: destination,
+        pipe: broker,
+        exporterID: "00000000-0000-4000-8000-000000000090",
+        emittedAt: "2026-01-01T00:00:00Z"
+    )
+    #expect(completed.report.verdict == .passed)
+    #expect(completed.report.allowsEnablement)
+    #expect(completed.report.steps.map(\.name) == [.connect, .publishCanary, .receiveEcho])
+    #expect(completed.events.contains(.destinationEnabled))
+}
+
+@Test func mqttQoS0EnablementIsSentUnconfirmed() async throws {
+    let broker = LoopbackMQTTBroker()
+    let destination = try MQTTDestination(
+        urlString: "mqtt://broker.example:1883",
+        allowedHosts: ["broker.example"],
+        allowInsecure: true,
+        clientID: "c1",
+        topic: "ohe/health",
+        qos: .atMostOnce
+    )
+    let completed = try await MQTTDestinationEnable.complete(
+        destination: destination,
+        pipe: broker,
+        exporterID: "00000000-0000-4000-8000-000000000090",
+        emittedAt: "2026-01-01T00:00:00Z"
+    )
+    #expect(completed.report.verdict == .sentUnconfirmed)
+    #expect(completed.report.allowsEnablement)
+}
+
 func writeMQTTPayload() throws -> (URL, BatchID) {
     let sample = heartSample("00000000-0000-0000-0000-000000000001")
     let batchID = BatchID(rawValue: "0192f3c1-0000-0000-0000-00000000000a")

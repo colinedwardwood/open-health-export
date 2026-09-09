@@ -233,6 +233,28 @@ public struct RunEvent: Sendable, Equatable {
         self.wallTimeEpoch = wallTimeEpoch
         self.errorClass = errorClass
     }
+
+    public var isProblemOutcome: Bool {
+        switch outcomeKind {
+        case "success", "successNothingDue":
+            false
+        default:
+            true
+        }
+    }
+}
+
+/// Newest problems first, then remaining runs newest-first. Caps the on-device history list.
+public enum RunHistory {
+    public static func problemsFirst(_ events: [RunEvent], limit: Int = 50) -> [RunEvent] {
+        let ranked = events.enumerated().sorted { lhs, rhs in
+            if lhs.element.isProblemOutcome != rhs.element.isProblemOutcome {
+                return lhs.element.isProblemOutcome
+            }
+            return lhs.offset > rhs.offset
+        }
+        return Array(ranked.prefix(limit).map(\.element))
+    }
 }
 
 public struct EgressEntry: Sendable, Equatable {

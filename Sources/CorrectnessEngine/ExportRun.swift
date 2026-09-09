@@ -130,6 +130,12 @@ public struct ExportRun: Sendable {
         )
         var wireEnvelope = envelope
         wireEnvelope.completeThrough = page.observedThrough.ISO8601Format()
+        if wireEnvelope.tzDatabaseVersion == nil,
+           temporal.tzDatabaseVersion != "unknown",
+           !temporal.tzDatabaseVersion.isEmpty
+        {
+            wireEnvelope.tzDatabaseVersion = temporal.tzDatabaseVersion
+        }
         let payload = try NativeWire.encode(
             samples: page.samples,
             categories: page.categories,

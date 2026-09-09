@@ -13,6 +13,7 @@ import RunJournal
 import SinkCompanion
 import SinkHTTP
 import SinkLocalFile
+import SinkMQTT
 import StorageSQLite
 import UIKit
 import Watchdog
@@ -34,6 +35,15 @@ private struct HTTPSVerificationRecord: Codable {
     var issuerSPKISha256: String?
     var firstSeen: String
     var hasBearer: Bool
+}
+
+private struct MQTTVerificationRecord: Codable {
+    var urlString: String
+    var allowedHosts: [String]
+    var allowInsecure: Bool
+    var clientID: String
+    var topic: String
+    var report: DestinationTestReport
 }
 
 private actor ObserverExportGate {
@@ -175,11 +185,7 @@ enum HarnessExport {
         }
         let (verified, events) = try verifiedLocalFile(root: root, destinationDirectory: dest)
         try await emitTrustNotices(events)
-        let context = TemporalContext(
-            timeZoneIdentifier: "UTC",
-            localeIdentifier: "en_US_POSIX",
-            tzDatabaseVersion: "host"
-        )
+        let context = TemporalContext.utcHost
         let source = HealthKitAnchoredSource(context: context, limit: 1000)
         let observations = HealthKitDayObservationSource(context: context, limit: 1000)
         let statistics = HealthKitStatisticsSource(context: context)
@@ -294,11 +300,7 @@ enum HarnessExport {
             destinationDirectory: dest
         )
         try await emitTrustNotices(events)
-        let context = TemporalContext(
-            timeZoneIdentifier: "UTC",
-            localeIdentifier: "en_US_POSIX",
-            tzDatabaseVersion: "host"
-        )
+        let context = TemporalContext.utcHost
         let observations = HealthKitDayObservationSource(
             context: context,
             limit: 1000
@@ -414,11 +416,7 @@ enum HarnessExport {
             destinationDirectory: dest
         )
         try await emitTrustNotices(events)
-        let context = TemporalContext(
-            timeZoneIdentifier: "UTC",
-            localeIdentifier: "en_US_POSIX",
-            tzDatabaseVersion: "host"
-        )
+        let context = TemporalContext.utcHost
         let now = Date().ISO8601Format()
         let outcome = try await ReconcileSweep(
             observations: HealthKitDayObservationSource(
@@ -460,11 +458,7 @@ enum HarnessExport {
         let store = try SQLiteStateStore(path: sqliteURL.path)
         let (verified, events) = try verifiedLocalFile(root: root, destinationDirectory: dest)
         try await emitTrustNotices(events)
-        let context = TemporalContext(
-            timeZoneIdentifier: "UTC",
-            localeIdentifier: "en_US_POSIX",
-            tzDatabaseVersion: "host"
-        )
+        let context = TemporalContext.utcHost
         let now = Date().ISO8601Format()
         let exporterId = try installationID()
         var envelope = WireEnvelope(
@@ -553,11 +547,7 @@ enum HarnessExport {
             }
             try await emitTrustNotices(completed.events, destination: session.serviceName)
         }
-        let context = TemporalContext(
-            timeZoneIdentifier: "UTC",
-            localeIdentifier: "en_US_POSIX",
-            tzDatabaseVersion: "host"
-        )
+        let context = TemporalContext.utcHost
         let source = HealthKitAnchoredSource(context: context, limit: 1000)
         let observations = HealthKitDayObservationSource(context: context, limit: 1000)
         let statistics = HealthKitStatisticsSource(context: context)
@@ -695,6 +685,21 @@ enum HarnessExport {
         return lines.first ?? "Ledger has not been written yet."
     }
 
+    static func historyLines() async throws -> [String] {
+        let root = try applicationSupportRoot()
+        let store = try SQLiteStateStore(
+            path: root.appendingPathComponent("state.sqlite").path
+        )
+        let events = try await store.transact { try $0.loadJournal() }
+        return RunHistory.problemsFirst(events).map { event in
+            let date = Date(timeIntervalSince1970: event.wallTimeEpoch)
+                .formatted(date: .abbreviated, time: .shortened)
+            let error = event.errorClass.map { " · \($0)" } ?? ""
+            return "\(date) · \(event.outcomeKind)\(error) · "
+                + "\(event.samplesAcked)/\(event.samplesCommitted) acknowledged"
+        }
+    }
+
     static func wakeAttributionLine() async throws -> String {
         let snapshots = StatusSnapshotLocation.readAll()
         guard let expected = snapshots.compactMap(\.nextAttemptLatestEpoch).min() else {
@@ -823,6 +828,132 @@ enum HarnessExport {
         return lines
     }
 
+    static func enableMQTTDestination(
+        urlString: String,
+        allowInsecure: Bool,
+        clientID: String,
+        topic: String
+    ) async throws -> [String] {
+        guard let host = URL(string: urlString)?.host?.lowercased(), !host.isEmpty else {
+            throw EgressError.invalidURL
+        }
+        let allowedHosts: Set<String> = [host]
+        let destination = try MQTTDestination(
+            urlString: urlString,
+            allowedHosts: allowedHosts,
+            allowInsecure: allowInsecure,
+            clientID: clientID,
+            topic: topic
+        )
+        let sink = try MQTTSink.overNetwork(destination: destination, pin: nil)
+        let now = Date().ISO8601Format()
+        let completed = try await MQTTDestinationEnable.complete(
+            destination: destination,
+            pipe: sink.pipe,
+            exporterID: try installationID(),
+            emittedAt: now
+        )
+        let record = MQTTVerificationRecord(
+            urlString: destination.url.absoluteString,
+            allowedHosts: allowedHosts.sorted(),
+            allowInsecure: allowInsecure,
+            clientID: clientID,
+            topic: topic,
+            report: completed.report
+        )
+        let root = try applicationSupportRoot()
+        try JSONEncoder().encode(record).write(
+            to: root.appendingPathComponent("mqtt-destination.json"),
+            options: .atomic
+        )
+        if let snapshotURL = StatusSnapshotLocation.url(destinationID: "mqtt") {
+            try DestinationSnapshotFile.recordSecurityEvents(
+                completed.events.count,
+                destinationID: "mqtt",
+                destinationLabel: host,
+                writtenAtEpoch: Date().timeIntervalSince1970,
+                at: snapshotURL
+            )
+        }
+        try await emitTrustNotices(completed.events, destination: host)
+        if allowInsecure {
+            let store = try SQLiteStateStore(
+                path: root.appendingPathComponent("state.sqlite").path
+            )
+            try await store.transact { tx in
+                try tx.appendLedger(
+                    EgressEntry(
+                        destination: host,
+                        sampleCount: 0,
+                        outcomeKind: "security:insecure_mqtt_enabled",
+                        detail: "explicit_user_opt_in",
+                        wallTimeEpoch: Date().timeIntervalSince1970
+                    )
+                )
+            }
+        }
+        return completed.report.steps.map { "\($0.name.rawValue): \($0.outcome.rawValue)" }
+    }
+
+    static func runMQTTDestination() async throws -> [String] {
+        let root = try applicationSupportRoot()
+        let data = try Data(
+            contentsOf: root.appendingPathComponent("mqtt-destination.json")
+        )
+        let saved = try JSONDecoder().decode(MQTTVerificationRecord.self, from: data)
+        let allowedHosts = Set(saved.allowedHosts)
+        let destination = try MQTTDestination(
+            urlString: saved.urlString,
+            allowedHosts: allowedHosts,
+            allowInsecure: saved.allowInsecure,
+            clientID: saved.clientID,
+            topic: saved.topic
+        )
+        let sink = try MQTTSink.overNetwork(destination: destination, pin: nil)
+        var setup = DestinationSetup()
+        try setup.resumeEnabled(testReport: saved.report)
+        let verified = try setup.enable(sink: sink)
+        let store = try SQLiteStateStore(
+            path: root.appendingPathComponent("state.sqlite").path
+        )
+        let scratch = root.appendingPathComponent("scratch", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: scratch,
+            withIntermediateDirectories: true
+        )
+        let context = TemporalContext.utcHost
+        let source = HealthKitAnchoredSource(context: context, limit: 1000)
+        let now = Date().ISO8601Format()
+        let exporterID = try installationID()
+        var lines: [String] = []
+        for metric in selectedMetrics() {
+            let outcome = try await ExportRun(
+                source: source,
+                destination: verified,
+                store: store,
+                metric: metric,
+                scratchDirectory: scratch,
+                destinationName: "mqtt",
+                envelope: WireEnvelope(
+                    exporterId: exporterID,
+                    seq: 1,
+                    emittedAt: now,
+                    observedAt: now
+                ),
+                temporal: context,
+                statistics: HealthKitStatisticsSource(context: context),
+                observations: HealthKitDayObservationSource(context: context),
+                trigger: .manual,
+                snapshotURL: StatusSnapshotLocation.url(destinationID: "mqtt"),
+                ledgerHeadSeal: ledgerHeadSeal(),
+                ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json")
+            ).run()
+            lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
+        }
+        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+        return lines
+    }
+
     static func runHTTPSDestination() async throws -> [String] {
         let root = try applicationSupportRoot()
         let data = try Data(
@@ -879,11 +1010,7 @@ enum HarnessExport {
             at: scratch,
             withIntermediateDirectories: true
         )
-        let context = TemporalContext(
-            timeZoneIdentifier: "UTC",
-            localeIdentifier: "en_US_POSIX",
-            tzDatabaseVersion: "host"
-        )
+        let context = TemporalContext.utcHost
         let source = HealthKitAnchoredSource(context: context, limit: 1000)
         let now = Date().ISO8601Format()
         let exporterID = try installationID()

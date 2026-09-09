@@ -46,6 +46,8 @@ targets:
         product: ExportCore
       - package: open-health-exporter
         product: HealthKitSource
+      - package: open-health-exporter
+        product: SinkMQTT
       - sdk: VisionKit.framework
       - sdk: AVFoundation.framework
       - target: StatusWidget

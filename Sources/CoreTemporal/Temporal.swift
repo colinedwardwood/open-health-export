@@ -22,6 +22,20 @@ public struct TemporalContext: Sendable {
         tzDatabaseVersion: "unknown"
     )
 
+    /// Host tzdata identity for live checkpoints and wire headers (R-84).
+    public static var hostTzDatabaseVersion: String {
+        let version = TimeZone.timeZoneDataVersion
+        return version.isEmpty ? "unknown" : version
+    }
+
+    public static var utcHost: TemporalContext {
+        TemporalContext(
+            timeZoneIdentifier: "UTC",
+            localeIdentifier: "en_US_POSIX",
+            tzDatabaseVersion: hostTzDatabaseVersion
+        )
+    }
+
     public func timeZone() -> TimeZone {
         TimeZone(identifier: timeZoneIdentifier) ?? TimeZone(secondsFromGMT: 0)!
     }

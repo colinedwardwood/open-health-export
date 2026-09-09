@@ -15,6 +15,7 @@ public struct WireEnvelope: Sendable, Equatable {
     public var specVersion: String
     public var demo: Bool
     public var completeThrough: String?
+    public var tzDatabaseVersion: String?
 
     public init(
         exporterId: String,
@@ -28,7 +29,8 @@ public struct WireEnvelope: Sendable, Equatable {
         spec: String = "ohe.wire/1",
         specVersion: String = "1.0",
         demo: Bool = false,
-        completeThrough: String? = nil
+        completeThrough: String? = nil,
+        tzDatabaseVersion: String? = nil
     ) {
         self.exporterId = exporterId
         self.seq = seq
@@ -42,6 +44,7 @@ public struct WireEnvelope: Sendable, Equatable {
         self.specVersion = specVersion
         self.demo = demo
         self.completeThrough = completeThrough
+        self.tzDatabaseVersion = tzDatabaseVersion
     }
 }
 
@@ -327,6 +330,9 @@ private extension NativeWire {
         }
         if let completeThrough = envelope.completeThrough {
             object["completeThrough"] = .string(completeThrough)
+        }
+        if let tzDatabaseVersion = envelope.tzDatabaseVersion, !tzDatabaseVersion.isEmpty {
+            object["tzDatabaseVersion"] = .string(tzDatabaseVersion)
         }
         return try CanonicalJSON.object(object).serialized()
     }

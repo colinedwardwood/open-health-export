@@ -33,7 +33,7 @@ let linuxCore: [Target] = [
     .target(name: "SinkCompanion", dependencies: ["CompanionWire", "EnginePorts", "NetEgress", "WireFormat", "CoreDomain", "FileWriteKit", "DestinationTrust"]),
     .target(name: "CompanionReceive", dependencies: ["CompanionWire", "FileWriteKit", "NetEgress", "WireFormat"]),
     .target(name: "MQTTCodec"),
-    .target(name: "SinkMQTT", dependencies: ["MQTTCodec", "EnginePorts", "NetEgress", "WireFormat", "CoreDomain"]),
+    .target(name: "SinkMQTT", dependencies: ["MQTTCodec", "EnginePorts", "NetEgress", "WireFormat", "CoreDomain", "DestinationTrust"]),
     .target(
         name: "TestSupport",
         dependencies: [

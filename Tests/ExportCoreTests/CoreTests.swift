@@ -1341,7 +1341,7 @@ func statisticsRecord(
         FileManager.default.contentsOfDirectory(
             at: destinationURL,
             includingPropertiesForKeys: nil
-        ).first
+        ).first { $0.pathExtension == "ndjson" }
     )
     let payload = try String(contentsOf: payloadURL, encoding: .utf8)
     #expect(payload.contains("\"kind\":\"sample.category\""))
@@ -1727,6 +1727,54 @@ private func runUntilProcessExitSeam() async throws {
     let files = try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
         .filter { $0.pathExtension == "ndjson" && $0.lastPathComponent != "src.ndjson" }
     #expect(files.count == 1)
+}
+
+@Test func localFileSinkWritesJSONCSVAndHAESidecars() async throws {
+    let dir = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-sidecars-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let (payload, batchID) = try writeMQTTPayload()
+    let sink = LocalFileSink(directory: dir)
+    _ = try await sink.send(fileHandle: payload.path, idempotencyKey: batchID)
+    let encodings = dir.appendingPathComponent(
+        NativeWire.outputFileName(batchID: batchID, demo: false)
+    ).deletingPathExtension().appendingPathExtension("encodings")
+    let names = try FileManager.default.contentsOfDirectory(atPath: encodings.path)
+    #expect(names.contains("batch.json"))
+    #expect(names.contains("batch.pretty.json"))
+    #expect(names.contains("batch.hae.json"))
+    #expect(names.contains("_meta.json"))
+    #expect(names.contains { $0.hasPrefix("ohe1-quantity-") })
+}
+
+@Test func nativeWireHeaderCarriesDeclaredTzDatabaseVersion() throws {
+    let envelope = WireEnvelope(
+        exporterId: "exp",
+        seq: 1,
+        emittedAt: "2026-01-01T00:00:00Z",
+        observedAt: "2026-01-01T00:00:00Z",
+        tzDatabaseVersion: "2024a"
+    )
+    let data = try NativeWire.encode(
+        samples: [heartSample("00000000-0000-0000-0000-000000000001")],
+        tombstones: [],
+        metric: MetricID(rawValue: "heartRate"),
+        batchID: BatchID(rawValue: "0192f3c1-0000-0000-0000-00000000000b"),
+        envelope: envelope
+    )
+    let text = String(decoding: data, as: UTF8.self)
+    #expect(text.contains("\"tzDatabaseVersion\":\"2024a\""))
+}
+
+@Test func runHistoryListsProblemsBeforeSuccess() {
+    let events = [
+        RunEvent(runID: RunID(rawValue: "a"), outcomeKind: "success", detail: "", wallTimeEpoch: 1),
+        RunEvent(runID: RunID(rawValue: "b"), outcomeKind: "failed", detail: "", errorClass: "network"),
+        RunEvent(runID: RunID(rawValue: "c"), outcomeKind: "successNothingDue", detail: "", wallTimeEpoch: 3),
+        RunEvent(runID: RunID(rawValue: "d"), outcomeKind: "unknownAck", detail: "", wallTimeEpoch: 4),
+    ]
+    let ranked = RunHistory.problemsFirst(events)
+    #expect(ranked.map(\.outcomeKind) == ["unknownAck", "failed", "successNothingDue", "success"])
 }
 
 @Test func localFileSinkRejectsDifferentBytesForTheSameKey() async throws {

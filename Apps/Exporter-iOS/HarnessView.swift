@@ -31,6 +31,11 @@ struct HarnessView: View {
     @State private var httpsBearer = ""
     @State private var allowInsecureHTTP = false
     @State private var httpsTestLines: [String] = []
+    @State private var mqttURL = ""
+    @State private var mqttClientID = "ohe-iphone"
+    @State private var mqttTopic = "ohe/health"
+    @State private var allowInsecureMQTT = false
+    @State private var mqttTestLines: [String] = []
     @State private var showScanner = false
     @State private var diagnosticPreview = ""
     @State private var diagnosticPayload: Data?
@@ -42,6 +47,7 @@ struct HarnessView: View {
     private var diagnosticWindowHours = 24
     @State private var destinationStatusLines: [String] = []
     @State private var ledgerLines: [String] = []
+    @State private var historyLines: [String] = []
     @State private var ledgerWarning = ""
     @State private var wakeAttribution = ""
     @State private var queueEvictionGaps: [GapRecord] = []
@@ -194,11 +200,15 @@ struct HarnessView: View {
 
     private var controls: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Button("Request Health read access") {
+            Button("Request Health read access for selected types") {
                 Task { await requestAccess() }
             }
             .accessibilityIdentifier("health-request")
+            .accessibilityHint("Asks Apple for read permission only for types currently selected in Data.")
             .disabled(phase == .working)
+
+            Text("This is not a medical device. It does not diagnose or treat anything.")
+                .font(.footnote)
 
             Button("Run R-70 (one anchored page per type)") {
                 Task { await runR70() }
@@ -334,6 +344,41 @@ struct HarnessView: View {
                     .font(.footnote)
                     .textSelection(.enabled)
             }
+            TextField("MQTT broker URL", text: $mqttURL)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.URL)
+                .accessibilityIdentifier("mqtt-url")
+            TextField("MQTT client ID", text: $mqttClientID)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .accessibilityIdentifier("mqtt-client-id")
+            TextField("MQTT topic", text: $mqttTopic)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .accessibilityIdentifier("mqtt-topic")
+            Toggle("Allow plain MQTT (unsafe)", isOn: $allowInsecureMQTT)
+                .accessibilityIdentifier("mqtt-insecure")
+            if allowInsecureMQTT {
+                Text("Plain MQTT exposes health exports to anyone able to observe this network.")
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
+            Button("Test and enable MQTT destination") {
+                Task { await enableMQTT() }
+            }
+            .disabled(phase == .working || mqttURL.isEmpty || mqttClientID.isEmpty || mqttTopic.isEmpty)
+            .accessibilityIdentifier("mqtt-enable")
+            Button("Export one page (MQTT destination)") {
+                Task { await runMQTTExport() }
+            }
+            .disabled(phase == .working)
+            .accessibilityIdentifier("mqtt-export")
+            ForEach(Array(mqttTestLines.enumerated()), id: \.offset) { _, line in
+                Text(line)
+                    .font(.footnote)
+                    .textSelection(.enabled)
+            }
             Button("Refresh destination status") {
                 destinationStatusLines = HarnessExport.destinationStatusLines()
             }
@@ -367,6 +412,17 @@ struct HarnessView: View {
                 Text(line)
                     .font(.system(.footnote, design: .monospaced))
                     .textSelection(.enabled)
+            }
+            Button("Show export history (problems first)") {
+                Task { await loadHistory() }
+            }
+            .disabled(phase == .working)
+            .accessibilityIdentifier("history-load")
+            ForEach(Array(historyLines.enumerated()), id: \.offset) { index, line in
+                Text(line)
+                    .font(.system(.footnote, design: .monospaced))
+                    .textSelection(.enabled)
+                    .accessibilityIdentifier("history-row-\(index)")
             }
 
             Text("If someone else set this up")
@@ -519,6 +575,21 @@ struct HarnessView: View {
     }
 
     @MainActor
+    private func loadHistory() async {
+        phase = .working
+        do {
+            historyLines = try await HarnessExport.historyLines()
+            status = historyLines.isEmpty
+                ? "Ready. No export history yet."
+                : "Ready. Problems are listed before successful runs."
+        } catch {
+            historyLines = []
+            status = "Failed: \(error.localizedDescription)"
+        }
+        phase = .ready
+    }
+
+    @MainActor
     private func applyBrowserSelection() async {
         phase = .working
         let adding = browserSelection.subtracting(browserBaseline)
@@ -568,11 +639,7 @@ struct HarnessView: View {
         phase = .working
         status = "Working: R-70 measurement."
         results = []
-        let context = TemporalContext(
-            timeZoneIdentifier: "UTC",
-            localeIdentifier: "en_US_POSIX",
-            tzDatabaseVersion: "host"
-        )
+        let context = TemporalContext.utcHost
         let source = HealthKitSampleSource(context: context, limit: 10_000)
         var lines: [String] = []
         for metric in [MetricCatalog.heartRate.id, MetricCatalog.stepCount.id] {
@@ -842,7 +909,7 @@ struct HarnessView: View {
         let context = TemporalContext(
             timeZoneIdentifier: timeZone.identifier,
             localeIdentifier: "en_US_POSIX",
-            tzDatabaseVersion: "host"
+            tzDatabaseVersion: TemporalContext.hostTzDatabaseVersion
         )
         let source = HealthKitDayObservationSource(context: context, limit: 1000)
         var calendar = Calendar(identifier: .gregorian)
@@ -975,6 +1042,43 @@ struct HarnessView: View {
             status = "Ready. Network destination passed its real-path test and is enabled."
         } catch {
             httpsTestLines = []
+            status = "Failed: \(error.localizedDescription)"
+        }
+        phase = .ready
+    }
+
+    @MainActor
+    private func enableMQTT() async {
+        phase = .working
+        status = "Working: MQTT destination test."
+        do {
+            mqttTestLines = try await HarnessExport.enableMQTTDestination(
+                urlString: mqttURL,
+                allowInsecure: allowInsecureMQTT,
+                clientID: mqttClientID,
+                topic: mqttTopic
+            )
+            destinationStatusLines = HarnessExport.destinationStatusLines()
+            await refreshLedgerIntegrity()
+            status = "Ready. MQTT destination passed its real-path test and is enabled."
+        } catch {
+            mqttTestLines = []
+            status = "Failed: \(error.localizedDescription)"
+        }
+        phase = .ready
+    }
+
+    @MainActor
+    private func runMQTTExport() async {
+        phase = .working
+        status = "Working: MQTT export."
+        do {
+            results = try await HarnessExport.runMQTTDestination()
+            destinationStatusLines = HarnessExport.destinationStatusLines()
+            await refreshLedgerIntegrity()
+            await refreshWakeAttribution()
+            status = "Ready. MQTT export finished."
+        } catch {
             status = "Failed: \(error.localizedDescription)"
         }
         phase = .ready

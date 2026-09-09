@@ -196,6 +196,7 @@
       "type": "regular",
       "dependencies": [
         "CoreDomain",
+        "DestinationTrust",
         "EnginePorts",
         "MQTTCodec",
         "NetEgress",

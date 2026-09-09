@@ -22,6 +22,7 @@ final class ExporterUITests: XCTestCase {
 
         disclosure.tap()
         XCTAssertTrue(app.buttons["health-request"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["history-load"].exists)
     }
 
     func testDisclosureAndMainControlsPassAccessibilityAudit() throws {

@@ -59,7 +59,8 @@
         "spec": { "type": "string", "const": "ohe.wire/1" },
         "specVersion": { "type": "string" },
         "types": { "type": "array", "items": { "type": "string" } },
-        "demo": { "type": "boolean" }
+        "demo": { "type": "boolean" },
+        "tzDatabaseVersion": { "type": "string" }
       }
     },
     "footer": {

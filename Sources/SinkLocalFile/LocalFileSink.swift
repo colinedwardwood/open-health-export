@@ -31,6 +31,7 @@ public struct LocalFileSink: DestinationSink, Sendable {
         } else {
             try FileWriteKit.writeAtomically(sourceData, to: destination)
         }
+        try? NativeSidecars.write(fromNDJSON: sourceData, beside: destination)
         let text = String(decoding: sourceData, as: UTF8.self)
         return DeliveryReceipt(
             batchID: idempotencyKey,
