@@ -483,3 +483,140 @@ private func writeHTTPSPayload() throws -> (URL, BatchID) {
         _ = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
     }
 }
+
+@Test func scriptableHTTPServerCoversStatusLatencyChunkedRedirectRetryAndReset() async throws {
+    let server = ScriptableHTTPServer()
+    try server.start()
+    defer { server.stop() }
+
+    server.enqueue(
+        ScriptableHTTPServer.Script(
+            status: 204,
+            delayNanoseconds: 80_000_000
+        )
+    )
+    server.enqueue(
+        ScriptableHTTPServer.Script(
+            status: 302,
+            headers: ["Location": "http://evil.example/hook"]
+        )
+    )
+    server.enqueue(
+        ScriptableHTTPServer.Script(
+            status: 429,
+            headers: ["Retry-After": "15"]
+        )
+    )
+    server.enqueue(
+        try ScriptableHTTPServer.Script.json(["accepted": 7], status: 200).withChunkSize(5)
+    )
+    server.enqueue(
+        ScriptableHTTPServer.Script(
+            status: 200,
+            body: Data(repeating: 0x41, count: 64),
+            closeAfterBodyBytes: 8
+        )
+    )
+
+    let transport = URLSessionHTTPTransport()
+    let body = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-http-loopback-\(UUID().uuidString)")
+    try Data("ping".utf8).write(to: body)
+
+    let clock = ContinuousClock()
+    let delayed = try await clock.measure {
+        _ = try await transport.execute(
+            OutboundHTTPRequest(
+                method: "POST",
+                url: server.origin.appendingPathComponent("delay"),
+                headers: ["X-Test": "latency"],
+                bodyFile: body
+            )
+        )
+    }
+    #expect(delayed >= .milliseconds(80))
+
+    let redirected = try await transport.execute(
+        OutboundHTTPRequest(
+            method: "POST",
+            url: server.origin.appendingPathComponent("redirect"),
+            headers: [:],
+            bodyFile: body
+        )
+    )
+    #expect(redirected.status == 302)
+    #expect(redirected.header("Location") == "http://evil.example/hook")
+
+    let limited = try await transport.execute(
+        OutboundHTTPRequest(
+            method: "POST",
+            url: server.origin.appendingPathComponent("retry"),
+            headers: [:],
+            bodyFile: body
+        )
+    )
+    #expect(limited.status == 429)
+    #expect(limited.header("Retry-After") == "15")
+
+    let chunked = try await transport.execute(
+        OutboundHTTPRequest(
+            method: "POST",
+            url: server.origin.appendingPathComponent("chunked"),
+            headers: [:],
+            bodyFile: body
+        )
+    )
+    #expect(chunked.status == 200)
+    let object = try JSONSerialization.jsonObject(with: chunked.body) as? [String: Any]
+    #expect(object?["accepted"] as? Int == 7)
+
+    await #expect(throws: (any Error).self) {
+        _ = try await transport.execute(
+            OutboundHTTPRequest(
+                method: "POST",
+                url: server.origin.appendingPathComponent("reset"),
+                headers: [:],
+                bodyFile: body
+            )
+        )
+    }
+
+    let recorded = server.requests()
+    #expect(recorded.map(\.target) == ["/delay", "/redirect", "/retry", "/chunked", "/reset"])
+    #expect(recorded.allSatisfy { $0.method == "POST" })
+    #expect(recorded.contains { $0.headers["x-test"] == "latency" })
+}
+
+@Test func httpsSinkDeliversOverLoopbackHTTPAndHonoursQueued401ThenSuccess() async throws {
+    let server = ScriptableHTTPServer()
+    try server.start()
+    defer { server.stop() }
+    server.enqueue(ScriptableHTTPServer.Script(status: 401))
+    server.enqueue(ScriptableHTTPServer.Script(status: 204))
+
+    let (file, batchID) = try writeHTTPSPayload()
+    let destination = try HTTPSDestination(
+        urlString: server.origin.appendingPathComponent("hook").absoluteString,
+        allowedHosts: ["127.0.0.1"],
+        allowInsecureHTTP: true
+    )
+    let sink = HTTPSSink(destination: destination, transport: URLSessionHTTPTransport())
+    await #expect(throws: EgressError.httpStatus(401)) {
+        _ = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
+    }
+    let receipt = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
+    #expect(receipt.statusOnly)
+    let recorded = server.requests()
+    #expect(recorded.count == 2)
+    #expect(recorded[0].headers["idempotency-key"] == batchID.rawValue)
+    #expect(recorded[0].headers["content-encoding"] == "gzip")
+    #expect(try Gzip.decompress(recorded[0].body).isEmpty == false)
+}
+
+private extension ScriptableHTTPServer.Script {
+    func withChunkSize(_ size: Int) -> ScriptableHTTPServer.Script {
+        var copy = self
+        copy.chunkSize = size
+        return copy
+    }
+}
