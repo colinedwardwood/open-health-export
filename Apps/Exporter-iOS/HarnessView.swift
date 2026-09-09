@@ -41,8 +41,8 @@ struct HarnessView: View {
     @State private var browserSearch = ""
     @State private var browserSelecting = false
     @State private var browserReviewVisible = false
-    @State private var browserBaseline = Set(MetricCatalog.all.map(\.id))
-    @State private var browserSelection = Set(MetricCatalog.all.map(\.id))
+    @State private var browserBaseline = Set(MetricCatalog.coreDaily.map(\.id))
+    @State private var browserSelection = Set(MetricCatalog.coreDaily.map(\.id))
     @State private var selectedBrowserMetric: MetricID?
     @State private var pendingSensitiveMetric: MetricID?
     @State private var sensitiveDestinationConfirmation = ""
@@ -89,6 +89,9 @@ struct HarnessView: View {
         .onAppear {
             timeToFirstFrameMS = LaunchMark.millisecondsToNow()
             destinationStatusLines = HarnessExport.destinationStatusLines()
+            let selected = Set(HarnessExport.selectedMetrics())
+            browserBaseline = selected
+            browserSelection = selected
             if disclosureAcknowledged {
                 phase = .ready
                 status = "Ready."
@@ -426,12 +429,38 @@ struct HarnessView: View {
     }
 
     @MainActor
+    private func applyBrowserSelection() async {
+        phase = .working
+        let adding = browserSelection.subtracting(browserBaseline)
+        let removing = browserBaseline.subtracting(browserSelection)
+        do {
+            if !adding.isEmpty {
+                try await HealthKitAuthorization.requestReadAccess(
+                    metrics: adding.sorted { $0.rawValue < $1.rawValue }
+                )
+            }
+            try await HarnessExport.applySelectedMetrics(
+                browserSelection,
+                removing: removing
+            )
+            browserBaseline = browserSelection
+            browserReviewVisible = false
+            AppLifecycleCoordinator.shared.stopObservers()
+            await startHealthObserversIfEligible()
+            status = "Ready. Export selection updated."
+        } catch {
+            status = "Failed: \(error.localizedDescription)"
+        }
+        phase = .ready
+    }
+
+    @MainActor
     private func requestAccess() async {
         phase = .working
         status = "Working: Health authorisation."
         do {
             try await HealthKitAuthorization.requestReadAccess(
-                metrics: [MetricCatalog.heartRate.id, MetricCatalog.stepCount.id]
+                metrics: HarnessExport.selectedMetrics()
             )
             try await HarnessExport.observeAuthorizationChanges()
             try await HarnessExport.reenableCoreActivityAfterAuthorizationRequest()
@@ -584,8 +613,7 @@ struct HarnessView: View {
                                 .foregroundStyle(.orange)
                         }
                         Button("Continue") {
-                            browserBaseline = browserSelection
-                            browserReviewVisible = false
+                            Task { await applyBrowserSelection() }
                         }
                         .accessibilityIdentifier("browser-review-continue")
                     }

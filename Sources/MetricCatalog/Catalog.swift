@@ -470,6 +470,11 @@ public enum MetricCatalog {
         all.first { $0.id == id }
     }
 
+    /// First-run preset. Sensitive types are visible but can only be added individually.
+    public static var coreDaily: [MetricDeclaration] {
+        all.filter { $0.sensitivity == .routine }
+    }
+
     /// Metrics whose canonical aggregate is HealthKit's statistic (R-80 exception list).
     public static var hkStatisticsExceptions: [MetricID] {
         all.filter(\.usesHealthKitStatistics).map(\.id)

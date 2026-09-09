@@ -112,3 +112,13 @@ private func browserSample(
     draft.clearAll()
     #expect(draft.selected.isEmpty)
 }
+
+@Test func coreDailyPresetContainsOnlyRoutineMetrics() {
+    #expect(!MetricCatalog.coreDaily.isEmpty)
+    #expect(MetricCatalog.coreDaily.allSatisfy { $0.sensitivity == .routine })
+    #expect(
+        Set(MetricCatalog.coreDaily.map(\.id)).isDisjoint(
+            with: Set(MetricCatalog.all.filter { $0.sensitivity == .sensitive }.map(\.id))
+        )
+    )
+}

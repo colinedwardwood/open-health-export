@@ -45,6 +45,47 @@ private actor ObserverExportGate {
 }
 
 enum HarnessExport {
+    private static let selectedMetricsKey = "ohe.selectedMetrics"
+
+    static func selectedMetrics() -> [MetricID] {
+        let allowed = Set(MetricCatalog.all.map(\.id))
+        if let stored = UserDefaults.standard.stringArray(forKey: selectedMetricsKey) {
+            return stored.map(MetricID.init(rawValue:)).filter { allowed.contains($0) }
+        }
+        return MetricCatalog.coreDaily.map(\.id)
+    }
+
+    static func saveSelectedMetrics(_ metrics: Set<MetricID>) {
+        let allowed = Set(MetricCatalog.all.map(\.id))
+        UserDefaults.standard.set(
+            metrics.intersection(allowed).map(\.rawValue).sorted(),
+            forKey: selectedMetricsKey
+        )
+    }
+
+    static func applySelectedMetrics(
+        _ metrics: Set<MetricID>,
+        removing: Set<MetricID>
+    ) async throws {
+        let root = try applicationSupportRoot()
+        let store = try SQLiteStateStore(
+            path: root.appendingPathComponent("state.sqlite").path
+        )
+        let now = Date().timeIntervalSince1970
+        for metric in removing {
+            try await store.purgeType(
+                metric: metric,
+                reason: TypeDisableReason.explicitStop,
+                destination: "local-file",
+                atEpoch: now
+            )
+        }
+        for metric in metrics.subtracting(removing) {
+            try await store.reenableType(metric: metric, reason: "user_selected")
+        }
+        saveSelectedMetrics(metrics)
+    }
+
     @MainActor
     static func fetchSecurityAdvisory(enabled: Bool) async throws -> AdvisoryPresentation {
         let defaults = UserDefaults.standard
@@ -104,12 +145,10 @@ enum HarnessExport {
     }
 
     static func runOnePageEachMetric(
-        metrics: [MetricID] = [
-            MetricCatalog.heartRate.id,
-            MetricCatalog.stepCount.id,
-        ],
+        metrics: [MetricID]? = nil,
         trigger: RunTrigger = .manual
     ) async throws -> [String] {
+        let metrics = metrics ?? selectedMetrics()
         let fm = FileManager.default
         let root = try applicationSupportRoot()
         let sqliteURL = root.appendingPathComponent("state.sqlite")
@@ -191,11 +230,9 @@ enum HarnessExport {
     }
 
     static func runFullReconcile(
-        metrics: [MetricID] = [
-            MetricCatalog.heartRate.id,
-            MetricCatalog.stepCount.id,
-        ]
+        metrics: [MetricID]? = nil
     ) async throws -> [String] {
+        let metrics = metrics ?? selectedMetrics()
         let root = try applicationSupportRoot()
         let dest = root.appendingPathComponent("exports", isDirectory: true)
         let scratch = root.appendingPathComponent("scratch", isDirectory: true)
@@ -646,7 +683,7 @@ enum HarnessExport {
         let root = try applicationSupportRoot()
         let grant = HealthAuthorizationGrant(
             id: "core-activity",
-            metrics: [MetricCatalog.heartRate.id, MetricCatalog.stepCount.id]
+            metrics: selectedMetrics()
         )
         let observer = HealthAuthorizationObserver(
             recordURL: root.appendingPathComponent("health-authorization.json")
@@ -676,7 +713,7 @@ enum HarnessExport {
     static func reenableCoreActivityAfterAuthorizationRequest() async throws {
         let root = try applicationSupportRoot()
         let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
-        for metric in [MetricCatalog.heartRate.id, MetricCatalog.stepCount.id] {
+        for metric in selectedMetrics() {
             try await store.reenableType(
                 metric: metric,
                 reason: "user_requested_core_activity"
@@ -689,10 +726,7 @@ enum HarnessExport {
             wakeLedger: try wakeLedger()
         )
         try await coordinator.start(
-            metrics: [
-                MetricCatalog.heartRate.id,
-                MetricCatalog.stepCount.id,
-            ]
+            metrics: selectedMetrics()
         ) { metric in
             try? await observeAuthorizationChanges()
             await ObserverExportGate.shared.enqueue(metric)
