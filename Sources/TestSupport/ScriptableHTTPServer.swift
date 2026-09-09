@@ -86,7 +86,11 @@ public final class ScriptableHTTPServer: @unchecked Sendable {
     }
 
     public func start() throws {
+        #if os(Linux)
+        let fd = socket(AF_INET, Int32(SOCK_STREAM.rawValue), 0)
+        #else
         let fd = socket(AF_INET, SOCK_STREAM, 0)
+        #endif
         guard fd >= 0 else { throw ScriptableHTTPError.bind }
         var reuse: Int32 = 1
         _ = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, socklen_t(MemoryLayout<Int32>.size))
