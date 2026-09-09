@@ -1590,6 +1590,13 @@ private func runUntilProcessExitSeam() async throws {
             receiver.quantities["e0000000-0000-4000-8000-000000000001"] != nil,
             "sample lost at \(location.rawValue)"
         )
+        let journal = try await store.transact { try $0.loadJournal() }
+        #expect(!journal.isEmpty, "journal missing after relaunch at \(location.rawValue)")
+        #expect(
+            [RunOutcome.Kind.success.rawValue, RunOutcome.Kind.successNothingDue.rawValue]
+                .contains(journal.last?.outcomeKind ?? ""),
+            "relaunch outcome missing at \(location.rawValue)"
+        )
     }
 }
 #endif
