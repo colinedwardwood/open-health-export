@@ -8,7 +8,7 @@ import MetricCatalog
 import SinkLocalFile
 import Testing
 import TestSupport
-import WireFormat
+@testable import WireFormat
 
 private struct PropertyRNG {
     private var state: UInt64
@@ -365,4 +365,118 @@ private func propertySample(uuid: String, value: Double, minute: Int) -> SampleR
     #expect(corruptionRejected)
     #expect(store.transaction.cursors[metric]?.epoch == 9)
     #expect(store.transaction.cursors[metric]?.anchorBlob == Data("not-a-checkpoint".utf8))
+}
+
+@Test func p1LosslessNDJSONAndJSONRoundTripWithShrinkOnMismatch() throws {
+    for seed in 1 ... 80 {
+        var rng = PropertyRNG(seed: UInt64(seed))
+        let count = Int(rng.next() % 8) + 1
+        var samples: [SampleRecord] = []
+        for index in 0 ..< count {
+            samples.append(
+                propertySample(
+                    uuid: propertyUUID(seed * 50 + index),
+                    value: Double(rng.next() % 100_000) / 100,
+                    minute: index
+                )
+            )
+        }
+        var envelope = testEnvelope()
+        envelope.seq = seed
+        let batchID = BatchID(rawValue: propertyUUID(seed))
+        func encode(_ subset: [SampleRecord]) throws -> Data {
+            try NativeWire.encode(
+                samples: subset,
+                tombstones: [],
+                metric: MetricCatalog.heartRate.id,
+                batchID: batchID,
+                envelope: envelope
+            )
+        }
+        let original = try encode(samples)
+        let decoded = try NativeSidecars.quantitySamples(fromNDJSON: original)
+        let again = try encode(decoded)
+        if original != again {
+            var shrinking = samples
+            while shrinking.count > 1 {
+                var candidate = shrinking
+                candidate.removeLast()
+                let smaller = try encode(candidate)
+                let smallerAgain = try encode(try NativeSidecars.quantitySamples(fromNDJSON: smaller))
+                if smaller != smallerAgain {
+                    shrinking = candidate
+                } else {
+                    break
+                }
+            }
+            #expect(Bool(false), "P1 NDJSON round-trip failed for seed \(seed) at size \(shrinking.count)")
+        }
+        #expect(decoded.map(\.key.uuid) == samples.map(\.key.uuid))
+        #expect(decoded.map(\.value) == samples.map(\.value))
+        let json = try NativeJSON.document(fromNDJSON: original)
+        let jsonObject = try JSONSerialization.jsonObject(with: json.canonical) as? [String: Any]
+        let records = jsonObject?["records"] as? [Any]
+        #expect(records?.count == samples.count, "P1 JSON record count seed \(seed)")
+        let uuids = records?.compactMap { ($0 as? [String: Any])?["uuid"] as? String }
+        #expect(uuids == samples.map(\.key.uuid))
+        let csv = try NativeCSV.quantityFiles(
+            samples: samples,
+            envelope: envelope,
+            ndjson: original
+        )
+        #expect(String(decoding: csv.meta, as: UTF8.self).contains("csvDropsMetadata"))
+    }
+}
+
+@Test func p2ReExportOfTheSameScopeIsByteIdentical() throws {
+    for seed in 1 ... 40 {
+        var rng = PropertyRNG(seed: UInt64(seed))
+        let samples = [
+            propertySample(
+                uuid: propertyUUID(seed),
+                value: Double(rng.next() % 200) + 40,
+                minute: 3
+            ),
+        ]
+        let first = try NativeWire.encode(
+            samples: samples,
+            tombstones: [],
+            metric: MetricCatalog.heartRate.id,
+            batchID: BatchID(rawValue: propertyUUID(seed)),
+            envelope: testEnvelope()
+        )
+        let second = try NativeWire.encode(
+            samples: samples,
+            tombstones: [],
+            metric: MetricCatalog.heartRate.id,
+            batchID: BatchID(rawValue: propertyUUID(seed)),
+            envelope: testEnvelope()
+        )
+        #expect(first == second, "P2 re-export drifted for seed \(seed)")
+    }
+}
+
+@Test func p15AtomicWriteLeavesPriorCompleteBytesOrAbsentNeverTorn() throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-p15-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let destination = directory.appendingPathComponent("cursor.bin")
+    let prior = Data("complete-prior-state".utf8)
+    let next = Data("complete-next-state-that-is-longer".utf8)
+    try FileWriteKit.writeAtomically(prior, to: destination)
+    FileWriteKit.$fault.withValue(.abortBeforeRename) {
+        #expect(throws: FileWriteError.injectedFault) {
+            try FileWriteKit.writeAtomically(next, to: destination)
+        }
+    }
+    #expect(try Data(contentsOf: destination) == prior)
+    FileWriteKit.$fault.withValue(.abortAfterTruncatingTemp(to: 4)) {
+        #expect(throws: FileWriteError.injectedFault) {
+            try FileWriteKit.writeAtomically(next, to: destination)
+        }
+    }
+    #expect(try Data(contentsOf: destination) == prior)
+    try FileWriteKit.writeAtomically(next, to: destination)
+    #expect(try Data(contentsOf: destination) == next)
 }

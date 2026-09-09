@@ -4,6 +4,10 @@ import MetricCatalog
 
 /// Live encodings that ride next to the canonical NDJSON archive (R-12).
 public enum NativeSidecars {
+    public static func quantitySamples(fromNDJSON data: Data) throws -> [SampleRecord] {
+        try parse(data).samples
+    }
+
     public static func write(fromNDJSON data: Data, beside ndjsonURL: URL) throws {
         let parsed = try parse(data)
         let jsonPair = try NativeJSON.document(fromNDJSON: data)

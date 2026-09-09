@@ -6,7 +6,21 @@ import Darwin
 import Glibc
 #endif
 
+public enum FileWriteError: Error, Equatable {
+    case injectedFault
+}
+
 public enum FileWriteKit {
+    #if DEBUG
+    public enum Fault: Sendable {
+        case none
+        case abortBeforeRename
+        case abortAfterTruncatingTemp(to: Int)
+    }
+
+    @TaskLocal public static var fault: Fault = .none
+    #endif
+
     /// Write bytes via a sibling temp file then POSIX `rename`. Survives a crash mid-write:
     /// the destination is the previous complete file or absent, never a torn file.
     /// `FileManager.replaceItemAt` is not reliable on swift-corelibs-foundation.
@@ -15,6 +29,9 @@ public enum FileWriteKit {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let temp = directory.appendingPathComponent(".\(destination.lastPathComponent).tmp-\(UUID().uuidString)")
         try data.write(to: temp, options: .withoutOverwriting)
+        #if DEBUG
+        try injectWriteFault(temp: temp, intended: data)
+        #endif
         if rename(temp.path, destination.path) != 0 {
             let code = Int(errno)
             try? FileManager.default.removeItem(at: temp)
@@ -26,4 +43,19 @@ public enum FileWriteKit {
         let data = try Data(contentsOf: source)
         try writeAtomically(data, to: destination)
     }
+
+    #if DEBUG
+    private static func injectWriteFault(temp: URL, intended: Data) throws {
+        switch fault {
+        case .none:
+            return
+        case .abortBeforeRename:
+            try? FileManager.default.removeItem(at: temp)
+            throw FileWriteError.injectedFault
+        case .abortAfterTruncatingTemp(let count):
+            try Data(intended.prefix(max(0, count))).write(to: temp)
+            throw FileWriteError.injectedFault
+        }
+    }
+    #endif
 }

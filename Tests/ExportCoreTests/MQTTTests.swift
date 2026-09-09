@@ -214,6 +214,22 @@ import WireFormat
     #expect(completed.report.allowsEnablement)
 }
 
+@Test func mqttTopicAllows256BytesAndRejectsOverUInt16() throws {
+    let topic256 = String(repeating: "a", count: 256)
+    try MQTTTopic.validate(topic256)
+    let packet = try MQTTCodec.publish(
+        topic: topic256,
+        payload: Data("x".utf8),
+        qos: .atLeastOnce,
+        packetID: 1
+    )
+    #expect(!packet.isEmpty)
+    #expect(throws: MQTTError.badTopic) {
+        try MQTTTopic.validate(String(repeating: "b", count: MQTTTopic.maximumUTF8Count + 1))
+    }
+    try MQTTTopic.validate(String(repeating: "c", count: MQTTTopic.maximumUTF8Count))
+}
+
 func writeMQTTPayload() throws -> (URL, BatchID) {
     let sample = heartSample("00000000-0000-0000-0000-000000000001")
     let batchID = BatchID(rawValue: "0192f3c1-0000-0000-0000-00000000000a")

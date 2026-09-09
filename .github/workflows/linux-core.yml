@@ -10,8 +10,8 @@ jobs:
       - uses: swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc # v3
         with:
           swift-version: "6.3.3"
-      - name: Install zlib headers
-        run: sudo apt-get update && sudo apt-get install -y zlib1g-dev
+      - name: Install zlib headers and Mosquitto
+        run: sudo apt-get update && sudo apt-get install -y zlib1g-dev mosquitto
       - name: Build Linux core
         run: swift build --target CoreDomain && swift build --target CorrectnessEngine
       - name: Test

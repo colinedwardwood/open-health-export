@@ -59,11 +59,14 @@ public enum MQTTRemainingLength {
 }
 
 public enum MQTTTopic {
+    public static let maximumUTF8Count = 65_535
+
     public static func validate(_ topic: String) throws {
         if topic.isEmpty { throw MQTTError.badTopic }
         if topic.contains("#") || topic.contains("+") || topic.contains("\0") {
             throw MQTTError.badTopic
         }
+        guard topic.utf8.count <= maximumUTF8Count else { throw MQTTError.badTopic }
     }
 }
 
