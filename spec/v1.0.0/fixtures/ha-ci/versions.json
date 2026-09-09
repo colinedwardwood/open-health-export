@@ -1,0 +1,6 @@
+{
+  "windowMonths": 12,
+  "currentStable": "2026.8.3",
+  "oldestInWindow": "2025.9.4",
+  "image": "ghcr.io/home-assistant/home-assistant"
+}

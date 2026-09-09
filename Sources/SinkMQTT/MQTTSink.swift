@@ -173,16 +173,26 @@ public struct MQTTSink: DestinationSink, Sendable {
     }
 }
 
-#if canImport(Network)
 extension MQTTSink {
     /// Dials with `NetEgress`'s byte stream. A pin is the trust decision for `mqtts`
-    /// (self-signed home brokers); plaintext `mqtt` ignores it.
+    /// (self-signed home brokers). Plaintext `mqtt` uses POSIX TCP so Linux CI can
+    /// reach a real Mosquitto; TLS remains Darwin-only.
     public static func overNetwork(destination: MQTTDestination, pin: PinRecord?) throws -> MQTTSink {
-        let stream = NWByteStream(
-            endpoint: try streamEndpoint(for: destination),
-            options: NWByteStream.Options(pin: pin, failFastOnWaiting: true)
+        let endpoint = try streamEndpoint(for: destination)
+        if endpoint.usesTLS {
+            #if canImport(Network)
+            let stream = NWByteStream(
+                endpoint: endpoint,
+                options: NWByteStream.Options(pin: pin, failFastOnWaiting: true)
+            )
+            return MQTTSink(destination: destination, pipe: ByteStreamMQTTPipe(stream: stream))
+            #else
+            throw StreamError.unsupportedPlatform
+            #endif
+        }
+        return MQTTSink(
+            destination: destination,
+            pipe: ByteStreamMQTTPipe(stream: POSIXByteStream(endpoint: endpoint))
         )
-        return MQTTSink(destination: destination, pipe: ByteStreamMQTTPipe(stream: stream))
     }
 }
-#endif

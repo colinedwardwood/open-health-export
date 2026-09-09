@@ -12,6 +12,11 @@
       "role": "R-84/G1 frozen encoder triple: logical-input.json plus expected.ndjson/json/csv",
       "injectedTzDatabase": "fixtures/tz-database-version.txt"
     },
+    "ha-ci": {
+      "role": "R-89 Home Assistant container config and pinned version window",
+      "currentStable": "2026.8.3",
+      "oldestInWindow": "2025.9.4"
+    },
     "fix-catalogue.json": {
       "cases": 72,
       "role": "Stage 4 FIX-* meta-test input; every t0 ID has a Linux witness"

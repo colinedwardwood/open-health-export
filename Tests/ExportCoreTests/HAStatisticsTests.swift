@@ -100,6 +100,16 @@ import WireFormat
     ])
 }
 
+@Test func haStatisticsRestAttributesOmitNullCatalogueFields() {
+    let heart = HAStatisticsContract.cases().first { $0.wireID == "heart_rate" }!
+    let attributes = HAStatisticsContract.restAttributes(for: heart)
+    #expect(attributes["unit_of_measurement"] as? String == "bpm")
+    #expect(attributes["state_class"] as? String == "measurement")
+    #expect(attributes["device_class"] == nil)
+    let snapshot = HAStatisticsContract.snapshot(from: attributes, state: "70")
+    #expect(HAStatisticsContract.entityMatches(snapshot, expected: heart))
+}
+
 @Test func haStatisticsRejectsInvalidMeasurementAndEnumCombinations() {
     #expect(
         !HAStatisticsContract.statisticsWouldRecord(stateClass: "measurement", deviceClass: "energy")

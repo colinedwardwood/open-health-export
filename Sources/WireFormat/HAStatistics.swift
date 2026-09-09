@@ -74,6 +74,22 @@ public enum HAStatisticsContract {
     public static let measurementForbiddenDeviceClasses: Set<String> = [
         "date", "enum", "energy", "gas", "monetary", "timestamp", "volume", "water",
     ]
+    public static let invalidEnergyMeasurementEntityID = "sensor.ohe_invalid_energy_measurement"
+
+    /// Attributes posted on `/api/states/<entity_id>`. Nil catalogue fields are omitted, not empty.
+    public static func restAttributes(for item: HAStatisticsCase) -> [String: Any] {
+        var attributes: [String: Any] = [:]
+        if let unit = item.unit {
+            attributes["unit_of_measurement"] = unit
+        }
+        if let deviceClass = item.deviceClass {
+            attributes["device_class"] = deviceClass
+        }
+        if let stateClass = item.stateClass {
+            attributes["state_class"] = stateClass
+        }
+        return attributes
+    }
 
     /// One case per catalogue metric, matching MQTT discovery unique_id / statistic / granularity.
     public static func cases(
@@ -107,6 +123,20 @@ public enum HAStatisticsContract {
     public static func stateParses(_ snapshot: HAEntitySnapshot, expected: Double, precision: Double = 0.000_001) -> Bool {
         guard let value = Double(snapshot.state) else { return false }
         return abs(value - expected) <= precision
+    }
+
+    public static func snapshot(
+        from attributes: [String: Any],
+        state: String,
+        exists: Bool = true
+    ) -> HAEntitySnapshot {
+        HAEntitySnapshot(
+            exists: exists,
+            state: state,
+            unit: attributes["unit_of_measurement"] as? String,
+            deviceClass: attributes["device_class"] as? String,
+            stateClass: attributes["state_class"] as? String
+        )
     }
 
     /// HA long-term statistics exist only when `state_class` is present and the combination is valid.

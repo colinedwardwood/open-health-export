@@ -267,6 +267,15 @@
       ]
     },
     {
+      "name": "hacontract",
+      "type": "executable",
+      "dependencies": [
+        "MetricCatalog",
+        "NetEgress",
+        "WireFormat"
+      ]
+    },
+    {
       "name": "m0harness",
       "type": "executable",
       "dependencies": []

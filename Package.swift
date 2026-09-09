@@ -76,6 +76,11 @@ let linuxCore: [Target] = [
         path: "Tools/receiver"
     ),
     .executableTarget(
+        name: "hacontract",
+        dependencies: ["MetricCatalog", "WireFormat", "NetEgress"],
+        path: "Tools/hacontract"
+    ),
+    .executableTarget(
         name: "wirefuzz",
         dependencies: ["CompanionWire", "MQTTCodec", "WireFormat"],
         path: "Tools/wirefuzz"
@@ -153,6 +158,7 @@ var products: [Product] = [
     .executable(name: "policycheck", targets: ["policycheck"]),
     .executable(name: "m0harness", targets: ["m0harness"]),
     .executable(name: "receiver", targets: ["receiver"]),
+    .executable(name: "hacontract", targets: ["hacontract"]),
     .executable(name: "wirefuzz", targets: ["wirefuzz"]),
     .library(name: "SinkMQTT", targets: ["MQTTCodec", "SinkMQTT"]),
 ]

@@ -1,0 +1,81 @@
+name: container-contracts
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "17 6 * * *"
+jobs:
+  mosquitto:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc
+        with:
+          swift-version: "6.3.3"
+      - name: Start Mosquitto
+        run: |
+          docker run -d --name ohe-mosquitto \
+            -p 1883:1883 \
+            -v "$PWD/spec/v1.0.0/fixtures/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf" \
+            eclipse-mosquitto:2.0.22
+          for i in $(seq 1 30); do
+            python3 -c 'import socket;s=socket.create_connection(("127.0.0.1",1883),2);s.close()' && exit 0
+            sleep 1
+          done
+          exit 1
+      - name: MQTT broker contract
+        env:
+          OHE_MQTT_BROKER: mqtt://127.0.0.1:1883
+        run: swift test --filter mosquittoQoS
+  home-assistant-current:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc
+        with:
+          swift-version: "6.3.3"
+      - name: Start Home Assistant 2026.8.3
+        run: |
+          docker run -d --name ohe-ha \
+            -p 8123:8123 \
+            -v "$PWD/spec/v1.0.0/fixtures/ha-ci:/config" \
+            ghcr.io/home-assistant/home-assistant:2026.8.3
+          for i in $(seq 1 90); do
+            curl -fsS http://127.0.0.1:8123/api/onboarding >/dev/null && exit 0
+            sleep 2
+          done
+          docker logs ohe-ha
+          exit 1
+      - name: Catalogue statistics contract
+        env:
+          OHE_HA_URL: http://127.0.0.1:8123
+          OHE_HA_WAIT_SECONDS: "480"
+        run: swift run hacontract
+  home-assistant-oldest:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc
+        with:
+          swift-version: "6.3.3"
+      - name: Start Home Assistant 2025.9.4
+        run: |
+          docker run -d --name ohe-ha \
+            -p 8123:8123 \
+            -v "$PWD/spec/v1.0.0/fixtures/ha-ci:/config" \
+            ghcr.io/home-assistant/home-assistant:2025.9.4
+          for i in $(seq 1 90); do
+            curl -fsS http://127.0.0.1:8123/api/onboarding >/dev/null && exit 0
+            sleep 2
+          done
+          docker logs ohe-ha
+          exit 1
+      - name: Catalogue statistics contract
+        env:
+          OHE_HA_URL: http://127.0.0.1:8123
+          OHE_HA_WAIT_SECONDS: "480"
+        run: swift run hacontract
