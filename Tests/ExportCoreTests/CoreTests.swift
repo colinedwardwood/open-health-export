@@ -2219,6 +2219,69 @@ private func runUntilProcessExitSeam() async throws {
     )
 }
 
+@Test func reconcilePlannerBuildsAnInclusiveValidatedFullRange() throws {
+    #expect(
+        try ReconcilePlanner.days(from: "2024-02-28", through: "2024-03-01") == [
+            "2024-02-28",
+            "2024-02-29",
+            "2024-03-01",
+        ]
+    )
+    #expect(throws: ReconcileRangeError.invalidDay("2024-02-30")) {
+        _ = try ReconcilePlanner.days(from: "2024-02-30", through: "2024-03-01")
+    }
+    #expect(
+        throws: ReconcileRangeError.reversed(
+            start: "2024-03-02",
+            end: "2024-03-01"
+        )
+    ) {
+        _ = try ReconcilePlanner.days(from: "2024-03-02", through: "2024-03-01")
+    }
+}
+
+@Test func userTriggeredFullReconcileCoversHistoryOlderThanSevenDays() async throws {
+    let metric = MetricCatalog.heartRate.id
+    var old = heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+    old.start = "2023-12-01T10:00:00Z"
+    old.end = old.start
+    var recent = heartSample("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+    recent.start = "2024-01-01T10:00:00Z"
+    recent.end = recent.start
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-full-reconcile-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let store = MemoryStateStore()
+    let outcome = try await ReconcileSweep(
+        observations: FixtureDays(
+            byDay: [
+                "2023-12-01": [old],
+                "2024-01-01": [recent],
+            ]
+        ),
+        destination: .testing(LocalFileSink(directory: root)),
+        store: store,
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    ).runFullHistory(throughDay: "2024-01-01")
+
+    #expect(outcome.kind == .success)
+    #expect(try store.transaction.loadCursor(metric: metric) == nil)
+    #expect(try store.transaction.loadEmittedIndex(uuid: old.key.uuid) != nil)
+    #expect(try store.transaction.loadEmittedIndex(uuid: recent.key.uuid) != nil)
+    let payload = try FileManager.default.contentsOfDirectory(
+        at: root,
+        includingPropertiesForKeys: nil
+    ).filter { $0.pathExtension == "ndjson" }
+        .map { try String(contentsOf: $0, encoding: .utf8) }
+        .joined()
+    #expect(payload.contains("\"reason\":\"full_reconcile\""))
+    #expect(payload.contains(old.key.uuid))
+    #expect(payload.contains(recent.key.uuid))
+}
+
 @Test func reconcileSweepRepairsAbsenceWithoutAdvancingCursor() async throws {
     let metric = MetricID(rawValue: "heartRate")
     let keep = heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")

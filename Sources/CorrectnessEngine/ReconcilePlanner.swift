@@ -27,6 +27,11 @@ public struct ReconcileDayPlan: Sendable, Equatable {
     public var isClean: Bool { outcome == .identical && repairs.isEmpty }
 }
 
+public enum ReconcileRangeError: Error, Equatable {
+    case invalidDay(String)
+    case reversed(start: String, end: String)
+}
+
 /// Fixture-friendly R-08 planner: classify one (metric, day) cell and name the repairs.
 /// Does not touch HealthKit or the store; the caller supplies stored census, index, and observed samples.
 public enum ReconcilePlanner {
@@ -87,6 +92,53 @@ public enum ReconcilePlanner {
             }
         }
         return days.reversed()
+    }
+
+    public static func days(from startDay: String, through endDay: String) throws -> [String] {
+        guard var current = components(startDay) else {
+            throw ReconcileRangeError.invalidDay(startDay)
+        }
+        guard components(endDay) != nil else {
+            throw ReconcileRangeError.invalidDay(endDay)
+        }
+        guard startDay <= endDay else {
+            throw ReconcileRangeError.reversed(start: startDay, end: endDay)
+        }
+        var result: [String] = []
+        while true {
+            let day = format(current)
+            result.append(day)
+            if day == endDay { return result }
+            current.day += 1
+            if current.day > daysInMonth(year: current.year, month: current.month) {
+                current.day = 1
+                current.month += 1
+                if current.month > 12 {
+                    current.month = 1
+                    current.year += 1
+                }
+            }
+        }
+    }
+
+    private static func components(
+        _ day: String
+    ) -> (year: Int, month: Int, day: Int)? {
+        let parts = day.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3,
+              (1 ... 12).contains(parts[1]),
+              (1 ... daysInMonth(year: parts[0], month: parts[1])).contains(parts[2]),
+              format((parts[0], parts[1], parts[2])) == day
+        else {
+            return nil
+        }
+        return (parts[0], parts[1], parts[2])
+    }
+
+    private static func format(
+        _ value: (year: Int, month: Int, day: Int)
+    ) -> String {
+        String(format: "%04d-%02d-%02d", value.year, value.month, value.day)
     }
 
     private static func daysInMonth(year: Int, month: Int) -> Int {

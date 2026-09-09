@@ -8,6 +8,10 @@ import RunJournal
 import Watchdog
 import WireFormat
 
+public enum ReconcileSweepError: Error, Equatable {
+    case fullHistoryRangeUnavailable
+}
+
 /// R-08 trailing-window apply. Plans from stored census vs date-ranged observations, then
 /// enqueues a repair batch without advancing the HealthKit cursor.
 public struct ReconcileSweep: Sendable {
@@ -62,6 +66,36 @@ public struct ReconcileSweep: Sendable {
     }
 
     public func run(throughDay: String) async throws -> RunOutcome {
+        try await run(
+            days: ReconcilePlanner.trailingDays(throughDay: throughDay),
+            throughDay: throughDay,
+            reason: "reconcile"
+        )
+    }
+
+    public func runFullHistory(throughDay: String) async throws -> RunOutcome {
+        guard let bounded = observations as? any BoundedDayObservationSource else {
+            throw ReconcileSweepError.fullHistoryRangeUnavailable
+        }
+        guard let available = try await bounded.availableDayRange(metric: metric) else {
+            return try await run(days: [], throughDay: throughDay, reason: "full_reconcile")
+        }
+        let endDay = min(available.upperBound, throughDay)
+        let days = available.lowerBound <= endDay
+            ? try ReconcilePlanner.days(from: available.lowerBound, through: endDay)
+            : []
+        return try await run(
+            days: days,
+            throughDay: endDay,
+            reason: "full_reconcile"
+        )
+    }
+
+    private func run(
+        days: [String],
+        throughDay: String,
+        reason: String
+    ) async throws -> RunOutcome {
         if let status = try await store.transact({ try $0.loadTypeStatus(metric: metric) }),
            status.disabled {
             let tally = RunTally(
@@ -74,7 +108,6 @@ public struct ReconcileSweep: Sendable {
             return outcome
         }
 
-        let days = ReconcilePlanner.trailingDays(throughDay: throughDay)
         var samples: [SampleRecord] = []
         var tombstones: [TombstoneRecord] = []
         for day in days {
@@ -109,11 +142,13 @@ public struct ReconcileSweep: Sendable {
             samples: samples,
             tombstones: tombstones,
             metric: metric,
-            anchorBlob: Data("reconcile:\(throughDay)".utf8),
+            anchorBlob: Data(
+                "\(reason):\(days.first ?? throughDay):\(throughDay)".utf8
+            ),
             observedThrough: clock.now()
         )
         var wire = envelope
-        wire.reason = "reconcile"
+        wire.reason = reason
         let aggregates = try await drainPlans(for: page)
         let batchID = NativeWire.batchID(metric: metric, anchorBlob: page.anchorBlob)
         let payload = try NativeWire.encode(

@@ -959,7 +959,7 @@ public final class HealthKitCorrelationSource: SampleSource, @unchecked Sendable
 }
 
 /// Date-ranged R-08 source. Sweep anchors are throwaway values and never escape this adapter.
-public final class HealthKitDayObservationSource: DayObservationSource, @unchecked Sendable {
+public final class HealthKitDayObservationSource: BoundedDayObservationSource, @unchecked Sendable {
     private let store: HKHealthStore
     private let context: TemporalContext
     private let limit: Int
@@ -968,6 +968,21 @@ public final class HealthKitDayObservationSource: DayObservationSource, @uncheck
         self.store = store
         self.context = context
         self.limit = limit
+    }
+
+    public func availableDayRange(metric: MetricID) async throws -> ClosedRange<String>? {
+        guard HKHealthStore.isHealthDataAvailable() else {
+            throw HealthKitSourceError.unavailable
+        }
+        guard let type = SampleConversion.quantityType(for: metric) else {
+            throw HealthKitSourceError.unknownMetric(metric)
+        }
+        guard let first = try await boundary(type: type, ascending: true) else {
+            return nil
+        }
+        let last = try await boundary(type: type, ascending: false) ?? first
+        return DayBucket.containing(first.startDate, context: context).isoDay
+            ... DayBucket.containing(last.startDate, context: context).isoDay
     }
 
     public func samples(metric: MetricID, day: String) async throws -> [SampleRecord] {
@@ -1002,6 +1017,34 @@ public final class HealthKitDayObservationSource: DayObservationSource, @uncheck
             if page.count < limit || page.anchor == nil {
                 return records
             }
+        }
+    }
+
+    private func boundary(
+        type: HKQuantityType,
+        ascending: Bool
+    ) async throws -> HKQuantitySample? {
+        try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: type,
+                predicate: nil,
+                limit: 1,
+                sortDescriptors: [
+                    NSSortDescriptor(
+                        key: HKSampleSortIdentifierStartDate,
+                        ascending: ascending
+                    ),
+                ]
+            ) { _, samples, error in
+                if let error {
+                    continuation.resume(
+                        throwing: HealthKitSourceError.classifiedQueryError(error)
+                    )
+                    return
+                }
+                continuation.resume(returning: samples?.first as? HKQuantitySample)
+            }
+            self.store.execute(query)
         }
     }
 

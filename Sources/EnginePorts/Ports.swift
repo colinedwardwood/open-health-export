@@ -347,6 +347,11 @@ public protocol DayObservationSource: Sendable {
     func samples(metric: MetricID, day: String) async throws -> [SampleRecord]
 }
 
+/// A date-ranged source that can discover the complete day span available for a metric.
+public protocol BoundedDayObservationSource: DayObservationSource {
+    func availableDayRange(metric: MetricID) async throws -> ClosedRange<String>?
+}
+
 /// Classified destination failure. Call sites must not invent a `RunOutcome`.
 public enum DestinationSendError: Error, Sendable, Equatable {
     case localNetworkDenied

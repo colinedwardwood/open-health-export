@@ -234,12 +234,20 @@ public struct FixtureSource: SampleSource {
     }
 }
 
-public struct FixtureDays: DayObservationSource, Sendable {
+public struct FixtureDays: BoundedDayObservationSource, Sendable {
     public var byDay: [String: [SampleRecord]]
     public init(byDay: [String: [SampleRecord]]) { self.byDay = byDay }
 
     public func samples(metric: MetricID, day: String) async throws -> [SampleRecord] {
         (byDay[day] ?? []).filter { $0.metric == metric }
+    }
+
+    public func availableDayRange(metric: MetricID) async throws -> ClosedRange<String>? {
+        let days = byDay.compactMap { day, samples in
+            samples.contains { $0.metric == metric } ? day : nil
+        }.sorted()
+        guard let first = days.first, let last = days.last else { return nil }
+        return first ... last
     }
 }
 

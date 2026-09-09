@@ -186,6 +186,12 @@ struct HarnessView: View {
             }
             .disabled(phase == .working)
             .accessibilityHint("Writes NDJSON under Application Support using the engine and local-file sink.")
+            Button("Reconcile all available Health history") {
+                Task { await runFullReconcile() }
+            }
+            .disabled(phase == .working || !HarnessExport.isLocalFileEnabled())
+            .accessibilityIdentifier("full-reconcile")
+            .accessibilityHint("Compares every available day without advancing HealthKit anchors.")
             Text("DEMO MODE — synthetic data")
                 .font(.headline)
                 .foregroundStyle(.orange)
@@ -742,6 +748,22 @@ struct HarnessView: View {
             destinationStatusLines = HarnessExport.destinationStatusLines()
             await refreshLedgerIntegrity()
             status = "Ready. Local export finished. Outcome kinds are engine-derived, not assigned by this screen."
+        } catch {
+            status = "Failed: \(error.localizedDescription)"
+        }
+        phase = .ready
+    }
+
+    @MainActor
+    private func runFullReconcile() async {
+        phase = .working
+        status = "Working: full Health history reconciliation."
+        results = []
+        do {
+            results = try await HarnessExport.runFullReconcile()
+            destinationStatusLines = HarnessExport.destinationStatusLines()
+            await refreshLedgerIntegrity()
+            status = "Ready. Full reconciliation finished without advancing anchored cursors."
         } catch {
             status = "Failed: \(error.localizedDescription)"
         }

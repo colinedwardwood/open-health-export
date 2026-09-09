@@ -190,6 +190,74 @@ enum HarnessExport {
         return lines
     }
 
+    static func runFullReconcile(
+        metrics: [MetricID] = [
+            MetricCatalog.heartRate.id,
+            MetricCatalog.stepCount.id,
+        ]
+    ) async throws -> [String] {
+        let root = try applicationSupportRoot()
+        let dest = root.appendingPathComponent("exports", isDirectory: true)
+        let scratch = root.appendingPathComponent("scratch", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: dest,
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: scratch,
+            withIntermediateDirectories: true
+        )
+        let store = try SQLiteStateStore(
+            path: root.appendingPathComponent("state.sqlite").path
+        )
+        let (verified, events) = try verifiedLocalFile(
+            root: root,
+            destinationDirectory: dest
+        )
+        try await emitTrustNotices(events)
+        let context = TemporalContext(
+            timeZoneIdentifier: "UTC",
+            localeIdentifier: "en_US_POSIX",
+            tzDatabaseVersion: "host"
+        )
+        let observations = HealthKitDayObservationSource(
+            context: context,
+            limit: 1000
+        )
+        let statistics = HealthKitStatisticsSource(context: context)
+        let now = Date().ISO8601Format()
+        let exporterID = try installationID()
+        let seal = ledgerHeadSeal()
+        var lines: [String] = []
+        for metric in metrics {
+            let outcome = try await ReconcileSweep(
+                observations: observations,
+                destination: verified,
+                store: store,
+                metric: metric,
+                scratchDirectory: scratch,
+                destinationName: "local-file",
+                envelope: WireEnvelope(
+                    exporterId: exporterID,
+                    seq: 1,
+                    emittedAt: now,
+                    observedAt: now
+                ),
+                temporal: context,
+                statistics: statistics,
+                trigger: .manual,
+                snapshotURL: StatusSnapshotLocation.url(destinationID: "local-file"),
+                externalStatusURL: dest.appendingPathComponent("status.json"),
+                ledgerHeadSeal: seal,
+                ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json")
+            ).runFullHistory(throughDay: String(now.prefix(10)))
+            lines.append("\(metric.rawValue) full reconcile: \(outcome.kind.rawValue)")
+        }
+        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+        lines.append("Files: \(dest.path)")
+        return lines
+    }
+
     static func runDemoDataset(typedDestinationName: String) async throws -> [String] {
         try DemoExportGate.confirmSending(to: "local-file", typed: typedDestinationName)
         let fm = FileManager.default
