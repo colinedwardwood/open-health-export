@@ -24,6 +24,10 @@ public enum AggregateFold {
         let statistic: AggregateStatistic = (decl?.cumulative == true) ? .sum : .mean
         let values = samples
             .filter { $0.metric == metric && $0.start.hasPrefix(day) }
+            .sorted {
+                if $0.key.uuid != $1.key.uuid { return $0.key.uuid < $1.key.uuid }
+                return $0.start < $1.start
+            }
             .map(\.value)
         guard !values.isEmpty else {
             return AggregateFoldResult(value: nil, sampleCount: 0, statistic: statistic)

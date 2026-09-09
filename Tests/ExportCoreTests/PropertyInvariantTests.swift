@@ -1,4 +1,5 @@
 import CoreDomain
+import CoreTemporal
 import CorrectnessEngine
 import DestinationTrust
 import EnginePorts
@@ -453,6 +454,137 @@ private func propertySample(uuid: String, value: Double, minute: Int) -> SampleR
             envelope: testEnvelope()
         )
         #expect(first == second, "P2 re-export drifted for seed \(seed)")
+    }
+}
+
+@Test func p8DeterminismIgnoresHostileLocaleAndRepeats() throws {
+    let english = TemporalContext(
+        timeZoneIdentifier: "Asia/Kathmandu",
+        localeIdentifier: "en_US_POSIX",
+        tzDatabaseVersion: "fixture-2024"
+    )
+    let arabic = TemporalContext(
+        timeZoneIdentifier: "Asia/Kathmandu",
+        localeIdentifier: "ar_EG",
+        tzDatabaseVersion: "fixture-2024"
+    )
+    #expect(
+        BucketKey.boundsP1D(day: "2024-06-01", context: english)
+            == BucketKey.boundsP1D(day: "2024-06-01", context: arabic)
+    )
+    for seed in 1 ... 40 {
+        var rng = PropertyRNG(seed: UInt64(seed))
+        let samples = [
+            propertySample(
+                uuid: propertyUUID(seed),
+                value: Double(rng.next() % 200) + 40,
+                minute: 4
+            ),
+        ]
+        let batchID = BatchID(rawValue: propertyUUID(seed))
+        let first = try NativeWire.encode(
+            samples: samples,
+            tombstones: [],
+            metric: MetricCatalog.heartRate.id,
+            batchID: batchID,
+            envelope: testEnvelope()
+        )
+        for _ in 0 ..< 8 {
+            #expect(
+                try NativeWire.encode(
+                    samples: samples,
+                    tombstones: [],
+                    metric: MetricCatalog.heartRate.id,
+                    batchID: batchID,
+                    envelope: testEnvelope()
+                ) == first,
+                "P8 drifted for seed \(seed)"
+            )
+        }
+    }
+}
+
+@Test func p9AggregationIsIndependentOfSampleOrder() {
+    for seed in 1 ... 80 {
+        var rng = PropertyRNG(seed: UInt64(seed))
+        let count = Int(rng.next() % 12) + 2
+        var samples: [SampleRecord] = []
+        for index in 0 ..< count {
+            let base = propertySample(
+                uuid: propertyUUID(seed * 100 + index),
+                value: Double(rng.next() % 100_000) / 100,
+                minute: index
+            )
+            samples.append(
+                SampleRecord(
+                    key: base.key,
+                    metric: MetricCatalog.stepCount.id,
+                    start: base.start,
+                    end: base.end,
+                    timeZoneOffsetMinutes: base.timeZoneOffsetMinutes,
+                    timeZoneSource: base.timeZoneSource,
+                    value: base.value,
+                    unit: CanonicalUnit(symbol: "count"),
+                    observedAt: base.observedAt
+                )
+            )
+        }
+        var reversed = Array(samples.reversed())
+        reversed.swapAt(0, reversed.count - 1)
+        let forward = AggregateFold.foldDay(
+            metric: MetricCatalog.stepCount.id,
+            day: "2026-01-01",
+            samples: samples
+        )
+        let backward = AggregateFold.foldDay(
+            metric: MetricCatalog.stepCount.id,
+            day: "2026-01-01",
+            samples: reversed
+        )
+        #expect(forward == backward, "P9 order dependence seed \(seed)")
+    }
+}
+
+@Test func p11BucketKeyIsStableUnderRecomputation() {
+    let context = TemporalContext(
+        timeZoneIdentifier: "UTC",
+        localeIdentifier: "en_US_POSIX",
+        tzDatabaseVersion: "2024a"
+    )
+    let metric = MetricCatalog.heartRate.id
+    for seed in 1 ... 30 {
+        var rng = PropertyRNG(seed: UInt64(seed))
+        let extra = propertySample(
+            uuid: propertyUUID(seed + 50),
+            value: Double(rng.next() % 40) + 50,
+            minute: 12
+        )
+        let samples = [
+            propertySample(uuid: propertyUUID(seed), value: 70, minute: 1),
+            extra,
+        ]
+        let first = AggregateDrain.planDay(
+            metric: metric,
+            day: "2026-01-01",
+            samples: Array(samples.prefix(1)),
+            context: context,
+            emitSeq: 1,
+            computedAt: "2026-01-02T00:00:00Z",
+            observedAt: "2026-01-02T00:00:00Z",
+            now: Date(timeIntervalSince1970: 1_767_225_600)
+        )
+        let second = AggregateDrain.planDay(
+            metric: metric,
+            day: "2026-01-01",
+            samples: samples,
+            context: context,
+            emitSeq: 2,
+            computedAt: "2026-01-03T00:00:00Z",
+            observedAt: "2026-01-03T00:00:00Z",
+            now: Date(timeIntervalSince1970: 1_767_312_000),
+            priorEmitSeq: 1
+        )
+        #expect(first?.record.bucketKey == second?.record.bucketKey, "P11 key drift seed \(seed)")
     }
 }
 
