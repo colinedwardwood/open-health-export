@@ -185,86 +185,104 @@ private func propertySample(uuid: String, value: Double, minute: Int) -> SampleR
 
 @Test func statefulCommandModelConvergesWithEngineForSeededSequences() async throws {
     for seed in 1 ... 20 {
-        var rng = PropertyRNG(seed: UInt64(seed))
-        var model: [String: SampleRecord] = [:]
-        var retired: Set<String> = []
-        let metric = MetricCatalog.heartRate.id
-        let store = MemoryStateStore()
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("ohe-model-\(seed)-\(UUID().uuidString)")
-        let destination = root.appendingPathComponent("destination")
-        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-        var receiver = ReferenceReceiver()
-        var previousEpoch: UInt32 = 0
-        var pages: [SamplePage] = []
-
-        for step in 1 ... 24 {
-            let slot = Int(rng.next() % 12)
-            let uuid = propertyUUID(slot)
-            if retired.contains(uuid) { continue }
-            let delete = rng.next() % 5 == 0 && model[uuid] != nil
-            let samples: [SampleRecord]
-            let tombstones: [TombstoneRecord]
-            if delete {
-                model.removeValue(forKey: uuid)
-                retired.insert(uuid)
-                samples = []
-                tombstones = [
-                    TombstoneRecord(key: RecordKey(uuid: uuid), metric: metric),
-                ]
-            } else {
-                let sample = propertySample(
-                    uuid: uuid,
-                    value: Double(rng.next() % 10_000) / 10,
-                    minute: step
-                )
-                model[uuid] = sample
-                samples = [sample]
-                tombstones = []
-            }
-            pages.append(
-                SamplePage(
-                    samples: samples,
-                    tombstones: tombstones,
-                    metric: metric,
-                    anchorBlob: Data([UInt8(step)]),
-                    observedThrough: Date(timeIntervalSince1970: TimeInterval(step))
-                )
-            )
-            var envelope = testEnvelope()
-            envelope.seq = step
-            let run = ExportRun(
-                source: FixtureSource(pages: pages),
-                destination: .testing(LocalFileSink(directory: destination)),
-                store: store,
-                metric: metric,
-                scratchDirectory: root.appendingPathComponent("scratch-\(step)"),
-                envelope: envelope
-            )
-            let outcome = try await run.run()
-            #expect(outcome.kind == .success, "seed \(seed) step \(step)")
-            let cursor = try await store.transact { try $0.loadCursor(metric: metric) }
-            let epoch = cursor?.epoch ?? 0
-            #expect(epoch >= previousEpoch, "P5 cursor regression seed \(seed)")
-            previousEpoch = epoch
-            #expect(try await store.transact { try $0.pendingBatches() }.isEmpty)
+        let trace = try await statefulExportTrace(seed: seed)
+        #expect(trace.live == Set(trace.model.keys), "P4 live set diverged for seed \(seed)")
+        var previous: UInt32 = 0
+        for epoch in trace.epochs {
+            #expect(epoch >= previous, "P5 cursor regression seed \(seed)")
+            previous = epoch
         }
-
-        let delivered = try FileManager.default.contentsOfDirectory(
-            at: destination,
-            includingPropertiesForKeys: nil
-        ).filter { $0.pathExtension == "ndjson" }
-        for url in delivered.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
-            try receiver.ingest(ndjson: String(contentsOf: url, encoding: .utf8))
-        }
-        #expect(
-            Set(receiver.quantities.keys) == Set(model.keys),
-            "P4 live set diverged for seed \(seed)"
-        )
-        for uuid in retired {
-            #expect(receiver.quantities[uuid] == nil, "P7 tombstone not terminal seed \(seed)")
+        for uuid in trace.retired {
+            #expect(!trace.live.contains(uuid), "P7 tombstone not terminal seed \(seed)")
         }
     }
+}
+
+private struct StatefulExportTrace {
+    var model: [String: SampleRecord]
+    var retired: Set<String>
+    var epochs: [UInt32]
+    var live: Set<String>
+}
+
+private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> StatefulExportTrace {
+    var rng = PropertyRNG(seed: UInt64(seed))
+    var model: [String: SampleRecord] = [:]
+    var retired: Set<String> = []
+    var epochs: [UInt32] = []
+    let metric = MetricCatalog.heartRate.id
+    let store = MemoryStateStore()
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-model-\(seed)-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let destination = root.appendingPathComponent("destination")
+    try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+    var pages: [SamplePage] = []
+
+    for step in 1 ... steps {
+        let slot = Int(rng.next() % 12)
+        let uuid = propertyUUID(slot)
+        if retired.contains(uuid) { continue }
+        let delete = rng.next() % 5 == 0 && model[uuid] != nil
+        let samples: [SampleRecord]
+        let tombstones: [TombstoneRecord]
+        if delete {
+            model.removeValue(forKey: uuid)
+            retired.insert(uuid)
+            samples = []
+            tombstones = [
+                TombstoneRecord(key: RecordKey(uuid: uuid), metric: metric),
+            ]
+        } else {
+            let sample = propertySample(
+                uuid: uuid,
+                value: Double(rng.next() % 10_000) / 10,
+                minute: step
+            )
+            model[uuid] = sample
+            samples = [sample]
+            tombstones = []
+        }
+        pages.append(
+            SamplePage(
+                samples: samples,
+                tombstones: tombstones,
+                metric: metric,
+                anchorBlob: Data([UInt8(step)]),
+                observedThrough: Date(timeIntervalSince1970: TimeInterval(step))
+            )
+        )
+        var envelope = testEnvelope()
+        envelope.seq = step
+        let run = ExportRun(
+            source: FixtureSource(pages: pages),
+            destination: .testing(LocalFileSink(directory: destination)),
+            store: store,
+            metric: metric,
+            scratchDirectory: root.appendingPathComponent("scratch-\(step)"),
+            envelope: envelope
+        )
+        let outcome = try await run.run()
+        #expect(outcome.kind == .success, "seed \(seed) step \(step)")
+        let cursor = try await store.transact { try $0.loadCursor(metric: metric) }
+        epochs.append(cursor?.epoch ?? 0)
+        #expect(try await store.transact { try $0.pendingBatches() }.isEmpty)
+    }
+
+    var receiver = ReferenceReceiver()
+    let delivered = try FileManager.default.contentsOfDirectory(
+        at: destination,
+        includingPropertiesForKeys: nil
+    ).filter { $0.pathExtension == "ndjson" }
+    for url in delivered.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+        try receiver.ingest(ndjson: String(contentsOf: url, encoding: .utf8))
+    }
+    return StatefulExportTrace(
+        model: model,
+        retired: retired,
+        epochs: epochs,
+        live: Set(receiver.quantities.keys)
+    )
 }
 
 @Test func highRiskStatefulCommandsPreserveQueueCursorAndDestinationInvariants() async throws {
@@ -364,6 +382,71 @@ private func propertySample(uuid: String, value: Double, minute: Int) -> SampleR
         corruptionRejected = true
     }
     #expect(corruptionRejected)
+    #expect(store.transaction.cursors[metric]?.epoch == 9)
+    #expect(store.transaction.cursors[metric]?.anchorBlob == Data("not-a-checkpoint".utf8))
+}
+
+@Test func p4LiveSetMatchesTheReferenceModelAfterSeededSequences() async throws {
+    for seed in 1 ... 8 {
+        let trace = try await statefulExportTrace(seed: seed, steps: 12)
+        #expect(trace.live == Set(trace.model.keys), "P4 seed \(seed)")
+    }
+}
+
+@Test func p5PersistedCursorNeverRegresses() async throws {
+    for seed in 1 ... 8 {
+        let trace = try await statefulExportTrace(seed: seed, steps: 12)
+        var previous: UInt32 = 0
+        for epoch in trace.epochs {
+            #expect(epoch >= previous, "P5 seed \(seed)")
+            previous = epoch
+        }
+    }
+}
+
+@Test func p7TombstonesAreTerminalInTheLiveSet() async throws {
+    for seed in 1 ... 8 {
+        let trace = try await statefulExportTrace(seed: seed, steps: 12)
+        for uuid in trace.retired {
+            #expect(!trace.live.contains(uuid), "P7 seed \(seed)")
+        }
+    }
+}
+
+@Test func p13CorruptCheckpointDoesNotSilentlyResetTheCursor() async throws {
+    let metric = MetricCatalog.heartRate.id
+    let sample = propertySample(uuid: propertyUUID(13), value: 72, minute: 1)
+    let page = SamplePage(
+        samples: [sample],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([1]),
+        observedThrough: Date(timeIntervalSince1970: 1)
+    )
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-p13-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = MemoryStateStore()
+    let run = ExportRun(
+        source: FixtureSource(pages: [page]),
+        destination: .testing(LocalFileSink(directory: root)),
+        store: store,
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    )
+    store.transaction.cursors[metric] = CursorSnapshot(
+        metric: metric,
+        epoch: 9,
+        anchorBlob: Data("not-a-checkpoint".utf8)
+    )
+    var rejected = false
+    do {
+        _ = try await run.run()
+    } catch {
+        rejected = true
+    }
+    #expect(rejected)
     #expect(store.transaction.cursors[metric]?.epoch == 9)
     #expect(store.transaction.cursors[metric]?.anchorBlob == Data("not-a-checkpoint".utf8))
 }
@@ -611,4 +694,19 @@ private func propertySample(uuid: String, value: Double, minute: Int) -> SampleR
     #expect(try Data(contentsOf: destination) == prior)
     try FileWriteKit.writeAtomically(next, to: destination)
     #expect(try Data(contentsOf: destination) == next)
+}
+
+@Test func qa19EveryCorrectnessPropertyHasANamedTest() throws {
+    let tests = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    var found = Set<Int>()
+    let enumerator = FileManager.default.enumerator(at: tests, includingPropertiesForKeys: nil)
+    let pattern = try NSRegularExpression(pattern: #"@Test func p(1[0-6]|[1-9])[A-Z]"#)
+    for case let file as URL in enumerator! where file.pathExtension == "swift" {
+        let text = try String(contentsOf: file, encoding: .utf8)
+        let ns = text as NSString
+        for match in pattern.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
+            found.insert(Int(ns.substring(with: match.range(at: 1)))!)
+        }
+    }
+    #expect(found == Set(1 ... 16), "missing \(Set(1 ... 16).subtracting(found).sorted())")
 }

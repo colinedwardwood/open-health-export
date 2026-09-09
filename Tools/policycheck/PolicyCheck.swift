@@ -195,6 +195,24 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck ambient clocks: ok")
+
+        let workflows = root.appendingPathComponent(".github/workflows")
+        if let files = FileManager.default.enumerator(at: workflows, includingPropertiesForKeys: nil) {
+            for case let file as URL in files where file.pathExtension == "yml" || file.pathExtension == "yaml" {
+                let text = try String(contentsOf: file, encoding: .utf8)
+                let pullsOnPush = text.contains("pull_request:") || text.contains("pull_request ")
+                let selfHosted = text.split(separator: "\n").contains {
+                    $0.contains("runs-on:") && $0.contains("self-hosted")
+                }
+                if pullsOnPush, selfHosted {
+                    FileHandle.standardError.write(
+                        Data("\(file.path): self-hosted jobs must not use pull_request (QA-28)\n".utf8)
+                    )
+                    exit(1)
+                }
+            }
+        }
+        print("policycheck self-hosted runners stay off pull_request: ok")
         var disguise: [String] = []
         if let files = FileManager.default.enumerator(at: apps, includingPropertiesForKeys: nil) {
             for case let file as URL in files {
