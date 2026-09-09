@@ -59,7 +59,11 @@ public actor POSIXByteStream: ByteStream {
     private static func connect(host: String, port: UInt16) throws -> Int32 {
         var hints = addrinfo()
         hints.ai_family = AF_UNSPEC
+        #if os(Linux)
+        hints.ai_socktype = Int32(SOCK_STREAM.rawValue)
+        #else
         hints.ai_socktype = SOCK_STREAM
+        #endif
         var info: UnsafeMutablePointer<addrinfo>?
         let portString = String(port)
         let err = host.withCString { hostC in
