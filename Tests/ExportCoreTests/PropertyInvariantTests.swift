@@ -1,5 +1,6 @@
 import CoreDomain
 import CorrectnessEngine
+import DestinationTrust
 import EnginePorts
 import FileWriteKit
 import Foundation
@@ -19,6 +20,41 @@ private struct PropertyRNG {
     mutating func next() -> UInt64 {
         state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
         return state
+    }
+}
+
+private enum StatefulSinkError: Error {
+    case injected
+}
+
+private actor StatefulPropertySink: DestinationSink {
+    private var failuresRemaining: Int
+    private var receiver = ReferenceReceiver()
+
+    init(failuresRemaining: Int) {
+        self.failuresRemaining = failuresRemaining
+    }
+
+    func allowDelivery() {
+        failuresRemaining = 0
+    }
+
+    func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt {
+        if failuresRemaining > 0 {
+            failuresRemaining -= 1
+            throw StatefulSinkError.injected
+        }
+        let text = try String(contentsOfFile: fileHandle, encoding: .utf8)
+        try receiver.ingest(ndjson: text)
+        return DeliveryReceipt(
+            batchID: idempotencyKey,
+            accepted: text.split(separator: "\n").count,
+            statusOnly: false
+        )
+    }
+
+    func liveUUIDs() -> Set<String> {
+        Set(receiver.quantities.keys)
     }
 }
 
@@ -228,4 +264,105 @@ private func propertySample(uuid: String, value: Double, minute: Int) -> SampleR
             #expect(receiver.quantities[uuid] == nil, "P7 tombstone not terminal seed \(seed)")
         }
     }
+}
+
+@Test func highRiskStatefulCommandsPreserveQueueCursorAndDestinationInvariants() async throws {
+    let metric = MetricCatalog.heartRate.id
+    let uuid = propertyUUID(999)
+    let sample = propertySample(uuid: uuid, value: 72, minute: 1)
+    let page = SamplePage(
+        samples: [sample],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([1]),
+        observedThrough: Date(timeIntervalSince1970: 1)
+    )
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-stateful-high-risk-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = MemoryStateStore()
+    let sink = StatefulPropertySink(failuresRemaining: 1)
+    let destination = VerifiedDestination.testing(sink)
+    let run = ExportRun(
+        source: FixtureSource(pages: [page]),
+        destination: destination,
+        store: store,
+        metric: metric,
+        scratchDirectory: root,
+        envelope: testEnvelope()
+    )
+
+    // destinationFail ⨟ resume: the committed cursor and batch survive the failed send.
+    var failed = false
+    do {
+        _ = try await run.run()
+    } catch {
+        failed = true
+    }
+    #expect(failed)
+    let committedCursor = try await store.transact { try $0.loadCursor(metric: metric) }
+    #expect(committedCursor?.epoch == 1)
+    #expect(try await store.transact { try $0.pendingBatches() }.count == 1)
+    await sink.allowDelivery()
+    _ = try await PendingDeliveryRunner(
+        destination: destination,
+        store: store
+    ).runOnce()
+    #expect(try await store.transact { try $0.pendingBatches() }.isEmpty)
+    #expect(await sink.liveUUIDs() == [uuid])
+
+    // revokeAuth ⨟ grantAuth: per-type state is purged and replay remains idempotent.
+    try await store.purgeType(
+        metric: metric,
+        reason: TypeDisableReason.authorizationRevoked,
+        destination: "property",
+        atEpoch: 2
+    )
+    #expect(try await store.transact { try $0.loadCursor(metric: metric) } == nil)
+    #expect(try await store.transact { try $0.loadTypeStatus(metric: metric) }?.disabled == true)
+    try await store.reenableType(metric: metric, reason: "property_grant")
+    #expect(try await store.transact { try $0.loadTypeStatus(metric: metric) }?.disabled == false)
+    _ = try await run.run()
+    #expect(await sink.liveUUIDs() == [uuid])
+
+    // fillQueue: eviction is oldest-first and every loss is represented by one gap.
+    for index in 1 ... 2 {
+        try await store.transact { tx in
+            try tx.enqueuePending(
+                PendingBatch(
+                    id: BatchID(rawValue: "queue-\(index)"),
+                    payloadURL: root.appendingPathComponent("queue-\(index)").path,
+                    expectedRecords: 1,
+                    byteCount: 8,
+                    metric: metric,
+                    createdAtEpoch: TimeInterval(index)
+                )
+            )
+        }
+    }
+    let evicted = try await store.transact {
+        try QueueAdmission.makeRoom(
+            for: 3,
+            on: $0,
+            policy: QueuePolicy(cap: 10, lowWatermark: 4)
+        )
+    }
+    #expect(evicted.map(\.id.rawValue) == ["queue-1", "queue-2"])
+    #expect(try await store.transact { try $0.loadGaps() }.count == 2)
+
+    // corruptCheckpoint: the engine fails explicitly and never resets to a zero anchor.
+    store.transaction.cursors[metric] = CursorSnapshot(
+        metric: metric,
+        epoch: 9,
+        anchorBlob: Data("not-a-checkpoint".utf8)
+    )
+    var corruptionRejected = false
+    do {
+        _ = try await run.run()
+    } catch {
+        corruptionRejected = true
+    }
+    #expect(corruptionRejected)
+    #expect(store.transaction.cursors[metric]?.epoch == 9)
+    #expect(store.transaction.cursors[metric]?.anchorBlob == Data("not-a-checkpoint".utf8))
 }
