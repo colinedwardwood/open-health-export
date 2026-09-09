@@ -1,6 +1,30 @@
 import CoreDomain
 import Foundation
 
+public enum DisplayUnitPreference: String, Sendable, CaseIterable, Codable {
+    case canonical
+    case metric
+    case usCustomary
+
+    public var label: String {
+        switch self {
+        case .canonical: "Export units"
+        case .metric: "Metric display"
+        case .usCustomary: "US customary display"
+        }
+    }
+}
+
+public struct DisplayMeasurement: Sendable, Equatable {
+    public var value: Double
+    public var unit: String
+
+    public init(value: Double, unit: String) {
+        self.value = value
+        self.unit = unit
+    }
+}
+
 public struct DataBrowserRow: Sendable, Equatable, Identifiable {
     public var id: MetricID { metric }
     public var metric: MetricID
@@ -47,6 +71,8 @@ public struct DataBrowserDetail: Sendable, Equatable {
     public var metric: MetricID
     public var title: String
     public var exportUnit: String
+    public var displayValue: Double?
+    public var displayUnit: String
     public var latest: SampleRecord?
     public var samples: [SampleRecord]
     public var aggregates: [AggregateRecord]
@@ -57,6 +83,8 @@ public struct DataBrowserDetail: Sendable, Equatable {
         metric: MetricID,
         title: String,
         exportUnit: String,
+        displayValue: Double?,
+        displayUnit: String,
         latest: SampleRecord?,
         samples: [SampleRecord],
         aggregates: [AggregateRecord],
@@ -66,6 +94,8 @@ public struct DataBrowserDetail: Sendable, Equatable {
         self.metric = metric
         self.title = title
         self.exportUnit = exportUnit
+        self.displayValue = displayValue
+        self.displayUnit = displayUnit
         self.latest = latest
         self.samples = samples
         self.aggregates = aggregates
@@ -165,7 +195,8 @@ public enum DataBrowser {
         latest: [MetricID: SampleRecord],
         exported: Set<MetricID> = [],
         search: String = "",
-        onlyWithData: Bool = false
+        onlyWithData: Bool = false,
+        displayUnits: DisplayUnitPreference = .canonical
     ) -> [DataBrowserRow] {
         let needle = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return MetricCatalog.all.compactMap { declaration in
@@ -173,8 +204,13 @@ public enum DataBrowser {
             let sample = latest[declaration.id]
             let subtitle: String
             if let sample {
+                let display = displayMeasurement(
+                    sample.value,
+                    unit: declaration.wireUnit,
+                    preference: displayUnits
+                )
                 let source = sample.source.map { " · \($0.name)" } ?? ""
-                subtitle = "\(formatValue(sample.value)) \(declaration.wireUnit) · \(sample.start)\(source)"
+                subtitle = "\(formatValue(display.value)) \(display.unit) · \(sample.start)\(source)"
             } else {
                 subtitle = noDataCopy
             }
@@ -204,6 +240,7 @@ public enum DataBrowser {
         aggregates: [AggregateRecord] = [],
         destinations: [DataBrowserDestination] = [],
         period: DataBrowserPeriod = .month,
+        displayUnits: DisplayUnitPreference = .canonical,
         now: Date
     ) -> DataBrowserDetail? {
         guard let declaration = MetricCatalog.declaration(for: metric) else { return nil }
@@ -223,10 +260,19 @@ public enum DataBrowser {
             ? "\(declaration.cumulative ? "sum" : "mean") · "
                 + "\(declaration.cumulative ? "cumulative" : "discrete") · local day"
             : nil
+        let display = visibleSamples.first.map {
+            displayMeasurement(
+                $0.value,
+                unit: declaration.wireUnit,
+                preference: displayUnits
+            )
+        }
         return DataBrowserDetail(
             metric: metric,
             title: title,
             exportUnit: declaration.wireUnit,
+            displayValue: display?.value,
+            displayUnit: display?.unit ?? declaration.wireUnit,
             latest: visibleSamples.first,
             samples: visibleSamples,
             aggregates: visibleAggregates,
@@ -237,5 +283,41 @@ public enum DataBrowser {
 
     public static func formatValue(_ value: Double) -> String {
         String(format: "%.4g", value)
+    }
+
+    public static func displayMeasurement(
+        _ value: Double,
+        unit: String,
+        preference: DisplayUnitPreference
+    ) -> DisplayMeasurement {
+        let converted: (Double?, String)?
+        switch (preference, unit) {
+        case (.metric, "mg/dL"):
+            converted = (
+                try? UnitMath.millimolesPerLitre(fromMilligramsPerDecilitre: value),
+                "mmol/L"
+            )
+        case (.metric, "mmHg"):
+            converted = (
+                try? UnitMath.kilopascals(fromMillimetresOfMercury: value),
+                "kPa"
+            )
+        case (.usCustomary, "kg"):
+            converted = (try? UnitMath.pounds(fromKilograms: value), "lb")
+        case (.usCustomary, "km"):
+            converted = (try? UnitMath.miles(fromKilometres: value), "mi")
+        case (.usCustomary, "degC"):
+            converted = (try? UnitMath.fahrenheit(fromCelsius: value), "degF")
+        case (.usCustomary, "m"):
+            converted = (try? UnitMath.inches(fromMetres: value), "in")
+        case (.usCustomary, "mL"):
+            converted = (try? UnitMath.fluidOunces(fromMillilitres: value), "fl oz")
+        default:
+            converted = nil
+        }
+        guard let converted, let convertedValue = converted.0 else {
+            return DisplayMeasurement(value: value, unit: unit)
+        }
+        return DisplayMeasurement(value: convertedValue, unit: converted.1)
     }
 }

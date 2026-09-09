@@ -24,8 +24,28 @@ public enum UnitMath {
         try finite(value) * 0.45359237
     }
 
+    public static func pounds(fromKilograms value: Double) throws -> Double {
+        try finite(value) / 0.45359237
+    }
+
     public static func kilometres(fromMiles value: Double) throws -> Double {
         try finite(value) * 1.609344
+    }
+
+    public static func miles(fromKilometres value: Double) throws -> Double {
+        try finite(value) / 1.609344
+    }
+
+    public static func millimolesPerLitre(fromMilligramsPerDecilitre value: Double) throws -> Double {
+        try finite(value) / glucoseMillimolesPerLitreToMilligramsPerDecilitre
+    }
+
+    public static func inches(fromMetres value: Double) throws -> Double {
+        try finite(value) / 0.0254
+    }
+
+    public static func fluidOunces(fromMillilitres value: Double) throws -> Double {
+        try finite(value) / 29.5735295625
     }
 
     public static func kilojoules(fromKilocalories value: Double) throws -> Double {

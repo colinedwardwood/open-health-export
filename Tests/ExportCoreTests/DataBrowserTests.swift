@@ -122,3 +122,26 @@ private func browserSample(
         )
     )
 }
+
+@Test func displayUnitOverridesNeverChangeCanonicalExportValues() {
+    let pounds = DataBrowser.displayMeasurement(
+        10,
+        unit: "kg",
+        preference: .usCustomary
+    )
+    #expect(abs(pounds.value - 22.046_226_218_5) < 0.000_001)
+    #expect(pounds.unit == "lb")
+    let glucose = DataBrowser.displayMeasurement(
+        180.182,
+        unit: "mg/dL",
+        preference: .metric
+    )
+    #expect(abs(glucose.value - 10) < 0.000_001)
+    #expect(glucose.unit == "mmol/L")
+    let canonical = DataBrowser.displayMeasurement(
+        180.182,
+        unit: "mg/dL",
+        preference: .canonical
+    )
+    #expect(canonical == DisplayMeasurement(value: 180.182, unit: "mg/dL"))
+}

@@ -7,3 +7,6 @@ first-run export selection; review persists changes, requests Health permission 
 added types, purges removed types, and drives foreground/background export plus observers.
 The browser now defaults to real Health values and “Only types with data”; synthetic values
 require an explicit demo toggle, while Select mode still exposes every configurable type.
+Users can independently choose canonical export, metric display, or US customary display
+units for weight, distance, temperature, height, water, glucose, and pressure. The detail
+screen names the unchanged canonical export unit whenever display conversion is active.

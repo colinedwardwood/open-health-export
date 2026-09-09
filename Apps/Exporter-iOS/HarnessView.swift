@@ -63,6 +63,8 @@ struct HarnessView: View {
     private var browserOnlyWithData = true
     @AppStorage("ohe.browserDemoMode")
     private var browserDemoMode = false
+    @AppStorage("ohe.displayUnitPreference")
+    private var displayUnitPreference: DisplayUnitPreference = .canonical
     @AppStorage("ohe.advisoryEnabled")
     private var advisoryEnabled = true
     @State private var advisoryBanner: String?
@@ -619,7 +621,8 @@ struct HarnessView: View {
             latest: latest,
             exported: browserSelection,
             search: browserSearch,
-            onlyWithData: browserOnlyWithData && !browserSelecting
+            onlyWithData: browserOnlyWithData && !browserSelecting,
+            displayUnits: displayUnitPreference
         )
         let selectedDetail = selectedBrowserMetric.flatMap { metric in
             let live = liveBrowserSamples[metric]
@@ -635,6 +638,7 @@ struct HarnessView: View {
                 destinations: browserSelection.contains(metric)
                     ? [DataBrowserDestination(name: "Archive folder", lastSent: "demo")]
                     : [],
+                displayUnits: displayUnitPreference,
                 now: detailNow
             )
         }
@@ -733,6 +737,12 @@ struct HarnessView: View {
                     .accessibilityIdentifier("browser-only-with-data")
                 Toggle("Show demo values", isOn: $browserDemoMode)
                     .accessibilityIdentifier("browser-demo-mode")
+                Picker("Display units", selection: $displayUnitPreference) {
+                    ForEach(DisplayUnitPreference.allCases, id: \.self) { preference in
+                        Text(preference.label).tag(preference)
+                    }
+                }
+                .accessibilityIdentifier("browser-display-units")
                 TextField("Search types", text: $browserSearch)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -788,8 +798,15 @@ struct HarnessView: View {
     private func dataBrowserDetail(_ detail: DataBrowserDetail) -> some View {
         if let latest = detail.latest {
             Text("Latest").font(.caption)
-            Text("\(DataBrowser.formatValue(latest.value)) \(detail.exportUnit)")
+            Text(
+                "\(DataBrowser.formatValue(detail.displayValue ?? latest.value)) "
+                    + detail.displayUnit
+            )
                 .accessibilityIdentifier("browser-detail-latest")
+            if detail.displayUnit != detail.exportUnit {
+                Text("Export remains \(detail.exportUnit).")
+                    .font(.footnote)
+            }
             Text(latest.start).font(.footnote)
             Text("Source: \(latest.source?.name ?? "Unknown")").font(.footnote)
         } else {
