@@ -8,7 +8,18 @@ import WireFormat
 
 @main
 struct HAContract {
-    static func main() async throws {
+    static func main() async {
+        do {
+            try await run()
+        } catch {
+            FileHandle.standardError.write(
+                Data("hacontract failed: \(error)\n".utf8)
+            )
+            exit(1)
+        }
+    }
+
+    static func run() async throws {
         guard let raw = ProcessInfo.processInfo.environment["OHE_HA_URL"] else {
             print("hacontract skipped: OHE_HA_URL is unset")
             return
@@ -383,6 +394,9 @@ struct HAWebSocket {
     var base: URL
 
     func statisticsDuringPeriod(entityIDs: [String], token: String) async throws -> [String: [HAStatisticsRow]] {
+        #if os(Linux)
+        return try await statisticsUsingPOSIX(entityIDs: entityIDs, token: token)
+        #else
         guard var components = URLComponents(url: base, resolvingAgainstBaseURL: false) else {
             throw EgressError.invalidURL
         }
@@ -416,6 +430,14 @@ struct HAWebSocket {
             ]
         )
         let result = try await nextResult(task, id: 1)
+        return rows(from: result, entityIDs: entityIDs)
+        #endif
+    }
+
+    private func rows(
+        from result: [String: Any],
+        entityIDs: [String]
+    ) -> [String: [HAStatisticsRow]] {
         let payload = (result["result"] as? [String: Any]) ?? [:]
         var mapped: [String: [HAStatisticsRow]] = [:]
         for id in entityIDs {
@@ -432,6 +454,205 @@ struct HAWebSocket {
         }
         return mapped
     }
+
+    #if os(Linux)
+    private func statisticsUsingPOSIX(
+        entityIDs: [String],
+        token: String
+    ) async throws -> [String: [HAStatisticsRow]] {
+        let host = base.host ?? "127.0.0.1"
+        let port = UInt16(base.port ?? 8123)
+        let stream = POSIXByteStream(
+            endpoint: try StreamEndpoint(host: host, port: port, usesTLS: false)
+        )
+        try await stream.open()
+        let key = Data((0 ..< 16).map { _ in UInt8.random(in: 0 ... 255) })
+            .base64EncodedString()
+        let handshake = [
+            "GET /api/websocket HTTP/1.1",
+            "Host: \(host):\(port)",
+            "Upgrade: websocket",
+            "Connection: Upgrade",
+            "Sec-WebSocket-Key: \(key)",
+            "Sec-WebSocket-Version: 13",
+            "",
+            "",
+        ].joined(separator: "\r\n")
+        try await stream.send(Data(handshake.utf8))
+        var header = Data()
+        while header.range(of: Data("\r\n\r\n".utf8)) == nil {
+            header.append(try await stream.receive(max: 4096))
+            if header.count > 16_384 {
+                throw EgressError.transport("websocket handshake")
+            }
+        }
+        guard let split = header.range(of: Data("\r\n\r\n".utf8)),
+              String(decoding: header[..<split.lowerBound], as: UTF8.self)
+                .contains(" 101 ")
+        else {
+            throw EgressError.transport("websocket upgrade rejected")
+        }
+        var leftover = Data(header[split.upperBound...])
+        let required: [String: Any]
+        do {
+            required = try await nextPOSIXJSON(stream: stream, leftover: &leftover)
+        } catch {
+            throw EgressError.transport("auth-required frame: \(error)")
+        }
+        guard required["type"] as? String == "auth_required" else {
+            throw EgressError.transport("websocket did not request authentication")
+        }
+        try await sendPOSIXJSON(
+            stream: stream,
+            object: ["type": "auth", "access_token": token]
+        )
+        let authed: [String: Any]
+        do {
+            authed = try await nextPOSIXJSON(stream: stream, leftover: &leftover)
+        } catch {
+            throw EgressError.transport("auth response: \(error)")
+        }
+        guard authed["type"] as? String == "auth_ok" else {
+            throw EgressError.transport("websocket auth")
+        }
+        let start = ISO8601DateFormatter().string(
+            from: Date().addingTimeInterval(-6 * 3600)
+        )
+        let end = ISO8601DateFormatter().string(
+            from: Date().addingTimeInterval(3600)
+        )
+        try await sendPOSIXJSON(
+            stream: stream,
+            object: [
+                "id": 1,
+                "type": "recorder/statistics_during_period",
+                "start_time": start,
+                "end_time": end,
+                "statistic_ids": entityIDs,
+                "period": "5minute",
+            ]
+        )
+        let result: [String: Any]
+        do {
+            result = try await nextPOSIXResult(
+                stream: stream,
+                leftover: &leftover,
+                id: 1
+            )
+        } catch {
+            throw EgressError.transport("statistics response: \(error)")
+        }
+        await stream.close()
+        return rows(from: result, entityIDs: entityIDs)
+    }
+
+    private func sendPOSIXJSON(
+        stream: POSIXByteStream,
+        object: [String: Any]
+    ) async throws {
+        let payload = try JSONSerialization.data(withJSONObject: object)
+        try await stream.send(maskedFrame(payload))
+    }
+
+    private func nextPOSIXResult(
+        stream: POSIXByteStream,
+        leftover: inout Data,
+        id: Int
+    ) async throws -> [String: Any] {
+        while true {
+            let object = try await nextPOSIXJSON(stream: stream, leftover: &leftover)
+            if object["type"] as? String == "result",
+               (object["id"] as? Int ?? (object["id"] as? NSNumber)?.intValue) == id {
+                return object
+            }
+        }
+    }
+
+    private func nextPOSIXJSON(
+        stream: POSIXByteStream,
+        leftover: inout Data
+    ) async throws -> [String: Any] {
+        while true {
+            if let frame = decodeFrame(leftover) {
+                leftover.removeSubrange(0 ..< frame.consumed)
+                if frame.opcode == 0x9 {
+                    try await stream.send(maskedFrame(frame.payload, opcode: 0xA))
+                    continue
+                }
+                if frame.opcode == 0x8 {
+                    let reason = frame.payload.count > 2
+                        ? String(decoding: frame.payload.dropFirst(2), as: UTF8.self)
+                        : "no reason"
+                    throw EgressError.transport("websocket closed: \(reason)")
+                }
+                if frame.opcode == 0x1 {
+                    return try JSONSerialization.jsonObject(
+                        with: frame.payload
+                    ) as? [String: Any] ?? [:]
+                }
+                continue
+            }
+            leftover.append(try await stream.receive(max: 4096))
+        }
+    }
+
+    private func maskedFrame(_ payload: Data, opcode: UInt8 = 0x1) -> Data {
+        var frame = Data([0x80 | opcode])
+        let key: [UInt8] = (0 ..< 4).map { _ in UInt8.random(in: 0 ... 255) }
+        if payload.count <= 125 {
+            frame.append(0x80 | UInt8(payload.count))
+        } else if payload.count <= 65_535 {
+            frame.append(0x80 | 126)
+            frame.append(UInt8((payload.count >> 8) & 0xFF))
+            frame.append(UInt8(payload.count & 0xFF))
+        } else {
+            frame.append(0x80 | 127)
+            var length = UInt64(payload.count).bigEndian
+            withUnsafeBytes(of: &length) { frame.append(contentsOf: $0) }
+        }
+        frame.append(contentsOf: key)
+        frame.append(
+            contentsOf: payload.enumerated().map { index, byte in
+                byte ^ key[index % key.count]
+            }
+        )
+        return frame
+    }
+
+    private func decodeFrame(
+        _ buffer: Data
+    ) -> (opcode: UInt8, payload: Data, consumed: Int)? {
+        guard buffer.count >= 2 else { return nil }
+        let bytes = [UInt8](buffer)
+        let opcode = bytes[0] & 0x0F
+        let masked = bytes[1] & 0x80 != 0
+        var length = Int(bytes[1] & 0x7F)
+        var offset = 2
+        if length == 126 {
+            guard buffer.count >= 4 else { return nil }
+            length = Int(bytes[2]) << 8 | Int(bytes[3])
+            offset = 4
+        } else if length == 127 {
+            guard buffer.count >= 10 else { return nil }
+            length = bytes[2 ... 9].reduce(0) { ($0 << 8) | Int($1) }
+            offset = 10
+        }
+        var key: [UInt8] = []
+        if masked {
+            guard buffer.count >= offset + 4 else { return nil }
+            key = Array(bytes[offset ..< offset + 4])
+            offset += 4
+        }
+        guard buffer.count >= offset + length else { return nil }
+        var payload = Array(bytes[offset ..< offset + length])
+        if masked {
+            for index in payload.indices {
+                payload[index] ^= key[index % key.count]
+            }
+        }
+        return (opcode, Data(payload), offset + length)
+    }
+    #endif
 
     private func number(_ value: Any?) -> Double? {
         if value is NSNull { return nil }

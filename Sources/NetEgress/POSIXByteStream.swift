@@ -45,7 +45,9 @@ public actor POSIXByteStream: ByteStream {
             DarwinOrGlibc.recv(fd, raw.baseAddress, raw.count, 0)
         }
         if n == 0 { throw StreamError.closedByPeer }
-        if n < 0 { throw StreamError.transport("recv") }
+        if n < 0 {
+            throw StreamError.transport("recv: \(String(cString: strerror(errno)))")
+        }
         return Data(buffer.prefix(Int(n)))
     }
 
