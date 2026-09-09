@@ -10,10 +10,18 @@ import TestSupport
 import Testing
 import WireFormat
 
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
+
 private func mosquittoURL() -> String? {
     ProcessInfo.processInfo.environment["OHE_MQTT_BROKER"]
 }
 
+@Suite(.serialized)
+struct MosquittoContractTests {
 @Test(.enabled(if: mosquittoURL() != nil))
 func mosquittoQoS1PublishesAndAwaitsPuback() async throws {
     let url = try #require(mosquittoURL())
@@ -70,7 +78,7 @@ func mosquittoQoS0IsUnknownAckOnTheEngine() async throws {
     #expect(outcome.kind == .unknownAck)
 }
 
-private func mosquittoExecutable() -> String? {
+private static func mosquittoExecutable() -> String? {
     let extras = [
         "/opt/homebrew/sbin/mosquitto",
         "/usr/local/sbin/mosquitto",
@@ -88,7 +96,7 @@ private func mosquittoExecutable() -> String? {
     return nil
 }
 
-private func mosquittoPasswdExecutable() -> String? {
+private static func mosquittoPasswdExecutable() -> String? {
     let extras = [
         "/opt/homebrew/bin/mosquitto_passwd",
         "/usr/local/bin/mosquitto_passwd",
@@ -108,12 +116,12 @@ private func mosquittoPasswdExecutable() -> String? {
 
 @Test(
     .enabled(
-        if: mosquittoExecutable() != nil && mosquittoPasswdExecutable() != nil
+        if: Self.mosquittoExecutable() != nil && Self.mosquittoPasswdExecutable() != nil
     )
 )
 func mosquittoQoS1RequiresUsernameAndPassword() async throws {
-    let binary = try #require(mosquittoExecutable())
-    let passwd = try #require(mosquittoPasswdExecutable())
+    let binary = try #require(Self.mosquittoExecutable())
+    let passwd = try #require(Self.mosquittoPasswdExecutable())
     let port = UInt16(21_830 + (ProcessInfo.processInfo.processIdentifier % 1_000))
     let work = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-mosq-auth-\(UUID().uuidString)")
@@ -168,9 +176,9 @@ func mosquittoQoS1RequiresUsernameAndPassword() async throws {
     #expect(receipt.accepted == 1)
 }
 
-@Test(.enabled(if: mosquittoExecutable() != nil))
+@Test(.enabled(if: Self.mosquittoExecutable() != nil))
 func mosquittoQoS1SurvivesBrokerRestart() async throws {
-    let binary = try #require(mosquittoExecutable())
+    let binary = try #require(Self.mosquittoExecutable())
     let port = UInt16(18_830 + (ProcessInfo.processInfo.processIdentifier % 1_000))
     let work = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-mosq-restart-\(UUID().uuidString)")
@@ -234,17 +242,16 @@ func mosquittoQoS1SurvivesBrokerRestart() async throws {
     }
 
     try await publishOnce(clientID: "ohe-r90-restart-1")
-    broker.terminate()
-    broker.waitUntilExit()
+    await stopMosquitto(broker)
     broker = try startBroker()
     try await waitUntilListening()
     try await publishOnce(clientID: "ohe-r90-restart-2")
 }
 
 #if canImport(Network)
-@Test(.enabled(if: mosquittoExecutable() != nil))
+@Test(.enabled(if: Self.mosquittoExecutable() != nil))
 func mosquittoQoS1PublishesOverPinnedTestCATLS() async throws {
-    let binary = try #require(mosquittoExecutable())
+    let binary = try #require(Self.mosquittoExecutable())
     let material = try MosquittoTLSMaterial.generate()
     defer { try? FileManager.default.removeItem(at: material.directory) }
     let port = UInt16(19_830 + (ProcessInfo.processInfo.processIdentifier % 1_000))
@@ -288,9 +295,9 @@ func mosquittoQoS1PublishesOverPinnedTestCATLS() async throws {
     }
 }
 
-@Test(.enabled(if: mosquittoExecutable() != nil))
+@Test(.enabled(if: Self.mosquittoExecutable() != nil))
 func mosquittoQoS1RequiresTheCAIssuedClientCertificate() async throws {
-    let binary = try #require(mosquittoExecutable())
+    let binary = try #require(Self.mosquittoExecutable())
     let material = try MosquittoTLSMaterial.generate()
     defer { try? FileManager.default.removeItem(at: material.directory) }
     let port = UInt16(20_830 + (ProcessInfo.processInfo.processIdentifier % 1_000))
@@ -348,6 +355,7 @@ func mosquittoQoS1RequiresTheCAIssuedClientCertificate() async throws {
     #expect(receipt.accepted == 1)
 }
 #endif
+}
 
 private func startMosquitto(binary: String, conf: URL) throws -> Process {
     let process = Process()
@@ -357,6 +365,41 @@ private func startMosquitto(binary: String, conf: URL) throws -> Process {
     process.standardError = FileHandle.nullDevice
     try process.run()
     return process
+}
+
+private func stopMosquitto(_ process: Process) async {
+    guard process.isRunning else { return }
+    await withCheckedContinuation { continuation in
+        let pid = process.processIdentifier
+        DispatchQueue.global(qos: .userInitiated).async {
+            #if canImport(Darwin)
+            _ = Darwin.kill(pid, SIGTERM)
+            var status: Int32 = 0
+            for _ in 0 ..< 100 {
+                let result = Darwin.waitpid(pid, &status, WNOHANG)
+                if result == pid || (result < 0 && errno == ECHILD) {
+                    continuation.resume()
+                    return
+                }
+                Darwin.usleep(20_000)
+            }
+            _ = Darwin.kill(pid, SIGKILL)
+            #else
+            _ = Glibc.kill(pid, SIGTERM)
+            var status: Int32 = 0
+            for _ in 0 ..< 100 {
+                let result = Glibc.waitpid(pid, &status, WNOHANG)
+                if result == pid || (result < 0 && errno == ECHILD) {
+                    continuation.resume()
+                    return
+                }
+                Glibc.usleep(20_000)
+            }
+            _ = Glibc.kill(pid, SIGKILL)
+            #endif
+            continuation.resume()
+        }
+    }
 }
 
 private func waitForMosquitto(port: UInt16) async throws {

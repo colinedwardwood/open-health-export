@@ -4,6 +4,10 @@ import MetricCatalog
 
 /// Live encodings that ride next to the canonical NDJSON archive (R-12).
 public enum NativeSidecars {
+    private struct QuantityValue: Decodable {
+        let value: Double
+    }
+
     public static func quantitySamples(fromNDJSON data: Data) throws -> [SampleRecord] {
         try parse(data).samples
     }
@@ -74,6 +78,13 @@ public enum NativeSidecars {
                 let resolved = MetricCatalog.all.first { $0.wireId == wireId }?.id
                     ?? MetricID(rawValue: wireId)
                 if metric == nil { metric = resolved }
+                // Foundation JSONSerialization rounds some 17-digit decimals to
+                // the adjacent Double on Linux. JSONDecoder uses correctly-rounded
+                // binary64 conversion and preserves the canonical wire value.
+                let quantity = try JSONDecoder().decode(
+                    QuantityValue.self,
+                    from: Data(line.utf8)
+                )
                 samples.append(
                     SampleRecord(
                         key: RecordKey(uuid: object["uuid"] as? String ?? ""),
@@ -84,7 +95,7 @@ public enum NativeSidecars {
                         timeZoneSource: TimeZoneSource(
                             rawValue: object["tzSource"] as? String ?? "unknown"
                         ) ?? .unknown,
-                        value: (object["value"] as? NSNumber)?.doubleValue ?? 0,
+                        value: quantity.value,
                         unit: CanonicalUnit(symbol: object["unit"] as? String ?? ""),
                         observedAt: object["observedAt"] as? String ?? ""
                     )
