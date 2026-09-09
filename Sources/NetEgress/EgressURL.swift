@@ -17,10 +17,17 @@ public struct OutboundHTTPRequest: Sendable {
 public struct OutboundHTTPResponse: Sendable {
     public var status: Int
     public var body: Data
+    public var headers: [String: String]
 
-    public init(status: Int, body: Data) {
+    public init(status: Int, body: Data, headers: [String: String] = [:]) {
         self.status = status
         self.body = body
+        self.headers = headers
+    }
+
+    public func header(_ name: String) -> String? {
+        let wanted = name.lowercased()
+        return headers.first { $0.key.lowercased() == wanted }?.value
     }
 }
 
@@ -41,8 +48,34 @@ public enum EgressError: Error, Equatable {
     case notAllowlisted(String)
     case notHTTP
     case httpStatus(Int)
+    case httpRetryAfter(status: Int, seconds: TimeInterval)
     case transport(String)
     case pinMismatch
+}
+
+/// RFC 9110 `Retry-After`: delta-seconds or HTTP-date, capped at 24 hours.
+public enum HTTPRetryAfter {
+    public static let maximum: TimeInterval = 24 * 60 * 60
+
+    public static func parseDelta(_ raw: String?) -> TimeInterval? {
+        guard let raw else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let seconds = TimeInterval(trimmed) else { return nil }
+        return min(max(0, seconds), maximum)
+    }
+
+    public static func parse(_ raw: String?, now: Date) -> TimeInterval? {
+        if let delta = parseDelta(raw) { return delta }
+        guard let raw else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        guard let date = formatter.date(from: trimmed) else { return nil }
+        return min(max(0, date.timeIntervalSince(now)), maximum)
+    }
 }
 
 /// Parse and authorize a destination URL before any DNS or connect (R-32 step 1).

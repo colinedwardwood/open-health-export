@@ -82,10 +82,13 @@ struct HarnessView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     Text(status)
                         .font(.body)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                         .accessibilityLabel("Status: \(status)")
 
                     Text("Time to first screen: \(timeToFirstFrameMS, specifier: "%.0f") ms (foreground; R-73 is a background-launch budget).")
                         .font(.footnote)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     if phase == .disclosure {
                         disclosure
@@ -186,8 +189,11 @@ struct HarnessView: View {
             Text("Before Health access")
                 .font(.headline)
             Text("This is not a medical device. It does not diagnose or treat anything.")
+                .fixedSize(horizontal: false, vertical: true)
             Text("When the phone is locked, Apple withholds Health data after a short window. Background export is best-effort: iOS may not wake the app, and we will say so instead of pretending a schedule ran.")
+                .fixedSize(horizontal: false, vertical: true)
             Text("You choose what is read. We do not hide destinations, and we do not send telemetry to the maintainers.")
+                .fixedSize(horizontal: false, vertical: true)
             Button("I understand — continue") {
                 disclosureAcknowledged = true
                 phase = .ready
@@ -209,6 +215,7 @@ struct HarnessView: View {
 
             Text("This is not a medical device. It does not diagnose or treat anything.")
                 .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
 
             Button("Run R-70 (one anchored page per type)") {
                 Task { await runR70() }
@@ -809,14 +816,18 @@ struct HarnessView: View {
                         Text(preference.label).tag(preference)
                     }
                 }
+                .accessibilityLabel("Display units")
                 .accessibilityIdentifier("browser-display-units")
                 TextField("Search types", text: $browserSearch)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
+                    .accessibilityLabel("Search types")
                     .accessibilityIdentifier("browser-search")
                 if rows.isEmpty {
                     Text("No data types match your search.")
                         .font(.footnote)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityLabel("No data types match your search.")
                         .accessibilityIdentifier("browser-empty")
                 }
                 ForEach(rows) { row in
@@ -840,6 +851,7 @@ struct HarnessView: View {
                                     Image(systemName: browserSelection.contains(row.metric)
                                         ? "checkmark.circle.fill"
                                         : "circle")
+                                        .accessibilityHidden(true)
                                 }
                                 Text(row.title)
                                 if row.sensitive {
@@ -851,9 +863,11 @@ struct HarnessView: View {
                             Text(row.subtitle)
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     .buttonStyle(.plain)
+                    .accessibilityElement(children: .ignore)
                     .accessibilityLabel("\(row.title), \(row.subtitle)")
                     .accessibilityIdentifier("browser-row-\(row.metric.rawValue)")
                 }

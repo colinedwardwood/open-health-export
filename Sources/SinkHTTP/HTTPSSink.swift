@@ -61,14 +61,23 @@ public struct HTTPSSink: DestinationSink, Sendable {
             try FileWriteKit.writeAtomically(Data(rendered.utf8), to: renderedURL)
             bodyFile = renderedURL
         }
+        let uncompressed = try Data(contentsOf: bodyFile)
+        let gzipped = try Gzip.compress(uncompressed)
+        let gzipURL = bodyFile.deletingLastPathComponent()
+            .appendingPathComponent("\(idempotencyKey.rawValue).gz")
+        try FileWriteKit.writeAtomically(gzipped, to: gzipURL)
+        headers["Content-Encoding"] = "gzip"
         let request = OutboundHTTPRequest(
             method: "POST",
             url: destination.url,
             headers: headers,
-            bodyFile: bodyFile
+            bodyFile: gzipURL
         )
         let response = try await transport.execute(request)
         guard (200..<300).contains(response.status) else {
+            if let seconds = HTTPRetryAfter.parseDelta(response.header("Retry-After")) {
+                throw EgressError.httpRetryAfter(status: response.status, seconds: seconds)
+            }
             throw EgressError.httpStatus(response.status)
         }
         if let accepted = parseAccepted(response.body) {

@@ -66,6 +66,7 @@ import WireFormat
     #expect(requests[0].method == "POST")
     #expect(requests[0].headers["Idempotency-Key"] == batchID.rawValue)
     #expect(requests[0].headers["Content-Type"] == "application/x-ndjson; profile=\"ohe.wire/1\"")
+    #expect(requests[0].headers["Content-Encoding"] == "gzip")
 }
 
 @Test func duplicateHTTPSDeliveryConvergesAtTheReceiver() async throws {
@@ -92,7 +93,10 @@ private actor ConvergingHTTPReceiver: HTTPTransport {
     func execute(_ request: OutboundHTTPRequest) async throws -> OutboundHTTPResponse {
         deliveries += 1
         let key = request.headers["Idempotency-Key"] ?? ""
-        let body = try Data(contentsOf: request.bodyFile)
+        var body = try Data(contentsOf: request.bodyFile)
+        if request.headers["Content-Encoding"] == "gzip" {
+            body = try Gzip.decompress(body)
+        }
         if let existing = stored[key] {
             guard existing == body else {
                 return OutboundHTTPResponse(status: 409, body: Data())
@@ -237,7 +241,8 @@ private actor ConvergingHTTPReceiver: HTTPTransport {
     let requests = await transport.requests
     #expect(requests[0].url.host == "ha.example")
     #expect(requests[0].url.path == "/api/webhook/ohe")
-    let body = String(decoding: try Data(contentsOf: requests[0].bodyFile), as: UTF8.self)
+    let gzipped = try Data(contentsOf: requests[0].bodyFile)
+    let body = String(decoding: try Gzip.decompress(gzipped), as: UTF8.self)
     #expect(body.contains("\"batch\":\"0192f3c1-0000-0000-0000-000000000001\""))
     #expect(body.contains("\"count\":1"))
 }
@@ -440,5 +445,41 @@ private func writeHTTPSPayload() throws -> (URL, BatchID) {
             allowedHosts: ["other.example"],
             allowInsecureHTTP: true
         )
+    }
+}
+
+@Test func gzipRoundTripsAndHTTPSBodiesAreGzipEncoded() throws {
+    let original = Data((0..<4_000).map { UInt8($0 % 251) })
+    let compressed = try Gzip.compress(original)
+    #expect(try Gzip.decompress(compressed) == original)
+    #expect(compressed.count < original.count)
+}
+
+@Test func httpRetryAfterParsesDeltaSecondsAndHTTPDate() {
+    #expect(HTTPRetryAfter.parse("30", now: Date(timeIntervalSince1970: 0)) == 30)
+    #expect(HTTPRetryAfter.parse("100000", now: Date(timeIntervalSince1970: 0)) == HTTPRetryAfter.maximum)
+    let now = Date(timeIntervalSince1970: 1_000)
+    #expect(
+        HTTPRetryAfter.parse("Thu, 01 Jan 1970 00:16:50 GMT", now: now) == 10
+    )
+    #expect(HTTPRetryAfter.parse("nope", now: now) == nil)
+}
+
+@Test func httpsHonoursRetryAfterOnTransientFailure() async throws {
+    let (file, batchID) = try writeHTTPSPayload()
+    let transport = RecordingHTTPTransport(
+        response: OutboundHTTPResponse(
+            status: 429,
+            body: Data(),
+            headers: ["Retry-After": "120"]
+        )
+    )
+    let destination = try HTTPSDestination(
+        urlString: "https://ha.example/ingest",
+        allowedHosts: ["ha.example"]
+    )
+    let sink = HTTPSSink(destination: destination, transport: transport)
+    await #expect(throws: EgressError.httpRetryAfter(status: 429, seconds: 120)) {
+        _ = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
     }
 }

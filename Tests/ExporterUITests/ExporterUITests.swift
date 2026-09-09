@@ -149,7 +149,7 @@ final class ExporterUITests: XCTestCase {
 
     @discardableResult
     private func scrollToHittable(_ element: XCUIElement) -> XCUIElement {
-        for _ in 0 ..< 12 where !element.isHittable {
+        for _ in 0 ..< 40 where !element.isHittable {
             app.swipeUp()
         }
         XCTAssertTrue(element.isHittable)

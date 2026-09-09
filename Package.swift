@@ -25,7 +25,10 @@ let linuxCore: [Target] = [
     .target(name: "CorrectnessEngine", dependencies: ["EnginePorts", "MetricCatalog", "CoreDomain", "CoreTemporal", "WireFormat", "FileWriteKit", "DestinationTrust", "Watchdog", "RunJournal"]),
     .target(name: "Watchdog", dependencies: ["EnginePorts", "CoreDomain", "CoreTemporal"]),
     .target(name: "DiagnosticBundle", dependencies: ["EnginePorts", "Redaction", "CoreDomain"]),
-    .target(name: "FileWriteKit"),
+    .target(
+        name: "FileWriteKit",
+        linkerSettings: [.linkedLibrary("z")]
+    ),
     .target(name: "SinkLocalFile", dependencies: ["EnginePorts", "FileWriteKit", "CoreDomain", "WireFormat", "DestinationTrust"]),
     .target(name: "NetEgress", dependencies: ["WireFormat", "EnginePorts", "RunJournal"]),
     .target(name: "DestinationTrust", dependencies: ["EnginePorts", "NetEgress"]),

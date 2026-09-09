@@ -4,11 +4,19 @@ import FoundationNetworking
 #endif
 
 /// The only type in ExportCore allowed to talk to `URLSession` (R-32).
-public struct URLSessionHTTPTransport: HTTPTransport {
+public final class URLSessionHTTPTransport: HTTPTransport, @unchecked Sendable {
     private let session: URLSession
+    private let redirects: DenyHTTPRedirects
 
-    public init(session: URLSession = .shared) {
-        self.session = session
+    public init() {
+        let redirects = DenyHTTPRedirects()
+        self.redirects = redirects
+        let configuration = URLSessionConfiguration.ephemeral
+        session = URLSession(
+            configuration: configuration,
+            delegate: redirects,
+            delegateQueue: nil
+        )
     }
 
     public func execute(_ request: OutboundHTTPRequest) async throws -> OutboundHTTPResponse {
@@ -23,7 +31,26 @@ public struct URLSessionHTTPTransport: HTTPTransport {
         guard let http = response as? HTTPURLResponse else {
             throw EgressError.notHTTP
         }
-        return OutboundHTTPResponse(status: http.statusCode, body: data)
+        var headers: [String: String] = [:]
+        for (key, value) in http.allHeaderFields {
+            if let name = key as? String, let text = value as? String {
+                headers[name] = text
+            }
+        }
+        return OutboundHTTPResponse(status: http.statusCode, body: data, headers: headers)
+    }
+}
+
+/// Redirects are not followed: a 3xx host is not re-checked against the allowlist (T-04).
+final class DenyHTTPRedirects: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        completionHandler(nil)
     }
 }
 
