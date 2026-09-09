@@ -30,6 +30,20 @@ public enum EscalationCopy {
         "Export is overdue. Notifications are off — use the widget."
 }
 
+public enum OverdueNotificationSchedule {
+    public static func fireEpoch(
+        snapshot: DestinationStatusSnapshot
+    ) -> TimeInterval? {
+        guard snapshot.enabled,
+              let lastSuccess = snapshot.lastSuccessEpoch,
+              let threshold = snapshot.overdueThresholdSeconds
+        else {
+            return nil
+        }
+        return lastSuccess + threshold
+    }
+}
+
 public enum Escalation {
     public static func plan(
         snapshot: DestinationStatusSnapshot,

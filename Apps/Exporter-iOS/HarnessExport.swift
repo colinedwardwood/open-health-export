@@ -178,6 +178,7 @@ enum HarnessExport {
 
         var lines: [String] = []
         for metric in metrics {
+            let snapshotURL = StatusSnapshotLocation.url(destinationID: "local-file")
             let run = ExportRun(
                 source: source,
                 destination: verified,
@@ -195,7 +196,7 @@ enum HarnessExport {
                 statistics: statistics,
                 observations: observations,
                 trigger: trigger,
-                snapshotURL: StatusSnapshotLocation.url(destinationID: "local-file"),
+                snapshotURL: snapshotURL,
                 externalStatusURL: dest.appendingPathComponent("status.json"),
                 ledgerHeadSeal: ledgerSeal,
                 ledgerSealURL: ledgerSealURL
@@ -203,6 +204,10 @@ enum HarnessExport {
             let outcome = try await run.run()
             WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
             lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
+            if (outcome.kind == .success || outcome.kind == .successNothingDue),
+               let snapshotURL {
+                await rescheduleOverdueNotification(snapshotURL: snapshotURL)
+            }
 
             let reconcile = ReconcileSweep(
                 observations: observations,
@@ -220,13 +225,17 @@ enum HarnessExport {
                 temporal: context,
                 statistics: statistics,
                 trigger: trigger,
-                snapshotURL: StatusSnapshotLocation.url(destinationID: "local-file"),
+                snapshotURL: snapshotURL,
                 externalStatusURL: dest.appendingPathComponent("status.json"),
                 ledgerHeadSeal: ledgerSeal,
                 ledgerSealURL: ledgerSealURL
             )
             let reconciled = try await reconcile.run(throughDay: String(now.prefix(10)))
             lines.append("\(metric.rawValue) reconcile: \(reconciled.kind.rawValue)")
+            if (reconciled.kind == .success || reconciled.kind == .successNothingDue),
+               let snapshotURL {
+                await rescheduleOverdueNotification(snapshotURL: snapshotURL)
+            }
         }
         let newQueueGap = try await store.transact {
             try $0.loadGaps().contains {
@@ -241,6 +250,13 @@ enum HarnessExport {
         }
         lines.append("Files: \(dest.path)")
         return lines
+    }
+
+    private static func rescheduleOverdueNotification(snapshotURL: URL) async {
+        guard let snapshot = try? DestinationSnapshotFile.read(from: snapshotURL) else {
+            return
+        }
+        _ = try? await LocalUserNotifier().rescheduleExportOverdue(snapshot: snapshot)
     }
 
     static func runFullReconcile(

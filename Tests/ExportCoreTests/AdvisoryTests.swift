@@ -209,6 +209,20 @@ private let checkInstant = Date(timeIntervalSince1970: 1_767_225_600) // 2026-01
     #expect(AdvisoryStaleness.staleCopy == "security advisories are stale")
 }
 
+@Test func overdueNotificationScheduleUsesLastSuccessAndNeverInventsAThreshold() {
+    var snapshot = DestinationStatusSnapshot(
+        destinationID: "local-file",
+        enabled: true,
+        lastSuccessEpoch: 1_000,
+        writtenAtEpoch: 1_000
+    )
+    #expect(OverdueNotificationSchedule.fireEpoch(snapshot: snapshot) == nil)
+    snapshot.overdueThresholdSeconds = 3_600
+    #expect(OverdueNotificationSchedule.fireEpoch(snapshot: snapshot) == 4_600)
+    snapshot.enabled = false
+    #expect(OverdueNotificationSchedule.fireEpoch(snapshot: snapshot) == nil)
+}
+
 @Test func watchdogEscalatesOnWidgetWhenNotificationsAreDenied() async throws {
     let snapshot = DestinationStatusSnapshot(
         destinationID: "local-file",
