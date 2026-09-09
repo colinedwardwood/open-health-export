@@ -1,0 +1,69 @@
+name: Release gate
+description: Evidence checklist required before publishing a release
+title: "Release: "
+labels:
+  - release
+body:
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      placeholder: v1.2.3
+    validations:
+      required: true
+  - type: input
+    id: wire-version
+    attributes:
+      label: Wire specification version
+      placeholder: spec/v1.0.0
+    validations:
+      required: true
+  - type: input
+    id: ha-version
+    attributes:
+      label: Home Assistant integration version
+      placeholder: ha/v0.3.0 or unchanged
+    validations:
+      required: true
+  - type: textarea
+    id: qa-evidence
+    attributes:
+      label: QA evidence
+      description: Link device pass, soak, canary, energy, accessibility, performance, migration, P0/P1, and flake evidence.
+    validations:
+      required: true
+  - type: textarea
+    id: compliance-evidence
+    attributes:
+      label: Compliance evidence
+      description: Name the reviewers and link the R-109/R-111 sign-offs.
+    validations:
+      required: true
+  - type: textarea
+    id: provenance-evidence
+    attributes:
+      label: Provenance and stranger-test evidence
+      description: Link BUILDINFO, SBOM, attestations, clean build-from-source result, and last-good tag.
+    validations:
+      required: true
+  - type: checkboxes
+    id: gates
+    attributes:
+      label: Required gates
+      options:
+        - label: All three version streams and compatibility metadata are correct.
+          required: true
+        - label: Required CI, container contracts, upstream canaries, and spec-freeze checks are green.
+          required: true
+        - label: Device, soak, accessibility, performance, migration, and flake evidence is attached.
+          required: true
+        - label: There are no open P0 or P1 defects accepted into this release.
+          required: true
+        - label: Privacy manifests, licences, store copy, disclaimers, SBOM, and attestations were reviewed.
+          required: true
+        - label: Both named compliance reviewers approved the release.
+          required: true
+        - label: A different maintainer completed the clean build-from-source stranger test.
+          required: true
+        - label: Roll-forward instructions and the last-good tag are recorded.
+          required: true

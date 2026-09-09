@@ -5,3 +5,5 @@ enum/measurement entity is excluded. QoS 0 stays `unknownAck`. TLS MQTTS
 remains Darwin-only until a portable TLS stream exists. The HA WebSocket uses
 Foundation on Darwin and an RFC 6455 POSIX path on Linux, where
 FoundationNetworking's libcurl build does not support WebSockets.
+Both the current and oldest supported Home Assistant pins now gate pull
+requests instead of leaving the lower compatibility bound to the schedule.

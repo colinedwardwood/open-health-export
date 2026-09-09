@@ -40,6 +40,29 @@ private func sampleFeed(seq: Int = 1, keyID: String = AdvisoryPinnedKeys.activeI
 
 private let checkInstant = Date(timeIntervalSince1970: 1_767_225_600) // 2026-01-02T00:00:00Z
 
+private actor ToggleDestinationSink: DestinationSink {
+    private var failing = true
+
+    func allowDelivery() {
+        failing = false
+    }
+
+    func send(
+        fileHandle: String,
+        idempotencyKey: BatchID
+    ) async throws -> DeliveryReceipt {
+        if failing {
+            throw DestinationSendError.destinationUnreachable
+        }
+        let text = try String(contentsOfFile: fileHandle, encoding: .utf8)
+        return DeliveryReceipt(
+            batchID: idempotencyKey,
+            accepted: max(0, text.split(whereSeparator: \.isNewline).count - 2),
+            statusOnly: false
+        )
+    }
+}
+
 @Test func hmacSHA256MatchesRFC4231Case1() {
     let key = Data(repeating: 0x0b, count: 20)
     let message = Data("Hi There".utf8)
@@ -242,6 +265,93 @@ private let checkInstant = Date(timeIntervalSince1970: 1_767_225_600) // 2026-01
             currentlyDenied: false
         )
     )
+}
+
+@Test func missedWindowsKeepOneOverdueDeadlineAndSuccessClearsStaleness() async throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-staleness-integration-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let snapshotURL = root.appendingPathComponent("status.json")
+    try DestinationSnapshotFile.write(
+        DestinationStatusSnapshot(
+            destinationID: "test",
+            enabled: true,
+            state: .healthy,
+            lastOutcome: "success",
+            lastSuccessEpoch: 1_000,
+            overdueThresholdSeconds: 100,
+            writtenAtEpoch: 1_000
+        ),
+        to: snapshotURL
+    )
+    let initial = try DestinationSnapshotFile.read(from: snapshotURL)
+    let initialDeadline = try #require(
+        OverdueNotificationSchedule.fireEpoch(snapshot: initial)
+    )
+    #expect(initialDeadline == 1_100)
+
+    let metric = MetricCatalog.heartRate.id
+    let pages = (1 ... 3).map { index in
+        SamplePage(
+            samples: [
+                SampleRecord(
+                    key: RecordKey(uuid: String(format: "00000000-0000-4000-8000-%012d", index)),
+                    metric: metric,
+                    start: "2026-01-01T00:0\(index):00Z",
+                    end: "2026-01-01T00:0\(index):00Z",
+                    timeZoneOffsetMinutes: 0,
+                    timeZoneSource: .unknown,
+                    value: Double(70 + index),
+                    unit: CanonicalUnit(symbol: "bpm"),
+                    observedAt: "2026-01-01T00:0\(index):00Z"
+                ),
+            ],
+            tombstones: [],
+            metric: metric,
+            anchorBlob: Data([UInt8(index)]),
+            observedThrough: Date(timeIntervalSince1970: TimeInterval(index))
+        )
+    }
+    let store = MemoryStateStore()
+    let sink = ToggleDestinationSink()
+    var registeredDeadlines: Set<TimeInterval> = [initialDeadline]
+    for instant in [1_200.0, 1_250.0] {
+        let outcome = try await ExportRun(
+            source: FixtureSource(pages: pages),
+            destination: .testing(sink),
+            store: store,
+            metric: metric,
+            scratchDirectory: root.appendingPathComponent("scratch-\(Int(instant))"),
+            envelope: testEnvelope(),
+            clock: FrozenClock(instant: Date(timeIntervalSince1970: instant)),
+            snapshotURL: snapshotURL
+        ).run()
+        #expect(outcome.kind == .failed)
+        let snapshot = try DestinationSnapshotFile.read(from: snapshotURL)
+        #expect(snapshot.state(at: instant) == .overdue)
+        registeredDeadlines.insert(
+            try #require(OverdueNotificationSchedule.fireEpoch(snapshot: snapshot))
+        )
+    }
+    #expect(registeredDeadlines == [1_100])
+
+    await sink.allowDelivery()
+    let recoveredAt = 1_300.0
+    let recovered = try await ExportRun(
+        source: FixtureSource(pages: pages),
+        destination: .testing(sink),
+        store: store,
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch-recovered"),
+        envelope: testEnvelope(),
+        clock: FrozenClock(instant: Date(timeIntervalSince1970: recoveredAt)),
+        snapshotURL: snapshotURL
+    ).run()
+    #expect(recovered.kind == .success)
+    let healthy = try DestinationSnapshotFile.read(from: snapshotURL)
+    #expect(healthy.state(at: recoveredAt) == .healthy)
+    #expect(OverdueNotificationSchedule.fireEpoch(snapshot: healthy) == 1_400)
 }
 
 @Test func watchdogEscalatesOnWidgetWhenNotificationsAreDenied() async throws {

@@ -341,6 +341,7 @@ public struct ExportRun: Sendable {
         try DestinationSnapshotFile.write(
             DestinationStatusSnapshot(
                 destinationID: destinationName,
+                destinationLabel: prior?.destinationLabel ?? destinationName,
                 enabled: true,
                 lastOutcome: outcome.kind.rawValue,
                 lastSuccessEpoch: succeeded ? now : prior?.lastSuccessEpoch,
@@ -349,6 +350,10 @@ public struct ExportRun: Sendable {
                 attribution: ExternalStatusRecord.attribution(for: trigger),
                 attributionConfidence: "evidenced",
                 errorClass: tally.terminalError.rawValue,
+                staleThresholdSeconds: prior?.staleThresholdSeconds,
+                overdueThresholdSeconds: prior?.overdueThresholdSeconds,
+                nextAttemptEarliestEpoch: prior?.nextAttemptEarliestEpoch,
+                nextAttemptLatestEpoch: prior?.nextAttemptLatestEpoch,
                 unacknowledgedSecurityEventCount:
                     prior?.unacknowledgedSecurityEventCount ?? 0,
                 writtenAtEpoch: now

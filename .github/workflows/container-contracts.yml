@@ -64,7 +64,6 @@ jobs:
           OHE_HA_WAIT_SECONDS: "480"
         run: swift run hacontract
   home-assistant-oldest:
-    if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

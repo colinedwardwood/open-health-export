@@ -9,3 +9,6 @@ cancels and reschedules the overdue notification from the persisted destination 
 before R-71 supplies that threshold, no deadline is invented. Foreground launches probe
 notification settings and ledger only the transition to denied as a suppression security
 event, incrementing destination snapshots so the in-app and widget paths remain honest.
+Export and reconcile snapshot rewrites preserve configured thresholds and retry windows;
+a synthetic-clock integration now proves repeated missed windows retain one overdue
+deadline and the next success clears staleness.

@@ -6,7 +6,7 @@ concurrency:
   group: macos-build-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  darwin:
+  build-from-source-clean:
     runs-on: macos-26
     timeout-minutes: 15
     steps:
