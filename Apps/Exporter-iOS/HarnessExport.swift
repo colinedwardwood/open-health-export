@@ -557,8 +557,14 @@ enum HarnessExport {
     }
 
     @MainActor
-    static func diagnosticBundle() throws -> (preview: String, payload: Data) {
-        let assembler = BundleAssembler()
+    static func diagnosticBundle(
+        minimumRuns: Int = 30,
+        windowHours: Int = 24
+    ) throws -> (preview: String, payload: Data) {
+        let assembler = BundleAssembler(
+            maxRuns: minimumRuns,
+            windowSeconds: TimeInterval(windowHours) * 60 * 60
+        )
         let root = try applicationSupportRoot()
         let journal = SQLiteDiagnosticReader.read(
             path: root.appendingPathComponent("state.sqlite").path,

@@ -32,6 +32,10 @@ struct HarnessView: View {
     @State private var diagnosticPayload: Data?
     @State private var diagnosticGate = DiagnosticPreviewGate()
     @State private var diagnosticShareURL: URL?
+    @AppStorage("ohe.diagnosticMinimumRuns")
+    private var diagnosticMinimumRuns = 30
+    @AppStorage("ohe.diagnosticWindowHours")
+    private var diagnosticWindowHours = 24
     @State private var destinationStatusLines: [String] = []
     @State private var ledgerLines: [String] = []
     @State private var ledgerWarning = ""
@@ -341,6 +345,18 @@ struct HarnessView: View {
 
             Text("Diagnostics")
                 .font(.headline)
+            Stepper(
+                "Include at least \(diagnosticMinimumRuns) recent runs",
+                value: $diagnosticMinimumRuns,
+                in: 1 ... 100
+            )
+            .accessibilityIdentifier("diagnostic-minimum-runs")
+            Stepper(
+                "Include runs from \(diagnosticWindowHours) hours",
+                value: $diagnosticWindowHours,
+                in: 1 ... 168
+            )
+            .accessibilityIdentifier("diagnostic-window-hours")
             Button("Build diagnostic bundle") {
                 buildDiagnostic()
             }
@@ -406,7 +422,10 @@ struct HarnessView: View {
         diagnosticShareURL = nil
         diagnosticGate = DiagnosticPreviewGate()
         do {
-            let built = try HarnessExport.diagnosticBundle()
+            let built = try HarnessExport.diagnosticBundle(
+                minimumRuns: diagnosticMinimumRuns,
+                windowHours: diagnosticWindowHours
+            )
             diagnosticPreview = built.preview
             diagnosticPayload = built.payload
             status = "Ready. Read the diagnostic JSON. Share appears only after you confirm."
