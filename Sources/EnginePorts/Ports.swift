@@ -406,6 +406,7 @@ public struct UserNotice: Sendable, Equatable {
         case destinationRepointed
         case destinationEnabled
         case destinationTrustLost
+        case queueEvicted
         case queueExpired
         case exportOverdue
     }

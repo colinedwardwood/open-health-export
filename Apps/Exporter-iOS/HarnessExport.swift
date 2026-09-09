@@ -158,6 +158,9 @@ enum HarnessExport {
         try fm.createDirectory(at: scratch, withIntermediateDirectories: true)
 
         let store = try SQLiteStateStore(path: sqliteURL.path)
+        let gapIDsBefore = try await store.transact {
+            Set(try $0.loadGaps().map(\.batchID))
+        }
         let (verified, events) = try verifiedLocalFile(root: root, destinationDirectory: dest)
         try await emitTrustNotices(events)
         let context = TemporalContext(
@@ -224,6 +227,17 @@ enum HarnessExport {
             )
             let reconciled = try await reconcile.run(throughDay: String(now.prefix(10)))
             lines.append("\(metric.rawValue) reconcile: \(reconciled.kind.rawValue)")
+        }
+        let newQueueGap = try await store.transact {
+            try $0.loadGaps().contains {
+                !gapIDsBefore.contains($0.batchID)
+                    && $0.rangeDescription.hasPrefix("queue_eviction:")
+            }
+        }
+        if newQueueGap {
+            _ = try await LocalUserNotifier().notify(
+                UserNotice(kind: .queueEvicted, destination: "Configured destinations")
+            )
         }
         lines.append("Files: \(dest.path)")
         return lines

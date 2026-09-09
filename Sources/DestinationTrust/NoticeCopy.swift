@@ -44,6 +44,11 @@ public enum NoticeCopy {
                 title: "Destination unpaired",
                 body: "\(notice.destination) is no longer trusted. Export is halted."
             )
+        case .queueEvicted:
+            return LocalizedNotice(
+                title: "Queued export data removed",
+                body: "\(notice.destination) reached its storage limit. Open Data gaps to re-export the affected date range."
+            )
         case .queueExpired:
             return LocalizedNotice(
                 title: "Queued exports expired",
