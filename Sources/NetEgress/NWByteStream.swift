@@ -271,31 +271,17 @@ public actor NWByteStream: ByteStream {
         sec_protocol_options_set_verify_block(security, { metadata, trustRef, complete in
             let trust = sec_trust_copy_ref(trustRef).takeRetainedValue()
             guard
-                let chain = SecTrustCopyCertificateChain(trust) as? [SecCertificate],
-                let leaf = chain.first,
-                let leafSPKI = try? SPKIDigest.sha256Hex(certificateDER: SecCertificateCopyData(leaf) as Data)
+                var identity = TLSIdentity.fromServerTrust(trust, host: host)
             else {
                 complete(false)
                 return
             }
-            let issuer = chain.dropFirst().first
-            let issuerSPKI = issuer
-                .flatMap { try? SPKIDigest.sha256Hex(certificateDER: SecCertificateCopyData($0) as Data) }
-            let identity = TLSIdentity(
-                leafSPKISha256: leafSPKI,
-                issuerSPKISha256: issuerSPKI ?? "",
-                tlsVersion: Self.versionName(sec_protocol_metadata_get_negotiated_tls_protocol_version(metadata)),
-                cipherSuite: String(
-                    format: "0x%04X",
-                    sec_protocol_metadata_get_negotiated_tls_ciphersuite(metadata).rawValue
-                ),
-                leafSubject: SecCertificateCopySubjectSummary(leaf) as String? ?? host,
-                leafIssuer: issuer.flatMap { SecCertificateCopySubjectSummary($0) as String? } ?? "",
-                notBefore: "",
-                notAfter: "",
-                resolvedAddress: "",
-                addressClass: .unknown,
-                trustAnchorKind: "systemTrustStore"
+            identity.tlsVersion = Self.versionName(
+                sec_protocol_metadata_get_negotiated_tls_protocol_version(metadata)
+            )
+            identity.cipherSuite = String(
+                format: "0x%04X",
+                sec_protocol_metadata_get_negotiated_tls_ciphersuite(metadata).rawValue
             )
             observation.set(identity)
             if let pin {

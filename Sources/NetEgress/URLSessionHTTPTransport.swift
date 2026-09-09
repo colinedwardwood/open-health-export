@@ -2,19 +2,22 @@ import Foundation
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
+#if canImport(Security)
+import Security
+#endif
 
 /// The only type in ExportCore allowed to talk to `URLSession` (R-32).
 public final class URLSessionHTTPTransport: HTTPTransport, @unchecked Sendable {
     private let session: URLSession
-    private let redirects: DenyHTTPRedirects
+    private let delegate: HTTPSessionDelegate
 
-    public init() {
-        let redirects = DenyHTTPRedirects()
-        self.redirects = redirects
+    public init(pin: PinRecord? = nil) {
+        let delegate = HTTPSessionDelegate(pin: pin)
+        self.delegate = delegate
         let configuration = URLSessionConfiguration.ephemeral
         session = URLSession(
             configuration: configuration,
-            delegate: redirects,
+            delegate: delegate,
             delegateQueue: nil
         )
     }
@@ -42,7 +45,14 @@ public final class URLSessionHTTPTransport: HTTPTransport, @unchecked Sendable {
 }
 
 /// Redirects are not followed: a 3xx host is not re-checked against the allowlist (T-04).
-final class DenyHTTPRedirects: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+/// Server trust follows the pin when one exists, otherwise R-31 TOFU.
+final class HTTPSessionDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate, @unchecked Sendable {
+    let pin: PinRecord?
+
+    init(pin: PinRecord?) {
+        self.pin = pin
+    }
+
     func urlSession(
         _ session: URLSession,
         task: URLSessionTask,
@@ -51,6 +61,38 @@ final class DenyHTTPRedirects: NSObject, URLSessionTaskDelegate, @unchecked Send
         completionHandler: @escaping (URLRequest?) -> Void
     ) {
         completionHandler(nil)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        #if canImport(Security)
+        guard
+            challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+            let trust = challenge.protectionSpace.serverTrust,
+            let identity = TLSIdentity.fromServerTrust(
+                trust,
+                host: challenge.protectionSpace.host
+            )
+        else {
+            completionHandler(.performDefaultHandling, nil)
+            return
+        }
+        if let pin {
+            do {
+                try PinGate.requireMatch(observed: identity, stored: pin)
+                completionHandler(.useCredential, URLCredential(trust: trust))
+            } catch {
+                completionHandler(.cancelAuthenticationChallenge, nil)
+            }
+            return
+        }
+        completionHandler(.useCredential, URLCredential(trust: trust))
+        #else
+        completionHandler(.performDefaultHandling, nil)
+        #endif
     }
 }
 
@@ -62,7 +104,8 @@ public enum SystemHTTPTransport {
     public static func make(
         probing url: URL,
         allowedHosts: Set<String>,
-        allowInsecureHTTP: Bool = false
+        allowInsecureHTTP: Bool = false,
+        pin: PinRecord? = nil
     ) throws -> any HTTPTransport {
         #if canImport(Network)
         let endpoint = try StreamEndpoint.parse(
@@ -71,7 +114,7 @@ public enum SystemHTTPTransport {
             allowInsecure: allowInsecureHTTP
         )
         return IdentityProbingHTTPTransport(
-            http: URLSessionHTTPTransport(),
+            http: URLSessionHTTPTransport(pin: pin),
             endpoint: endpoint
         )
         #else
@@ -80,7 +123,7 @@ public enum SystemHTTPTransport {
             allowedHosts: allowedHosts,
             allowInsecureHTTP: allowInsecureHTTP
         )
-        return URLSessionHTTPTransport()
+        return URLSessionHTTPTransport(pin: pin)
         #endif
     }
 }

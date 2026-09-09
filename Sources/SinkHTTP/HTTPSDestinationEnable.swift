@@ -47,16 +47,22 @@ public enum HTTPSDestinationEnable {
             try setup.pinWithoutTLS()
         }
 
+        let delivery: any HTTPTransport
+        if let pin = setup.pin {
+            delivery = PinningHTTPTransport(inner: transport, pin: pin)
+        } else {
+            delivery = transport
+        }
         let report = await HTTPSDestinationTest.run(
             destination: destination,
-            transport: transport,
+            transport: delivery,
             pin: setup.pin,
             canary: canary,
             observedAt: emittedAt
         )
         try setup.recordTest(report)
         let verified = try setup.enable(
-            sink: HTTPSSink(destination: destination, transport: transport)
+            sink: HTTPSSink(destination: destination, transport: delivery)
         )
         return (
             verified,

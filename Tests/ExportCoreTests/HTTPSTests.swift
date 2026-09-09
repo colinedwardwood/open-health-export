@@ -641,6 +641,72 @@ private func writeHTTPSPayload() throws -> (URL, BatchID) {
     #expect(try Gzip.decompress(recorded[0].body).isEmpty == false)
 }
 
+#if canImport(Network)
+@Suite(.serialized)
+struct HTTPSPinnedLoopbackTests {
+@Test func httpsEnablePinsSelfSignedLoopbackAndURLSessionHonoursThePin() async throws {
+    let material = try LoopbackTLS.material()
+    let server = try LocalHTTPSServer(parameters: LocalHTTPSServer.tlsParameters(identity: material.identity))
+    let port = try await server.start()
+    let destination = try HTTPSDestination(
+        urlString: "https://127.0.0.1:\(port)/hook",
+        allowedHosts: ["127.0.0.1"]
+    )
+    let transport = try SystemHTTPTransport.make(
+        probing: destination.url,
+        allowedHosts: ["127.0.0.1"]
+    )
+    let completed = try await HTTPSDestinationEnable.complete(
+        destination: destination,
+        transport: transport,
+        exporterID: "00000000-0000-4000-8000-000000000025",
+        emittedAt: "2026-01-01T00:00:00Z"
+    )
+    #expect(completed.identity?.leafSPKISha256 == material.pin.leafSPKISha256)
+    #expect(completed.report.allowsEnablement)
+    let (file, batchID) = try writeHTTPSPayload()
+    let sink = HTTPSSink(
+        destination: destination,
+        transport: PinningHTTPTransport(inner: transport, pin: material.pin)
+    )
+    let receipt = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
+    #expect(receipt.statusOnly)
+    await server.stop()
+}
+
+@Test func httpsPinnedURLSessionRejectsAMismatchedLeaf() async throws {
+    let material = try LoopbackTLS.material()
+    let server = try LocalHTTPSServer(parameters: LocalHTTPSServer.tlsParameters(identity: material.identity))
+    let port = try await server.start()
+    let destination = try HTTPSDestination(
+        urlString: "https://127.0.0.1:\(port)/hook",
+        allowedHosts: ["127.0.0.1"]
+    )
+    let wrong = PinRecord(
+        leafSPKISha256: String(repeating: "ab", count: 32),
+        issuerSPKISha256: String(repeating: "cd", count: 32),
+        firstSeen: "2024-01-01T00:00:00Z",
+        policy: .leaf
+    )
+    let (file, batchID) = try writeHTTPSPayload()
+    let sink = HTTPSSink(
+        destination: destination,
+        transport: PinningHTTPTransport(
+            inner: try SystemHTTPTransport.make(
+                probing: destination.url,
+                allowedHosts: ["127.0.0.1"]
+            ),
+            pin: wrong
+        )
+    )
+    await #expect(throws: EgressError.pinMismatch) {
+        _ = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
+    }
+    await server.stop()
+}
+}
+#endif
+
 private extension ScriptableHTTPServer.Script {
     func withChunkSize(_ size: Int) -> ScriptableHTTPServer.Script {
         var copy = self

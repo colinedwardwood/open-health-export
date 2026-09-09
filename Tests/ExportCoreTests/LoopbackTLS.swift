@@ -4,6 +4,8 @@ import NetEgress
 import Security
 
 enum LoopbackTLS {
+    private static let lock = NSLock()
+
     struct Material {
         var identity: SecIdentity
         var certificateDER: Data
@@ -11,6 +13,8 @@ enum LoopbackTLS {
     }
 
     static func material(commonName: String = "127.0.0.1") throws -> Material {
+        lock.lock()
+        defer { lock.unlock() }
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ohe-tls-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
@@ -20,6 +24,7 @@ enum LoopbackTLS {
         try runOpenSSL([
             "req", "-x509", "-newkey", "rsa:2048", "-sha256", "-days", "1", "-nodes",
             "-keyout", key.path, "-out", cert.path, "-subj", "/CN=\(commonName)",
+            "-addext", "subjectAltName=IP:127.0.0.1,DNS:localhost,DNS:127.0.0.1",
         ])
         try runOpenSSL([
             "pkcs12", "-export", "-inkey", key.path, "-in", cert.path, "-out", p12.path,

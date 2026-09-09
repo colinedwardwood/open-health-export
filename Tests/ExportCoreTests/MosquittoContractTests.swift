@@ -88,6 +88,86 @@ private func mosquittoExecutable() -> String? {
     return nil
 }
 
+private func mosquittoPasswdExecutable() -> String? {
+    let extras = [
+        "/opt/homebrew/bin/mosquitto_passwd",
+        "/usr/local/bin/mosquitto_passwd",
+        "/usr/bin/mosquitto_passwd",
+    ]
+    if let found = extras.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
+        return found
+    }
+    for dir in (ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":") {
+        let candidate = URL(fileURLWithPath: String(dir)).appendingPathComponent("mosquitto_passwd").path
+        if FileManager.default.isExecutableFile(atPath: candidate) {
+            return candidate
+        }
+    }
+    return nil
+}
+
+@Test(
+    .enabled(
+        if: mosquittoExecutable() != nil && mosquittoPasswdExecutable() != nil
+    )
+)
+func mosquittoQoS1RequiresUsernameAndPassword() async throws {
+    let binary = try #require(mosquittoExecutable())
+    let passwd = try #require(mosquittoPasswdExecutable())
+    let port = UInt16(21_830 + (ProcessInfo.processInfo.processIdentifier % 1_000))
+    let work = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-mosq-auth-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: work) }
+    let pwfile = work.appendingPathComponent("passwd")
+    let makeUser = Process()
+    makeUser.executableURL = URL(fileURLWithPath: passwd)
+    makeUser.arguments = ["-c", "-b", pwfile.path, "exporter", "secret"]
+    makeUser.standardOutput = FileHandle.nullDevice
+    makeUser.standardError = FileHandle.nullDevice
+    try makeUser.run()
+    makeUser.waitUntilExit()
+    guard makeUser.terminationStatus == 0 else { throw MQTTError.truncated }
+    let conf = work.appendingPathComponent("mosquitto.conf")
+    try """
+    listener \(port)
+    protocol mqtt
+    allow_anonymous false
+    password_file \(pwfile.path)
+    persistence false
+    log_type error
+    """.write(to: conf, atomically: true, encoding: .utf8)
+    let broker = try startMosquitto(binary: binary, conf: conf)
+    defer { if broker.isRunning { broker.terminate() } }
+    try await waitForMosquitto(port: port)
+
+    let (file, batchID) = try writeMQTTPayload()
+    let anonymous = try MQTTDestination(
+        urlString: "mqtt://127.0.0.1:\(port)",
+        allowedHosts: ["127.0.0.1"],
+        allowInsecure: true,
+        clientID: "ohe-r90-auth-anon",
+        topic: "ohe/health"
+    )
+    let rejected = try MQTTSink.overNetwork(destination: anonymous, pin: nil)
+    await #expect(throws: MQTTError.connack(5)) {
+        _ = try await rejected.send(fileHandle: file.path, idempotencyKey: batchID)
+    }
+
+    let destination = try MQTTDestination(
+        urlString: "mqtt://127.0.0.1:\(port)",
+        allowedHosts: ["127.0.0.1"],
+        allowInsecure: true,
+        clientID: "ohe-r90-auth-ok",
+        topic: "ohe/health",
+        username: "exporter",
+        password: "secret"
+    )
+    let sink = try MQTTSink.overNetwork(destination: destination, pin: nil)
+    let receipt = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
+    #expect(receipt.accepted == 1)
+}
+
 @Test(.enabled(if: mosquittoExecutable() != nil))
 func mosquittoQoS1SurvivesBrokerRestart() async throws {
     let binary = try #require(mosquittoExecutable())
@@ -267,6 +347,7 @@ func mosquittoQoS1RequiresTheCAIssuedClientCertificate() async throws {
     let receipt = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
     #expect(receipt.accepted == 1)
 }
+#endif
 
 private func startMosquitto(binary: String, conf: URL) throws -> Process {
     let process = Process()
@@ -293,4 +374,3 @@ private func waitForMosquitto(port: UInt16) async throws {
     }
     throw MQTTError.truncated
 }
-#endif

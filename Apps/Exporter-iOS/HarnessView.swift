@@ -35,6 +35,7 @@ struct HarnessView: View {
     @State private var mqttURL = ""
     @State private var mqttClientID = "ohe-iphone"
     @State private var mqttTopic = "ohe/health"
+    @State private var mqttQoS: UInt8 = 1
     @State private var mqttUsername = ""
     @State private var mqttPassword = ""
     @State private var allowInsecureMQTT = false
@@ -395,6 +396,11 @@ struct HarnessView: View {
             Text("Use {{exporterId|raw}} and {{batchId|raw}} if the broker needs a templated topic.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+            Picker("MQTT QoS", selection: $mqttQoS) {
+                Text("At most once (0)").tag(UInt8(0))
+                Text("At least once (1)").tag(UInt8(1))
+            }
+            .accessibilityIdentifier("mqtt-qos")
             Button("Choose MQTT client PKCS#12") {
                 pickingMQTTPKCS12 = true
             }
@@ -1130,7 +1136,8 @@ struct HarnessView: View {
                 clientPKCS12: mqttPKCS12Data,
                 clientPKCS12Password: mqttPKCS12Password.isEmpty ? nil : mqttPKCS12Password,
                 username: mqttUsername.isEmpty ? nil : mqttUsername,
-                password: mqttPassword.isEmpty ? nil : mqttPassword
+                password: mqttPassword.isEmpty ? nil : mqttPassword,
+                qos: mqttQoS
             )
             destinationStatusLines = HarnessExport.destinationStatusLines()
             await refreshLedgerIntegrity()

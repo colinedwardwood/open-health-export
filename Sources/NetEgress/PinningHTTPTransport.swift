@@ -20,6 +20,6 @@ public struct PinningHTTPTransport: HTTPTransport {
         } catch PinError.notPinned {
             throw EgressError.pinMismatch
         }
-        return try await inner.execute(request)
+        return try await URLSessionHTTPTransport(pin: pin).execute(request)
     }
 }

@@ -43,6 +43,7 @@ private struct MQTTVerificationRecord: Codable {
     var allowInsecure: Bool
     var clientID: String
     var topic: String
+    var qos: UInt8?
     var report: DestinationTestReport
     var hasClientPKCS12: Bool?
     var clientPKCS12Password: String?
@@ -843,7 +844,8 @@ enum HarnessExport {
         clientPKCS12: Data? = nil,
         clientPKCS12Password: String? = nil,
         username: String? = nil,
-        password: String? = nil
+        password: String? = nil,
+        qos: UInt8 = 1
     ) async throws -> [String] {
         guard let host = URL(string: urlString)?.host?.lowercased(), !host.isEmpty else {
             throw EgressError.invalidURL
@@ -856,6 +858,7 @@ enum HarnessExport {
             allowInsecure: allowInsecure,
             clientID: clientID,
             topic: topic,
+            qos: qos == 0 ? .atMostOnce : .atLeastOnce,
             clientPKCS12: clientPKCS12,
             clientPKCS12Password: clientPKCS12Password,
             exporterID: exporterID,
@@ -876,6 +879,7 @@ enum HarnessExport {
             allowInsecure: allowInsecure,
             clientID: clientID,
             topic: topic,
+            qos: destination.qos.rawValue,
             report: completed.report,
             hasClientPKCS12: clientPKCS12 != nil,
             clientPKCS12Password: clientPKCS12Password,
@@ -966,6 +970,7 @@ enum HarnessExport {
             allowInsecure: saved.allowInsecure,
             clientID: saved.clientID,
             topic: saved.topic,
+            qos: saved.qos == 0 ? .atMostOnce : .atLeastOnce,
             username: saved.username,
             password: password,
             clientPKCS12: pkcs12,
