@@ -704,6 +704,32 @@ struct HTTPSPinnedLoopbackTests {
     }
     await server.stop()
 }
+
+@Test func httpsSinkPostsOverHTTP2WhenThePeerAdvertisesALPN() async throws {
+    let material = try LoopbackTLS.material()
+    let server = try LocalHTTP2Server(parameters: LocalHTTP2Server.tlsParameters(identity: material.identity))
+    let port = try await server.start()
+    let destination = try HTTPSDestination(
+        urlString: "https://127.0.0.1:\(port)/hook",
+        allowedHosts: ["127.0.0.1"]
+    )
+    let (file, batchID) = try writeHTTPSPayload()
+    let sink = HTTPSSink(
+        destination: destination,
+        transport: PinningHTTPTransport(
+            inner: try SystemHTTPTransport.make(
+                probing: destination.url,
+                allowedHosts: ["127.0.0.1"]
+            ),
+            pin: material.pin
+        )
+    )
+    let receipt = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
+    #expect(receipt.statusOnly)
+    #expect(await server.prefaceSeen())
+    #expect(await server.requestCount() == 1)
+    await server.stop()
+}
 }
 #endif
 
