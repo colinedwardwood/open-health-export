@@ -128,6 +128,13 @@ found=0
 for binary in "${binaries[@]}"; do
   echo "Scanning release binary: $binary"
   strings "$binary" > "$scratch/strings"
+  # A gate that reads nothing passes everything. Any real Mach-O carries far more
+  # than this, so an empty or truncated read is a broken scan, not a clean binary.
+  extracted="$(wc -l < "$scratch/strings")"
+  if [[ "$extracted" -lt 100 ]]; then
+    echo "Release artifact scan read only $extracted strings from $binary" >&2
+    exit 1
+  fi
   while IFS= read -r forbidden; do
     if grep -F -- "$forbidden" "$scratch/strings"; then
       echo "Forbidden release string leaked into $binary: $forbidden" >&2
