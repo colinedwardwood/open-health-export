@@ -16,6 +16,7 @@ jobs:
         run: |
           swift build -c release --product corpusgen
           swift build -c release --product pipelinecheck
+          swift build -c release --product exportruncheck
       - name: Generate ten million records reproducibly
         shell: bash
         run: |
@@ -44,6 +45,10 @@ jobs:
         run: |
           .build/release/corpusgen --tier T1 --seed 1 --count 5000 |
             .build/release/pipelinecheck
+      - name: Exercise ExportRun within its memory ceiling
+        run: |
+          .build/release/corpusgen --tier T1 --seed 1 --count 5000 |
+            .build/release/exportruncheck
   tier-two-pathologies:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest

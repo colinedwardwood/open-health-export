@@ -276,6 +276,20 @@
       ]
     },
     {
+      "name": "exportruncheck",
+      "type": "executable",
+      "dependencies": [
+        "CoreDomain",
+        "CoreTemporal",
+        "CorrectnessEngine",
+        "EnginePorts",
+        "MetricCatalog",
+        "SinkLocalFile",
+        "TestSupport",
+        "WireFormat"
+      ]
+    },
+    {
       "name": "hacontract",
       "type": "executable",
       "dependencies": [

@@ -99,6 +99,20 @@ let linuxCore: [Target] = [
         dependencies: ["WireFormat"],
         path: "Tools/pipelinecheck"
     ),
+    .executableTarget(
+        name: "exportruncheck",
+        dependencies: [
+            "CoreDomain",
+            "CoreTemporal",
+            "CorrectnessEngine",
+            "EnginePorts",
+            "MetricCatalog",
+            "SinkLocalFile",
+            "TestSupport",
+            "WireFormat",
+        ],
+        path: "Tools/exportruncheck"
+    ),
     .testTarget(
         name: "ExportCoreTests",
         dependencies: [
@@ -175,6 +189,7 @@ var products: [Product] = [
     .executable(name: "hacontract", targets: ["hacontract"]),
     .executable(name: "wirefuzz", targets: ["wirefuzz"]),
     .executable(name: "pipelinecheck", targets: ["pipelinecheck"]),
+    .executable(name: "exportruncheck", targets: ["exportruncheck"]),
     .library(name: "SinkMQTT", targets: ["MQTTCodec", "SinkMQTT"]),
 ]
 
