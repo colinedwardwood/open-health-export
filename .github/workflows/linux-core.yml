@@ -4,7 +4,8 @@ on:
   pull_request:
 concurrency:
   group: linux-core-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Commits on main are judged individually; superseding one leaves it unverified.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
   export-core:
     runs-on: ubuntu-latest

@@ -37,8 +37,7 @@ final class ExporterUITests: XCTestCase {
     func testBrowserEmptyAndDetailStatesPassAccessibilityAudit() throws {
         enterControls()
         let search = scrollToHittable(app.textFields["browser-search"])
-        search.tap()
-        search.typeText("no-such-health-type")
+        type("no-such-health-type", into: search)
         XCTAssertTrue(app.staticTexts["browser-empty"].waitForExistence(timeout: 2))
         app.keyboards.buttons["return"].tap()
         try performAccessibilityAudit()
@@ -137,8 +136,7 @@ final class ExporterUITests: XCTestCase {
     func testDataBrowserShowsAnExplicitEmptySearchState() {
         enterControls()
         let search = scrollToHittable(app.textFields["browser-search"])
-        search.tap()
-        search.typeText("no-such-health-type")
+        type("no-such-health-type", into: search)
         XCTAssertTrue(app.staticTexts["browser-empty"].waitForExistence(timeout: 2))
         XCTAssertEqual(
             app.staticTexts["browser-empty"].label,
@@ -166,8 +164,7 @@ final class ExporterUITests: XCTestCase {
         XCTAssertFalse(export.isEnabled)
         let field = app.textFields["demo-confirm"]
         XCTAssertTrue(field.waitForExistence(timeout: 2))
-        field.tap()
-        field.typeText("local-file")
+        type("local-file", into: field)
         XCTAssertTrue(export.isEnabled)
     }
 
@@ -216,9 +213,20 @@ final class ExporterUITests: XCTestCase {
     private func filterBrowserToHeartRate() {
         let search = app.textFields["browser-search"]
         XCTAssertTrue(search.waitForExistence(timeout: 2))
-        search.tap()
-        search.typeText("heart")
+        type("heart", into: search)
         app.keyboards.buttons["return"].tap()
+    }
+
+    /// A single tap does not reliably take keyboard focus on CI's simulator, and typing
+    /// without focus fails the run rather than retrying. Waiting for the keyboard is the
+    /// signal that the tap landed.
+    private func type(_ text: String, into field: XCUIElement) {
+        for _ in 0 ..< 3 {
+            field.tap()
+            if app.keyboards.element.waitForExistence(timeout: 5) { break }
+        }
+        XCTAssertTrue(app.keyboards.element.exists, "keyboard never appeared for \(field.identifier)")
+        field.typeText(text)
     }
 
     private func visibleIdentifiers() -> [String] {

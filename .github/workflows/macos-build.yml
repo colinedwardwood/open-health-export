@@ -4,15 +4,18 @@ on:
   pull_request:
 concurrency:
   group: macos-build-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # On main every commit is a release candidate and must be judged on its own
+  # evidence. Cancelling the previous run leaves commits marked "cancelled",
+  # which reads as unverified and forces pushes to be spaced by a full run.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
-  build-from-source-clean:
+  darwin-package:
     runs-on: macos-26
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Install build and broker tools
-        run: brew install xcodegen mosquitto
+      - name: Install broker tools
+        run: brew install mosquitto
       - name: Test Darwin package targets
         run: swift test
       - name: Test MQTT against Mosquitto on Darwin
@@ -28,6 +31,14 @@ jobs:
             sleep 1
           done
           swift test --filter MosquittoExternalBrokerTests
+
+  ios-app:
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        run: brew install xcodegen
       - name: Generate Xcode project
         run: xcodegen generate
       - name: Build iOS exporter and widget
@@ -45,14 +56,28 @@ jobs:
             xcrun simctl list devices available -j |
               python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for runtime in d.values() for x in runtime if "iPhone" in x["name"]))'
           )"
+          # Each UI case drives its own simulator clone, so the suite scales with
+          # the runner instead of serialising fourteen app launches.
           xcodebuild \
             -project OpenHealthExporter.xcodeproj \
             -scheme ExporteriOS \
             -sdk iphonesimulator \
             -destination "platform=iOS Simulator,id=${DESTINATION_ID}" \
             -configuration Debug \
+            -parallel-testing-enabled YES \
+            -maximum-parallel-testing-workers 3 \
             CODE_SIGNING_ALLOWED=NO \
             test
+
+  mac-companion:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate
       - name: Build macOS companion
         run: |
           xcodebuild \
