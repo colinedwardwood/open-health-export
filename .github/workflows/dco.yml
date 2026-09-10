@@ -28,7 +28,10 @@ jobs:
               git log -1 --format='%h %s' "${commit}"
               missing=1
             fi
-          done < <(git rev-list "${range}")
+          # Merge commits are skipped, as GitHub's own DCO app does: a merge authors no
+          # content of its own, and every commit it joins is certified on its own line.
+          # `git merge` cannot sign one off without rewriting the merge by hand.
+          done < <(git rev-list --no-merges "${range}")
           if [ "${missing}" -ne 0 ]; then
             echo "R-101: every commit must be signed off (git commit -s)."
             exit 1
