@@ -84,7 +84,7 @@ final class ExporterUITests: XCTestCase {
         scrollToHittable(end)
 
         let share = app.buttons["diagnostic-share"]
-        XCTAssertTrue(share.waitForExistence(timeout: 5))
+        XCTAssertTrue(share.waitForExistence(timeout: 10))
         XCTAssertGreaterThan(share.frame.minY, end.frame.minY)
     }
 

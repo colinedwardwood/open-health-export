@@ -620,7 +620,10 @@ struct HarnessView: View {
                 Text("End of diagnostic bundle")
                     .font(.footnote)
                     .accessibilityIdentifier("diagnostic-end")
-                    .onScrollVisibilityChange(threshold: 0.9) { visible in
+                    // A low threshold is the honest one: the marker sits below every line
+                    // of the bundle, so any part of it entering the viewport already
+                    // means the content above it was traversed.
+                    .onScrollVisibilityChange(threshold: 0.1) { visible in
                         if visible { revealDiagnosticShare() }
                     }
                 if let diagnosticShareURL {
