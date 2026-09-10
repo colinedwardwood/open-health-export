@@ -859,11 +859,11 @@ enum HarnessExport {
             clientID: clientID,
             topic: topic,
             qos: qos == 0 ? .atMostOnce : .atLeastOnce,
+            username: username,
+            password: password,
             clientPKCS12: clientPKCS12,
             clientPKCS12Password: clientPKCS12Password,
-            exporterID: exporterID,
-            username: username,
-            password: password
+            exporterID: exporterID
         )
         let sink = try MQTTSink.overNetwork(destination: destination, pin: nil)
         let now = Date().ISO8601Format()
