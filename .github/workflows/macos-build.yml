@@ -89,3 +89,55 @@ jobs:
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO \
             build
+
+  release-artifact-scan:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install build tools
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Release configuration cannot enable DEBUG
+        run: |
+          for target in ExporteriOS StatusWidget CompanionMac; do
+            conditions="$(
+              xcodebuild \
+                -project OpenHealthExporter.xcodeproj \
+                -target "$target" \
+                -configuration Release \
+                -showBuildSettings |
+                sed -n 's/^[[:space:]]*SWIFT_ACTIVE_COMPILATION_CONDITIONS = //p'
+            )"
+            if [[ " $conditions " == *" DEBUG "* ]]; then
+              echo "DEBUG is enabled for the Release configuration of $target: $conditions"
+              exit 1
+            fi
+            echo "$target Release compilation conditions: ${conditions:-<none>}"
+          done
+      - name: Build shipped Apple binaries in Release
+        run: |
+          xcodebuild \
+            -project OpenHealthExporter.xcodeproj \
+            -target ExporteriOS \
+            -sdk iphonesimulator \
+            -configuration Release \
+            SYMROOT="$RUNNER_TEMP/ohe-release-ios" \
+            OBJROOT="$RUNNER_TEMP/ohe-release-ios-obj" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+          xcodebuild \
+            -project OpenHealthExporter.xcodeproj \
+            -target CompanionMac \
+            -sdk macosx \
+            -configuration Release \
+            SYMROOT="$RUNNER_TEMP/ohe-release-mac" \
+            OBJROOT="$RUNNER_TEMP/ohe-release-mac-obj" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+      - name: Release apps omit fault seams and health-data canaries
+        run: |
+          scripts/scan-release-artifacts.sh \
+            "$RUNNER_TEMP/ohe-release-ios/Release-iphonesimulator" \
+            "$RUNNER_TEMP/ohe-release-mac/Release"
