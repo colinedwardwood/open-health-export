@@ -69,7 +69,17 @@ jobs:
             -parallel-testing-enabled YES \
             -maximum-parallel-testing-workers 3 \
             CODE_SIGNING_ALLOWED=NO \
+            -resultBundlePath "$RUNNER_TEMP/ohe-ui.xcresult" \
             test
+      # xcodebuild's summary names the failing case but not the assertion, which
+      # leaves a red UI run with nothing to diagnose it from.
+      - name: Keep the UI result bundle when a case fails
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ios-ui-xcresult
+          path: ${{ runner.temp }}/ohe-ui.xcresult
+          retention-days: 7
 
   mac-companion:
     runs-on: macos-26
