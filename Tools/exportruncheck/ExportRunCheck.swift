@@ -24,10 +24,15 @@ struct ExportRunCheck {
     private static func run() async throws {
         let input = FileHandle.standardInput.readDataToEndOfFile()
         let inputLines = try validateT1Provenance(input)
-        let samples = try NativeSidecars.quantitySamples(fromNDJSON: input)
-            .filter { $0.metric == MetricCatalog.heartRate.id }
-        guard !samples.isEmpty else {
-            throw CheckError.noHeartRateSamples
+        // Every metric in the slice is exported, not one of them. Filtering to a single
+        // type turns a five-thousand-record volume check into a two-hundred-sample one,
+        // which would clear any ceiling worth declaring.
+        let byMetric = Dictionary(
+            grouping: try NativeSidecars.quantitySamples(fromNDJSON: input),
+            by: \.metric
+        )
+        guard !byMetric.isEmpty else {
+            throw CheckError.noSamples
         }
 
         let root = FileManager.default.temporaryDirectory
@@ -39,33 +44,42 @@ struct ExportRunCheck {
         defer { try? FileManager.default.removeItem(at: root) }
 
         let store = MemoryStateStore()
-        let run = ExportRun(
-            source: CorpusSliceSource(samples: samples),
-            destination: .testing(LocalFileSink(directory: destination)),
-            store: store,
-            metric: MetricCatalog.heartRate.id,
-            scratchDirectory: scratch,
-            envelope: WireEnvelope(
-                exporterId: "00000000-0000-4000-8000-000000000024",
-                seq: 1,
-                emittedAt: "2025-01-01T00:00:00Z",
-                observedAt: "2025-01-01T00:00:00Z"
-            ),
-            clock: FrozenClock(instant: Date(timeIntervalSince1970: 1_735_689_600)),
-            trigger: .bgProcessing
-        )
-        let outcome = try await run.run()
-        guard outcome.kind == .success else {
-            throw CheckError.outcome(outcome.kind.rawValue)
-        }
-        guard outcome.ackEvidence == .receiptFull else {
-            throw CheckError.ackEvidence(outcome.ackEvidence.rawValue)
-        }
-        guard let event = store.transaction.journal.last else {
-            throw CheckError.missingJournal
-        }
-        guard event.samplesRead == event.samplesAcked else {
-            throw CheckError.countMismatch(read: event.samplesRead, acked: event.samplesAcked)
+        var totalRead = 0
+        var totalAcked = 0
+        var corpusSamples = 0
+        for (index, metric) in byMetric.keys.sorted(by: { $0.rawValue < $1.rawValue }).enumerated() {
+            let samples = byMetric[metric] ?? []
+            corpusSamples += samples.count
+            let run = ExportRun(
+                source: CorpusSliceSource(samples: samples),
+                destination: .testing(LocalFileSink(directory: destination)),
+                store: store,
+                metric: metric,
+                scratchDirectory: scratch.appendingPathComponent(metric.rawValue),
+                envelope: WireEnvelope(
+                    exporterId: "00000000-0000-4000-8000-000000000024",
+                    seq: index + 1,
+                    emittedAt: "2025-01-01T00:00:00Z",
+                    observedAt: "2025-01-01T00:00:00Z"
+                ),
+                clock: FrozenClock(instant: Date(timeIntervalSince1970: 1_735_689_600)),
+                trigger: .bgProcessing
+            )
+            let outcome = try await run.run()
+            guard outcome.kind == .success else {
+                throw CheckError.outcome(metric: metric.rawValue, outcome: outcome.kind.rawValue)
+            }
+            guard outcome.ackEvidence == .receiptFull else {
+                throw CheckError.ackEvidence(outcome.ackEvidence.rawValue)
+            }
+            guard let event = store.transaction.journal.last else {
+                throw CheckError.missingJournal
+            }
+            guard event.samplesRead == event.samplesAcked else {
+                throw CheckError.countMismatch(read: event.samplesRead, acked: event.samplesAcked)
+            }
+            totalRead += event.samplesRead
+            totalAcked += event.samplesAcked
         }
 
         #if os(Linux)
@@ -81,10 +95,11 @@ struct ExportRunCheck {
         #endif
 
         print(
-            "exportruncheck outcome=\(outcome.kind.rawValue)"
-                + " samples_read=\(event.samplesRead)"
-                + " samples_acked=\(event.samplesAcked)"
-                + " corpus_samples=\(samples.count)"
+            "exportruncheck outcome=success"
+                + " metrics=\(byMetric.count)"
+                + " samples_read=\(totalRead)"
+                + " samples_acked=\(totalAcked)"
+                + " corpus_samples=\(corpusSamples)"
                 + " input_lines=\(inputLines)"
                 + " peak_rss_mib=\(memoryResult)"
                 + " limit_mib=\(memoryLimitMiB)"
@@ -134,8 +149,8 @@ private struct CorpusSliceSource: SampleSource {
 
 private enum CheckError: Error, CustomStringConvertible {
     case invalidProvenance
-    case noHeartRateSamples
-    case outcome(String)
+    case noSamples
+    case outcome(metric: String, outcome: String)
     case ackEvidence(String)
     case missingJournal
     case countMismatch(read: Int, acked: Int)
@@ -146,10 +161,10 @@ private enum CheckError: Error, CustomStringConvertible {
         switch self {
         case .invalidProvenance:
             "stdin is not a synthetic T1 corpusgen stream"
-        case .noHeartRateSamples:
-            "T1 corpus slice contained no heart-rate quantity samples"
-        case .outcome(let outcome):
-            "ExportRun closed with \(outcome), expected success"
+        case .noSamples:
+            "T1 corpus slice contained no quantity samples"
+        case .outcome(let metric, let outcome):
+            "ExportRun for \(metric) closed with \(outcome), expected success"
         case .ackEvidence(let evidence):
             "ExportRun acknowledgement evidence was \(evidence), expected receiptFull"
         case .missingJournal:
