@@ -101,8 +101,8 @@ struct HarnessView: View {
                     if phase == .disclosure {
                         disclosure
                     } else {
-                        controls
                         dataBrowser
+                        controls
                     }
 
                     if !results.isEmpty {
@@ -119,6 +119,7 @@ struct HarnessView: View {
             }
             .navigationTitle("M0 harness")
         }
+        .tint(.primary)
         .onAppear {
             timeToFirstFrameMS = LaunchMark.millisecondsToNow()
             destinationStatusLines = HarnessExport.destinationStatusLines()
@@ -279,7 +280,7 @@ struct HarnessView: View {
             }
             Text("DEMO MODE — synthetic data")
                 .font(.headline)
-                .foregroundStyle(.orange)
+                .foregroundStyle(.primary)
             Text("Demo export never reads HealthKit. Type the destination name local-file to confirm you are not sending this into a live archive.")
                 .font(.footnote)
             TextField("Type local-file to confirm demo export", text: $demoConfirmName)
@@ -309,7 +310,8 @@ struct HarnessView: View {
             if let advisoryBanner {
                 Text(advisoryBanner)
                     .font(.footnote)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.primary)
+                    .fontWeight(.semibold)
                     .accessibilityIdentifier("advisory-banner")
             }
             ForEach(advisoryItems, id: \.id) { item in
@@ -339,7 +341,8 @@ struct HarnessView: View {
             if !ledgerWarning.isEmpty {
                 Text(ledgerWarning)
                     .font(.footnote)
-                    .foregroundStyle(ledgerWarning.hasPrefix("WARNING") ? .red : .secondary)
+                    .foregroundStyle(.primary)
+                    .fontWeight(ledgerWarning.hasPrefix("WARNING") ? .semibold : .regular)
                     .accessibilityLabel("Ledger status: \(ledgerWarning)")
             }
             Text("Your health data is sent only to destinations listed here. This is what the app records about its own use, not independent proof.")
@@ -363,7 +366,8 @@ struct HarnessView: View {
             if allowInsecureHTTP {
                 Text("Plain HTTP exposes health exports to anyone able to observe this network.")
                     .font(.footnote)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(.primary)
+                    .fontWeight(.semibold)
             }
             Button("Test, pin, and enable HTTPS destination") {
                 Task { await enableHTTPS() }
@@ -395,7 +399,7 @@ struct HarnessView: View {
                 .accessibilityIdentifier("mqtt-topic")
             Text("Use {{exporterId|raw}} and {{batchId|raw}} if the broker needs a templated topic.")
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
             Picker("MQTT QoS", selection: $mqttQoS) {
                 Text("At most once (0)").tag(UInt8(0))
                 Text("At least once (1)").tag(UInt8(1))
@@ -431,7 +435,8 @@ struct HarnessView: View {
             if allowInsecureMQTT {
                 Text("Plain MQTT exposes health exports to anyone able to observe this network.")
                     .font(.footnote)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(.primary)
+                    .fontWeight(.semibold)
             }
             Button("Test and enable MQTT destination") {
                 Task { await enableMQTT() }
@@ -808,11 +813,8 @@ struct HarnessView: View {
                     : "Health values read on this iPhone."
             )
                 .font(.footnote)
-                .foregroundColor(
-                    browserDemoMode
-                        ? .orange
-                        : .secondary
-                )
+                .foregroundStyle(.primary)
+                .fontWeight(browserDemoMode ? .semibold : .regular)
 
             if let detail = selectedDetail {
                 Button(browserLoadingHealth ? "Loading Health data…" : "Load 30 days from Health") {
@@ -848,7 +850,8 @@ struct HarnessView: View {
                         if !removing.isEmpty {
                             Text("Removing a type does not delete data already sent to Archive folder.")
                                 .font(.footnote)
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(.primary)
+                                .fontWeight(.semibold)
                         }
                         Button("Continue") {
                             Task { await applyBrowserSelection() }
@@ -918,13 +921,13 @@ struct HarnessView: View {
                                 Text(row.title)
                                 if row.sensitive {
                                     Text("sensitive")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
+                                        .font(.body)
+                                        .foregroundStyle(.primary)
                                 }
                             }
                             Text(row.subtitle)
                                 .font(.footnote)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.primary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }

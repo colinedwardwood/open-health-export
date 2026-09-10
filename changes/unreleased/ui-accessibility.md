@@ -6,3 +6,7 @@ review, and empty-result identifiers, with XCUITests for empty search and
 metric-detail navigation. CI also runs XCTest's accessibility audit over the
 disclosure, main controls, empty search, and metric-detail screens, plus an
 Accessibility Extra Extra Extra Large Dynamic Type launch.
+The data browser appears before advanced controls, uses Dynamic Type for
+sensitivity labels, and keeps enabled text at system-primary contrast. UI
+audits suppress only Xcode 26's known disabled-control contrast false positive,
+tracked in issue #4; enabled contrast findings still fail.
