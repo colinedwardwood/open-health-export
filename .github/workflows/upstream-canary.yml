@@ -1,0 +1,127 @@
+name: upstream-canary
+on:
+  schedule:
+    - cron: "23 7 * * *"
+  workflow_dispatch:
+    inputs:
+      simulate_divergence:
+        description: Force a red canary and open tracking issues (QA-22 proof)
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  issues: write
+jobs:
+  declared-window:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare HA and Mosquitto stables to declared pins
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SIMULATE_DIVERGENCE: ${{ github.event.inputs.simulate_divergence == 'true' && '1' || '0' }}
+        run: bash Tools/upstream-canary/check.sh
+  home-assistant-latest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc
+        with:
+          swift-version: "6.3.3"
+      - name: Start latest Home Assistant stable
+        id: start
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          latest="$(
+            gh api 'repos/home-assistant/core/releases?per_page=30' \
+              --jq '[.[] | select(.draft == false and .prerelease == false)][0].tag_name'
+          )"
+          latest="${latest#v}"
+          test -n "${latest}"
+          echo "OHE_CANARY_VERSION=${latest}" >> "${GITHUB_ENV}"
+          docker pull "ghcr.io/home-assistant/home-assistant:${latest}"
+          docker run -d --name ohe-ha-canary \
+            -p 8123:8123 \
+            -v "$PWD/spec/v1.0.0/fixtures/ha-ci:/config" \
+            "ghcr.io/home-assistant/home-assistant:${latest}"
+          for attempt in $(seq 1 120); do
+            curl -fsS http://127.0.0.1:8123/api/onboarding >/dev/null && exit 0
+            printf 'waiting for Home Assistant (attempt %s)\n' "${attempt}"
+            sleep 2
+          done
+          docker logs ohe-ha-canary
+          exit 1
+      - name: Exercise latest Home Assistant contract
+        id: contract
+        if: steps.start.outcome == 'success'
+        continue-on-error: true
+        env:
+          OHE_HA_URL: http://127.0.0.1:8123
+          OHE_HA_WAIT_SECONDS: "480"
+        run: swift run hacontract
+      - name: Track Home Assistant contract divergence
+        if: steps.start.outcome == 'failure' || steps.contract.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPORT_SERVICE: Home Assistant
+          REPORT_VERSION: ${{ env.OHE_CANARY_VERSION }}
+          REPORT_DETAILS: The real latest-stable Home Assistant startup or contract failed.
+        run: |
+          bash Tools/upstream-canary/check.sh
+          exit 1
+  mosquitto-latest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc
+        with:
+          swift-version: "6.3.3"
+      - name: Start latest Mosquitto stable
+        id: start
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          latest="$(
+            gh api 'repos/eclipse/mosquitto/tags?per_page=30' \
+              --jq '[.[].name | select(test("(?i)rc|beta|alpha") | not)][0]'
+          )"
+          latest="${latest#v}"
+          test -n "${latest}"
+          echo "OHE_CANARY_VERSION=${latest}" >> "${GITHUB_ENV}"
+          docker pull "eclipse-mosquitto:${latest}"
+          docker run -d --name ohe-mosquitto-canary \
+            -p 1883:1883 \
+            -v "$PWD/spec/v1.0.0/fixtures/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf" \
+            "eclipse-mosquitto:${latest}"
+          for attempt in $(seq 1 30); do
+            python3 -c 'import socket;s=socket.create_connection(("127.0.0.1",1883),2);s.close()' && exit 0
+            printf 'waiting for Mosquitto (attempt %s)\n' "${attempt}"
+            sleep 1
+          done
+          docker logs ohe-mosquitto-canary
+          exit 1
+      - name: Exercise latest Mosquitto contract
+        id: contract
+        if: steps.start.outcome == 'success'
+        continue-on-error: true
+        env:
+          OHE_MQTT_BROKER: mqtt://127.0.0.1:1883
+        run: swift test --filter MosquittoExternalBrokerTests
+      - name: Track Mosquitto contract divergence
+        if: steps.start.outcome == 'failure' || steps.contract.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPORT_SERVICE: Mosquitto
+          REPORT_VERSION: ${{ env.OHE_CANARY_VERSION }}
+          REPORT_DETAILS: The real latest-stable Mosquitto startup or contract failed.
+        run: |
+          bash Tools/upstream-canary/check.sh
+          exit 1

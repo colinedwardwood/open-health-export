@@ -13,9 +13,10 @@
       "injectedTzDatabase": "fixtures/tz-database-version.txt"
     },
     "ha-ci": {
-      "role": "R-89 Home Assistant container config and pinned version window",
+      "role": "R-89 Home Assistant container config and pinned version window; QA-22 canary pins",
       "currentStable": "2026.8.3",
-      "oldestInWindow": "2025.9.4"
+      "oldestInWindow": "2025.9.4",
+      "mosquittoTag": "2.0.22"
     },
     "fix-catalogue.json": {
       "cases": 72,

@@ -2,5 +2,7 @@
   "windowMonths": 12,
   "currentStable": "2026.8.3",
   "oldestInWindow": "2025.9.4",
-  "image": "ghcr.io/home-assistant/home-assistant"
+  "image": "ghcr.io/home-assistant/home-assistant",
+  "mosquittoImage": "eclipse-mosquitto",
+  "mosquittoTag": "2.0.22"
 }

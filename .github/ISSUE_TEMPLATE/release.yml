@@ -55,6 +55,8 @@ body:
           required: true
         - label: Required CI, container contracts, upstream canaries, and spec-freeze checks are green.
           required: true
+        - label: No QA-22 upstream canary has been red for more than 24 hours without an accepted tracking issue.
+          required: true
         - label: Device, soak, accessibility, performance, migration, and flake evidence is attached.
           required: true
         - label: There are no open P0 or P1 defects accepted into this release.

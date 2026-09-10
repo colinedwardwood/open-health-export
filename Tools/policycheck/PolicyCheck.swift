@@ -230,6 +230,7 @@ struct PolicyCheck {
         }
         print("policycheck no alternate icons: ok")
         try checkStringCatalog(root: root)
+        try checkUpstreamVersionPins(root: root)
         try checkAdjacency(root: root)
         try checkHealthKitSymbolsStayInAdapter(sources: sources)
         try checkSpecArtifacts(root: root)
@@ -300,6 +301,44 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck string catalog covers app UI literals: ok")
+    }
+
+    static func checkUpstreamVersionPins(root: URL) throws {
+        let pinsURL = root.appendingPathComponent("spec/v1.0.0/fixtures/ha-ci/versions.json")
+        guard
+            let pins = try JSONSerialization.jsonObject(with: Data(contentsOf: pinsURL)) as? [String: Any],
+            let current = pins["currentStable"] as? String, !current.isEmpty,
+            let oldest = pins["oldestInWindow"] as? String, !oldest.isEmpty,
+            let mosquitto = pins["mosquittoTag"] as? String, !mosquitto.isEmpty
+        else {
+            FileHandle.standardError.write(Data("ha-ci/versions.json is missing required pins\n".utf8))
+            exit(1)
+        }
+        let workflow = try String(
+            contentsOf: root.appendingPathComponent(".github/workflows/container-contracts.yml"),
+            encoding: .utf8
+        )
+        for token in [current, oldest, mosquitto] where !workflow.contains(token) {
+            FileHandle.standardError.write(
+                Data("container-contracts.yml does not pin declared upstream version \(token)\n".utf8)
+            )
+            exit(1)
+        }
+        let canary = try String(
+            contentsOf: root.appendingPathComponent(".github/workflows/upstream-canary.yml"),
+            encoding: .utf8
+        )
+        if canary.contains("pull_request:") || canary.contains("push:") {
+            FileHandle.standardError.write(
+                Data("upstream-canary must not run on pull_request or push (QA-22)\n".utf8)
+            )
+            exit(1)
+        }
+        if !canary.contains("schedule:") || !canary.contains("workflow_dispatch:") {
+            FileHandle.standardError.write(Data("upstream-canary must be nightly and dispatchable\n".utf8))
+            exit(1)
+        }
+        print("policycheck upstream version pins match container contracts: ok")
     }
 
     static func checkSponsorGating(root: URL) throws {
