@@ -16,6 +16,7 @@ public final class MemoryTransaction: StateTransaction {
     public var emittedIndex: [String: EmittedIndexRow] = [:]
     public var aggregateEmitSeq: [String: Int] = [:]
     public var typeStatus: [MetricID: TypeStatus] = [:]
+    public var anchorHolds: [MetricID: AnchorHold] = [:]
     private var pendingOrder: [BatchID] = []
 
     public init() {}
@@ -173,11 +174,28 @@ public final class MemoryTransaction: StateTransaction {
         typeStatus[status.metric] = status
     }
 
+    public func loadAnchorHold(metric: MetricID) throws -> AnchorHold? {
+        anchorHolds[metric]
+    }
+
+    public func loadAnchorHolds() throws -> [AnchorHold] {
+        anchorHolds.values.sorted { $0.metric.rawValue < $1.metric.rawValue }
+    }
+
+    public func upsertAnchorHold(_ hold: AnchorHold) throws {
+        anchorHolds[hold.metric] = hold
+    }
+
+    public func clearAnchorHold(metric: MetricID) throws {
+        anchorHolds.removeValue(forKey: metric)
+    }
+
     public func purgeMetricState(metric: MetricID) throws {
         cursors.removeValue(forKey: metric)
         census = census.filter { $0.value.metric != metric }
         dirty.removeValue(forKey: metric)
         emittedIndex = emittedIndex.filter { $0.value.metric != metric }
+        anchorHolds.removeValue(forKey: metric)
     }
 
     public func wipe(atEpoch: TimeInterval) throws -> [String] {
@@ -197,6 +215,7 @@ public final class MemoryTransaction: StateTransaction {
         emittedIndex = [:]
         aggregateEmitSeq = [:]
         typeStatus = [:]
+        anchorHolds = [:]
         try appendLedger(
             EgressEntry(
                 destination: "local-device",

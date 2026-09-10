@@ -149,6 +149,50 @@ public struct TypeStatus: Sendable, Equatable {
     }
 }
 
+/// QA-17: a metric whose anchor can no longer be trusted. The hold stops the metric
+/// exporting until someone decides what to do, because the alternative — reading with
+/// no anchor — is a full re-export of the whole store that nobody asked for.
+public struct AnchorHold: Sendable, Equatable {
+    public enum Reason: String, Sendable, Equatable, CaseIterable {
+        /// No cursor, but this metric has exported before. The anchor was lost, not absent.
+        case cursorLost
+        /// A delta run returned more than a delta plausibly can.
+        case replaySuspected
+    }
+
+    /// What was decided about the hold. `nil` means nobody has decided yet, which is
+    /// the state that keeps the metric stopped.
+    public enum Decision: String, Sendable, Equatable, CaseIterable {
+        /// The user accepted the cost and asked for the history to be sent again.
+        case reexportAuthorized
+    }
+
+    public var metric: MetricID
+    public var reason: Reason
+    public var detectedAtEpoch: TimeInterval
+    /// What the run saw: samples returned for a replay, 0 for a lost cursor.
+    public var observedSamples: Int
+    /// The last day we know reached a destination, so the decision can be costed.
+    public var lastEmittedDay: String?
+    public var decision: Decision?
+
+    public init(
+        metric: MetricID,
+        reason: Reason,
+        detectedAtEpoch: TimeInterval,
+        observedSamples: Int = 0,
+        lastEmittedDay: String? = nil,
+        decision: Decision? = nil
+    ) {
+        self.metric = metric
+        self.reason = reason
+        self.detectedAtEpoch = detectedAtEpoch
+        self.observedSamples = observedSamples
+        self.lastEmittedDay = lastEmittedDay
+        self.decision = decision
+    }
+}
+
 public enum AuthGrant: String, Sendable, Equatable {
     case unknown
     case granted
@@ -365,6 +409,10 @@ public protocol StateTransaction: AnyObject {
     func loadJournal() throws -> [RunEvent]
     func loadTypeStatus(metric: MetricID) throws -> TypeStatus?
     func upsertTypeStatus(_ status: TypeStatus) throws
+    func loadAnchorHold(metric: MetricID) throws -> AnchorHold?
+    func upsertAnchorHold(_ hold: AnchorHold) throws
+    func clearAnchorHold(metric: MetricID) throws
+    func loadAnchorHolds() throws -> [AnchorHold]
     func purgeMetricState(metric: MetricID) throws
     /// Clears every table. Returns pending payload paths to unlink after COMMIT (R-43).
     func wipe(atEpoch: TimeInterval) throws -> [String]

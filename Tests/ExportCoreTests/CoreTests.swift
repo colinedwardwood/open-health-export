@@ -2010,6 +2010,183 @@ private func runUntilProcessExitSeam() async throws {
     #expect(store.transaction.journal.last?.detail == "anchor_undecodable")
 }
 
+/// Records whether it was asked for anything, so a test can prove a run never read.
+private final class ReadCountingSource: SampleSource, @unchecked Sendable {
+    let page: SamplePage
+    private(set) var reads = 0
+
+    init(page: SamplePage) { self.page = page }
+
+    func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage {
+        reads += 1
+        return page
+    }
+}
+
+private func anchorHoldFixture(
+    metric: MetricID,
+    samples: [SampleRecord]
+) throws -> (MemoryStateStore, ReadCountingSource, URL) {
+    let store = MemoryStateStore()
+    let dest = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-anchor-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+    let page = SamplePage(
+        samples: samples,
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([9]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    return (store, ReadCountingSource(page: page), dest)
+}
+
+/// The metric has exported before, so an absent cursor is a lost anchor, not a first
+/// run. Reading with no anchor would send the whole store again (QA-17).
+@Test func aLostAnchorHoldsTheMetricInsteadOfReExportingEverything() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let (store, source, dest) = try anchorHoldFixture(
+        metric: metric,
+        samples: [heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")]
+    )
+    try await store.transact {
+        try $0.upsertEmittedIndex(
+            EmittedIndexRow(
+                uuid: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                metric: metric,
+                day: "2026-09-08",
+                digest: "d",
+                batchID: BatchID(rawValue: "b1")
+            )
+        )
+    }
+    let run = ExportRun(
+        source: source,
+        destination: .testing(LocalFileSink(directory: dest)),
+        store: store,
+        metric: metric,
+        scratchDirectory: dest.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    )
+    let outcome = try await run.run()
+
+    #expect(outcome.kind.rawValue == "failed")
+    #expect(source.reads == 0)
+    #expect(try await store.transact { try $0.pendingBatches() }.isEmpty)
+    #expect(store.transaction.journal.last?.detail == "anchor_invalidated")
+    let hold = try #require(store.transaction.anchorHolds[metric])
+    #expect(hold.reason == .cursorLost)
+    #expect(hold.lastEmittedDay == "2026-09-08")
+    #expect(hold.decision == nil)
+
+    // Still held on the next wake: the state is recoverable, not self-clearing.
+    let second = try await run.run()
+    #expect(second.kind.rawValue == "failed")
+    #expect(source.reads == 0)
+    #expect(store.transaction.journal.last?.detail == "anchor_hold")
+}
+
+/// The only way past a hold is a decision that was recorded before the run.
+@Test func authorisingReExportIsWhatLetsTheHistoryGoOutAgain() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let (store, source, dest) = try anchorHoldFixture(
+        metric: metric,
+        samples: [heartSample("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")]
+    )
+    try await store.transact {
+        try $0.upsertAnchorHold(
+            AnchorHold(
+                metric: metric,
+                reason: .cursorLost,
+                detectedAtEpoch: 0,
+                lastEmittedDay: "2026-09-08",
+                decision: .reexportAuthorized
+            )
+        )
+    }
+    let run = ExportRun(
+        source: source,
+        destination: .testing(LocalFileSink(directory: dest)),
+        store: store,
+        metric: metric,
+        scratchDirectory: dest.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    )
+    let outcome = try await run.run()
+
+    #expect(outcome.kind.rawValue != "failed")
+    #expect(source.reads == 1)
+    #expect(store.transaction.anchorHolds[metric] == nil)
+}
+
+/// A run that resumed from an anchor and got the whole store back has an anchor that no
+/// longer means what it says. The flood is dropped rather than queued.
+@Test func aDeltaThatReturnsTheWholeStoreIsHeldInsteadOfEnqueued() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let uuids = [
+        "cccccccc-cccc-cccc-cccc-cccccccccccc",
+        "dddddddd-dddd-dddd-dddd-dddddddddddd",
+        "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+    ]
+    let (store, source, dest) = try anchorHoldFixture(
+        metric: metric,
+        samples: uuids.map { heartSample($0) }
+    )
+    try await store.transact {
+        try $0.commitBatch(
+            PendingBatch(
+                id: BatchID(rawValue: "seed"),
+                payloadURL: dest.appendingPathComponent("seed").path,
+                expectedRecords: 0,
+                byteCount: 0,
+                metric: metric,
+                createdAtEpoch: 0
+            ),
+            advancing: CursorAdvance(
+                page: SamplePage(
+                    samples: [],
+                    tombstones: [],
+                    metric: metric,
+                    anchorBlob: Data([1]),
+                    observedThrough: Date(timeIntervalSince1970: 0)
+                ),
+                epoch: 1
+            )
+        )
+    }
+    let run = ExportRun(
+        source: source,
+        destination: .testing(LocalFileSink(directory: dest)),
+        store: store,
+        metric: metric,
+        scratchDirectory: dest.appendingPathComponent("scratch"),
+        envelope: testEnvelope(),
+        replaySampleLimit: 2
+    )
+    let outcome = try await run.run()
+
+    #expect(outcome.kind.rawValue == "failed")
+    #expect(store.transaction.journal.last?.detail == "anchor_invalidated")
+    let hold = try #require(store.transaction.anchorHolds[metric])
+    #expect(hold.reason == .replaySuspected)
+    #expect(hold.observedSamples == 3)
+    let queued = try await store.transact { try $0.pendingBatches() }
+    #expect(queued.map(\.id.rawValue) == ["seed"])
+}
+
+@Test func theReplayBoundIsAboveAnyPlausibleIncrement() {
+    #expect(AnchorGuard.implausibleDeltaSamples == 50_000)
+    #expect(
+        !AnchorGuard.replayIsSuspected(resumedFromAnchor: true, sampleCount: 50_000)
+    )
+    #expect(AnchorGuard.replayIsSuspected(resumedFromAnchor: true, sampleCount: 50_001))
+    // A first run legitimately returns everything; it is not a replay.
+    #expect(!AnchorGuard.replayIsSuspected(resumedFromAnchor: false, sampleCount: 500_000))
+    #expect(!AnchorGuard.cursorIsLost(hasCursor: false, lastEmittedDay: nil))
+    #expect(AnchorGuard.cursorIsLost(hasCursor: false, lastEmittedDay: "2026-09-08"))
+    #expect(!AnchorGuard.cursorIsLost(hasCursor: true, lastEmittedDay: "2026-09-08"))
+}
+
 @Test func queueAdmissionEvictsOldestBatchesAndRecordsGaps() async throws {
     let metric = MetricID(rawValue: "heartRate")
     let page = SamplePage(

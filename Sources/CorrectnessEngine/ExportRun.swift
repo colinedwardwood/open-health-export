@@ -26,6 +26,8 @@ public struct ExportRun: Sendable {
     public var externalStatusURL: URL?
     public var ledgerHeadSeal: (any LedgerHeadSeal)?
     public var ledgerSealURL: URL?
+    /// QA-17: the page size above which a delta is treated as a replayed store.
+    public var replaySampleLimit: Int
     #if DEBUG
     public var faults: any ExportFaultInjector = NoExportFaults()
     #endif
@@ -47,7 +49,8 @@ public struct ExportRun: Sendable {
         snapshotURL: URL? = nil,
         externalStatusURL: URL? = nil,
         ledgerHeadSeal: (any LedgerHeadSeal)? = nil,
-        ledgerSealURL: URL? = nil
+        ledgerSealURL: URL? = nil,
+        replaySampleLimit: Int = AnchorGuard.implausibleDeltaSamples
     ) {
         self.source = source
         self.destination = destination
@@ -66,6 +69,7 @@ public struct ExportRun: Sendable {
         self.externalStatusURL = externalStatusURL
         self.ledgerHeadSeal = ledgerHeadSeal
         self.ledgerSealURL = ledgerSealURL
+        self.replaySampleLimit = replaySampleLimit
     }
 
     public func run() async throws -> RunOutcome {
@@ -83,6 +87,19 @@ public struct ExportRun: Sendable {
             return outcome
         }
         let effectiveEpoch = max(epoch, typeStatus?.generation ?? epoch)
+        let openHold = try await store.transact { try $0.loadAnchorHold(metric: metric) }
+        var authorizedReexport = false
+        if let openHold {
+            guard openHold.decision == .reexportAuthorized else {
+                // Someone has to decide whether this metric re-exports its history.
+                // Until they do, running would make that decision for them.
+                return try await refuse(cause: AnchorGuard.heldJournalDetail)
+            }
+            // Decided, and the decision was to send it all again. The guards below stay
+            // quiet for this run so they do not re-hold what was just authorised.
+            authorizedReexport = true
+            try await store.transact { try $0.clearAnchorHold(metric: metric) }
+        }
         let prior: CursorSnapshot?
         do {
             prior = try await store.transact { tx in
@@ -93,6 +110,17 @@ public struct ExportRun: Sendable {
             let outcome = RunOutcome.derive(from: tally)
             try await record(outcome: outcome, tally: tally, receipt: nil)
             throw error
+        }
+        let lastEmittedDay = try await store.transact { tx in
+            try tx.latestEmittedDay(metric: metric)
+        }
+        if !authorizedReexport,
+           AnchorGuard.cursorIsLost(hasCursor: prior != nil, lastEmittedDay: lastEmittedDay)
+        {
+            // Reading now would pass a nil anchor and pull the whole store back, which
+            // is exactly the silent full re-export QA-17 forbids. Do not read at all.
+            try await hold(reason: .cursorLost, observedSamples: 0, lastEmittedDay: lastEmittedDay)
+            return try await refuse(cause: AnchorGuard.journalDetail)
         }
         let page: SamplePage
         do {
@@ -114,6 +142,23 @@ public struct ExportRun: Sendable {
         #if DEBUG
         try faults.hit(.afterRead)
         #endif
+        let returned = page.censusKeys.count + page.tombstones.count
+        if !authorizedReexport,
+           AnchorGuard.replayIsSuspected(
+               resumedFromAnchor: prior != nil,
+               sampleCount: returned,
+               limit: replaySampleLimit
+           )
+        {
+            // The anchor was accepted and the source still replayed the store, so the
+            // anchor no longer means what it says. Drop the page rather than enqueue it.
+            try await hold(
+                reason: .replaySuspected,
+                observedSamples: returned,
+                lastEmittedDay: lastEmittedDay
+            )
+            return try await refuse(cause: AnchorGuard.journalDetail)
+        }
         let aggregates = try await drainPlans(for: page)
         if !page.hasRecords, aggregates.isEmpty {
             let outcome = RunOutcome.derive(from: RunTally(nothingDue: true))
@@ -298,6 +343,32 @@ public struct ExportRun: Sendable {
             observedAt: envelope.observedAt,
             now: clock.now()
         )
+    }
+
+    private func hold(
+        reason: AnchorHold.Reason,
+        observedSamples: Int,
+        lastEmittedDay: String?
+    ) async throws {
+        let detectedAt = clock.now().timeIntervalSince1970
+        try await store.transact { tx in
+            try tx.upsertAnchorHold(
+                AnchorHold(
+                    metric: metric,
+                    reason: reason,
+                    detectedAtEpoch: detectedAt,
+                    observedSamples: observedSamples,
+                    lastEmittedDay: lastEmittedDay
+                )
+            )
+        }
+    }
+
+    private func refuse(cause: String) async throws -> RunOutcome {
+        let tally = RunTally(failed: 1, terminalError: .internalFault, partialCause: cause)
+        let outcome = RunOutcome.derive(from: tally)
+        try await record(outcome: outcome, tally: tally, receipt: nil)
+        return outcome
     }
 
     private func record(outcome: RunOutcome, tally: RunTally, receipt: DeliveryReceipt?) async throws {

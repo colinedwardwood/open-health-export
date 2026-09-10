@@ -171,7 +171,15 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 job_id TEXT PRIMARY KEY,
                 payload BLOB NOT NULL
             );
-            PRAGMA user_version = 10;
+            CREATE TABLE IF NOT EXISTS anchor_holds (
+                metric TEXT PRIMARY KEY,
+                reason TEXT NOT NULL,
+                detected_at_epoch REAL NOT NULL,
+                observed_samples INTEGER NOT NULL DEFAULT 0,
+                last_emitted_day TEXT,
+                decision TEXT
+            );
+            PRAGMA user_version = 11;
             """)
     }
 
@@ -692,8 +700,74 @@ private final class SQLiteTransaction: StateTransaction {
         try stepDone(stmt)
     }
 
+    func loadAnchorHold(metric: MetricID) throws -> AnchorHold? {
+        let stmt = try store.prepare(
+            "SELECT reason, detected_at_epoch, observed_samples, last_emitted_day, decision FROM anchor_holds WHERE metric = ? LIMIT 1;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, metric.rawValue)
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
+        return hold(from: stmt, metric: metric)
+    }
+
+    func loadAnchorHolds() throws -> [AnchorHold] {
+        let stmt = try store.prepare(
+            "SELECT reason, detected_at_epoch, observed_samples, last_emitted_day, decision, metric FROM anchor_holds ORDER BY metric;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        var holds: [AnchorHold] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            holds.append(hold(from: stmt, metric: MetricID(rawValue: text(stmt, 5))))
+        }
+        return holds
+    }
+
+    private func hold(from stmt: OpaquePointer, metric: MetricID) -> AnchorHold {
+        AnchorHold(
+            metric: metric,
+            // An unreadable reason still holds the metric. Forgetting why we stopped is
+            // not a reason to start re-exporting again.
+            reason: AnchorHold.Reason(rawValue: text(stmt, 0)) ?? .cursorLost,
+            detectedAtEpoch: sqlite3_column_double(stmt, 1),
+            observedSamples: Int(sqlite3_column_int64(stmt, 2)),
+            lastEmittedDay: sqlite3_column_type(stmt, 3) == SQLITE_NULL ? nil : text(stmt, 3),
+            decision: sqlite3_column_type(stmt, 4) == SQLITE_NULL
+                ? nil
+                : AnchorHold.Decision(rawValue: text(stmt, 4))
+        )
+    }
+
+    func upsertAnchorHold(_ hold: AnchorHold) throws {
+        let stmt = try store.prepare(
+            "INSERT INTO anchor_holds (metric, reason, detected_at_epoch, observed_samples, last_emitted_day, decision) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(metric) DO UPDATE SET reason = excluded.reason, detected_at_epoch = excluded.detected_at_epoch, observed_samples = excluded.observed_samples, last_emitted_day = excluded.last_emitted_day, decision = excluded.decision;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, hold.metric.rawValue)
+        bindText(stmt, 2, hold.reason.rawValue)
+        sqlite3_bind_double(stmt, 3, hold.detectedAtEpoch)
+        sqlite3_bind_int64(stmt, 4, Int64(hold.observedSamples))
+        if let day = hold.lastEmittedDay {
+            bindText(stmt, 5, day)
+        } else {
+            sqlite3_bind_null(stmt, 5)
+        }
+        if let decision = hold.decision {
+            bindText(stmt, 6, decision.rawValue)
+        } else {
+            sqlite3_bind_null(stmt, 6)
+        }
+        try stepDone(stmt)
+    }
+
+    func clearAnchorHold(metric: MetricID) throws {
+        let stmt = try store.prepare("DELETE FROM anchor_holds WHERE metric = ?;")
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, metric.rawValue)
+        try stepDone(stmt)
+    }
+
     func purgeMetricState(metric: MetricID) throws {
-        for table in ["cursors", "census", "dirty", "emitted_index"] {
+        for table in ["cursors", "census", "dirty", "emitted_index", "anchor_holds"] {
             let stmt = try store.prepare("DELETE FROM \(table) WHERE metric = ?;")
             defer { sqlite3_finalize(stmt) }
             bindText(stmt, 1, metric.rawValue)
@@ -714,7 +788,7 @@ private final class SQLiteTransaction: StateTransaction {
         for table in [
             "journal", "ledger", "cursors", "census", "dirty", "pending_batches",
             "deliveries", "gaps", "emitted_index", "aggregate_emit", "type_status",
-            "backfill_checkpoints",
+            "backfill_checkpoints", "anchor_holds",
         ] {
             try store.exec("DELETE FROM \(table);")
         }
