@@ -54,6 +54,73 @@ private struct MQTTVerificationRecord: Codable {
     var firstSeen: String?
 }
 
+private actor CountingBackfillObservations: DayObservationSource {
+    let base: HealthKitDayObservationSource
+    private var samplesRead = 0
+
+    init(base: HealthKitDayObservationSource) {
+        self.base = base
+    }
+
+    func samples(metric: MetricID, day: String) async throws -> [SampleRecord] {
+        let samples = try await base.samples(metric: metric, day: day)
+        samplesRead += samples.count
+        return samples
+    }
+
+    func count() -> Int {
+        samplesRead
+    }
+}
+
+private struct HealthBackfillProcessor: BackfillChunkProcessor {
+    var observations: HealthKitDayObservationSource
+    var statistics: HealthKitStatisticsSource
+    var destination: VerifiedDestination
+    var store: any StateStore
+    var scratchDirectory: URL
+    var exporterID: String
+    var temporal: TemporalContext
+    var ledgerHeadSeal: any LedgerHeadSeal
+    var ledgerSealURL: URL
+
+    func process(
+        metric: MetricID,
+        days: [String],
+        mode: BackfillMode
+    ) async throws -> BackfillChunkResult {
+        let counted = CountingBackfillObservations(base: observations)
+        let now = Date().ISO8601Format()
+        let outcome = try await ReconcileSweep(
+            observations: counted,
+            destination: destination,
+            store: store,
+            metric: metric,
+            scratchDirectory: scratchDirectory,
+            destinationName: "local-file",
+            envelope: WireEnvelope(
+                exporterId: exporterID,
+                seq: 1,
+                emittedAt: now,
+                observedAt: now
+            ),
+            temporal: temporal,
+            statistics: statistics,
+            trigger: .manual,
+            snapshotURL: StatusSnapshotLocation.url(destinationID: "local-file"),
+            externalStatusURL: scratchDirectory
+                .deletingLastPathComponent()
+                .appendingPathComponent("exports/status.json"),
+            ledgerHeadSeal: ledgerHeadSeal,
+            ledgerSealURL: ledgerSealURL
+        ).runBackfill(days: days, mode: mode)
+        return BackfillChunkResult(
+            samplesRead: await counted.count(),
+            batchesEnqueued: outcome.kind == .successNothingDue ? 0 : 1
+        )
+    }
+}
+
 private actor ObserverExportGate {
     static let shared = ObserverExportGate()
     private var pending: Set<MetricID> = []
@@ -345,6 +412,92 @@ enum HarnessExport {
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
         lines.append("Files: \(dest.path)")
         return lines
+    }
+
+    static func runBackfill(mode: BackfillMode) async throws -> [String] {
+        let root = try applicationSupportRoot()
+        let destinationDirectory = root.appendingPathComponent(
+            "exports",
+            isDirectory: true
+        )
+        let scratch = root.appendingPathComponent("backfill-scratch", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: destinationDirectory,
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: scratch,
+            withIntermediateDirectories: true
+        )
+        let store = try SQLiteStateStore(
+            path: root.appendingPathComponent("state.sqlite").path
+        )
+        let (destination, events) = try verifiedLocalFile(
+            root: root,
+            destinationDirectory: destinationDirectory
+        )
+        try await emitTrustNotices(events)
+        let context = TemporalContext.utcHost
+        let observations = HealthKitDayObservationSource(context: context, limit: 1000)
+        var metrics: [MetricID] = []
+        var firstDay: String?
+        var lastDay: String?
+        for metric in selectedMetrics() {
+            guard let range = try? await observations.availableDayRange(metric: metric) else {
+                continue
+            }
+            metrics.append(metric)
+            firstDay = min(firstDay ?? range.lowerBound, range.lowerBound)
+            lastDay = max(lastDay ?? range.upperBound, range.upperBound)
+        }
+        guard let firstDay, let lastDay, !metrics.isEmpty else {
+            return ["No supported Health history is available for backfill."]
+        }
+
+        let checkpointURL = root.appendingPathComponent(
+            mode == .raw ? "backfill-raw.json" : "backfill-aggregate.json"
+        )
+        let processor = HealthBackfillProcessor(
+            observations: observations,
+            statistics: HealthKitStatisticsSource(context: context),
+            destination: destination,
+            store: store,
+            scratchDirectory: scratch,
+            exporterID: try installationID(),
+            temporal: context,
+            ledgerHeadSeal: ledgerHeadSeal(),
+            ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json")
+        )
+        let job = BackfillJob(
+            checkpointURL: checkpointURL,
+            processor: processor,
+            store: store
+        )
+        if !FileManager.default.fileExists(atPath: checkpointURL.path) {
+            let hostModel = await UIDevice.current.model
+            try await job.create(
+                BackfillCheckpoint(
+                    jobID: UUID().uuidString,
+                    createdAt: Date().ISO8601Format(),
+                    hostModel: hostModel,
+                    plan: BackfillPlan(
+                        windowStartDay: firstDay,
+                        windowEndDay: lastDay,
+                        mode: mode,
+                        metrics: metrics,
+                        destinations: ["local-file"]
+                    )
+                )
+            )
+        }
+        let completed = try await job.run()
+        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+        return [
+            "\(mode.rawValue) backfill complete",
+            "Samples read: \(completed.progress.samplesRead)",
+            "Batches enqueued: \(completed.progress.batchesEnqueued)",
+            "Checkpoint: \(checkpointURL.path)",
+        ]
     }
 
     static func queueEvictionGaps() async throws -> [GapRecord] {
@@ -1189,6 +1342,10 @@ enum HarnessExport {
         )
         try? FileManager.default.removeItem(at: localFileTestReportURL(root: root))
         try? FileManager.default.removeItem(at: companionTestReportURL(root: root))
+        try? FileManager.default.removeItem(at: root.appendingPathComponent("backfill-raw.json"))
+        try? FileManager.default.removeItem(
+            at: root.appendingPathComponent("backfill-aggregate.json")
+        )
         try await vault().forget()
         if let directory = StatusSnapshotLocation.directory() {
             try? FileManager.default.removeItem(at: directory)

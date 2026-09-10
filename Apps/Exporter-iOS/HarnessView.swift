@@ -1,12 +1,14 @@
 import CompanionWire
 import CoreDomain
 import CoreTemporal
+import CorrectnessEngine
 import DestinationTrust
 import DiagnosticBundle
 import EnginePorts
 import HealthKitSource
 import MetricCatalog
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 import Watchdog
 import WireFormat
@@ -261,6 +263,20 @@ struct HarnessView: View {
             }
             .disabled(phase == .working)
             .accessibilityHint("Writes NDJSON under Application Support using the engine and local-file sink.")
+            Text("Backfill runs newest-first and resumes from an inspectable checkpoint. On iOS 26 or later it continues unattended after you leave the app. On iOS 18 through 25, keep this screen open; the app prevents idle sleep while it works.")
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("backfill-os-disclosure")
+            Button("Backfill all history (aggregates)") {
+                Task { await runBackfill(mode: .aggregateOnly) }
+            }
+            .disabled(phase == .working || !HarnessExport.isLocalFileEnabled())
+            .accessibilityIdentifier("backfill-aggregate")
+            Button("Backfill raw history (explicit action)") {
+                Task { await runBackfill(mode: .raw) }
+            }
+            .disabled(phase == .working || !HarnessExport.isLocalFileEnabled())
+            .accessibilityIdentifier("backfill-raw")
             Button("Reconcile all available Health history") {
                 Task { await runFullReconcile() }
             }
@@ -1064,6 +1080,31 @@ struct HarnessView: View {
             destinationStatusLines = HarnessExport.destinationStatusLines()
             await refreshLedgerIntegrity()
             status = "Ready. Full reconciliation finished without advancing anchored cursors."
+        } catch {
+            status = "Failed: \(error.localizedDescription)"
+        }
+        phase = .ready
+    }
+
+    @MainActor
+    private func runBackfill(mode: BackfillMode) async {
+        phase = .working
+        status = mode == .raw
+            ? "Working: preparing explicit raw-history backfill."
+            : "Working: preparing aggregate-only history backfill."
+        results = []
+        do {
+            if try ContinuedBackfillCoordinator.submit(mode: mode) {
+                status = "Ready. iOS accepted the unattended backfill; progress is available in the system UI."
+                phase = .ready
+                return
+            }
+            UIApplication.shared.isIdleTimerDisabled = true
+            defer { UIApplication.shared.isIdleTimerDisabled = false }
+            results = try await HarnessExport.runBackfill(mode: mode)
+            destinationStatusLines = HarnessExport.destinationStatusLines()
+            await refreshLedgerIntegrity()
+            status = "Ready. Foreground backfill completed."
         } catch {
             status = "Failed: \(error.localizedDescription)"
         }

@@ -39,6 +39,7 @@
 	<array>
 		<string>app.openhealthexporter.refresh</string>
 		<string>app.openhealthexporter.processing</string>
+		<string>app.openhealthexporter.backfill</string>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>

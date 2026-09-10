@@ -109,10 +109,23 @@ public struct ReconcileSweep: Sendable {
         )
     }
 
+    public func runBackfill(
+        days: [String],
+        mode: BackfillMode
+    ) async throws -> RunOutcome {
+        try await run(
+            days: days,
+            throughDay: days.max() ?? String(clock.now().ISO8601Format().prefix(10)),
+            reason: "backfill",
+            includeRaw: mode == .raw
+        )
+    }
+
     private func run(
         days: [String],
         throughDay: String,
-        reason: String
+        reason: String,
+        includeRaw: Bool = true
     ) async throws -> RunOutcome {
         if let status = try await store.transact({ try $0.loadTypeStatus(metric: metric) }),
            status.disabled {
@@ -127,9 +140,11 @@ public struct ReconcileSweep: Sendable {
         }
 
         var samples: [SampleRecord] = []
+        var observedSamples: [SampleRecord] = []
         var tombstones: [TombstoneRecord] = []
         for day in days {
             let observed = try await observations.samples(metric: metric, day: day)
+            observedSamples.append(contentsOf: observed)
             let plan = try await store.transact { tx in
                 ReconcilePlanner.planDay(
                     metric: metric,
@@ -142,18 +157,13 @@ public struct ReconcileSweep: Sendable {
             for repair in plan.repairs {
                 switch repair {
                 case .reemitDay:
-                    samples.append(contentsOf: observed)
+                    if includeRaw {
+                        samples.append(contentsOf: observed)
+                    }
                 case .emitAbsenceTombstones(let tombs):
                     tombstones.append(contentsOf: tombs)
                 }
             }
-        }
-
-        if samples.isEmpty, tombstones.isEmpty {
-            let tally = RunTally(nothingDue: true)
-            let outcome = RunOutcome.derive(from: tally)
-            try await record(outcome: outcome, tally: tally, receipt: nil)
-            return outcome
         }
 
         let page = SamplePage(
@@ -165,9 +175,27 @@ public struct ReconcileSweep: Sendable {
             ),
             observedThrough: clock.now()
         )
+        let censusPage = SamplePage(
+            samples: observedSamples,
+            tombstones: tombstones,
+            metric: metric,
+            anchorBlob: page.anchorBlob,
+            observedThrough: page.observedThrough
+        )
+        let aggregatePage = includeRaw ? page : censusPage
+        let aggregates = try await drainPlans(
+            for: aggregatePage,
+            forcedDays: includeRaw ? [] : Set(days)
+        )
+        if !page.hasRecords, aggregates.isEmpty {
+            let tally = RunTally(nothingDue: true)
+            let outcome = RunOutcome.derive(from: tally)
+            try await record(outcome: outcome, tally: tally, receipt: nil)
+            return outcome
+        }
+
         var wire = envelope
         wire.reason = reason
-        let aggregates = try await drainPlans(for: page)
         let batchID = NativeWire.batchID(metric: metric, anchorBlob: page.anchorBlob)
         let payload = try NativeWire.encode(
             samples: page.samples,
@@ -193,7 +221,7 @@ public struct ReconcileSweep: Sendable {
         let victims = try await store.transact { tx in
             let evicted = try QueueAdmission.makeRoom(for: pending.byteCount, on: tx)
             try tx.enqueuePending(pending)
-            try Census.apply(page: page, to: tx)
+            try Census.apply(page: censusPage, to: tx)
             try EmittedIndex.record(page: page, batchID: pending.id, on: tx)
             for plan in aggregates {
                 try tx.upsertAggregateEmitSeq(
@@ -229,8 +257,12 @@ public struct ReconcileSweep: Sendable {
         return outcome
     }
 
-    private func drainPlans(for page: SamplePage) async throws -> [AggregateDayPlan] {
-        var days = Set(page.samples.map { String($0.start.prefix(10)) })
+    private func drainPlans(
+        for page: SamplePage,
+        forcedDays: Set<String> = []
+    ) async throws -> [AggregateDayPlan] {
+        var days = forcedDays
+        days.formUnion(page.samples.map { String($0.start.prefix(10)) })
         let tombDays = try await store.transact { tx -> Set<String> in
             var found: Set<String> = []
             for tomb in page.tombstones {

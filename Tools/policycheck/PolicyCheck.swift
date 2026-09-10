@@ -98,6 +98,7 @@ struct PolicyCheck {
             "BGTaskSchedulerPermittedIdentifiers",
             "app.openhealthexporter.refresh",
             "app.openhealthexporter.processing",
+            "app.openhealthexporter.backfill",
         ] where !exporterInfoText.contains(required) {
             FileHandle.standardError.write(
                 Data("iOS background task configuration is missing \(required)\n".utf8)

@@ -167,7 +167,11 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 reason TEXT NOT NULL,
                 generation INTEGER NOT NULL DEFAULT 1
             );
-            PRAGMA user_version = 9;
+            CREATE TABLE IF NOT EXISTS backfill_checkpoints (
+                job_id TEXT PRIMARY KEY,
+                payload BLOB NOT NULL
+            );
+            PRAGMA user_version = 10;
             """)
     }
 
@@ -258,6 +262,26 @@ private final class SQLiteTransaction: StateTransaction {
             epoch: checkpoint.epoch,
             anchorBlob: checkpoint.adapterAnchor
         )
+    }
+
+    func loadBackfillCheckpoint(jobID: String) throws -> Data? {
+        let stmt = try store.prepare(
+            "SELECT payload FROM backfill_checkpoints WHERE job_id = ? LIMIT 1;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, jobID)
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
+        return blob(stmt, 0)
+    }
+
+    func upsertBackfillCheckpoint(jobID: String, bytes: Data) throws {
+        let stmt = try store.prepare(
+            "INSERT INTO backfill_checkpoints (job_id, payload) VALUES (?, ?) ON CONFLICT(job_id) DO UPDATE SET payload = excluded.payload;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, jobID)
+        bindBlob(stmt, 2, bytes)
+        try stepDone(stmt)
     }
 
     func enqueuePending(_ batch: PendingBatch) throws {
@@ -680,6 +704,7 @@ private final class SQLiteTransaction: StateTransaction {
         for table in [
             "journal", "ledger", "cursors", "census", "dirty", "pending_batches",
             "deliveries", "gaps", "emitted_index", "aggregate_emit", "type_status",
+            "backfill_checkpoints",
         ] {
             try store.exec("DELETE FROM \(table);")
         }

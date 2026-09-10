@@ -112,6 +112,39 @@
         }
       }
     },
+    "Backfill all history (aggregates)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Backfill all history (aggregates)"
+          }
+        }
+      }
+    },
+    "Backfill raw history (explicit action)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Backfill raw history (explicit action)"
+          }
+        }
+      }
+    },
+    "Backfill runs newest-first and resumes from an inspectable checkpoint. On iOS 26 or later it continues unattended after you leave the app. On iOS 18 through 25, keep this screen open; the app prevents idle sleep while it works.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Backfill runs newest-first and resumes from an inspectable checkpoint. On iOS 26 or later it continues unattended after you leave the app. On iOS 18 through 25, keep this screen open; the app prevents idle sleep while it works."
+          }
+        }
+      }
+    },
     "Bearer token (optional)": {
       "extractionState": "manual",
       "localizations": {

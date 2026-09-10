@@ -102,6 +102,18 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(explanation.label.contains("full reconcile"))
     }
 
+    func testBackfillDisclosesOSTiersAndKeepsRawExplicit() {
+        enterControls()
+        let disclosure = scrollToHittable(app.staticTexts["backfill-os-disclosure"])
+        XCTAssertTrue(disclosure.label.contains("iOS 26"))
+        XCTAssertTrue(disclosure.label.contains("iOS 18 through 25"))
+        XCTAssertTrue(app.buttons["backfill-aggregate"].exists)
+        XCTAssertEqual(
+            app.buttons["backfill-raw"].label,
+            "Backfill raw history (explicit action)"
+        )
+    }
+
     func testDataBrowserSelectAndEmptyMeasurementsAreVisibleAfterDisclosure() {
         enterControls()
         XCTAssertTrue(app.staticTexts["browser-title"].waitForExistence(timeout: 2))

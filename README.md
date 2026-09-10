@@ -43,6 +43,12 @@ Requires [XcodeGen](https://github.com/yonaskolb/XcodeGen). The `.xcodeproj` is 
 not committed. Run on a physical iPhone (REF-B or iPhone XR) for a populated Health store.
 Acknowledge the locked-device disclosure before Health permission.
 
+Full-history backfill is user-initiated. On iOS 26 and later it uses the
+system's continued-processing UI and can finish unattended. On iOS 18–25 it
+requires foreground time; keep the app open.
+First-run backfill exports aggregates only. Raw-history backfill is a separate
+explicit action.
+
 If this app disappears from the Home Screen, that is an iOS feature we cannot
 prevent. Our binary has no stealth mode, alternate icons, or second name. Check
 Settings → Apps → Hidden Apps, Screen Time, Battery, and App Store purchase

@@ -2625,6 +2625,44 @@ private func runUntilProcessExitSeam() async throws {
     #expect(try store.transaction.pendingBatches().count == pendingBefore)
 }
 
+@Test func aggregateOnlyBackfillDoesNotEmitOrIndexRawSamples() async throws {
+    let metric = MetricCatalog.heartRate.id
+    let sample = heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+    let destination = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-backfill-aggregate-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: destination) }
+    try FileManager.default.createDirectory(
+        at: destination,
+        withIntermediateDirectories: true
+    )
+    let store = MemoryStateStore()
+    let outcome = try await ReconcileSweep(
+        observations: FixtureDays(byDay: ["2024-01-01": [sample]]),
+        destination: .testing(LocalFileSink(directory: destination)),
+        store: store,
+        metric: metric,
+        scratchDirectory: destination.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    ).runBackfill(days: ["2024-01-01"], mode: .aggregateOnly)
+
+    #expect(outcome.kind == .success)
+    #expect(
+        try store.transaction.loadCensus(metric: metric, day: "2024-01-01")?
+            .sampleCount == 1
+    )
+    #expect(try store.transaction.loadEmittedIndex(uuid: sample.key.uuid) == nil)
+    let payload = try FileManager.default.contentsOfDirectory(
+        at: destination,
+        includingPropertiesForKeys: nil
+    )
+    .filter { $0.pathExtension == "ndjson" }
+    .map { try String(contentsOf: $0, encoding: .utf8) }
+    .joined()
+    #expect(payload.contains("\"reason\":\"backfill\""))
+    #expect(payload.contains("\"kind\":\"aggregate\""))
+    #expect(!payload.contains("\"kind\":\"sample.quantity\""))
+}
+
 @Test func clearDirtyRemovesOnlyTheNamedDay() async throws {
     let store = MemoryStateStore()
     let metric = MetricID(rawValue: "heartRate")

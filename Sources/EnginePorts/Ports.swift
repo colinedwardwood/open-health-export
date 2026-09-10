@@ -335,6 +335,8 @@ public struct EmittedIndexRow: Sendable, Equatable {
 
 public protocol StateTransaction: AnyObject {
     func loadCursor(metric: MetricID) throws -> CursorSnapshot?
+    func loadBackfillCheckpoint(jobID: String) throws -> Data?
+    func upsertBackfillCheckpoint(jobID: String, bytes: Data) throws
     func enqueuePending(_ batch: PendingBatch) throws
     func commitBatch(_ batch: PendingBatch, advancing: CursorAdvance) throws
     /// Batches survive process death until a receipt confirms every expected record.

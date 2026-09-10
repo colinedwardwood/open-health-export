@@ -1,4 +1,5 @@
 import BackgroundTasks
+import CorrectnessEngine
 import EnginePorts
 import Foundation
 import HealthKitSource
@@ -51,9 +52,63 @@ final class ExporterAppDelegate: NSObject, UIApplicationDelegate {
     ) -> Bool {
         AppLifecycleCoordinator.shared.recordWake(.launch)
         BackgroundTaskCoordinator.register()
+        ContinuedBackfillCoordinator.register()
         Task {
             try? await AppLifecycleCoordinator.shared.startObserversIfEligible()
         }
+        return true
+    }
+}
+
+@MainActor
+enum ContinuedBackfillCoordinator {
+    static let identifier = "app.openhealthexporter.backfill"
+    private static let modeKey = "ohe.backfillMode"
+
+    static func register() {
+        guard #available(iOS 26.0, *) else { return }
+        BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: identifier,
+            using: nil
+        ) { task in
+            guard let continued = task as? BGContinuedProcessingTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            Task { @MainActor in
+                let mode = BackfillMode(
+                    rawValue: UserDefaults.standard.string(forKey: modeKey) ?? ""
+                ) ?? .aggregateOnly
+                let work = Task {
+                    try await HarnessExport.runBackfill(mode: mode)
+                }
+                continued.progress.totalUnitCount = 1
+                continued.expirationHandler = {
+                    work.cancel()
+                }
+                do {
+                    _ = try await work.value
+                    continued.progress.completedUnitCount = 1
+                    continued.setTaskCompleted(success: true)
+                } catch {
+                    continued.setTaskCompleted(success: false)
+                }
+            }
+        }
+    }
+
+    static func submit(mode: BackfillMode) throws -> Bool {
+        guard #available(iOS 26.0, *) else { return false }
+        UserDefaults.standard.set(mode.rawValue, forKey: modeKey)
+        let request = BGContinuedProcessingTaskRequest(
+            identifier: identifier,
+            title: mode == .raw
+                ? "Backfilling raw Health history"
+                : "Backfilling Health summaries",
+            subtitle: "Newest history first"
+        )
+        request.strategy = .queue
+        try BGTaskScheduler.shared.submit(request)
         return true
     }
 }

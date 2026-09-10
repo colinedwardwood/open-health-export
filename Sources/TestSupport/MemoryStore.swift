@@ -7,6 +7,7 @@ public final class MemoryTransaction: StateTransaction {
     public var journal: [RunEvent] = []
     public var ledger: [EgressEntry] = []
     public var cursors: [MetricID: CursorSnapshot] = [:]
+    public var backfillCheckpoints: [String: Data] = [:]
     public var gaps: [GapRecord] = []
     public var census: [String: CensusRow] = [:]
     public var dirty: [MetricID: Set<String>] = [:]
@@ -27,6 +28,14 @@ public final class MemoryTransaction: StateTransaction {
             epoch: checkpoint.epoch,
             anchorBlob: checkpoint.adapterAnchor
         )
+    }
+
+    public func loadBackfillCheckpoint(jobID: String) throws -> Data? {
+        backfillCheckpoints[jobID]
+    }
+
+    public func upsertBackfillCheckpoint(jobID: String, bytes: Data) throws {
+        backfillCheckpoints[jobID] = bytes
     }
 
     public func enqueuePending(_ batch: PendingBatch) throws {
@@ -171,6 +180,7 @@ public final class MemoryTransaction: StateTransaction {
         journal = []
         ledger = []
         cursors = [:]
+        backfillCheckpoints = [:]
         gaps = []
         census = [:]
         dirty = [:]
