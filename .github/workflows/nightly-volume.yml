@@ -13,7 +13,9 @@ jobs:
         with:
           swift-version: "6.3.3"
       - name: Build release corpus generator
-        run: swift build -c release --product corpusgen --product pipelinecheck
+        run: |
+          swift build -c release --product corpusgen
+          swift build -c release --product pipelinecheck
       - name: Generate ten million records reproducibly
         shell: bash
         run: |
