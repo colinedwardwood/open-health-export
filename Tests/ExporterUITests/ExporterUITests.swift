@@ -69,16 +69,23 @@ final class ExporterUITests: XCTestCase {
         try performAccessibilityAudit()
     }
 
-    func testDiagnosticShareDoesNotExistBeforeFullPreviewConfirmation() {
+    func testDiagnosticShareExistsOnlyPastTheBundlesLastLine() {
         enterControls()
         let build = scrollToHittable(app.buttons["diagnostic-build"])
         XCTAssertFalse(app.buttons["diagnostic-share"].exists)
         build.tap()
 
-        let confirm = scrollToHittable(app.buttons["diagnostic-confirm"])
-        XCTAssertFalse(app.buttons["diagnostic-share"].exists)
-        confirm.tap()
-        XCTAssertTrue(app.buttons["diagnostic-share"].waitForExistence(timeout: 2))
+        // S9 makes this structural rather than a state machine: sharing lives below the
+        // bundle's last line, so it cannot be reached without traversing the content by
+        // scroll, VoiceOver or Full Keyboard Access. Asserting order rather than
+        // off-screen absence keeps the test honest when a short bundle fits on one screen.
+        let end = app.staticTexts["diagnostic-end"]
+        XCTAssertTrue(end.waitForExistence(timeout: 5))
+        scrollToHittable(end)
+
+        let share = app.buttons["diagnostic-share"]
+        XCTAssertTrue(share.waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(share.frame.minY, end.frame.minY)
     }
 
     func testExplicitTypeStopRequiresTwoTaps() {

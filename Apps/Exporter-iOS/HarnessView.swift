@@ -600,22 +600,27 @@ struct HarnessView: View {
             }
             .accessibilityIdentifier("diagnostic-build")
             .disabled(phase == .working)
-            .accessibilityHint("Assembles a redacted ohe.diagnostic/1 JSON preview. Share does not exist until you confirm you read it.")
+            .accessibilityHint("Assembles a redacted ohe.diagnostic/1 JSON preview. Sharing exists only below the bundle's last line.")
             if !diagnosticPreview.isEmpty {
                 Text(diagnosticPreview)
                     .font(.system(.footnote, design: .monospaced))
                     .textSelection(.enabled)
-                Button("I have read this diagnostic") {
-                    confirmDiagnosticRead()
+                // S9: the share affordance exists only past the last line of content, so
+                // it cannot be reached without traversing the bundle by scroll, VoiceOver
+                // or Full Keyboard Access. Visibility, not an onAppear, is the evidence:
+                // a ScrollView builds every child eagerly whether it is on screen or not.
+                Text("End of diagnostic bundle")
+                    .font(.footnote)
+                    .accessibilityIdentifier("diagnostic-end")
+                    .onScrollVisibilityChange(threshold: 0.9) { visible in
+                        if visible { revealDiagnosticShare() }
+                    }
+                if let diagnosticShareURL {
+                    ShareLink(item: diagnosticShareURL) {
+                        Text("Share diagnostic")
+                    }
+                    .accessibilityIdentifier("diagnostic-share")
                 }
-                .accessibilityIdentifier("diagnostic-confirm")
-                .disabled(diagnosticPayload == nil)
-            }
-            if let diagnosticShareURL {
-                ShareLink(item: diagnosticShareURL) {
-                    Text("Share diagnostic")
-                }
-                .accessibilityIdentifier("diagnostic-share")
             }
 
             Text("Companion pairing")
@@ -666,7 +671,7 @@ struct HarnessView: View {
             )
             diagnosticPreview = built.preview
             diagnosticPayload = built.payload
-            status = "Ready. Read the diagnostic JSON. Share appears only after you confirm."
+            status = "Ready. Sharing exists only below the bundle's last line."
         } catch {
             diagnosticPreview = ""
             diagnosticPayload = nil
@@ -674,15 +679,15 @@ struct HarnessView: View {
         }
     }
 
-    private func confirmDiagnosticRead() {
-        guard let diagnosticPayload else { return }
+    private func revealDiagnosticShare() {
+        guard diagnosticShareURL == nil, let diagnosticPayload else { return }
         diagnosticGate.reachedEnd(of: diagnosticPayload)
         guard let payload = diagnosticGate.sharePayload else { return }
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("ohe-diagnostic.json")
         do {
             try payload.write(to: url, options: .atomic)
             diagnosticShareURL = url
-            status = "Ready. Share is available because you confirmed the full preview."
+            status = "Ready. You reached the end of the bundle, so sharing it is available."
         } catch {
             status = "Failed: \(error.localizedDescription)"
         }
