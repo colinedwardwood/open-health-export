@@ -20,6 +20,8 @@ private func mosquittoURL() -> String? {
     ProcessInfo.processInfo.environment["OHE_MQTT_BROKER"]
 }
 
+@Suite
+struct MosquittoExternalBrokerTests {
 @Test(.enabled(if: mosquittoURL() != nil))
 func mosquittoQoS1PublishesAndAwaitsPuback() async throws {
     let url = try #require(mosquittoURL())
@@ -74,6 +76,7 @@ func mosquittoQoS0IsUnknownAckOnTheEngine() async throws {
     )
     let outcome = try await run.run()
     #expect(outcome.kind == .unknownAck)
+}
 }
 
 private func mosquittoExecutable() -> String? {

@@ -32,7 +32,7 @@ jobs:
       - name: MQTT broker contract
         env:
           OHE_MQTT_BROKER: mqtt://127.0.0.1:1883
-        run: swift test --filter mosquittoQoS
+        run: swift test --filter MosquittoExternalBrokerTests
   home-assistant-current:
     runs-on: ubuntu-latest
     timeout-minutes: 20

@@ -27,7 +27,7 @@ jobs:
             test "$i" -lt 30 || exit 1
             sleep 1
           done
-          swift test --filter mosquittoQoS
+          swift test --filter MosquittoExternalBrokerTests
       - name: Generate Xcode project
         run: xcodegen generate
       - name: Build iOS exporter and widget

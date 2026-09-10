@@ -5,6 +5,8 @@ contracts. linux-core now cancels superseded runs and bounds the test step.
 Real-broker subprocess contracts run serially. Broker restart keeps
 `Process.waitUntilExit()` off the cooperative pool on Darwin and uses a bounded
 POSIX reap on Linux.
+Container jobs select only the external-broker suite instead of rerunning every
+local TLS and subprocess contract whose name contains `mosquittoQoS`.
 NDJSON sidecar decoding uses correctly rounded `JSONDecoder` binary64 values,
 avoiding Linux `JSONSerialization` drift on 17-digit canonical decimals.
 
