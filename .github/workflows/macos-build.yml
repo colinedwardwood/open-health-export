@@ -36,10 +36,14 @@ jobs:
 
   ios-app:
     runs-on: macos-26
-    # Fifteen UI cases across three simulator clones on a shared runner ran to 26
-    # minutes and were cut off mid-suite by a 25-minute cap. The cap was measuring the
-    # runner, not the app.
-    timeout-minutes: 50
+    # The whole suite on one runner ran to 26 minutes and was cut off mid-run. Split
+    # across two runners it is half that, and the split is derived from the test source
+    # so a new case cannot land outside every shard.
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1]
     steps:
       - uses: actions/checkout@v4
       - name: Install build tools
@@ -55,7 +59,7 @@ jobs:
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO \
             build
-      - name: Test critical iOS UI paths
+      - name: Test critical iOS UI paths (shard ${{ matrix.shard }} of 2)
         run: |
           DESTINATION_ID="$(
             xcrun simctl list devices available -j |
@@ -73,6 +77,7 @@ jobs:
             -maximum-parallel-testing-workers 3 \
             CODE_SIGNING_ALLOWED=NO \
             -resultBundlePath "$RUNNER_TEMP/ohe-ui.xcresult" \
+            $(bash scripts/ui-test-shard.sh ${{ matrix.shard }} 2) \
             test
       # xcodebuild's summary names the failing case but not the assertion, which
       # leaves a red UI run with nothing to diagnose it from.
@@ -80,7 +85,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ios-ui-xcresult
+          name: ios-ui-xcresult-${{ matrix.shard }}
           path: ${{ runner.temp }}/ohe-ui.xcresult
           retention-days: 7
 
