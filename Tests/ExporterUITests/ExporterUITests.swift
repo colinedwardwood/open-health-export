@@ -2,6 +2,11 @@ import XCTest
 
 @MainActor
 final class ExporterUITests: XCTestCase {
+    /// CI runs three simulator clones on a shared runner, where every launch and
+    /// transition takes several times what it does locally. These waits assert that a
+    /// control exists, not how fast it arrives; the timing budgets are R-73's job.
+    private let uiWait: TimeInterval = 30
+
     private var app: XCUIApplication!
 
     override func setUp() {
@@ -19,16 +24,16 @@ final class ExporterUITests: XCTestCase {
 
     func testDisclosurePrecedesHealthPermissionControl() {
         let disclosure = app.buttons["disclosure-continue"]
-        XCTAssertTrue(disclosure.waitForExistence(timeout: 5))
+        XCTAssertTrue(disclosure.waitForExistence(timeout: uiWait))
         XCTAssertFalse(app.buttons["health-request"].exists)
 
         disclosure.tap()
-        XCTAssertTrue(app.buttons["health-request"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["health-request"].waitForExistence(timeout: uiWait))
         XCTAssertTrue(app.buttons["history-load"].exists)
     }
 
     func testDisclosureAndMainControlsPassAccessibilityAudit() throws {
-        XCTAssertTrue(app.buttons["disclosure-continue"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["disclosure-continue"].waitForExistence(timeout: uiWait))
         try performAccessibilityAudit()
         enterControls()
         try performAccessibilityAudit()
@@ -38,7 +43,7 @@ final class ExporterUITests: XCTestCase {
         enterControls()
         let search = scrollToHittable(app.textFields["browser-search"])
         type("no-such-health-type", into: search)
-        XCTAssertTrue(app.staticTexts["browser-empty"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["browser-empty"].waitForExistence(timeout: uiWait))
         app.keyboards.buttons["return"].tap()
         try performAccessibilityAudit()
         app.terminate()
@@ -47,11 +52,11 @@ final class ExporterUITests: XCTestCase {
         filterBrowserToHeartRate()
         let row = app.descendants(matching: .any)["browser-row-heartRate"]
         XCTAssertTrue(
-            row.waitForExistence(timeout: 2),
+            row.waitForExistence(timeout: uiWait),
             "available identifiers: \(visibleIdentifiers())"
         )
         row.tap()
-        XCTAssertTrue(app.buttons["browser-back"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["browser-back"].waitForExistence(timeout: uiWait))
         try performAccessibilityAudit()
     }
 
@@ -62,7 +67,7 @@ final class ExporterUITests: XCTestCase {
             "UICTContentSizeCategoryAccessibilityExtraExtraExtraLarge",
         ]
         app.launch()
-        XCTAssertTrue(app.buttons["disclosure-continue"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["disclosure-continue"].waitForExistence(timeout: uiWait))
         try performAccessibilityAudit()
         enterControls()
         try performAccessibilityAudit()
@@ -77,7 +82,7 @@ final class ExporterUITests: XCTestCase {
 
         let banner = app.descendants(matching: .any)["anchor-hold-banner"]
         XCTAssertTrue(
-            banner.waitForExistence(timeout: 10),
+            banner.waitForExistence(timeout: uiWait),
             "available identifiers: \(visibleIdentifiers())"
         )
         enterControls()
@@ -93,7 +98,7 @@ final class ExporterUITests: XCTestCase {
         // recorded rather than the view forgetting.
         XCTAssertTrue(
             app.descendants(matching: .any)["anchor-hold-banner"]
-                .waitForNonExistence(timeout: 10)
+                .waitForNonExistence(timeout: uiWait)
         )
     }
 
@@ -108,11 +113,11 @@ final class ExporterUITests: XCTestCase {
         // scroll, VoiceOver or Full Keyboard Access. Asserting order rather than
         // off-screen absence keeps the test honest when a short bundle fits on one screen.
         let end = app.staticTexts["diagnostic-end"]
-        XCTAssertTrue(end.waitForExistence(timeout: 5))
+        XCTAssertTrue(end.waitForExistence(timeout: uiWait))
         scrollToHittable(end)
 
         let share = app.buttons["diagnostic-share"]
-        XCTAssertTrue(share.waitForExistence(timeout: 10))
+        XCTAssertTrue(share.waitForExistence(timeout: uiWait))
         XCTAssertGreaterThan(share.frame.minY, end.frame.minY)
     }
 
@@ -125,7 +130,7 @@ final class ExporterUITests: XCTestCase {
         confirm.tap()
         XCTAssertTrue(
             app.staticTexts["Status: Ready. Heart rate is disabled and queued payloads for that type were purged."]
-                .waitForExistence(timeout: 5)
+                .waitForExistence(timeout: uiWait)
         )
     }
 
@@ -151,12 +156,12 @@ final class ExporterUITests: XCTestCase {
 
     func testDataBrowserSelectAndEmptyMeasurementsAreVisibleAfterDisclosure() {
         enterControls()
-        XCTAssertTrue(app.staticTexts["browser-title"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["browser-title"].waitForExistence(timeout: uiWait))
         XCTAssertEqual(app.staticTexts["browser-title"].label, "Data")
         XCTAssertTrue(app.buttons["browser-select"].exists)
         XCTAssertFalse(app.buttons["browser-review"].exists)
         app.buttons["browser-select"].tap()
-        XCTAssertTrue(app.buttons["browser-invert-routine"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["browser-invert-routine"].waitForExistence(timeout: uiWait))
         XCTAssertTrue(app.buttons["browser-clear-all"].exists)
         XCTAssertTrue(app.buttons["browser-review"].exists)
         XCTAssertTrue(app.staticTexts["Measurements"].exists == false)
@@ -166,7 +171,7 @@ final class ExporterUITests: XCTestCase {
         enterControls()
         let search = scrollToHittable(app.textFields["browser-search"])
         type("no-such-health-type", into: search)
-        XCTAssertTrue(app.staticTexts["browser-empty"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["browser-empty"].waitForExistence(timeout: uiWait))
         XCTAssertEqual(
             app.staticTexts["browser-empty"].label,
             "No data types match your search."
@@ -178,11 +183,11 @@ final class ExporterUITests: XCTestCase {
         filterBrowserToHeartRate()
         let row = app.descendants(matching: .any)["browser-row-heartRate"]
         XCTAssertTrue(
-            row.waitForExistence(timeout: 2),
+            row.waitForExistence(timeout: uiWait),
             "available identifiers: \(visibleIdentifiers())"
         )
         row.tap()
-        XCTAssertTrue(app.buttons["browser-back"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["browser-back"].waitForExistence(timeout: uiWait))
         XCTAssertTrue(app.buttons["browser-load-health"].exists)
         XCTAssertEqual(app.staticTexts["browser-title"].label, "heart rate")
     }
@@ -192,7 +197,7 @@ final class ExporterUITests: XCTestCase {
         let export = scrollToHittable(app.buttons["demo-export"])
         XCTAssertFalse(export.isEnabled)
         let field = app.textFields["demo-confirm"]
-        XCTAssertTrue(field.waitForExistence(timeout: 2))
+        XCTAssertTrue(field.waitForExistence(timeout: uiWait))
         type("local-file", into: field)
         XCTAssertTrue(export.isEnabled)
     }
@@ -204,7 +209,7 @@ final class ExporterUITests: XCTestCase {
             "-NSForceRightToLeftWritingDirection", "YES",
         ]
         app.launch()
-        XCTAssertTrue(app.buttons["disclosure-continue"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["disclosure-continue"].waitForExistence(timeout: uiWait))
         try performAccessibilityAudit()
         enterControls()
         try performAccessibilityAudit()
@@ -225,7 +230,7 @@ final class ExporterUITests: XCTestCase {
 
     private func enterControls() {
         let disclosure = app.buttons["disclosure-continue"]
-        XCTAssertTrue(disclosure.waitForExistence(timeout: 5))
+        XCTAssertTrue(disclosure.waitForExistence(timeout: uiWait))
         disclosure.tap()
     }
 
@@ -241,7 +246,7 @@ final class ExporterUITests: XCTestCase {
 
     private func filterBrowserToHeartRate() {
         let search = app.textFields["browser-search"]
-        XCTAssertTrue(search.waitForExistence(timeout: 2))
+        XCTAssertTrue(search.waitForExistence(timeout: uiWait))
         type("heart", into: search)
         app.keyboards.buttons["return"].tap()
     }
@@ -250,9 +255,11 @@ final class ExporterUITests: XCTestCase {
     /// without focus fails the run rather than retrying. Waiting for the keyboard is the
     /// signal that the tap landed.
     private func type(_ text: String, into field: XCUIElement) {
+        // Shorter than uiWait on purpose: a tap that did not take focus is fixed by
+        // tapping again, not by waiting longer for a keyboard that is not coming.
         for _ in 0 ..< 3 {
             field.tap()
-            if app.keyboards.element.waitForExistence(timeout: 5) { break }
+            if app.keyboards.element.waitForExistence(timeout: 10) { break }
         }
         XCTAssertTrue(app.keyboards.element.exists, "keyboard never appeared for \(field.identifier)")
         field.typeText(text)
