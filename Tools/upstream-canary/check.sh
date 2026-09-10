@@ -6,6 +6,9 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 pins_file="${root}/spec/v1.0.0/fixtures/ha-ci/versions.json"
 simulate="${SIMULATE_DIVERGENCE:-0}"
+# This script's side effect is filing public issues, so it needs a way to be run
+# without doing that — locally, and when rehearsing a divergence.
+dry_run="${DRY_RUN:-0}"
 failed=0
 run_url="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-unknown}/actions/runs/${GITHUB_RUN_ID:-unknown}"
 commit="${GITHUB_SHA:-$(git -C "${root}" rev-parse HEAD)}"
@@ -34,6 +37,11 @@ latest_non_prerelease() {
 open_or_reuse_issue() {
   local title="$1"
   local body="$2"
+  if [ "${dry_run}" = "1" ]; then
+    printf 'dry-run would open or update issue: %s\n' "${title}"
+    printf '%s\n' "${body}"
+    return 0
+  fi
   local existing
   existing="$(
     gh issue list \
