@@ -1025,6 +1025,17 @@
         }
       }
     },
+    "Paused data": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused data"
+          }
+        }
+      }
+    },
     "Plain HTTP exposes health exports to anyone able to observe this network.": {
       "extractionState": "manual",
       "localizations": {

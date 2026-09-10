@@ -68,6 +68,35 @@ final class ExporterUITests: XCTestCase {
         try performAccessibilityAudit()
     }
 
+    /// QA-17: a paused type says so where the user will see it, and offers two named
+    /// choices. Neither the pause nor the resumption may be silent.
+    func testPausedAnchorIsVisibleAndOffersBothChoices() {
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_ANCHOR_HOLD"] = "heartRate"
+        app.launch()
+
+        let banner = app.descendants(matching: .any)["anchor-hold-banner"]
+        XCTAssertTrue(
+            banner.waitForExistence(timeout: 10),
+            "available identifiers: \(visibleIdentifiers())"
+        )
+        enterControls()
+        let explanation = scrollToHittable(app.staticTexts["anchor-hold-explanation-0"])
+        XCTAssertTrue(explanation.exists)
+        XCTAssertTrue(explanation.label.contains("2026-09-08"), explanation.label)
+
+        XCTAssertTrue(app.buttons["anchor-hold-reexport-0"].exists)
+        let stop = scrollToHittable(app.buttons["anchor-hold-stop-0"])
+        stop.tap()
+
+        // Deciding is what clears it. The banner going away proves the decision was
+        // recorded rather than the view forgetting.
+        XCTAssertTrue(
+            app.descendants(matching: .any)["anchor-hold-banner"]
+                .waitForNonExistence(timeout: 10)
+        )
+    }
+
     func testDiagnosticShareExistsOnlyPastTheBundlesLastLine() {
         enterControls()
         let build = scrollToHittable(app.buttons["diagnostic-build"])

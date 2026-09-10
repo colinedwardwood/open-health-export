@@ -44,6 +44,11 @@ public enum NoticeCopy {
                 title: "Destination unpaired",
                 body: "\(notice.destination) is no longer trusted. Export is halted."
             )
+        case .anchorInvalidated:
+            return LocalizedNotice(
+                title: "Export paused for some data",
+                body: "The export lost its place in some of your Health data. Nothing more is being sent to \(notice.destination) for it until you choose whether to send that history again."
+            )
         case .queueEvicted:
             return LocalizedNotice(
                 title: "Queued export data removed",

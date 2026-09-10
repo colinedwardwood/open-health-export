@@ -485,6 +485,7 @@ public struct UserNotice: Sendable, Equatable {
         case queueExpired
         case exportOverdue
         case healthAccessRevoked
+        case anchorInvalidated
     }
 
     public var kind: Kind

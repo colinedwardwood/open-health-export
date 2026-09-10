@@ -865,6 +865,70 @@ enum HarnessExport {
         return DestinationChangeBanner.detail(snapshots)
     }
 
+    static func anchorHolds() async throws -> [AnchorHold] {
+        let root = try applicationSupportRoot()
+        let store = try SQLiteStateStore(
+            path: root.appendingPathComponent("state.sqlite").path
+        )
+        return try await store.transact { try $0.loadAnchorHolds() }
+    }
+
+    /// QA-17: the user chose to send the history again. Recording the decision is what
+    /// releases the hold; the run reads it rather than inferring intent from a retry.
+    static func authoriseAnchorReexport(metric: MetricID) async throws {
+        let root = try applicationSupportRoot()
+        let store = try SQLiteStateStore(
+            path: root.appendingPathComponent("state.sqlite").path
+        )
+        try await store.transact { tx in
+            guard var hold = try tx.loadAnchorHold(metric: metric) else { return }
+            hold.decision = .reexportAuthorized
+            try tx.upsertAnchorHold(hold)
+        }
+    }
+
+    /// QA-17's other answer: stop this type rather than pay to send its history again.
+    static func stopExportingHeldType(metric: MetricID) async throws {
+        let root = try applicationSupportRoot()
+        let store = try SQLiteStateStore(
+            path: root.appendingPathComponent("state.sqlite").path
+        )
+        try await store.transact { tx in
+            let generation = try tx.loadTypeStatus(metric: metric)?.generation ?? 1
+            try tx.upsertTypeStatus(
+                TypeStatus(
+                    metric: metric,
+                    disabled: true,
+                    reason: "anchor_invalidated_user_stop",
+                    generation: generation
+                )
+            )
+            try tx.clearAnchorHold(metric: metric)
+        }
+    }
+
+    #if DEBUG
+    /// A hold can only arise from state the simulator has no way to produce — a cursor
+    /// that went missing behind a real HealthKit history. Seeding one is the only way a
+    /// UI test can assert what the user sees when it happens.
+    static func seedAnchorHoldForUITests(metric: MetricID) async throws {
+        let root = try applicationSupportRoot()
+        let store = try SQLiteStateStore(
+            path: root.appendingPathComponent("state.sqlite").path
+        )
+        try await store.transact { tx in
+            try tx.upsertAnchorHold(
+                AnchorHold(
+                    metric: metric,
+                    reason: .cursorLost,
+                    detectedAtEpoch: 0,
+                    lastEmittedDay: "2026-09-08"
+                )
+            )
+        }
+    }
+    #endif
+
     static func ledgerLines() async throws -> [String] {
         let root = try applicationSupportRoot()
         let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)

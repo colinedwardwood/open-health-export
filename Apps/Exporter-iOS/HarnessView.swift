@@ -100,6 +100,7 @@ struct HarnessView: View {
     @State private var advisoryBanner: String?
     @State private var advisoryItems: [AdvisoryItem] = []
     @State private var destinationChangeBanner: String?
+    @State private var anchorHolds: [AnchorHold] = []
     @State private var confirmationCard: DestinationConfirmationCard?
     @State private var confirmationKind: PendingConfirmationKind?
 
@@ -153,6 +154,20 @@ struct HarnessView: View {
                 .accessibilityIdentifier("destination-change-banner")
             }
         }
+        .safeAreaInset(edge: .top) {
+            if AnchorHoldBanner.isVisible(anchorHolds) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(AnchorHoldBanner.title)
+                        .font(.headline)
+                    Text(AnchorHoldBanner.detail(anchorHolds))
+                        .font(.footnote)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(.yellow)
+                .accessibilityIdentifier("anchor-hold-banner")
+            }
+        }
         .sheet(isPresented: Binding(
             get: { confirmationCard != nil },
             set: { presented in
@@ -189,6 +204,13 @@ struct HarnessView: View {
                 await refreshLedgerIntegrity()
                 await refreshWakeAttribution()
                 await refreshSecurityAdvisory()
+                #if DEBUG
+                if let held = ProcessInfo.processInfo.environment["OHE_SEED_ANCHOR_HOLD"] {
+                    try? await HarnessExport.seedAnchorHoldForUITests(
+                        metric: MetricID(rawValue: held)
+                    )
+                }
+                #endif
                 await refreshQueueGaps()
                 if disclosureAcknowledged,
                    !foregroundCatchUpStarted,
@@ -326,6 +348,26 @@ struct HarnessView: View {
             .disabled(phase == .working || !HarnessExport.isLocalFileEnabled())
             .accessibilityIdentifier("full-reconcile")
             .accessibilityHint("Compares every available day without advancing HealthKit anchors.")
+            if !anchorHolds.isEmpty {
+                Text("Paused data")
+                    .font(.headline)
+                ForEach(Array(anchorHolds.enumerated()), id: \.offset) { index, hold in
+                    Text(AnchorHoldBanner.explanation(hold))
+                        .font(.footnote)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("anchor-hold-explanation-\(index)")
+                    Button(AnchorHoldBanner.reexportChoice) {
+                        Task { await decideAnchorHold(hold, reexport: true) }
+                    }
+                    .disabled(phase == .working)
+                    .accessibilityIdentifier("anchor-hold-reexport-\(index)")
+                    Button(AnchorHoldBanner.stopChoice) {
+                        Task { await decideAnchorHold(hold, reexport: false) }
+                    }
+                    .disabled(phase == .working)
+                    .accessibilityIdentifier("anchor-hold-stop-\(index)")
+                }
+            }
             if !queueEvictionGaps.isEmpty {
                 Text("Data gaps")
                     .font(.headline)
@@ -1176,6 +1218,24 @@ struct HarnessView: View {
     @MainActor
     private func refreshQueueGaps() async {
         queueEvictionGaps = (try? await HarnessExport.queueEvictionGaps()) ?? []
+        anchorHolds = (try? await HarnessExport.anchorHolds()) ?? []
+    }
+
+    /// QA-17: both answers are explicit and both are recorded. Neither is a retry.
+    @MainActor
+    private func decideAnchorHold(_ hold: AnchorHold, reexport: Bool) async {
+        do {
+            if reexport {
+                try await HarnessExport.authoriseAnchorReexport(metric: hold.metric)
+                status = "\(hold.metric.rawValue) will send its history again on the next export."
+            } else {
+                try await HarnessExport.stopExportingHeldType(metric: hold.metric)
+                status = "\(hold.metric.rawValue) is no longer being exported."
+            }
+        } catch {
+            status = "Failed: \(error.localizedDescription)"
+        }
+        anchorHolds = (try? await HarnessExport.anchorHolds()) ?? []
     }
 
     /// R-69: the browser reports what the export recorded emitting, so a type that is
