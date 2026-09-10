@@ -934,14 +934,7 @@ enum HarnessExport {
             nowEpoch: Date().timeIntervalSince1970,
             expectedWakeByEpoch: expected
         )
-        switch attribution {
-        case .none:
-            return "Wake attribution: no overdue scheduling or execution failure."
-        case .scheduling:
-            return "Wake attribution: iOS did not wake the app by the measured deadline."
-        case .execution:
-            return "Wake attribution: the app woke, but export did not finish successfully."
-        }
+        return "Wake attribution: \(attribution.userFacingCopy)"
     }
 
     static func acknowledgeDestinationChanges() throws {

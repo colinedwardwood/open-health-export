@@ -3059,6 +3059,26 @@ private func runUntilProcessExitSeam() async throws {
     )
 }
 
+/// R-22's acceptance criterion is two-part: distinct outcomes *and* distinct copy. The
+/// classification is simulated below; this pins the half a user actually reads.
+@Test func schedulingAndExecutionFailuresReadDifferently() {
+    let scheduling = AttributionKind.scheduling.userFacingCopy
+    let execution = AttributionKind.execution.userFacingCopy
+    let quiet = AttributionKind.none.userFacingCopy
+    #expect(Set([scheduling, execution, quiet]).count == 3)
+
+    // RK-4: a wake the OS never delivered must not read as our export failing.
+    #expect(scheduling.contains("iOS did not wake the app"))
+    #expect(scheduling.contains("Nothing ran"))
+    #expect(!scheduling.lowercased().contains("export did not finish"))
+    #expect(execution.contains("woke on time"))
+    #expect(execution.contains("ours"))
+
+    for kind in AttributionKind.allCases {
+        #expect(!kind.userFacingCopy.isEmpty)
+    }
+}
+
 @Test func wakeAttributionSeparatesSchedulingFromExecution() {
     let expected: TimeInterval = 1_000
     #expect(

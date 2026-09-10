@@ -46,10 +46,24 @@ public struct WakeLedger: Sendable {
     }
 }
 
-public enum AttributionKind: String, Sendable, Equatable {
+public enum AttributionKind: String, Sendable, Equatable, CaseIterable {
     case none
     case scheduling
     case execution
+
+    /// R-22 is only satisfied if a person can tell the two failures apart, so the copy
+    /// belongs with the classification rather than at each call site. RK-4: when iOS
+    /// never woke us, say so — do not let the user read it as the export failing.
+    public var userFacingCopy: String {
+        switch self {
+        case .none:
+            return "No overdue scheduling or execution failure."
+        case .scheduling:
+            return "iOS did not wake the app by the measured deadline. Nothing ran, so nothing failed to send."
+        case .execution:
+            return "The app woke on time and the export did not finish. This one is ours."
+        }
+    }
 }
 
 /// R-22: a missing wake in an overdue window is scheduling; a wake without a clean journal is execution.
