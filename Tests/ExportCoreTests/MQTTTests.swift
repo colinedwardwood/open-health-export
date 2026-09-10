@@ -192,6 +192,10 @@ import WireFormat
     #expect(completed.report.allowsEnablement)
     #expect(completed.report.steps.map(\.name) == [.connect, .publishCanary, .receiveEcho])
     #expect(completed.events.contains(.destinationEnabled))
+    let preview = String(decoding: completed.preview, as: UTF8.self)
+    #expect(preview.contains("\"kind\":\"canary\""))
+    #expect(preview.contains("\"code\":\"OHE1-MQTT\""))
+    #expect(!preview.contains("\"kind\":\"sample."))
 }
 
 @Test func mqttQoS0EnablementIsSentUnconfirmed() async throws {

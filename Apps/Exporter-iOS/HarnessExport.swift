@@ -825,6 +825,10 @@ enum HarnessExport {
         var lines = completed.report.steps.map {
             "\($0.name.rawValue): \($0.outcome.rawValue)"
         }
+        lines.append(
+            "Dry-run preview (no Health data)\n"
+                + String(decoding: completed.preview, as: UTF8.self)
+        )
         if let identity = completed.identity {
             lines.append("TLS \(identity.tlsVersion) · \(identity.cipherSuite)")
             lines.append("Leaf SPKI \(identity.groupedLeafFingerprint)")
@@ -936,6 +940,10 @@ enum HarnessExport {
             }
         }
         return completed.report.steps.map { "\($0.name.rawValue): \($0.outcome.rawValue)" }
+            + [
+                "Dry-run preview (no Health data)\n"
+                    + String(decoding: completed.preview, as: UTF8.self),
+            ]
             + (completed.identity.map {
                 [
                     "TLS \($0.tlsVersion) · \($0.cipherSuite)",
@@ -1283,6 +1291,12 @@ enum HarnessExport {
                 )
             }
             await HealthKitBackgroundDelivery.disable(metrics: change.grant.metrics)
+            _ = try await LocalUserNotifier().notify(
+                UserNotice(
+                    kind: .healthAccessRevoked,
+                    destination: change.grant.id
+                )
+            )
         }
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
         return true

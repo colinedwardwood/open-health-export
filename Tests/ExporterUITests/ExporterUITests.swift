@@ -94,6 +94,14 @@ final class ExporterUITests: XCTestCase {
         )
     }
 
+    func testDeletionBehaviourStatesBestEffortAndNoCallback() {
+        enterControls()
+        let explanation = scrollToHittable(app.staticTexts["deletion-behaviour"])
+        XCTAssertTrue(explanation.label.contains("no deletion callback"))
+        XCTAssertTrue(explanation.label.contains("best-effort"))
+        XCTAssertTrue(explanation.label.contains("full reconcile"))
+    }
+
     func testDataBrowserSelectAndEmptyMeasurementsAreVisibleAfterDisclosure() {
         enterControls()
         XCTAssertTrue(app.staticTexts["browser-title"].waitForExistence(timeout: 2))

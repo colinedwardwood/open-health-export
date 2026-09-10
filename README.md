@@ -52,6 +52,11 @@ On the wire, destinations receive **`ohe.wire/1` NDJSON** (see `docs/02-design/0
 HTTPS POSTs that file with `Idempotency-Key` and `Content-Type: application/x-ndjson; profile="ohe.wire/1"`.
 JSON document, CSV, and the Health Auto Export profile are specified but not emitted yet.
 
+Deletion tombstones are **best-effort** because HealthKit provides no deletion
+callback and iOS may not wake the app when a deletion occurs. A later
+reconciliation sweep compares date-ranged HealthKit contents with the emitted
+index and repairs missed deletions.
+
 The sole built-in network host is the security advisory feed
 `https://advisories.openhealthexporter.org/advisories/v1.json` (R-38). It is fetched only on a
 user-visible foreground launch, never during export, and is disableable in the app. The GET

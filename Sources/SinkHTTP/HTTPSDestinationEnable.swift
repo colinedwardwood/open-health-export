@@ -16,7 +16,8 @@ public enum HTTPSDestinationEnable {
         destination: VerifiedDestination,
         events: [TrustEvent],
         report: DestinationTestReport,
-        identity: TLSIdentity?
+        identity: TLSIdentity?,
+        preview: Data
     ) {
         let canary = try NativeWire.encodeCanary(
             code: canaryCode,
@@ -68,7 +69,8 @@ public enum HTTPSDestinationEnable {
             verified,
             setup.drainEvents(),
             report,
-            identity
+            identity,
+            canary
         )
     }
 }

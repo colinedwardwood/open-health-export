@@ -111,7 +111,10 @@ private let everyTrustEvent: [TrustEvent] = [
     #expect(
         Set(kinds) == Set(
             UserNotice.Kind.allCases.filter {
-                $0 != .queueEvicted && $0 != .queueExpired && $0 != .exportOverdue
+                $0 != .queueEvicted
+                    && $0 != .queueExpired
+                    && $0 != .exportOverdue
+                    && $0 != .healthAccessRevoked
             }
         )
     )

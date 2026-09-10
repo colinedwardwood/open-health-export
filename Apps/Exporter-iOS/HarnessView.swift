@@ -247,6 +247,11 @@ struct HarnessView: View {
                 .font(.footnote)
                 .fixedSize(horizontal: false, vertical: true)
 
+            Text("HealthKit provides no deletion callback. Tombstones are best-effort when iOS next reports a deletion; a full reconcile repairs deletions that were not reported.")
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("deletion-behaviour")
+
             Button("Run R-70 (one anchored page per type)") {
                 Task { await runR70() }
             }

@@ -2163,6 +2163,49 @@ private func runUntilProcessExitSeam() async throws {
     #expect(try await store.transact { try $0.dirtyDays(metric: metric) } == ["2024-01-01"])
 }
 
+@Test func deleteOnlyAnchoredPageCommitsAndDeliversATombstone() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let uuid = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    let page = SamplePage(
+        samples: [],
+        tombstones: [
+            TombstoneRecord(key: RecordKey(uuid: uuid), metric: metric),
+        ],
+        metric: metric,
+        anchorBlob: Data([0xD1]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let destination = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-delete-only-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: destination) }
+    try FileManager.default.createDirectory(
+        at: destination,
+        withIntermediateDirectories: true
+    )
+    let store = MemoryStateStore()
+    let outcome = try await ExportRun(
+        source: FixtureSource(pages: [page]),
+        destination: .testing(LocalFileSink(directory: destination)),
+        store: store,
+        metric: metric,
+        scratchDirectory: destination.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    ).run()
+
+    #expect(outcome.kind == .success)
+    #expect(try store.transaction.loadCursor(metric: metric)?.anchorBlob == Data([0xD1]))
+    #expect(try store.transaction.pendingBatches().isEmpty)
+    let payload = try FileManager.default.contentsOfDirectory(
+        at: destination,
+        includingPropertiesForKeys: nil
+    )
+    .filter { $0.pathExtension == "ndjson" }
+    .map { try String(contentsOf: $0, encoding: .utf8) }
+    .joined()
+    #expect(payload.contains(uuid))
+    #expect(payload.contains("\"kind\":\"tombstone\""))
+}
+
 @Test func censusTombstoneWithoutEmittedIndexJournalsUndatable() async throws {
     let metric = MetricID(rawValue: "heartRate")
     let store = MemoryStateStore()
@@ -2365,7 +2408,7 @@ private func runUntilProcessExitSeam() async throws {
     }
 }
 
-@Test func userTriggeredFullReconcileCoversHistoryOlderThanSevenDays() async throws {
+@Test func restoreWithoutReliabilityStateFullReconcileRepairsAllAvailableHistory() async throws {
     let metric = MetricCatalog.heartRate.id
     var old = heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
     old.start = "2023-12-01T10:00:00Z"
@@ -2377,6 +2420,8 @@ private func runUntilProcessExitSeam() async throws {
         .appendingPathComponent("ohe-full-reconcile-\(UUID().uuidString)")
     defer { try? FileManager.default.removeItem(at: root) }
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    // Backups intentionally contain no anchors, census, or emitted index. The
+    // restored Health store remains available through date-ranged queries.
     let store = MemoryStateStore()
     let outcome = try await ReconcileSweep(
         observations: FixtureDays(
@@ -2445,10 +2490,12 @@ private func runUntilProcessExitSeam() async throws {
     #expect(payload.contains(sample.key.uuid))
 }
 
-@Test func reconcileSweepRepairsAbsenceWithoutAdvancingCursor() async throws {
+@Test func deletionWithoutHealthKitCallbackIsRepairedByReconcile() async throws {
     let metric = MetricID(rawValue: "heartRate")
     let keep = heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
     let gone = heartSample("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+    // HealthKit supplied no deletion tombstone/callback for `gone`; only the
+    // later date-ranged observation reveals its absence.
     let page = SamplePage(
         samples: [keep, gone],
         tombstones: [],
@@ -3205,11 +3252,16 @@ private func runUntilProcessExitSeam() async throws {
             )
         )
     }
+    let purgeStarted = ContinuousClock.now
     try await store.purgeType(
         metric: heart,
         reason: "revocation_observed",
         destination: "local-file",
         atEpoch: 1_234
+    )
+    #expect(
+        ContinuousClock.now - purgeStarted
+            < .seconds(Int64(TypePurge.observationSLA))
     )
     let remaining = try await store.transact { try $0.pendingBatches() }
     #expect(remaining.map(\.id.rawValue) == ["s"])

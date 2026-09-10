@@ -431,6 +431,7 @@ public struct UserNotice: Sendable, Equatable {
         case queueEvicted
         case queueExpired
         case exportOverdue
+        case healthAccessRevoked
     }
 
     public var kind: Kind

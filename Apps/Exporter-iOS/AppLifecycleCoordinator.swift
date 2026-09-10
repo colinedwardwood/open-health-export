@@ -21,9 +21,7 @@ final class AppLifecycleCoordinator {
     }
 
     func startObserversIfEligible() async throws {
-        guard UserDefaults.standard.bool(forKey: "ohe.disclosureAcknowledged"),
-              HarnessExport.isLocalFileEnabled()
-        else {
+        guard UserDefaults.standard.bool(forKey: "ohe.disclosureAcknowledged") else {
             return
         }
         let revoked = try await HarnessExport.observeAuthorizationChanges()
@@ -31,6 +29,7 @@ final class AppLifecycleCoordinator {
             stopObservers()
             return
         }
+        guard HarnessExport.isLocalFileEnabled() else { return }
         guard healthObservers == nil else { return }
         healthObservers = try await HarnessExport.startHealthObservers()
         BackgroundTaskCoordinator.submit()

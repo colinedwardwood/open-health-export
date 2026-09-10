@@ -234,6 +234,7 @@ struct PolicyCheck {
         try checkAdjacency(root: root)
         try checkHealthKitSymbolsStayInAdapter(sources: sources)
         try checkSpecArtifacts(root: root)
+        try checkHostTZDataPin(root: root)
     }
 
     static func checkStringCatalog(root: URL) throws {
@@ -301,6 +302,32 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck string catalog covers app UI literals: ok")
+    }
+
+    static func checkHostTZDataPin(root: URL) throws {
+        #if os(Linux)
+        let platform = "linux"
+        #else
+        let platform = "darwin"
+        #endif
+        let pinURL = root.appendingPathComponent(
+            "spec/v1.0.0/fixtures/host-tzdata-\(platform).txt"
+        )
+        let expected = try String(contentsOf: pinURL, encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let observed = TimeZone.timeZoneDataVersion
+        guard observed == expected else {
+            FileHandle.standardError.write(
+                Data(
+                    (
+                        "host tzdata drift on \(platform): expected \(expected), "
+                            + "observed \(observed); review frozen outputs before updating the pin\n"
+                    ).utf8
+                )
+            )
+            exit(1)
+        }
+        print("policycheck host tzdata \(platform) pin \(observed): ok")
     }
 
     static func checkUpstreamVersionPins(root: URL) throws {

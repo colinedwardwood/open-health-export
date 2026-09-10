@@ -18,7 +18,8 @@ public enum MQTTDestinationEnable {
         destination: VerifiedDestination,
         events: [TrustEvent],
         report: DestinationTestReport,
-        identity: TLSIdentity?
+        identity: TLSIdentity?,
+        preview: Data
     ) {
         let canary = try NativeWire.encodeCanary(
             code: canaryCode,
@@ -57,7 +58,7 @@ public enum MQTTDestinationEnable {
         let verified = try setup.enable(
             sink: MQTTSink(destination: destination, pipe: pipe)
         )
-        return (verified, setup.drainEvents(), report, observed)
+        return (verified, setup.drainEvents(), report, observed, canary)
     }
 
     public static func resume(

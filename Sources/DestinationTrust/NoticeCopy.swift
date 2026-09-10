@@ -59,6 +59,11 @@ public enum NoticeCopy {
                 title: "Export overdue",
                 body: "\(notice.destination) has not completed a successful export within the freshness window."
             )
+        case .healthAccessRevoked:
+            return LocalizedNotice(
+                title: "Health access changed",
+                body: "\(notice.destination) was disabled and its queued payloads were deleted after the app observed that Health access was revoked."
+            )
         }
     }
 }

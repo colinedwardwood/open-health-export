@@ -664,6 +664,10 @@ struct HTTPSPinnedLoopbackTests {
     )
     #expect(completed.identity?.leafSPKISha256 == material.pin.leafSPKISha256)
     #expect(completed.report.allowsEnablement)
+    let preview = String(decoding: completed.preview, as: UTF8.self)
+    #expect(preview.contains("\"kind\":\"canary\""))
+    #expect(preview.contains("\"code\":\"OHE1-HTTPS\""))
+    #expect(!preview.contains("\"kind\":\"sample."))
     let (file, batchID) = try writeHTTPSPayload()
     let sink = HTTPSSink(
         destination: destination,
