@@ -73,11 +73,14 @@ public enum DataBrowserPeriod: Int, Sendable, CaseIterable {
 
 public struct DataBrowserDestination: Sendable, Equatable {
     public var name: String
-    public var lastSent: String?
+    /// The latest sample day the export has actually emitted for this type. Day
+    /// granularity is all the emitted index records, so the copy says data through a day
+    /// rather than a time of sending, which we would be inventing (R-69).
+    public var sentThroughDay: String?
 
-    public init(name: String, lastSent: String? = nil) {
+    public init(name: String, sentThroughDay: String? = nil) {
         self.name = name
-        self.lastSent = lastSent
+        self.sentThroughDay = sentThroughDay
     }
 }
 

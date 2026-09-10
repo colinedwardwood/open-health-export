@@ -609,6 +609,16 @@ private final class SQLiteTransaction: StateTransaction {
         return rows
     }
 
+    func latestEmittedDay(metric: MetricID) throws -> String? {
+        let stmt = try store.prepare(
+            "SELECT day FROM emitted_index WHERE metric = ? ORDER BY day DESC LIMIT 1;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, metric.rawValue)
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
+        return text(stmt, 0)
+    }
+
     func loadAggregateEmitSeq(bucketKey: String) throws -> Int? {
         let stmt = try store.prepare(
             "SELECT emit_seq FROM aggregate_emit WHERE bucket_key = ? LIMIT 1;"

@@ -146,6 +146,13 @@ public final class MemoryTransaction: StateTransaction {
             .sorted { $0.uuid < $1.uuid }
     }
 
+    public func latestEmittedDay(metric: MetricID) throws -> String? {
+        emittedIndex.values
+            .filter { $0.metric == metric }
+            .map(\.day)
+            .max()
+    }
+
     public func loadAggregateEmitSeq(bucketKey: String) throws -> Int? {
         aggregateEmitSeq[bucketKey]
     }

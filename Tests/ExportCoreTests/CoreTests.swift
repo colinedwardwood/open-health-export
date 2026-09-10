@@ -1313,6 +1313,64 @@ func statisticsRecord(
     #expect(payload.contains("\"sampleCount\":1"))
 }
 
+/// R-69: the browser must not claim a delivery the export never made. Selection is not
+/// evidence — a type can be selected and never sent — so the claim is read back from the
+/// emitted index the run itself wrote.
+@Test func browserReportsOnlyWhatTheExportActuallyEmitted() async throws {
+    let exported = MetricCatalog.heartRate.id
+    let neverRun = MetricCatalog.stepCount.id
+    let store = MemoryStateStore()
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-r69-parity-\(UUID().uuidString)")
+    let destinationURL = root.appendingPathComponent("destination")
+    try FileManager.default.createDirectory(at: destinationURL, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    #expect(try await BrowserSendState.sentThroughDay(metric: exported, store: store) == nil)
+
+    let page = SamplePage(
+        samples: [heartSample("b1000000-0000-4000-8000-000000000001")],
+        tombstones: [],
+        metric: exported,
+        anchorBlob: Data([0x69]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let run = ExportRun(
+        source: FixtureSource(pages: [page]),
+        destination: .testing(LocalFileSink(directory: destinationURL)),
+        store: store,
+        metric: exported,
+        scratchDirectory: root.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    )
+    #expect(try await run.run().kind == .success)
+
+    let day = try #require(
+        await BrowserSendState.sentThroughDay(metric: exported, store: store)
+    )
+    let indexed = try store.transaction.loadEmittedIndex(metric: exported, day: day)
+    #expect(!indexed.isEmpty)
+    #expect(
+        try await BrowserSendState.sentThroughDay(metric: neverRun, store: store) == nil
+    )
+
+    // The detail a person reads carries that same day, and a type never exported carries
+    // no destination row rather than an empty or invented one.
+    let sent = DataBrowser.detail(
+        metric: exported,
+        samples: [],
+        destinations: [DataBrowserDestination(name: "Archive folder", sentThroughDay: day)],
+        now: Date(timeIntervalSince1970: 0)
+    )
+    #expect(sent?.destinations.first?.sentThroughDay == day)
+    let unsent = DataBrowser.detail(
+        metric: neverRun,
+        samples: [],
+        now: Date(timeIntervalSince1970: 0)
+    )
+    #expect(unsent?.destinations.isEmpty == true)
+}
+
 @Test func categoryPageCommitsCensusAndEmittedIndexWithoutInventedAggregate() async throws {
     let metric = MetricID(rawValue: "sleep_analysis")
     let category = CategoryRecord(

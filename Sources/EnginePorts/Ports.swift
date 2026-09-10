@@ -357,6 +357,9 @@ public protocol StateTransaction: AnyObject {
     func loadEmittedIndex(uuid: String) throws -> EmittedIndexRow?
     func removeEmittedIndex(uuid: String) throws
     func loadEmittedIndex(metric: MetricID, day: String) throws -> [EmittedIndexRow]
+    /// R-69: the latest day this metric has actually been emitted for, so the browser
+    /// can say what was sent from the export's own record rather than from a guess.
+    func latestEmittedDay(metric: MetricID) throws -> String?
     func loadAggregateEmitSeq(bucketKey: String) throws -> Int?
     func upsertAggregateEmitSeq(bucketKey: String, emitSeq: Int) throws
     func loadJournal() throws -> [RunEvent]

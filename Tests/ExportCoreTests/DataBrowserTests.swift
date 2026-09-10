@@ -50,7 +50,7 @@ private func browserSample(
                 ),
             ],
             destinations: [
-                DataBrowserDestination(name: "Archive folder", lastSent: "2026-09-08T11:30:00Z"),
+                DataBrowserDestination(name: "Archive folder", sentThroughDay: "2026-09-08"),
             ],
             period: .week,
             now: now

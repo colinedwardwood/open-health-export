@@ -78,6 +78,7 @@ struct HarnessView: View {
     @State private var pendingSensitiveMetric: MetricID?
     @State private var sensitiveDestinationConfirmation = ""
     @State private var liveBrowserSamples: [MetricID: [SampleRecord]] = [:]
+    @State private var browserSentThroughDay: [MetricID: String] = [:]
     @State private var browserLoadingHealth = false
     @State private var foregroundCatchUpStarted = false
     @AppStorage("ohe.browserOnlyWithData")
@@ -847,9 +848,9 @@ struct HarnessView: View {
             return DataBrowser.detail(
                 metric: metric,
                 samples: detailSamples,
-                destinations: browserSelection.contains(metric)
-                    ? [DataBrowserDestination(name: "Archive folder", lastSent: "demo")]
-                    : [],
+                destinations: browserSentThroughDay[metric].map {
+                    [DataBrowserDestination(name: "Archive folder", sentThroughDay: $0)]
+                } ?? [],
                 displayUnits: displayUnitPolicy,
                 now: detailNow
             )
@@ -1046,7 +1047,7 @@ struct HarnessView: View {
             Text("Not included in any export.")
         } else {
             ForEach(detail.destinations, id: \.name) { destination in
-                Text("\(destination.name) · last sent \(destination.lastSent ?? "never")")
+                Text("\(destination.name) · data through \(destination.sentThroughDay ?? "no day yet") has been sent")
             }
         }
         Text("Export unit: \(detail.exportUnit)").font(.footnote)
@@ -1091,6 +1092,7 @@ struct HarnessView: View {
                 ))
             }
             liveBrowserSamples[metric] = loaded
+            await refreshSentThroughDay(metric)
             status = loaded.isEmpty
                 ? DataBrowser.emptyDetailCopy
                 : "Loaded \(loaded.count) Health samples for comparison."
@@ -1174,6 +1176,17 @@ struct HarnessView: View {
     @MainActor
     private func refreshQueueGaps() async {
         queueEvictionGaps = (try? await HarnessExport.queueEvictionGaps()) ?? []
+    }
+
+    /// R-69: the browser reports what the export recorded emitting, so a type that is
+    /// selected but never sent shows no destination at all.
+    @MainActor
+    private func refreshSentThroughDay(_ metric: MetricID) async {
+        guard let day = try? await HarnessExport.sentThroughDay(metric: metric) else {
+            browserSentThroughDay[metric] = nil
+            return
+        }
+        browserSentThroughDay[metric] = day
     }
 
     @MainActor
