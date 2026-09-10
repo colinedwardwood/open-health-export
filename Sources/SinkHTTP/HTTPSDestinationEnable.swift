@@ -4,7 +4,69 @@ import Foundation
 import NetEgress
 import WireFormat
 
+public struct HTTPSDestinationProbe: Sendable {
+    public let destination: HTTPSDestination
+    public let report: DestinationTestReport
+    public let identity: TLSIdentity?
+    public let preview: Data
+    public let pin: PinRecord?
+    public let pendingEvents: [TrustEvent]
+}
+
 public enum HTTPSDestinationEnable {
+    public static func probe(
+        destination: HTTPSDestination,
+        transport: any HTTPTransport,
+        exporterID: String,
+        emittedAt: String,
+        pinPolicy: PinPolicy = .leaf,
+        canaryCode: String = "OHE1-HTTPS"
+    ) async throws -> HTTPSDestinationProbe {
+        let prepared = try await prepare(
+            destination: destination,
+            transport: transport,
+            exporterID: exporterID,
+            emittedAt: emittedAt,
+            pinPolicy: pinPolicy,
+            canaryCode: canaryCode
+        )
+        guard prepared.report.allowsEnablement else {
+            throw SetupError.verificationRequired
+        }
+        var setup = prepared.setup
+        return HTTPSDestinationProbe(
+            destination: destination,
+            report: prepared.report,
+            identity: prepared.identity,
+            preview: prepared.preview,
+            pin: setup.pin,
+            pendingEvents: setup.drainEvents()
+        )
+    }
+
+    public static func commit(
+        probe: HTTPSDestinationProbe,
+        transport: any HTTPTransport
+    ) throws -> (destination: VerifiedDestination, events: [TrustEvent]) {
+        var setup = DestinationSetup()
+        try setup.resumeAfterPassedTest(
+            preview: probe.preview,
+            pin: probe.pin,
+            identity: probe.identity,
+            testReport: probe.report
+        )
+        let delivery: any HTTPTransport
+        if let pin = probe.pin {
+            delivery = PinningHTTPTransport(inner: transport, pin: pin)
+        } else {
+            delivery = transport
+        }
+        let verified = try setup.enable(
+            sink: HTTPSSink(destination: probe.destination, transport: delivery)
+        )
+        return (verified, probe.pendingEvents + setup.drainEvents())
+    }
+
     public static func complete(
         destination: HTTPSDestination,
         transport: any HTTPTransport,
@@ -18,6 +80,37 @@ public enum HTTPSDestinationEnable {
         report: DestinationTestReport,
         identity: TLSIdentity?,
         preview: Data
+    ) {
+        let probe = try await probe(
+            destination: destination,
+            transport: transport,
+            exporterID: exporterID,
+            emittedAt: emittedAt,
+            pinPolicy: pinPolicy,
+            canaryCode: canaryCode
+        )
+        let committed = try commit(probe: probe, transport: transport)
+        return (
+            committed.destination,
+            committed.events,
+            probe.report,
+            probe.identity,
+            probe.preview
+        )
+    }
+
+    private static func prepare(
+        destination: HTTPSDestination,
+        transport: any HTTPTransport,
+        exporterID: String,
+        emittedAt: String,
+        pinPolicy: PinPolicy,
+        canaryCode: String
+    ) async throws -> (
+        setup: DestinationSetup,
+        identity: TLSIdentity?,
+        preview: Data,
+        report: DestinationTestReport
     ) {
         let canary = try NativeWire.encodeCanary(
             code: canaryCode,
@@ -62,15 +155,6 @@ public enum HTTPSDestinationEnable {
             observedAt: emittedAt
         )
         try setup.recordTest(report)
-        let verified = try setup.enable(
-            sink: HTTPSSink(destination: destination, transport: delivery)
-        )
-        return (
-            verified,
-            setup.drainEvents(),
-            report,
-            identity,
-            canary
-        )
+        return (setup, identity, canary, report)
     }
 }

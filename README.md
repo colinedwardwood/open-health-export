@@ -1,3 +1,4 @@
+
 # Open Health Exporter
 
 An Apple Health exporter that tells you the truth about what it did.
@@ -55,6 +56,9 @@ Settings → Apps → Hidden Apps, Screen Time, Battery, and App Store purchase
 history. Apple's guide: <https://support.apple.com/guide/personal-safety/lock-or-hide-apps-on-your-iphone-ipsd0be4c185/web>.
 
 On the wire, destinations receive **`ohe.wire/1` NDJSON** (see `docs/02-design/03-wire-format-spec.md`).
+HTTPS and MQTT destinations show a confirmation card with the grouped certificate fingerprint
+and a dry-run canary **before** Health data can move. An unacknowledged destination change
+keeps a non-dismissible in-app banner until you acknowledge it.
 HTTPS POSTs that file with `Idempotency-Key` and `Content-Type: application/x-ndjson; profile="ohe.wire/1"`.
 JSON document, CSV, and the Health Auto Export profile are specified but not emitted yet.
 

@@ -223,6 +223,42 @@ func sampleIdentity(leaf: String, issuer: String = "issuer00") -> TLSIdentity {
     #expect(AddressClassifying.classify("8.8.8.8") == .publicUnicast)
 }
 
+@Test func confirmationCardShowsGroupedSPKIAndDryRunPreview() {
+    let identity = sampleIdentity(leaf: "aaaabbbbccccdddd")
+    let preview = Data("{\"kind\":\"canary\",\"code\":\"OHE1-HTTPS\"}\n".utf8)
+    let card = DestinationConfirmationCard(
+        host: "homeassistant.local",
+        identity: identity,
+        preview: preview,
+        insecureWithoutTLS: false
+    )
+    #expect(card.lines.first == ConfirmationCopy.title)
+    #expect(card.lines.contains { $0.contains("a private address") })
+    #expect(card.lines.contains { $0.contains(identity.groupedLeafFingerprint) })
+    #expect(card.lines.contains(ConfirmationCopy.remember))
+    #expect(card.lines.contains(ConfirmationCopy.previewHeading))
+    #expect(card.lines.contains { $0.contains("\"kind\":\"canary\"") })
+}
+
+@Test func resumeAfterPassedTestDoesNotReemitPinEvents() throws {
+    var setup = DestinationSetup()
+    try setup.resumeAfterPassedTest(
+        preview: Data("preview".utf8),
+        pin: PinRecord(
+            leafSPKISha256: "aaaabbbbccccdddd",
+            issuerSPKISha256: "issuer00",
+            firstSeen: "2026-01-01T00:00:00Z",
+            policy: .leaf
+        ),
+        identity: sampleIdentity(leaf: "aaaabbbbccccdddd"),
+        testReport: .passedLocalFile
+    )
+    #expect(setup.state == .pinned)
+    #expect(setup.drainEvents().isEmpty)
+    _ = try setup.enable(sink: LocalFileSinkStub())
+    #expect(setup.drainEvents() == [.destinationEnabled])
+}
+
 private struct LocalFileSinkStub: DestinationSink {
     func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt {
         DeliveryReceipt(batchID: idempotencyKey, accepted: 0, statusOnly: true)

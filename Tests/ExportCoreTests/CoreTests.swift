@@ -905,6 +905,25 @@ private struct DeviceLockedSource: SampleSource {
     #expect(created.state == .noExportsYet)
 }
 
+@Test func destinationChangeBannerStaysUntilAcknowledgement() {
+    let quiet = DestinationStatusSnapshot(
+        destinationID: "https",
+        destinationLabel: "nas.example.com",
+        enabled: true,
+        writtenAtEpoch: 1
+    )
+    #expect(!DestinationChangeBanner.isVisible([quiet]))
+    let changed = DestinationStatusSnapshot(
+        destinationID: "https",
+        destinationLabel: "nas.example.com",
+        enabled: true,
+        unacknowledgedSecurityEventCount: 2,
+        writtenAtEpoch: 1
+    )
+    #expect(DestinationChangeBanner.isVisible([changed]))
+    #expect(DestinationChangeBanner.detail([changed]).contains("nas.example.com"))
+}
+
 @Test func exportRunWritesWidgetSnapshotAfterCommit() async throws {
     let metric = MetricID(rawValue: "heartRate")
     let page = SamplePage(

@@ -37,6 +37,57 @@ private struct HTTPSVerificationRecord: Codable {
     var hasBearer: Bool
 }
 
+private struct PendingHTTPS {
+    var probe: HTTPSDestinationProbe
+    var host: String
+    var allowedHosts: [String]
+    var allowInsecureHTTP: Bool
+    var bearer: String?
+    var firstSeen: String
+}
+
+private struct PendingMQTT {
+    var probe: MQTTDestinationProbe
+    var host: String
+    var allowedHosts: [String]
+    var allowInsecure: Bool
+    var clientID: String
+    var topic: String
+    var qos: UInt8
+    var clientPKCS12: Data?
+    var clientPKCS12Password: String?
+    var username: String?
+    var password: String?
+    var firstSeen: String
+}
+
+@MainActor
+private final class PendingDestination {
+    static let shared = PendingDestination()
+    var https: PendingHTTPS?
+    var mqtt: PendingMQTT?
+
+    func setHTTPS(_ value: PendingHTTPS?) {
+        https = value
+    }
+
+    func takeHTTPS() -> PendingHTTPS? {
+        let value = https
+        https = nil
+        return value
+    }
+
+    func setMQTT(_ value: PendingMQTT?) {
+        mqtt = value
+    }
+
+    func takeMQTT() -> PendingMQTT? {
+        let value = mqtt
+        mqtt = nil
+        return value
+    }
+}
+
 private struct MQTTVerificationRecord: Codable {
     var urlString: String
     var allowedHosts: [String]
@@ -808,6 +859,12 @@ enum HarnessExport {
         }
     }
 
+    static func destinationChangeBannerDetail() -> String? {
+        let snapshots = StatusSnapshotLocation.readAll()
+        guard DestinationChangeBanner.isVisible(snapshots) else { return nil }
+        return DestinationChangeBanner.detail(snapshots)
+    }
+
     static func ledgerLines() async throws -> [String] {
         let root = try applicationSupportRoot()
         let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
@@ -898,11 +955,11 @@ enum HarnessExport {
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
     }
 
-    static func enableHTTPSDestination(
+    static func prepareHTTPSDestination(
         urlString: String,
         allowInsecureHTTP: Bool,
         bearer: String?
-    ) async throws -> [String] {
+    ) async throws -> DestinationConfirmationCard {
         guard let host = URL(string: urlString)?.host?.lowercased(), !host.isEmpty else {
             throw EgressError.invalidURL
         }
@@ -919,28 +976,50 @@ enum HarnessExport {
             allowInsecureHTTP: allowInsecureHTTP
         )
         let now = Date().ISO8601Format()
-        let completed = try await HTTPSDestinationEnable.complete(
+        let probe = try await HTTPSDestinationEnable.probe(
             destination: destination,
             transport: transport,
             exporterID: try installationID(),
             emittedAt: now
         )
-        let record = HTTPSVerificationRecord(
-            urlString: destination.url.absoluteString,
+        await PendingDestination.shared.setHTTPS(PendingHTTPS(
+            probe: probe,
+            host: host,
             allowedHosts: allowedHosts.sorted(),
             allowInsecureHTTP: allowInsecureHTTP,
-            report: completed.report,
-            leafSPKISha256: completed.identity?.leafSPKISha256,
-            issuerSPKISha256: completed.identity?.issuerSPKISha256,
-            firstSeen: now,
-            hasBearer: bearer != nil
+            bearer: bearer,
+            firstSeen: now
+        ))
+        return DestinationConfirmationCard(
+            host: host,
+            identity: probe.identity,
+            preview: probe.preview,
+            insecureWithoutTLS: allowInsecureHTTP && probe.identity == nil
+        )
+    }
+
+    static func confirmPendingHTTPSDestination() async throws -> [String] {
+        guard let pending = await PendingDestination.shared.takeHTTPS() else {
+            throw SetupError.verificationRequired
+        }
+        let probe = pending.probe
+        let events = probe.pendingEvents + [.destinationEnabled]
+        let record = HTTPSVerificationRecord(
+            urlString: probe.destination.url.absoluteString,
+            allowedHosts: pending.allowedHosts,
+            allowInsecureHTTP: pending.allowInsecureHTTP,
+            report: probe.report,
+            leafSPKISha256: probe.identity?.leafSPKISha256,
+            issuerSPKISha256: probe.identity?.issuerSPKISha256,
+            firstSeen: pending.firstSeen,
+            hasBearer: pending.bearer != nil
         )
         let root = try applicationSupportRoot()
         let bearerStore = KeychainSecretStore(
             service: "app.openhealthexporter.ios.https"
         )
         let bearerHandle = SecretHandle(rawValue: "bearer")
-        if let bearer {
+        if let bearer = pending.bearer {
             try await bearerStore.store(Array(bearer.utf8), handle: bearerHandle)
         } else {
             try? await bearerStore.delete(bearerHandle)
@@ -951,22 +1030,22 @@ enum HarnessExport {
         )
         if let snapshotURL = StatusSnapshotLocation.url(destinationID: "https") {
             try DestinationSnapshotFile.recordSecurityEvents(
-                completed.events.count,
+                events.count,
                 destinationID: "https",
-                destinationLabel: host,
+                destinationLabel: pending.host,
                 writtenAtEpoch: Date().timeIntervalSince1970,
                 at: snapshotURL
             )
         }
-        try await emitTrustNotices(completed.events, destination: host)
-        if allowInsecureHTTP {
+        try await emitTrustNotices(events, destination: pending.host)
+        if pending.allowInsecureHTTP {
             let store = try SQLiteStateStore(
                 path: root.appendingPathComponent("state.sqlite").path
             )
             try await store.transact { tx in
                 try tx.appendLedger(
                     EgressEntry(
-                        destination: host,
+                        destination: pending.host,
                         sampleCount: 0,
                         outcomeKind: "security:insecure_http_enabled",
                         detail: "explicit_user_opt_in",
@@ -975,25 +1054,20 @@ enum HarnessExport {
                 )
             }
         }
-        var lines = completed.report.steps.map {
-            "\($0.name.rawValue): \($0.outcome.rawValue)"
-        }
-        lines.append(
-            "Dry-run preview (no Health data)\n"
-                + String(decoding: completed.preview, as: UTF8.self)
-        )
-        if let identity = completed.identity {
-            lines.append("TLS \(identity.tlsVersion) · \(identity.cipherSuite)")
-            lines.append("Leaf SPKI \(identity.groupedLeafFingerprint)")
-            lines.append("Subject \(identity.leafSubject)")
-            lines.append("Issuer \(identity.leafIssuer)")
-        } else {
-            lines.append("Plain HTTP enabled by explicit opt-in.")
-        }
-        return lines
+        return DestinationConfirmationCard(
+            host: pending.host,
+            identity: probe.identity,
+            preview: probe.preview,
+            insecureWithoutTLS: pending.allowInsecureHTTP && probe.identity == nil
+        ).lines
+            + probe.report.steps.map { "\($0.name.rawValue): \($0.outcome.rawValue)" }
     }
 
-    static func enableMQTTDestination(
+    static func cancelPendingHTTPSDestination() {
+        Task { await PendingDestination.shared.setHTTPS(nil) }
+    }
+
+    static func prepareMQTTDestination(
         urlString: String,
         allowInsecure: Bool,
         clientID: String,
@@ -1003,7 +1077,7 @@ enum HarnessExport {
         username: String? = nil,
         password: String? = nil,
         qos: UInt8 = 1
-    ) async throws -> [String] {
+    ) async throws -> DestinationConfirmationCard {
         guard let host = URL(string: urlString)?.host?.lowercased(), !host.isEmpty else {
             throw EgressError.invalidURL
         }
@@ -1024,31 +1098,59 @@ enum HarnessExport {
         )
         let sink = try MQTTSink.overNetwork(destination: destination, pin: nil)
         let now = Date().ISO8601Format()
-        let completed = try await MQTTDestinationEnable.complete(
+        let probe = try await MQTTDestinationEnable.probe(
             destination: destination,
             pipe: sink.pipe,
             exporterID: try installationID(),
             emittedAt: now
         )
-        let record = MQTTVerificationRecord(
-            urlString: destination.url.absoluteString,
+        await PendingDestination.shared.setMQTT(PendingMQTT(
+            probe: probe,
+            host: host,
             allowedHosts: allowedHosts.sorted(),
             allowInsecure: allowInsecure,
             clientID: clientID,
             topic: topic,
-            qos: destination.qos.rawValue,
-            report: completed.report,
-            hasClientPKCS12: clientPKCS12 != nil,
+            qos: qos,
+            clientPKCS12: clientPKCS12,
             clientPKCS12Password: clientPKCS12Password,
             username: username,
-            hasPassword: password != nil,
-            leafSPKISha256: completed.identity?.leafSPKISha256,
-            issuerSPKISha256: completed.identity?.issuerSPKISha256,
+            password: password,
             firstSeen: now
+        ))
+        return DestinationConfirmationCard(
+            host: host,
+            identity: probe.identity,
+            preview: probe.preview,
+            insecureWithoutTLS: allowInsecure && probe.identity == nil
+        )
+    }
+
+    static func confirmPendingMQTTDestination() async throws -> [String] {
+        guard let pending = await PendingDestination.shared.takeMQTT() else {
+            throw SetupError.verificationRequired
+        }
+        let probe = pending.probe
+        let events = probe.pendingEvents + [.destinationEnabled]
+        let record = MQTTVerificationRecord(
+            urlString: probe.destination.url.absoluteString,
+            allowedHosts: pending.allowedHosts,
+            allowInsecure: pending.allowInsecure,
+            clientID: pending.clientID,
+            topic: pending.topic,
+            qos: pending.qos,
+            report: probe.report,
+            hasClientPKCS12: pending.clientPKCS12 != nil,
+            clientPKCS12Password: pending.clientPKCS12Password,
+            username: pending.username,
+            hasPassword: pending.password != nil,
+            leafSPKISha256: probe.identity?.leafSPKISha256,
+            issuerSPKISha256: probe.identity?.issuerSPKISha256,
+            firstSeen: pending.firstSeen
         )
         let root = try applicationSupportRoot()
         let pkcs12URL = root.appendingPathComponent("mqtt-client.p12")
-        if let clientPKCS12 {
+        if let clientPKCS12 = pending.clientPKCS12 {
             try clientPKCS12.write(to: pkcs12URL, options: .atomic)
         } else {
             try? FileManager.default.removeItem(at: pkcs12URL)
@@ -1057,7 +1159,7 @@ enum HarnessExport {
             service: "app.openhealthexporter.mqtt"
         )
         let passwordHandle = SecretHandle(rawValue: "mqtt_password")
-        if let password {
+        if let password = pending.password {
             try await passwordStore.store(Array(password.utf8), handle: passwordHandle)
         } else {
             try? await passwordStore.delete(passwordHandle)
@@ -1068,22 +1170,22 @@ enum HarnessExport {
         )
         if let snapshotURL = StatusSnapshotLocation.url(destinationID: "mqtt") {
             try DestinationSnapshotFile.recordSecurityEvents(
-                completed.events.count,
+                events.count,
                 destinationID: "mqtt",
-                destinationLabel: host,
+                destinationLabel: pending.host,
                 writtenAtEpoch: Date().timeIntervalSince1970,
                 at: snapshotURL
             )
         }
-        try await emitTrustNotices(completed.events, destination: host)
-        if allowInsecure {
+        try await emitTrustNotices(events, destination: pending.host)
+        if pending.allowInsecure {
             let store = try SQLiteStateStore(
                 path: root.appendingPathComponent("state.sqlite").path
             )
             try await store.transact { tx in
                 try tx.appendLedger(
                     EgressEntry(
-                        destination: host,
+                        destination: pending.host,
                         sampleCount: 0,
                         outcomeKind: "security:insecure_mqtt_enabled",
                         detail: "explicit_user_opt_in",
@@ -1092,17 +1194,17 @@ enum HarnessExport {
                 )
             }
         }
-        return completed.report.steps.map { "\($0.name.rawValue): \($0.outcome.rawValue)" }
-            + [
-                "Dry-run preview (no Health data)\n"
-                    + String(decoding: completed.preview, as: UTF8.self),
-            ]
-            + (completed.identity.map {
-                [
-                    "TLS \($0.tlsVersion) · \($0.cipherSuite)",
-                    "Leaf SPKI \($0.groupedLeafFingerprint)",
-                ]
-            } ?? ["Plain MQTT enabled by explicit opt-in."])
+        return DestinationConfirmationCard(
+            host: pending.host,
+            identity: probe.identity,
+            preview: probe.preview,
+            insecureWithoutTLS: pending.allowInsecure && probe.identity == nil
+        ).lines
+            + probe.report.steps.map { "\($0.name.rawValue): \($0.outcome.rawValue)" }
+    }
+
+    static func cancelPendingMQTTDestination() {
+        Task { await PendingDestination.shared.setMQTT(nil) }
     }
 
     static func runMQTTDestination() async throws -> [String] {
@@ -1397,9 +1499,40 @@ enum HarnessExport {
     ) async throws {
         guard !events.isEmpty else { return }
         let notifier = LocalUserNotifier()
-        for event in events {
-            _ = try await notifier.notify(TrustNotice.notice(for: event, destination: destination))
+        let deliveries = try await TrustNoticePosting.post(
+            events: events,
+            destination: destination,
+            notifier: notifier
+        )
+        let suppressed = TrustNoticePosting.suppressedCount(deliveries)
+        guard suppressed > 0 else { return }
+        let root = try applicationSupportRoot()
+        let store = try SQLiteStateStore(
+            path: root.appendingPathComponent("state.sqlite").path
+        )
+        try await store.transact { tx in
+            try tx.appendLedger(
+                EgressEntry(
+                    destination: destination,
+                    sampleCount: 0,
+                    outcomeKind: "security:notifications_denied",
+                    detail: "trust_notice_suppressed:\(suppressed)",
+                    wallTimeEpoch: Date().timeIntervalSince1970
+                )
+            )
         }
+        for snapshot in StatusSnapshotLocation.readAll() where snapshot.destinationLabel == destination {
+            if let snapshotURL = StatusSnapshotLocation.url(destinationID: snapshot.destinationID) {
+                try DestinationSnapshotFile.recordSecurityEvents(
+                    suppressed,
+                    destinationID: snapshot.destinationID,
+                    destinationLabel: snapshot.destinationLabel,
+                    writtenAtEpoch: Date().timeIntervalSince1970,
+                    at: snapshotURL
+                )
+            }
+        }
+        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
     }
 
     private static func localFileTestReportURL(root: URL) -> URL {

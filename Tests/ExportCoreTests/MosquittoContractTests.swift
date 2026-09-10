@@ -253,6 +253,11 @@ func mosquittoQoS1SurvivesBrokerRestart() async throws {
 }
 
 #if canImport(Network)
+/// Serialized with the other broker-spawning tests: each case binds a listener and
+/// imports PKCS#12 material, and running them alongside the rest of the suite
+/// leaves brokers and TLS imports contending until the run stops making progress.
+@Suite(.serialized)
+struct MosquittoTLSSubprocessTests {
 @Test(.enabled(if: mosquittoExecutable() != nil))
 func mosquittoQoS1PublishesOverPinnedTestCATLS() async throws {
     let binary = try #require(mosquittoExecutable())
@@ -357,6 +362,7 @@ func mosquittoQoS1RequiresTheCAIssuedClientCertificate() async throws {
     let sink = try MQTTSink.overNetwork(destination: destination, pin: material.pin)
     let receipt = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
     #expect(receipt.accepted == 1)
+}
 }
 #endif
 

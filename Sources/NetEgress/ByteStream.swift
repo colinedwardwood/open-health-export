@@ -4,6 +4,9 @@ public enum StreamError: Error, Equatable {
     case notOpen
     case closedByPeer
     case connectTimeout
+    /// The peer completed a handshake and then never answered. A broker that rejects
+    /// our client certificate after TLS 1.3 finishes looks exactly like this.
+    case readTimeout
     case transport(String)
     case pinMismatch
     case badPort

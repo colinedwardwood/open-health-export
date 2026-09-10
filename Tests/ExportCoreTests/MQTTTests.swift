@@ -192,6 +192,13 @@ import WireFormat
     #expect(completed.report.allowsEnablement)
     #expect(completed.report.steps.map(\.name) == [.connect, .publishCanary, .receiveEcho])
     #expect(completed.events.contains(.destinationEnabled))
+    let probed = try await MQTTDestinationEnable.probe(
+        destination: destination,
+        pipe: LoopbackMQTTBroker(),
+        exporterID: "00000000-0000-4000-8000-000000000090",
+        emittedAt: "2026-01-01T00:00:00Z"
+    )
+    #expect(!probed.pendingEvents.contains(.destinationEnabled))
     let preview = String(decoding: completed.preview, as: UTF8.self)
     #expect(preview.contains("\"kind\":\"canary\""))
     #expect(preview.contains("\"code\":\"OHE1-MQTT\""))

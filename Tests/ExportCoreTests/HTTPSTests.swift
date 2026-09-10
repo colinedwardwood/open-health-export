@@ -417,6 +417,23 @@ private func writeHTTPSPayload() throws -> (URL, BatchID) {
         ]
     )
 
+    let probed = try await HTTPSDestinationEnable.probe(
+        destination: destination,
+        transport: transport,
+        exporterID: "00000000-0000-4000-8000-000000000025",
+        emittedAt: "2026-01-01T00:00:00Z"
+    )
+    #expect(!probed.pendingEvents.contains(.destinationEnabled))
+    #expect(probed.report.allowsEnablement)
+    let committed = try HTTPSDestinationEnable.commit(probe: probed, transport: transport)
+    #expect(
+        committed.events == [
+            .canaryConfirmed,
+            .pinRecorded(groupedFingerprint: TLSIdentity.grouped(identity.leafSPKISha256)),
+            .destinationEnabled,
+        ]
+    )
+
     let rejected = RecordingHTTPTransport(
         response: OutboundHTTPResponse(status: 401, body: Data()),
         tls: identity

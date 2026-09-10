@@ -170,6 +170,46 @@ private let everyTrustEvent: [TrustEvent] = [
     #expect(await notifier.attempts == 2)
 }
 
+@Test func notifierPostsEnableAndPinChangeAndRecordsDeniedDelivery() async throws {
+    let identity = sampleIdentity(leaf: "aaaabbbbccccdddd")
+    var setup = try pinnedSetup(identity: identity)
+    _ = try setup.enable(sink: TrustEventSinkStub())
+    let posting = RecordingNotifier()
+    let posted = try await TrustNoticePosting.post(
+        events: setup.drainEvents(),
+        destination: "ha.example",
+        notifier: posting
+    )
+    #expect(posted == [.posted, .posted, .posted])
+    #expect(await posting.kinds == [.destinationVerified, .destinationPinned, .destinationEnabled])
+
+    var halted = try pinnedSetup(identity: identity)
+    _ = halted.drainEvents()
+    #expect(throws: PinError.mismatch) {
+        try halted.observeIdentity(
+            sampleIdentity(leaf: "eeeeffff00001111"),
+            at: "2024-01-02T00:00:00Z"
+        )
+    }
+    let change = RecordingNotifier()
+    _ = try await TrustNoticePosting.post(
+        events: halted.drainEvents(),
+        destination: "ha.example",
+        notifier: change
+    )
+    #expect(await change.kinds == [.destinationRepointed])
+
+    let denied = RecordingNotifier(authorizationDenied: true)
+    let skipped = try await TrustNoticePosting.post(
+        events: [.destinationEnabled],
+        destination: "ha.example",
+        notifier: denied
+    )
+    #expect(skipped == [.skippedAuthorizationDenied])
+    #expect(TrustNoticePosting.suppressedCount(skipped) == 1)
+    #expect(await denied.notices.isEmpty)
+}
+
 private struct TrustEventSinkStub: DestinationSink {
     func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt {
         DeliveryReceipt(batchID: idempotencyKey, accepted: 0, statusOnly: true)

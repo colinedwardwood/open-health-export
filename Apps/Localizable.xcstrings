@@ -178,6 +178,17 @@
         }
       }
     },
+    "Cancel": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        }
+      }
+    },
     "Changed": {
       "extractionState": "manual",
       "localizations": {
@@ -262,6 +273,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Confirm sensitive type"
+          }
+        }
+      }
+    },
+    "Confirm this server": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm this server"
           }
         }
       }
@@ -552,17 +574,6 @@
         }
       }
     },
-    "HealthKit provides no deletion callback. Tombstones are best-effort when iOS next reports a deletion; a full reconcile repairs deletions that were not reported.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "HealthKit provides no deletion callback. Tombstones are best-effort when iOS next reports a deletion; a full reconcile repairs deletions that were not reported."
-          }
-        }
-      }
-    },
     "HTTPS destination URL": {
       "extractionState": "manual",
       "localizations": {
@@ -570,6 +581,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "HTTPS destination URL"
+          }
+        }
+      }
+    },
+    "HealthKit provides no deletion callback. Tombstones are best-effort when iOS next reports a deletion; a full reconcile repairs deletions that were not reported.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HealthKit provides no deletion callback. Tombstones are best-effort when iOS next reports a deletion; a full reconcile repairs deletions that were not reported."
           }
         }
       }
@@ -1267,6 +1289,28 @@
         }
       }
     },
+    "Test HTTPS destination": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test HTTPS destination"
+          }
+        }
+      }
+    },
+    "Test MQTT destination": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test MQTT destination"
+          }
+        }
+      }
+    },
     "Test and enable MQTT destination": {
       "extractionState": "manual",
       "localizations": {
@@ -1296,6 +1340,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "These queued date ranges were evicted to keep storage bounded."
+          }
+        }
+      }
+    },
+    "This is my server": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This is my server"
           }
         }
       }
@@ -1340,6 +1395,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Type local-file to confirm demo export"
+          }
+        }
+      }
+    },
+    "Unacknowledged destination change": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unacknowledged destination change"
           }
         }
       }

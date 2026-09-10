@@ -21,6 +21,11 @@ struct HarnessView: View {
         case working
     }
 
+    private enum PendingConfirmationKind {
+        case https
+        case mqtt
+    }
+
     @State private var phase: Phase = .disclosure
     @AppStorage("ohe.disclosureAcknowledged")
     private var disclosureAcknowledged = false
@@ -85,6 +90,9 @@ struct HarnessView: View {
     private var advisoryEnabled = true
     @State private var advisoryBanner: String?
     @State private var advisoryItems: [AdvisoryItem] = []
+    @State private var destinationChangeBanner: String?
+    @State private var confirmationCard: DestinationConfirmationCard?
+    @State private var confirmationKind: PendingConfirmationKind?
 
     var body: some View {
         NavigationStack {
@@ -122,9 +130,35 @@ struct HarnessView: View {
             .navigationTitle("M0 harness")
         }
         .tint(.primary)
+        .safeAreaInset(edge: .top) {
+            if let destinationChangeBanner {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Unacknowledged destination change")
+                        .font(.headline)
+                    Text(destinationChangeBanner)
+                        .font(.footnote)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(.yellow)
+                .accessibilityIdentifier("destination-change-banner")
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { confirmationCard != nil },
+            set: { presented in
+                if !presented {
+                    cancelDestinationConfirmation()
+                }
+            }
+        )) {
+            if let confirmationCard {
+                destinationConfirmation(confirmationCard)
+            }
+        }
         .onAppear {
             timeToFirstFrameMS = LaunchMark.millisecondsToNow()
-            destinationStatusLines = HarnessExport.destinationStatusLines()
+            refreshDestinationSurfaces()
             let selected = Set(HarnessExport.selectedMetrics())
             browserBaseline = selected
             browserSelection = selected
@@ -157,7 +191,7 @@ struct HarnessView: View {
         }
         .onOpenURL { url in
             guard let route = WidgetStatusRoute(url: url) else { return }
-            destinationStatusLines = HarnessExport.destinationStatusLines()
+            refreshDestinationSurfaces()
             if disclosureAcknowledged {
                 phase = .ready
                 status = route.destinationID.map {
@@ -390,8 +424,8 @@ struct HarnessView: View {
                     .foregroundStyle(.primary)
                     .fontWeight(.semibold)
             }
-            Button("Test, pin, and enable HTTPS destination") {
-                Task { await enableHTTPS() }
+            Button("Test HTTPS destination") {
+                Task { await testHTTPS() }
             }
             .disabled(phase == .working || httpsURL.isEmpty)
             .accessibilityIdentifier("https-enable")
@@ -459,8 +493,8 @@ struct HarnessView: View {
                     .foregroundStyle(.primary)
                     .fontWeight(.semibold)
             }
-            Button("Test and enable MQTT destination") {
-                Task { await enableMQTT() }
+            Button("Test MQTT destination") {
+                Task { await testMQTT() }
             }
             .disabled(phase == .working || mqttURL.isEmpty || mqttClientID.isEmpty || mqttTopic.isEmpty)
             .accessibilityIdentifier("mqtt-enable")
@@ -475,7 +509,7 @@ struct HarnessView: View {
                     .textSelection(.enabled)
             }
             Button("Refresh destination status") {
-                destinationStatusLines = HarnessExport.destinationStatusLines()
+                refreshDestinationSurfaces()
             }
             .accessibilityIdentifier("destination-refresh")
             ForEach(Array(destinationStatusLines.enumerated()), id: \.offset) { index, line in
@@ -491,7 +525,7 @@ struct HarnessView: View {
             Button("Acknowledge destination changes") {
                 do {
                     try HarnessExport.acknowledgeDestinationChanges()
-                    destinationStatusLines = HarnessExport.destinationStatusLines()
+                    refreshDestinationSurfaces()
                     status = "Ready. Unacknowledged destination changes were cleared."
                 } catch {
                     status = "Failed: \(error.localizedDescription)"
@@ -1045,7 +1079,7 @@ struct HarnessView: View {
         status = "Exporting demo dataset…"
         do {
             results = try await HarnessExport.runDemoDataset(typedDestinationName: demoConfirmName)
-            destinationStatusLines = HarnessExport.destinationStatusLines()
+            refreshDestinationSurfaces()
             status = "Demo export finished. Files are DEMO- prefixed."
         } catch {
             status = "Failed: \(error.localizedDescription)"
@@ -1059,7 +1093,7 @@ struct HarnessView: View {
         results = []
         do {
             results = try await HarnessExport.runOnePageEachMetric(trigger: trigger)
-            destinationStatusLines = HarnessExport.destinationStatusLines()
+            refreshDestinationSurfaces()
             await refreshLedgerIntegrity()
             await refreshWakeAttribution()
             await refreshQueueGaps()
@@ -1077,7 +1111,7 @@ struct HarnessView: View {
         results = []
         do {
             results = try await HarnessExport.runFullReconcile()
-            destinationStatusLines = HarnessExport.destinationStatusLines()
+            refreshDestinationSurfaces()
             await refreshLedgerIntegrity()
             status = "Ready. Full reconciliation finished without advancing anchored cursors."
         } catch {
@@ -1102,7 +1136,7 @@ struct HarnessView: View {
             UIApplication.shared.isIdleTimerDisabled = true
             defer { UIApplication.shared.isIdleTimerDisabled = false }
             results = try await HarnessExport.runBackfill(mode: mode)
-            destinationStatusLines = HarnessExport.destinationStatusLines()
+            refreshDestinationSurfaces()
             await refreshLedgerIntegrity()
             status = "Ready. Foreground backfill completed."
         } catch {
@@ -1141,7 +1175,8 @@ struct HarnessView: View {
         status = "Working: local-folder destination test."
         wipeArmed = false
         do {
-            destinationStatusLines = try await HarnessExport.enableLocalFileDestination()
+            _ = try await HarnessExport.enableLocalFileDestination()
+            refreshDestinationSurfaces()
             await startHealthObserversIfEligible()
             await refreshLedgerIntegrity()
             status = "Ready. Local archive passed write/read/confirm and is enabled."
@@ -1152,20 +1187,21 @@ struct HarnessView: View {
     }
 
     @MainActor
-    private func enableHTTPS() async {
+    private func testHTTPS() async {
         phase = .working
         status = "Working: HTTPS destination test and identity pin."
         do {
-            httpsTestLines = try await HarnessExport.enableHTTPSDestination(
+            confirmationKind = .https
+            confirmationCard = try await HarnessExport.prepareHTTPSDestination(
                 urlString: httpsURL,
                 allowInsecureHTTP: allowInsecureHTTP,
                 bearer: httpsBearer.isEmpty ? nil : httpsBearer
             )
-            httpsBearer = ""
-            destinationStatusLines = HarnessExport.destinationStatusLines()
-            await refreshLedgerIntegrity()
-            status = "Ready. Network destination passed its real-path test and is enabled."
+            httpsTestLines = confirmationCard?.lines ?? []
+            status = "Ready. Confirm this server before any Health data moves."
         } catch {
+            confirmationCard = nil
+            confirmationKind = nil
             httpsTestLines = []
             status = "Failed: \(error.localizedDescription)"
         }
@@ -1173,11 +1209,12 @@ struct HarnessView: View {
     }
 
     @MainActor
-    private func enableMQTT() async {
+    private func testMQTT() async {
         phase = .working
         status = "Working: MQTT destination test."
         do {
-            mqttTestLines = try await HarnessExport.enableMQTTDestination(
+            confirmationKind = .mqtt
+            confirmationCard = try await HarnessExport.prepareMQTTDestination(
                 urlString: mqttURL,
                 allowInsecure: allowInsecureMQTT,
                 clientID: mqttClientID,
@@ -1188,14 +1225,80 @@ struct HarnessView: View {
                 password: mqttPassword.isEmpty ? nil : mqttPassword,
                 qos: mqttQoS
             )
-            destinationStatusLines = HarnessExport.destinationStatusLines()
-            await refreshLedgerIntegrity()
-            status = "Ready. MQTT destination passed its real-path test and is enabled."
+            mqttTestLines = confirmationCard?.lines ?? []
+            status = "Ready. Confirm this server before any Health data moves."
         } catch {
+            confirmationCard = nil
+            confirmationKind = nil
             mqttTestLines = []
             status = "Failed: \(error.localizedDescription)"
         }
         phase = .ready
+    }
+
+    @MainActor
+    private func confirmPendingDestination() async {
+        phase = .working
+        status = "Working: enabling destination."
+        do {
+            switch confirmationKind {
+            case .https:
+                httpsTestLines = try await HarnessExport.confirmPendingHTTPSDestination()
+                httpsBearer = ""
+                status = "Ready. Network destination passed its real-path test and is enabled."
+            case .mqtt:
+                mqttTestLines = try await HarnessExport.confirmPendingMQTTDestination()
+                status = "Ready. MQTT destination passed its real-path test and is enabled."
+            case nil:
+                status = "Failed: nothing to confirm."
+            }
+            confirmationCard = nil
+            confirmationKind = nil
+            refreshDestinationSurfaces()
+            await refreshLedgerIntegrity()
+        } catch {
+            status = "Failed: \(error.localizedDescription)"
+        }
+        phase = .ready
+    }
+
+    private func cancelDestinationConfirmation() {
+        HarnessExport.cancelPendingHTTPSDestination()
+        HarnessExport.cancelPendingMQTTDestination()
+        confirmationCard = nil
+        confirmationKind = nil
+    }
+
+    private func refreshDestinationSurfaces() {
+        destinationStatusLines = HarnessExport.destinationStatusLines()
+        destinationChangeBanner = HarnessExport.destinationChangeBannerDetail()
+    }
+
+    @ViewBuilder
+    private func destinationConfirmation(_ card: DestinationConfirmationCard) -> some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(Array(card.lines.enumerated()), id: \.offset) { _, line in
+                        Text(line)
+                            .font(.footnote)
+                            .textSelection(.enabled)
+                    }
+                    Button("This is my server") {
+                        Task { await confirmPendingDestination() }
+                    }
+                    .accessibilityIdentifier("destination-confirm")
+                    Button("Cancel") {
+                        cancelDestinationConfirmation()
+                    }
+                    .accessibilityIdentifier("destination-confirm-cancel")
+                }
+                .padding()
+            }
+            .navigationTitle("Confirm this server")
+        }
+        .interactiveDismissDisabled()
+        .presentationDetents([.large])
     }
 
     @MainActor
@@ -1204,7 +1307,7 @@ struct HarnessView: View {
         status = "Working: MQTT export."
         do {
             results = try await HarnessExport.runMQTTDestination()
-            destinationStatusLines = HarnessExport.destinationStatusLines()
+            refreshDestinationSurfaces()
             await refreshLedgerIntegrity()
             await refreshWakeAttribution()
             status = "Ready. MQTT export finished."
@@ -1220,7 +1323,7 @@ struct HarnessView: View {
         status = "Working: HTTPS export."
         do {
             results = try await HarnessExport.runHTTPSDestination()
-            destinationStatusLines = HarnessExport.destinationStatusLines()
+            refreshDestinationSurfaces()
             await refreshLedgerIntegrity()
             await refreshWakeAttribution()
             status = "Ready. HTTPS export finished."
@@ -1259,7 +1362,7 @@ struct HarnessView: View {
             disclosureAcknowledged = false
             foregroundCatchUpStarted = false
             AppLifecycleCoordinator.shared.stopObservers()
-            destinationStatusLines = HarnessExport.destinationStatusLines()
+            refreshDestinationSurfaces()
             ledgerLines = []
             await refreshLedgerIntegrity()
             phase = .disclosure
@@ -1337,7 +1440,7 @@ struct HarnessView: View {
         results = []
         do {
             results = try await HarnessExport.runCompanion(session: pairing)
-            destinationStatusLines = HarnessExport.destinationStatusLines()
+            refreshDestinationSurfaces()
             status = "Ready. Companion export finished. Compare confirmation \(sas) with the Mac."
         } catch {
             status = "Failed: \(error.localizedDescription)"
@@ -1361,7 +1464,7 @@ struct HarnessView: View {
             pairing = nil
             sas = ""
             pairingPaste = ""
-            destinationStatusLines = HarnessExport.destinationStatusLines()
+            refreshDestinationSurfaces()
             status = "Ready. Companion pairing forgotten and its destination disabled."
         } catch {
             status = "Failed: \(error.localizedDescription)"

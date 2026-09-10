@@ -140,6 +140,27 @@ public struct DestinationSetup: Sendable {
         testReport = report
     }
 
+    /// Restores a probe that already passed the real-path test so the user can
+    /// confirm the identity card before `enable` (R-31). Does not emit trust events.
+    public mutating func resumeAfterPassedTest(
+        preview: Data,
+        pin: PinRecord?,
+        identity: TLSIdentity?,
+        testReport: DestinationTestReport
+    ) throws {
+        guard state == .draft else {
+            throw SetupError.illegalTransition(from: state, to: .pinned)
+        }
+        guard testReport.allowsEnablement else {
+            throw SetupError.verificationRequired
+        }
+        previewBytes = preview
+        self.pin = pin
+        displayedIdentity = identity
+        self.testReport = testReport
+        state = .pinned
+    }
+
     /// Restores a previously enabled destination after process restart without
     /// re-emitting trust events. The stored test report must still allow enablement.
     public mutating func resumeEnabled(testReport: DestinationTestReport) throws {

@@ -28,6 +28,9 @@ public actor NWByteStream: ByteStream {
         public var pin: PinRecord?
         public var requireTLS13: Bool
         public var connectTimeout: Duration
+        /// Bounds every read. Without it a peer that accepts our bytes and answers
+        /// nothing parks the export forever, which R-21 has no outcome for.
+        public var readTimeout: Duration
         /// A refused or unroutable destination sits in `.waiting` and retries rather than
         /// failing. Set this for the R-31 destination test, where the user holds a spinner.
         public var failFastOnWaiting: Bool
@@ -40,6 +43,7 @@ public actor NWByteStream: ByteStream {
             pin: PinRecord? = nil,
             requireTLS13: Bool = false,
             connectTimeout: Duration = .seconds(10),
+            readTimeout: Duration = .seconds(15),
             failFastOnWaiting: Bool = false,
             preSharedKey: PreSharedKey? = nil,
             clientIdentity: TLSClientIdentity? = nil
@@ -47,6 +51,7 @@ public actor NWByteStream: ByteStream {
             self.pin = pin
             self.requireTLS13 = requireTLS13
             self.connectTimeout = connectTimeout
+            self.readTimeout = readTimeout
             self.failFastOnWaiting = failFastOnWaiting
             self.preSharedKey = preSharedKey
             self.clientIdentity = clientIdentity
@@ -64,6 +69,10 @@ public actor NWByteStream: ByteStream {
     private let observation = TLSObservation()
     private var connection: NWConnection?
     private var openContinuation: CheckedContinuation<Void, Error>?
+    private var receiveContinuation: CheckedContinuation<Data, Error>?
+    private var receiveToken = 0
+    private var sendContinuation: CheckedContinuation<Void, Error>?
+    private var sendToken = 0
     private var isReady = false
     private var resolvedAddress: String?
     private var lastWaitingError: StreamError?
@@ -129,36 +138,35 @@ public actor NWByteStream: ByteStream {
     public func send(_ data: Data) async throws {
         try await open()
         guard let connection else { throw StreamError.notOpen }
+        sendToken += 1
+        let token = sendToken
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            connection.send(content: data, completion: .contentProcessed { error in
-                if let error {
-                    continuation.resume(throwing: StreamError.transport(String(describing: error)))
-                } else {
-                    continuation.resume()
-                }
+            sendContinuation = continuation
+            connection.send(content: data, completion: .contentProcessed { [weak self] error in
+                Task { await self?.finishSend(token: token, error: error) }
             })
+            armSendTimeout(token: token)
         }
     }
 
     public func receive(max: Int) async throws -> Data {
         try await open()
         guard let connection else { throw StreamError.notOpen }
+        receiveToken += 1
+        let token = receiveToken
         return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
-            connection.receive(minimumIncompleteLength: 1, maximumLength: max) { data, _, isComplete, error in
-                if let error {
-                    continuation.resume(throwing: StreamError.transport(String(describing: error)))
-                    return
+            receiveContinuation = continuation
+            connection.receive(minimumIncompleteLength: 1, maximumLength: max) { [weak self] data, _, isComplete, error in
+                Task {
+                    await self?.finishReceive(
+                        token: token,
+                        data: data,
+                        isComplete: isComplete,
+                        error: error
+                    )
                 }
-                if let data, !data.isEmpty {
-                    continuation.resume(returning: data)
-                    return
-                }
-                if isComplete {
-                    continuation.resume(throwing: StreamError.closedByPeer)
-                    return
-                }
-                continuation.resume(returning: Data())
             }
+            armReadTimeout(token: token)
         }
     }
 
@@ -210,6 +218,75 @@ public actor NWByteStream: ByteStream {
         } else {
             continuation.resume()
         }
+    }
+
+    private func finishSend(token: Int, error: NWError?) {
+        guard token == sendToken, let continuation = sendContinuation else { return }
+        sendContinuation = nil
+        if let error {
+            continuation.resume(throwing: classify(error))
+        } else {
+            continuation.resume()
+        }
+    }
+
+    /// A broker that completes the handshake and then refuses us — an mTLS listener we
+    /// have no client certificate for — never acknowledges the write at all.
+    private func armSendTimeout(token: Int) {
+        let timeout = options.readTimeout
+        Task { [weak self] in
+            try? await Task.sleep(for: timeout)
+            await self?.timeoutSend(token: token)
+        }
+    }
+
+    private func timeoutSend(token: Int) {
+        guard token == sendToken, let continuation = sendContinuation else { return }
+        sendContinuation = nil
+        continuation.resume(throwing: StreamError.readTimeout)
+        connection?.cancel()
+        isReady = false
+    }
+
+    private func finishReceive(
+        token: Int,
+        data: Data?,
+        isComplete: Bool,
+        error: NWError?
+    ) {
+        guard token == receiveToken, let continuation = receiveContinuation else { return }
+        receiveContinuation = nil
+        if let error {
+            continuation.resume(throwing: classify(error))
+            return
+        }
+        if let data, !data.isEmpty {
+            continuation.resume(returning: data)
+            return
+        }
+        if isComplete {
+            continuation.resume(throwing: StreamError.closedByPeer)
+            return
+        }
+        continuation.resume(returning: Data())
+    }
+
+    private func armReadTimeout(token: Int) {
+        let timeout = options.readTimeout
+        Task { [weak self] in
+            try? await Task.sleep(for: timeout)
+            await self?.timeoutReceive(token: token)
+        }
+    }
+
+    /// A silent peer is a delivery failure, not a hang. Cancelling the connection also
+    /// releases the pending `receive` callback so the next attempt starts clean.
+    private func timeoutReceive(token: Int) {
+        guard token == receiveToken, let continuation = receiveContinuation else { return }
+        receiveContinuation = nil
+        continuation.resume(throwing: StreamError.readTimeout)
+        connection?.cancel()
+        isReady = false
     }
 
     private func armConnectTimeout() {

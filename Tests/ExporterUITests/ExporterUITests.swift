@@ -186,6 +186,8 @@ final class ExporterUITests: XCTestCase {
             app.staticTexts["destination-empty"].label,
             "No destination snapshots yet."
         )
+        XCTAssertFalse(app.otherElements["destination-change-banner"].exists)
+        XCTAssertFalse(app.staticTexts["destination-change-banner"].exists)
     }
 
     private func enterControls() {
