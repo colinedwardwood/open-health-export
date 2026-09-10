@@ -6,8 +6,9 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 pins_file="${root}/spec/v1.0.0/fixtures/ha-ci/versions.json"
 simulate="${SIMULATE_DIVERGENCE:-0}"
-dry_run="${DRY_RUN:-0}"
 failed=0
+run_url="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-unknown}/actions/runs/${GITHUB_RUN_ID:-unknown}"
+commit="${GITHUB_SHA:-$(git -C "${root}" rev-parse HEAD)}"
 
 normalize() {
   local value="$1"
@@ -33,28 +34,24 @@ latest_non_prerelease() {
 open_or_reuse_issue() {
   local title="$1"
   local body="$2"
-  if [ "${dry_run}" = "1" ]; then
-    printf 'dry-run would open issue: %s\n' "${title}"
-    return 0
-  fi
   local existing
   existing="$(
-    python3 - "${title}" <<'PY'
-import json, subprocess, sys
-title = sys.argv[1]
-raw = subprocess.check_output(
-    ["gh", "issue", "list", "--state", "open", "--limit", "50",
-     "--search", "QA-22 canary:", "--json", "number,title"],
-    text=True,
-)
-for issue in json.loads(raw):
-    if issue.get("title") == title:
-        print(issue["number"])
-        break
-PY
+    gh issue list \
+      --state open \
+      --limit 100 \
+      --search '"QA-22 canary:" in:title' \
+      --json number,title \
+      --template '{{range .}}{{printf "%v\t%s\n" .number .title}}{{end}}' |
+      while IFS=$'\t' read -r number candidate; do
+        if [ "${candidate}" = "${title}" ]; then
+          printf '%s' "${number}"
+          break
+        fi
+      done
   )"
   if [ -n "${existing}" ]; then
-    printf 'tracking issue already open: #%s\n' "${existing}"
+    gh issue comment "${existing}" --body "${body}"
+    printf 'updated tracking issue: #%s\n' "${existing}"
     return 0
   fi
   gh issue create --title "${title}" --body "${body}"
@@ -62,10 +59,15 @@ PY
 
 if [ -n "${REPORT_SERVICE:-}" ]; then
   open_or_reuse_issue \
-    "QA-22 canary: ${REPORT_SERVICE} ${REPORT_VERSION:-unknown} contract failed" \
+    "QA-22 canary: ${REPORT_SERVICE} contract divergence" \
     "The nightly contract against ${REPORT_SERVICE} ${REPORT_VERSION:-unknown} failed.
 
 ${REPORT_DETAILS:-See the linked workflow run for details.}
+
+- Expected proof: latest-stable startup and contract succeed
+- Observed proof: startup or contract failed
+- Workflow run: ${run_url}
+- Commit: \`${commit}\`
 
 This job is a release gate (QA-22), not a required pull-request check."
   exit 0
@@ -98,13 +100,15 @@ fi
 if [ "${ha_latest}" != "${current}" ]; then
   failed=1
   open_or_reuse_issue \
-    "QA-22 canary: Home Assistant stable is ${ha_latest}, pin is ${current}" \
+    "QA-22 canary: Home Assistant release divergence" \
     "$(cat <<EOF
 The nightly upstream canary found a Home Assistant stable release that does not match the declared pin.
 
-- Declared \`currentStable\`: \`${current}\`
+- Expected proof (\`currentStable\`): \`${current}\`
+- Observed proof (latest non-prerelease): \`${ha_latest}\`
 - Declared \`oldestInWindow\`: \`${oldest}\`
-- Latest non-prerelease on [home-assistant/core](https://github.com/home-assistant/core/releases): \`${ha_latest}\`
+- Workflow run: ${run_url}
+- Commit: \`${commit}\`
 
 Bump \`spec/v1.0.0/fixtures/ha-ci/versions.json\` and \`.github/workflows/container-contracts.yml\` after verifying R-89 contracts, or accept this as an open canary until the window is updated.
 
@@ -116,12 +120,14 @@ fi
 if [ "${mqtt_latest}" != "${mosquitto_pin}" ]; then
   failed=1
   open_or_reuse_issue \
-    "QA-22 canary: Mosquitto stable is ${mqtt_latest}, pin is ${mosquitto_pin}" \
+    "QA-22 canary: Mosquitto release divergence" \
     "$(cat <<EOF
 The nightly upstream canary found a Mosquitto release that does not match the declared pin.
 
-- Declared \`mosquittoTag\`: \`${mosquitto_pin}\`
-- Latest non-prerelease on [eclipse/mosquitto](https://github.com/eclipse/mosquitto/releases): \`${mqtt_latest}\`
+- Expected proof (\`mosquittoTag\`): \`${mosquitto_pin}\`
+- Observed proof (latest non-prerelease): \`${mqtt_latest}\`
+- Workflow run: ${run_url}
+- Commit: \`${commit}\`
 
 Bump the pin in \`spec/v1.0.0/fixtures/ha-ci/versions.json\` and \`.github/workflows/container-contracts.yml\` after verifying R-90 contracts.
 
