@@ -36,7 +36,10 @@ jobs:
 
   ios-app:
     runs-on: macos-26
-    timeout-minutes: 25
+    # Fifteen UI cases across three simulator clones on a shared runner ran to 26
+    # minutes and were cut off mid-suite by a 25-minute cap. The cap was measuring the
+    # runner, not the app.
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
       - name: Install build tools
