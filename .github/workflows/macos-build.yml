@@ -3,10 +3,12 @@ on:
   push:
   pull_request:
 concurrency:
-  group: macos-build-${{ github.workflow }}-${{ github.ref }}
-  # On main every commit is a release candidate and must be judged on its own
-  # evidence. Cancelling the previous run leaves commits marked "cancelled",
-  # which reads as unverified and forces pushes to be spaced by a full run.
+  # Each commit on main gets its own concurrency group, so runs never contend and
+  # none is left marked cancelled. Grouping by ref is not enough: with
+  # cancel-in-progress false GitHub still cancels the *pending* run when a newer
+  # one queues, so a run could only ever be superseded rather than completed.
+  # Off main, superseding is exactly what we want.
+  group: macos-build-${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
   darwin-package:
