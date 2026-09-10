@@ -231,6 +231,7 @@ struct PolicyCheck {
         }
         print("policycheck no alternate icons: ok")
         try checkStringCatalog(root: root)
+        try checkNoHealthDenialClaims(root: root)
         try checkUpstreamVersionPins(root: root)
         try checkAdjacency(root: root)
         try checkHealthKitSymbolsStayInAdapter(sources: sources)
@@ -303,6 +304,53 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck string catalog covers app UI literals: ok")
+    }
+
+    /// R-60: Apple guarantees a denied HealthKit read is indistinguishable from absent
+    /// data, so no user-facing string may claim one. Positively detectable denials —
+    /// Local Network, notifications — say so in their own words and carry no Health term,
+    /// which is why the gate requires both a denial verb and a Health noun to fire.
+    static func checkNoHealthDenialClaims(root: URL) throws {
+        let denialTerms = [
+            "denied", "denial", "refused", "rejected",
+            "not authorized", "not authorised", "unauthorized", "unauthorised",
+            "no permission", "permission was", "you declined",
+        ]
+        let healthTerms = ["health"]
+        // Naming the ambiguity is the requirement, not a breach of it: copy may say that
+        // we cannot know whether a type was allowed or denied. It may not say it was.
+        let ambiguityPhrases = [
+            "does not tell us", "doesn't tell us", "cannot tell", "can't tell",
+            "no way to know", "indistinguishable", "whether you allowed or denied",
+        ]
+        let literal = try NSRegularExpression(pattern: #""([^"\\\n]{12,})""#)
+        var claims: [String] = []
+        for directory in ["Sources", "Apps"] {
+            let base = root.appendingPathComponent(directory)
+            guard let files = FileManager.default.enumerator(at: base, includingPropertiesForKeys: nil) else {
+                continue
+            }
+            for case let file as URL in files where file.pathExtension == "swift" {
+                let text = try String(contentsOf: file, encoding: .utf8)
+                let ns = text as NSString
+                for match in literal.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
+                    let value = ns.substring(with: match.range(at: 1))
+                    let lowered = value.lowercased()
+                    guard healthTerms.contains(where: { lowered.contains($0) }) else { continue }
+                    guard denialTerms.contains(where: { lowered.contains($0) }) else { continue }
+                    guard !ambiguityPhrases.contains(where: { lowered.contains($0) }) else { continue }
+                    claims.append("\(file.lastPathComponent): \(value)")
+                }
+            }
+        }
+        if !claims.isEmpty {
+            FileHandle.standardError.write(
+                Data(("R-60 forbids claiming a Health read was denied:\n"
+                    + claims.joined(separator: "\n") + "\n").utf8)
+            )
+            exit(1)
+        }
+        print("policycheck no copy claims a Health read was denied: ok")
     }
 
     static func checkHostTZDataPin(root: URL) throws {

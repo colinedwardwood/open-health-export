@@ -188,8 +188,13 @@ public struct DataSelectionDraft: Sendable, Equatable {
 /// R-69 type list: catalogue rows with values when present, never a denial claim.
 public enum DataBrowser {
     public static let noDataCopy = "No data on this iPhone"
+    /// R-60: a denied read and absent data are indistinguishable, so zero results name
+    /// both causes and hand over the route to check, rather than claiming either one.
+    public static let healthPathCopy =
+        "Check in Health, under Sharing, then Apps."
     public static let emptyDetailCopy =
-        "No samples for this type on this iPhone. Either there aren't any, or access is off in Health."
+        "No samples for this type on this iPhone. Either there aren't any, or access is off in Health. "
+            + healthPathCopy
 
     public static func rows(
         latest: [MetricID: SampleRecord],

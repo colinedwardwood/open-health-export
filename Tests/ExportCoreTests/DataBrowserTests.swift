@@ -74,6 +74,33 @@ private func browserSample(
     #expect(DataBrowser.emptyDetailCopy.contains("access is off in Health"))
 }
 
+/// R-60: the read that returns nothing because the type was denied and the read that
+/// returns nothing because the iPhone holds no such data must be indistinguishable in
+/// the product, because Apple makes them indistinguishable to us.
+@Test func deniedTypeAndAbsentDataProduceIdenticalCopy() throws {
+    let denied = MetricCatalog.heartRate.id
+    let absent = MetricCatalog.stepCount.id
+    let now = Date(timeIntervalSince1970: 0)
+
+    let deniedDetail = try #require(DataBrowser.detail(metric: denied, samples: [], now: now))
+    let absentDetail = try #require(DataBrowser.detail(metric: absent, samples: [], now: now))
+    #expect(deniedDetail.samples.isEmpty)
+    #expect(absentDetail.samples.isEmpty)
+
+    let rows = DataBrowser.rows(latest: [:])
+    let subtitles = Set(rows.filter { $0.id == denied || $0.id == absent }.map(\.subtitle))
+    #expect(subtitles == [DataBrowser.noDataCopy])
+
+    let copy = DataBrowser.emptyDetailCopy
+    #expect(copy.contains("Either there aren't any"))
+    #expect(copy.contains("access is off in Health"))
+    #expect(copy.contains(DataBrowser.healthPathCopy))
+    for claim in ["denied", "denial", "not authorised", "not authorized", "no permission"] {
+        #expect(!copy.lowercased().contains(claim))
+        #expect(!DataBrowser.noDataCopy.lowercased().contains(claim))
+    }
+}
+
 @Test func selectionReviewRequiresSensitiveIndividualConfirmation() throws {
     var draft = DataSelectionDraft(baseline: [MetricCatalog.stepCount.id])
     #expect(throws: DataSelectionError.sensitiveConfirmationRequired) {
