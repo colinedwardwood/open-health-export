@@ -381,8 +381,18 @@ private func stopMosquitto(_ process: Process) async {
     await withCheckedContinuation { continuation in
         DispatchQueue.global(qos: .userInitiated).async {
             #if canImport(Darwin)
+            // waitUntilExit() has no deadline, so a broker that does not act on
+            // SIGTERM parks the whole run rather than failing one test. Escalate
+            // on the same bounded schedule the Glibc branch uses.
             process.terminate()
-            process.waitUntilExit()
+            for _ in 0 ..< 100 {
+                if !process.isRunning { break }
+                Darwin.usleep(20_000)
+            }
+            if process.isRunning {
+                _ = Darwin.kill(process.processIdentifier, SIGKILL)
+                process.waitUntilExit()
+            }
             #else
             let pid = process.processIdentifier
             _ = Glibc.kill(pid, SIGTERM)
