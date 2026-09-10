@@ -5,9 +5,12 @@ import Security
 /// A user-supplied PKCS#12 identity for MQTTS client certificates.
 /// External keys are **not** Secure Enclave material (SEC-68).
 public struct TLSClientIdentity: @unchecked Sendable {
+    private static let importLock = NSLock()
     public let identity: SecIdentity
 
     public init(pkcs12 data: Data, password: String) throws {
+        Self.importLock.lock()
+        defer { Self.importLock.unlock() }
         var items: CFArray?
         let status = SecPKCS12Import(
             data as CFData,

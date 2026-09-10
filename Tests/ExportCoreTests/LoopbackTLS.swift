@@ -31,18 +31,7 @@ enum LoopbackTLS {
             "-passout", "pass:test",
         ])
         let p12Data = try Data(contentsOf: p12)
-        var items: CFArray?
-        let status = SecPKCS12Import(
-            p12Data as CFData,
-            [kSecImportExportPassphrase as String: "test"] as CFDictionary,
-            &items
-        )
-        guard status == errSecSuccess, let imported = items as? [[String: Any]],
-              let identity = imported.first?[kSecImportItemIdentity as String]
-        else {
-            throw StreamError.transport("pkcs12 import \(status)")
-        }
-        let secIdentity = identity as! SecIdentity
+        let secIdentity = try TLSClientIdentity(pkcs12: p12Data, password: "test").identity
         var certificate: SecCertificate?
         let certStatus = SecIdentityCopyCertificate(secIdentity, &certificate)
         guard certStatus == errSecSuccess, let certificate else {
