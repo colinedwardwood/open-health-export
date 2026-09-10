@@ -2,15 +2,29 @@ import CoreDomain
 import Foundation
 
 public enum DisplayUnitPreference: String, Sendable, CaseIterable, Codable {
+    /// R-65's default: follow the region, with the three below as the explicit override.
+    case automatic
     case canonical
     case metric
     case usCustomary
 
     public var label: String {
         switch self {
+        case .automatic: "Follow this iPhone's region"
         case .canonical: "Export units"
         case .metric: "Metric display"
         case .usCustomary: "US customary display"
+        }
+    }
+
+    /// The locale is only consulted for `automatic`; resolving here keeps every reading
+    /// path a pure function of an explicit policy.
+    public func policy(locale: Locale) -> UnitDisplayPolicy {
+        switch self {
+        case .automatic: UnitDisplayPolicy.following(locale)
+        case .canonical: .canonical
+        case .metric: .metric
+        case .usCustomary: .usCustomary
         }
     }
 }
@@ -201,7 +215,7 @@ public enum DataBrowser {
         exported: Set<MetricID> = [],
         search: String = "",
         onlyWithData: Bool = false,
-        displayUnits: DisplayUnitPreference = .canonical
+        displayUnits: UnitDisplayPolicy = .canonical
     ) -> [DataBrowserRow] {
         let needle = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return MetricCatalog.all.compactMap { declaration in
@@ -212,7 +226,7 @@ public enum DataBrowser {
                 let display = displayMeasurement(
                     sample.value,
                     unit: declaration.wireUnit,
-                    preference: displayUnits
+                    policy: displayUnits
                 )
                 let source = sample.source.map { " · \($0.name)" } ?? ""
                 subtitle = "\(formatValue(display.value)) \(display.unit) · \(sample.start)\(source)"
@@ -245,7 +259,7 @@ public enum DataBrowser {
         aggregates: [AggregateRecord] = [],
         destinations: [DataBrowserDestination] = [],
         period: DataBrowserPeriod = .month,
-        displayUnits: DisplayUnitPreference = .canonical,
+        displayUnits: UnitDisplayPolicy = .canonical,
         now: Date
     ) -> DataBrowserDetail? {
         guard let declaration = MetricCatalog.declaration(for: metric) else { return nil }
@@ -269,7 +283,7 @@ public enum DataBrowser {
             displayMeasurement(
                 $0.value,
                 unit: declaration.wireUnit,
-                preference: displayUnits
+                policy: displayUnits
             )
         }
         return DataBrowserDetail(
@@ -293,29 +307,33 @@ public enum DataBrowser {
     public static func displayMeasurement(
         _ value: Double,
         unit: String,
-        preference: DisplayUnitPreference
+        preference: DisplayUnitPreference,
+        locale: Locale = Locale(identifier: "en_US_POSIX")
+    ) -> DisplayMeasurement {
+        displayMeasurement(value, unit: unit, policy: preference.policy(locale: locale))
+    }
+
+    public static func displayMeasurement(
+        _ value: Double,
+        unit: String,
+        policy: UnitDisplayPolicy
     ) -> DisplayMeasurement {
         let converted: (Double?, String)?
-        switch (preference, unit) {
-        case (.metric, "mg/dL"):
+        switch unit {
+        case "mg/dL" where policy.glucose == .millimolesPerLitre:
             converted = (
                 try? UnitMath.millimolesPerLitre(fromMilligramsPerDecilitre: value),
                 "mmol/L"
             )
-        case (.metric, "mmHg"):
-            converted = (
-                try? UnitMath.kilopascals(fromMillimetresOfMercury: value),
-                "kPa"
-            )
-        case (.usCustomary, "kg"):
+        case "kg" where policy.mass == .pounds:
             converted = (try? UnitMath.pounds(fromKilograms: value), "lb")
-        case (.usCustomary, "km"):
+        case "km" where policy.distance == .miles:
             converted = (try? UnitMath.miles(fromKilometres: value), "mi")
-        case (.usCustomary, "degC"):
+        case "degC" where policy.temperature == .fahrenheit:
             converted = (try? UnitMath.fahrenheit(fromCelsius: value), "degF")
-        case (.usCustomary, "m"):
+        case "m" where policy.length == .inches:
             converted = (try? UnitMath.inches(fromMetres: value), "in")
-        case (.usCustomary, "mL"):
+        case "mL" where policy.volume == .fluidOunces:
             converted = (try? UnitMath.fluidOunces(fromMillilitres: value), "fl oz")
         default:
             converted = nil

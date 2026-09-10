@@ -85,7 +85,15 @@ struct HarnessView: View {
     @AppStorage("ohe.browserDemoMode")
     private var browserDemoMode = false
     @AppStorage("ohe.displayUnitPreference")
-    private var displayUnitPreference: DisplayUnitPreference = .canonical
+    private var displayUnitPreference: DisplayUnitPreference = .automatic
+    @AppStorage("ohe.clockDisplay")
+    private var clockDisplay: ClockDisplay = .system
+
+    /// The device locale enters here and nowhere deeper: every reading path below takes
+    /// an explicit policy, so a locale matrix test can drive them all (R-65).
+    private var displayUnitPolicy: UnitDisplayPolicy {
+        displayUnitPreference.policy(locale: Locale.current)
+    }
     @AppStorage("ohe.advisoryEnabled")
     private var advisoryEnabled = true
     @State private var advisoryBanner: String?
@@ -823,7 +831,7 @@ struct HarnessView: View {
             exported: browserSelection,
             search: browserSearch,
             onlyWithData: browserOnlyWithData && !browserSelecting,
-            displayUnits: displayUnitPreference
+            displayUnits: displayUnitPolicy
         )
         let selectedDetail = selectedBrowserMetric.flatMap { metric in
             let live = liveBrowserSamples[metric]
@@ -839,7 +847,7 @@ struct HarnessView: View {
                 destinations: browserSelection.contains(metric)
                     ? [DataBrowserDestination(name: "Archive folder", lastSent: "demo")]
                     : [],
-                displayUnits: displayUnitPreference,
+                displayUnits: displayUnitPolicy,
                 now: detailNow
             )
         }
@@ -943,6 +951,16 @@ struct HarnessView: View {
                 }
                 .accessibilityLabel("Display units")
                 .accessibilityIdentifier("browser-display-units")
+                Picker("Time format", selection: $clockDisplay) {
+                    ForEach(ClockDisplay.allCases, id: \.self) { choice in
+                        Text(choice.label).tag(choice)
+                    }
+                }
+                .accessibilityLabel("Time format")
+                .accessibilityIdentifier("browser-time-format")
+                Text("Sample times read as \(clockDisplay.timeString(Date(), locale: Locale.current, timeZone: .current)).")
+                    .font(.footnote)
+                    .accessibilityIdentifier("browser-time-example")
                 TextField("Search types", text: $browserSearch)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()

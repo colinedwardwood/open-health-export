@@ -150,6 +150,63 @@ private func browserSample(
     )
 }
 
+/// R-65's locale matrix. The regions are chosen for the cases a single metric/imperial
+/// switch gets wrong: the United Kingdom reads miles and kilograms at once, and Germany
+/// reads mg/dL despite being metric throughout.
+@Test(arguments: [
+    ("en_US", UnitDisplayPolicy.Mass.pounds, UnitDisplayPolicy.Distance.miles, UnitDisplayPolicy.Temperature.fahrenheit, UnitDisplayPolicy.Glucose.milligramsPerDecilitre),
+    ("en_GB", .kilograms, .miles, .celsius, .millimolesPerLitre),
+    ("de_DE", .kilograms, .kilometres, .celsius, .milligramsPerDecilitre),
+    ("fr_FR", .kilograms, .kilometres, .celsius, .milligramsPerDecilitre),
+    ("sv_SE", .kilograms, .kilometres, .celsius, .millimolesPerLitre),
+    ("ja_JP", .kilograms, .kilometres, .celsius, .milligramsPerDecilitre),
+    ("en_AU", .kilograms, .kilometres, .celsius, .millimolesPerLitre),
+])
+func displayUnitsFollowTheRegion(
+    identifier: String,
+    mass: UnitDisplayPolicy.Mass,
+    distance: UnitDisplayPolicy.Distance,
+    temperature: UnitDisplayPolicy.Temperature,
+    glucose: UnitDisplayPolicy.Glucose
+) {
+    let policy = UnitDisplayPolicy.following(Locale(identifier: identifier))
+    #expect(policy.mass == mass)
+    #expect(policy.distance == distance)
+    #expect(policy.temperature == temperature)
+    #expect(policy.glucose == glucose)
+
+    // The override outranks the region in every direction, or it is not an override.
+    let locale = Locale(identifier: identifier)
+    #expect(DisplayUnitPreference.usCustomary.policy(locale: locale) == .usCustomary)
+    #expect(DisplayUnitPreference.metric.policy(locale: locale) == .metric)
+    #expect(DisplayUnitPreference.canonical.policy(locale: locale) == .canonical)
+    #expect(DisplayUnitPreference.automatic.policy(locale: locale) == policy)
+}
+
+@Test(arguments: [
+    ("en_US", false),
+    ("en_GB", true),
+    ("de_DE", true),
+    ("ja_JP", true),
+    ("en_AU", false),
+])
+func clockFormatFollowsTheRegionUntilOverridden(identifier: String, twentyFourHour: Bool) {
+    let locale = Locale(identifier: identifier)
+    #expect(ClockDisplay.system.usesTwentyFourHour(locale: locale) == twentyFourHour)
+    #expect(ClockDisplay.twelveHour.usesTwentyFourHour(locale: locale) == false)
+    #expect(ClockDisplay.twentyFourHour.usesTwentyFourHour(locale: locale) == true)
+
+    // 13:45 UTC reads as an afternoon hour on both clocks, so the rendering differs
+    // visibly rather than only in the formatter's configuration.
+    let afternoon = Date(timeIntervalSince1970: 1_735_738_500)
+    let utc = TimeZone(identifier: "UTC")!
+    let twelve = ClockDisplay.twelveHour.timeString(afternoon, locale: locale, timeZone: utc)
+    let twentyFour = ClockDisplay.twentyFourHour.timeString(afternoon, locale: locale, timeZone: utc)
+    #expect(twelve != twentyFour)
+    #expect(twentyFour.contains("13"))
+    #expect(twelve.contains("1"))
+}
+
 @Test func displayUnitOverridesNeverChangeCanonicalExportValues() {
     let pounds = DataBrowser.displayMeasurement(
         10,
