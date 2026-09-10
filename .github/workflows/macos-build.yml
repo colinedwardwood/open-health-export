@@ -121,7 +121,7 @@ jobs:
           xcodebuild \
             -project OpenHealthExporter.xcodeproj \
             -target ExporteriOS \
-            -sdk iphonesimulator \
+            -sdk iphoneos \
             -configuration Release \
             SYMROOT="$RUNNER_TEMP/ohe-release-ios" \
             OBJROOT="$RUNNER_TEMP/ohe-release-ios-obj" \
@@ -139,5 +139,5 @@ jobs:
       - name: Release apps omit fault seams and health-data canaries
         run: |
           scripts/scan-release-artifacts.sh \
-            "$RUNNER_TEMP/ohe-release-ios/Release-iphonesimulator" \
+            "$RUNNER_TEMP/ohe-release-ios/Release-iphoneos" \
             "$RUNNER_TEMP/ohe-release-mac/Release"
