@@ -20,7 +20,7 @@ jobs:
           swift build -c release --product corpusgen
           swift build -c release --product pipelinecheck
           swift build -c release --product exportruncheck
-      - name: Generate ten million records reproducibly
+      - name: Generate ten million records within the budget
         shell: bash
         run: |
           set -euo pipefail
@@ -32,22 +32,26 @@ jobs:
           )"
           first_seconds=$((SECONDS - started))
           test "$first_seconds" -le 600
-
-          started=$SECONDS
-          second="$(
-            .build/release/corpusgen --tier T1 --seed 1 |
-              sha256sum |
-              cut -d' ' -f1
-          )"
-          second_seconds=$((SECONDS - started))
-          test "$second_seconds" -le 600
-          test "$first" = "$second"
-          printf 'tier=T1 records=10000000 sha256=%s first_s=%s second_s=%s\n' \
-            "$first" "$first_seconds" "$second_seconds"
-      - name: Validate a T1 prefix through the schema pipeline
+          printf '%s\n' "$first" > /tmp/t1-first.sha256
+          printf 'tier=T1 records=10000000 sha256=%s generation_s=%s\n' \
+            "$first" "$first_seconds"
+      - name: Reproduce and validate all ten million records
+        shell: bash
         run: |
-          .build/release/corpusgen --tier T1 --seed 1 --count 5000 |
-            .build/release/pipelinecheck
+          set -euo pipefail
+          # The second deterministic generation does double duty: a named pipe hashes
+          # the exact stream while pipelinecheck validates every record. This closes
+          # QA-04 without paying for a third ten-million-record generation.
+          mkfifo /tmp/t1-hash-stream
+          sha256sum < /tmp/t1-hash-stream | cut -d' ' -f1 > /tmp/t1-second.sha256 &
+          hash_pid=$!
+          .build/release/corpusgen --tier T1 --seed 1 |
+            tee /tmp/t1-hash-stream |
+            .build/release/pipelinecheck |
+            tee /tmp/t1-pipeline.out
+          wait "$hash_pid"
+          test "$(cat /tmp/t1-second.sha256)" = "$(cat /tmp/t1-first.sha256)"
+          grep -Fx 'pipelinecheck lines=10000001' /tmp/t1-pipeline.out
       - name: Exercise ExportRun within its memory ceiling
         run: |
           .build/release/corpusgen --tier T1 --seed 1 --count 5000 |
