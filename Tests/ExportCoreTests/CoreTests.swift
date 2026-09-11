@@ -175,6 +175,92 @@ private struct DeviceLockedSource: SampleSource {
     #expect(read.skippedRows == 0)
 }
 
+/// OBS-02, written to the requirement's own acceptance case: 1,200 runs over 120
+/// simulated days. Both bounds are asserted and so is the footprint, because "bounded
+/// on-disk footprint" is only a gate if it is a number.
+@Test func journalRetentionHoldsOverTwelveHundredRunsAndStaysBounded() async throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-retention-\(UUID().uuidString).sqlite")
+    defer { try? FileManager.default.removeItem(at: url) }
+    let day: TimeInterval = 24 * 60 * 60
+    let totalDays = 120
+    let runsPerDay = 10
+    let now = TimeInterval(totalDays) * day
+
+    do {
+        let store = try SQLiteStateStore(path: url.path)
+        // Oldest first, so the sweep has genuinely expired rows to find rather than
+        // only ever seeing a table that was already inside the bound.
+        for dayIndex in 0 ..< totalDays {
+            let age = TimeInterval(totalDays - 1 - dayIndex) * day
+            for slot in 0 ..< runsPerDay {
+                try await store.transact { tx in
+                    try tx.appendJournal(
+                        RunEvent(
+                            runID: RunID(rawValue: "run-\(dayIndex)-\(slot)"),
+                            outcomeKind: "success",
+                            detail: "",
+                            trigger: .bgProcessing,
+                            wallTimeEpoch: now - age
+                        )
+                    )
+                }
+            }
+        }
+
+        let retained = try await store.transact { tx in
+            try tx.unprojectedJournal(limit: 10_000)
+        }
+        let cutoff = now - JournalRetention.seconds
+
+        // 90 days at ten runs a day is the tighter bound here, so it is the one that
+        // decides: days 0 through 90 inclusive survive, the other 29 do not.
+        #expect(retained.count == (JournalRetention.days + 1) * runsPerDay)
+        #expect(retained.count <= JournalRetention.runs)
+        #expect(retained.allSatisfy { $0.wallTimeEpoch >= cutoff })
+        // The newest run is never the one evicted.
+        #expect(retained.contains { $0.runID.rawValue == "run-119-9" })
+        #expect(!retained.contains { $0.runID.rawValue == "run-0-0" })
+    }
+
+    let size = try FileManager.default
+        .attributesOfItem(atPath: url.path)[.size] as? Int ?? .max
+    #expect(size <= 5 * 1024 * 1024, "journal reached \(size) bytes")
+}
+
+/// OBS-02's other half: the run-count bound has to bite when runs arrive faster than
+/// the age bound can expire them, or a retry loop grows the store without limit.
+@Test func journalRunCountBoundCapsABurstInsideTheAgeWindow() async throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-retention-burst-\(UUID().uuidString).sqlite")
+    defer { try? FileManager.default.removeItem(at: url) }
+    let store = try SQLiteStateStore(path: url.path)
+    let now: TimeInterval = 10_000_000
+
+    // All within one hour, so nothing is old enough to expire by age.
+    for index in 0 ..< (JournalRetention.runs + 200) {
+        try await store.transact { tx in
+            try tx.appendJournal(
+                RunEvent(
+                    runID: RunID(rawValue: "burst-\(index)"),
+                    outcomeKind: "failed",
+                    detail: "",
+                    trigger: .bgProcessing,
+                    wallTimeEpoch: now + TimeInterval(index),
+                    errorClass: "destinationUnreachable"
+                )
+            )
+        }
+    }
+
+    let retained = try await store.transact { tx in
+        try tx.unprojectedJournal(limit: 10_000)
+    }
+    #expect(retained.count == JournalRetention.runs)
+    #expect(retained.contains { $0.runID.rawValue == "burst-1199" })
+    #expect(!retained.contains { $0.runID.rawValue == "burst-0" })
+}
+
 @Test func diagnosticWindowKeepsEveryRunInLastDayEvenAboveThirty() async throws {
     let url = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-diagnostic-window-\(UUID().uuidString).sqlite")

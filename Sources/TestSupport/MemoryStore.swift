@@ -93,6 +93,22 @@ public final class MemoryTransaction: StateTransaction {
 
     public func appendJournal(_ event: RunEvent) throws {
         journal.append(event)
+        // OBS-02: same policy as the SQLite store, so a test that passes here is not
+        // passing because the in-memory double is more permissive.
+        let newest = journal.map(\.wallTimeEpoch).max() ?? 0
+        _ = try pruneJournal(
+            sinceEpoch: newest - JournalRetention.seconds,
+            maximumRuns: JournalRetention.runs
+        )
+    }
+
+    public func pruneJournal(sinceEpoch: TimeInterval, maximumRuns: Int) throws -> Int {
+        let before = journal.count
+        journal.removeAll { $0.wallTimeEpoch < sinceEpoch }
+        if journal.count > maximumRuns {
+            journal.removeFirst(journal.count - max(0, maximumRuns))
+        }
+        return before - journal.count
     }
 
     public func unprojectedJournal(limit: Int) throws -> [RunEvent] {

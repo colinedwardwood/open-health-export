@@ -452,6 +452,49 @@ private final class SQLiteTransaction: StateTransaction {
             sqlite3_bind_null(stmt, 10)
         }
         try stepDone(stmt)
+        // OBS-02: enforced here because this is the one place every journal row goes
+        // through. Six call sites across the engine append runs, census records, queue
+        // expiries and type purges; a sweep any of them had to remember to call is a
+        // sweep that eventually does not get called.
+        _ = try pruneJournal(
+            sinceEpoch: newestJournalEpoch() - JournalRetention.seconds,
+            maximumRuns: JournalRetention.runs
+        )
+    }
+
+    /// The table's own newest row rather than the wall clock: retention then stays
+    /// deterministic under test and cannot be moved by a device whose clock jumped.
+    private func newestJournalEpoch() throws -> TimeInterval {
+        let stmt = try store.prepare("SELECT MAX(wall_time_epoch) FROM journal;")
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
+        return sqlite3_column_double(stmt, 0)
+    }
+
+    func pruneJournal(sinceEpoch: TimeInterval, maximumRuns: Int) throws -> Int {
+        var removed = 0
+
+        let byAge = try store.prepare("DELETE FROM journal WHERE wall_time_epoch < ?;")
+        defer { sqlite3_finalize(byAge) }
+        sqlite3_bind_double(byAge, 1, sinceEpoch)
+        try stepDone(byAge)
+        removed += Int(sqlite3_changes(store.db))
+
+        // `id` is the insertion order, so the newest rows are the highest ids. Offset
+        // rather than a count keeps this one statement regardless of table size.
+        let byCount = try store.prepare(
+            """
+            DELETE FROM journal WHERE id NOT IN (
+                SELECT id FROM journal ORDER BY id DESC LIMIT ?
+            );
+            """
+        )
+        defer { sqlite3_finalize(byCount) }
+        sqlite3_bind_int64(byCount, 1, sqlite3_int64(max(0, maximumRuns)))
+        try stepDone(byCount)
+        removed += Int(sqlite3_changes(store.db))
+
+        return removed
     }
 
     func unprojectedJournal(limit: Int) throws -> [RunEvent] {
