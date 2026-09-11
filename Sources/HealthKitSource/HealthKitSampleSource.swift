@@ -639,6 +639,12 @@ public struct HealthKitQueryWindow: Sendable, Equatable {
 
     /// Reads the grant's dates only. Metric membership stays with the scope itself.
     public init(scope: DestinationExportScope) {
+        guard scope.isConfigured else {
+            // Defense in depth: even if a caller misses the engine scope gate, an
+            // unconfigured destination must produce a zero-match HealthKit query.
+            self.init(startInclusive: .distantFuture)
+            return
+        }
         self.init(
             startInclusive: scope.startInclusive,
             endExclusive: scope.endExclusive

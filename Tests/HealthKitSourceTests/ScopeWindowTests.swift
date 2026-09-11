@@ -103,10 +103,13 @@ private func heartRate(startingAt start: Date) -> HKQuantitySample {
     #expect(predicate.evaluate(with: heartRate(startingAt: windowStart)))
     #expect(!predicate.evaluate(with: heartRate(startingAt: windowEnd)))
 
-    // An unconfigured destination has no dates, which must not widen into a filter
-    // that silently admits nothing.
+    // Defense in depth: an unconfigured destination must never become an
+    // unbounded HealthKit query if an app caller misses the engine gate.
     let empty = try DestinationExportScope(destinationID: "dest-2")
-    #expect(HealthKitQueryWindow(scope: empty) == .unbounded)
+    let denied = HealthKitQueryWindow(scope: empty)
+    #expect(!denied.isUnbounded)
+    let deniedPredicate = try #require(denied.samplePredicate)
+    #expect(!deniedPredicate.evaluate(with: heartRate(startingAt: windowStart)))
 }
 
 @Test func anchoredSourcesKeepTheirUnscopedInitialisers() {
