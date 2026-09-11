@@ -95,3 +95,16 @@ public enum OTLPSettingsGate {
         return OTLPExportSettings(enabled: true, endpoint: destination)
     }
 }
+
+/// R-53 opportunity policy: foreground, or charging on Wi-Fi. Never an observer-query wake.
+public enum OTLPOpportunity {
+    public static func allow(
+        foreground: Bool,
+        charging: Bool,
+        onWiFi: Bool,
+        observerWake: Bool
+    ) -> Bool {
+        guard !observerWake else { return false }
+        return foreground || (charging && onWiFi)
+    }
+}

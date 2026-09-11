@@ -40,6 +40,7 @@
 		<string>app.openhealthexporter.refresh</string>
 		<string>app.openhealthexporter.processing</string>
 		<string>app.openhealthexporter.backfill</string>
+		<string>app.openhealthexporter.otlp</string>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>

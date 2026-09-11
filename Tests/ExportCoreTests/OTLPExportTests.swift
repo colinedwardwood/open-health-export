@@ -123,6 +123,64 @@ import Testing
     #expect(!body.isEmpty)
 }
 
+@Test func otlpOpportunityForbidsObserverWakesAndAllowsForegroundOrChargingWiFi() {
+    #expect(
+        !OTLPOpportunity.allow(
+            foreground: true,
+            charging: true,
+            onWiFi: true,
+            observerWake: true
+        )
+    )
+    #expect(
+        OTLPOpportunity.allow(
+            foreground: true,
+            charging: false,
+            onWiFi: false,
+            observerWake: false
+        )
+    )
+    #expect(
+        OTLPOpportunity.allow(
+            foreground: false,
+            charging: true,
+            onWiFi: true,
+            observerWake: false
+        )
+    )
+    #expect(
+        !OTLPOpportunity.allow(
+            foreground: false,
+            charging: true,
+            onWiFi: false,
+            observerWake: false
+        )
+    )
+}
+
+@Test func otlpBackgroundTaskStaysOffTheHealthExportProcessingPath() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let info = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/Info.plist"),
+        encoding: .utf8
+    )
+    #expect(info.contains("app.openhealthexporter.otlp"))
+    let source = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/AppLifecycleCoordinator.swift"),
+        encoding: .utf8
+    )
+    let parts = source.components(separatedBy: "enum OTLPBackgroundCoordinator")
+    #expect(parts.count == 2)
+    #expect(!parts[0].contains("projectOTLP"))
+    #expect(parts[1].contains("projectOTLP"))
+    #expect(!parts[1].contains("runOnePageEachMetric"))
+    #expect(parts[1].contains("requiresExternalPower = true"))
+    #expect(parts[1].contains("requiresNetworkConnectivity = true"))
+}
+
 @Test func otlpSettingsStayDisabledUntilPreviewCompletes() {
     #expect(throws: OTLPExportError.previewRequired) {
         _ = try OTLPSettingsGate.enabledSettings(

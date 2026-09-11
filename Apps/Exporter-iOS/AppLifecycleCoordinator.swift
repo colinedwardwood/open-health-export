@@ -53,6 +53,7 @@ final class ExporterAppDelegate: NSObject, UIApplicationDelegate {
         AppLifecycleCoordinator.shared.recordWake(.launch)
         BackgroundTaskCoordinator.register()
         ContinuedBackfillCoordinator.register()
+        OTLPBackgroundCoordinator.register()
         Task {
             try? await AppLifecycleCoordinator.shared.startObserversIfEligible()
         }
@@ -164,6 +165,55 @@ enum BackgroundTaskCoordinator {
                 try await AppLifecycleCoordinator.shared.startObserversIfEligible()
                 if HarnessExport.isLocalFileEnabled() {
                     _ = try await HarnessExport.runOnePageEachMetric(trigger: trigger)
+                }
+                task.setTaskCompleted(success: true)
+            } catch {
+                task.setTaskCompleted(success: false)
+            }
+            submit()
+        }
+        task.expirationHandler = {
+            work.cancel()
+        }
+    }
+}
+
+@MainActor
+enum OTLPBackgroundCoordinator {
+    static let identifier = "app.openhealthexporter.otlp"
+
+    static func register() {
+        BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: identifier,
+            using: nil
+        ) { task in
+            guard let processing = task as? BGProcessingTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            Task { @MainActor in
+                handle(processing)
+            }
+        }
+    }
+
+    static func submit() {
+        guard !HarnessExport.storedOTLPURL().isEmpty else {
+            BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: identifier)
+            return
+        }
+        let request = BGProcessingTaskRequest(identifier: identifier)
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
+        request.requiresNetworkConnectivity = true
+        request.requiresExternalPower = true
+        try? BGTaskScheduler.shared.submit(request)
+    }
+
+    private static func handle(_ task: BGProcessingTask) {
+        let work = Task {
+            do {
+                if !HarnessExport.storedOTLPURL().isEmpty {
+                    _ = try await HarnessExport.projectOTLP()
                 }
                 task.setTaskCompleted(success: true)
             } catch {

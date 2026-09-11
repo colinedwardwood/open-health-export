@@ -145,6 +145,7 @@ struct PolicyCheck {
             "app.openhealthexporter.refresh",
             "app.openhealthexporter.processing",
             "app.openhealthexporter.backfill",
+            "app.openhealthexporter.otlp",
         ] where !exporterInfoText.contains(required) {
             FileHandle.standardError.write(
                 Data("iOS background task configuration is missing \(required)\n".utf8)

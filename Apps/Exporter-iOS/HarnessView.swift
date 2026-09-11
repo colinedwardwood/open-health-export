@@ -915,6 +915,7 @@ struct HarnessView: View {
                 previewPayload: preview
             )
             refreshDestinationSurfaces()
+            OTLPBackgroundCoordinator.submit()
             status = "Ready. OTLP collector is enabled and off the health export path."
         } catch {
             status = "Failed: \(error.localizedDescription)"
@@ -930,6 +931,7 @@ struct HarnessView: View {
             otlpLines = [result]
             refreshDestinationSurfaces()
             await refreshLedgerIntegrity()
+            OTLPBackgroundCoordinator.submit()
             status = "Ready. \(result)"
         } catch {
             status = "Failed: \(error.localizedDescription)"
@@ -944,6 +946,7 @@ struct HarnessView: View {
             otlpPreview = ""
             otlpPayload = nil
             refreshDestinationSurfaces()
+            OTLPBackgroundCoordinator.submit()
             status = "Ready. OTLP collector is disabled."
         } catch {
             status = "Failed: \(error.localizedDescription)"
