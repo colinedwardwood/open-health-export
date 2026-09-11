@@ -6,8 +6,10 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "41 5 * * *"
+    - cron: "17 4 * * 0"
 jobs:
   tier-one-corpus:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '41 5 * * *'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -57,7 +59,7 @@ jobs:
           .build/release/corpusgen --tier T1 --seed 1 --count 5000 |
             .build/release/exportruncheck
   tier-two-pathologies:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 4 * * 0'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
