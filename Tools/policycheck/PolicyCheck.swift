@@ -284,6 +284,7 @@ struct PolicyCheck {
         try checkDisclaimerAndCopyDenylist(root: root)
         try checkUpstreamVersionPins(root: root)
         try checkAdjacency(root: root)
+        try checkReceiverQuickstart(root: root)
         try checkHealthKitSymbolsStayInAdapter(sources: sources)
         try checkSpecArtifacts(root: root)
         try checkHostTZDataPin(root: root)
@@ -488,6 +489,7 @@ struct PolicyCheck {
             "README.md",
             "Apps/Exporter-iOS/HarnessView.swift",
             "Apps/Localizable.xcstrings",
+            "receiver/README.md",
         ] {
             let text = try String(
                 contentsOf: root.appendingPathComponent(relative),
@@ -595,6 +597,8 @@ struct PolicyCheck {
             "qa/energy-protocol.md",
             "qa/community-device-matrix/CHECKLIST.md",
             "docs/03-implementation/r27-failure-taxonomy.md",
+            "receiver/README.md",
+            "receiver/grafana/dashboards/ohe-receiver.json",
         ] {
             let url = root.appendingPathComponent(relative)
             guard FileManager.default.fileExists(atPath: url.path) else { continue }
@@ -1366,6 +1370,66 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck adjacency matches dump-package: ok")
+    }
+
+    /// R-115 in-repo stack: Classic Grafana dashboard plus compose. Catalogue upload is external.
+    static func checkReceiverQuickstart(root: URL) throws {
+        let compose = root.appendingPathComponent("receiver/compose.yaml")
+        let dashboard = root.appendingPathComponent("receiver/grafana/dashboards/ohe-receiver.json")
+        let readme = root.appendingPathComponent("receiver/README.md")
+        for url in [compose, dashboard, readme] {
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                FileHandle.standardError.write(Data("R-115 missing \(url.path)\n".utf8))
+                exit(1)
+            }
+        }
+        let composeText = try String(contentsOf: compose, encoding: .utf8)
+        if !composeText.contains("grafana") || !composeText.contains("prometheus") {
+            FileHandle.standardError.write(Data("R-115 compose.yaml must run Grafana and Prometheus\n".utf8))
+            exit(1)
+        }
+        let data = try Data(contentsOf: dashboard)
+        guard
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let schemaVersion = json["schemaVersion"] as? Int,
+            let title = json["title"] as? String,
+            let description = json["description"] as? String
+        else {
+            FileHandle.standardError.write(Data("R-115 dashboard JSON is missing Classic fields\n".utf8))
+            exit(1)
+        }
+        if schemaVersion < 30 || schemaVersion > 38 {
+            FileHandle.standardError.write(
+                Data("R-115 dashboard schemaVersion \(schemaVersion) is not Classic (30–38)\n".utf8)
+            )
+            exit(1)
+        }
+        if title.isEmpty {
+            FileHandle.standardError.write(Data("R-115 dashboard title is empty\n".utf8))
+            exit(1)
+        }
+        let disclaimer = try String(
+            contentsOf: root.appendingPathComponent("compliance/disclaimer.txt"),
+            encoding: .utf8
+        ).trimmingCharacters(in: .whitespacesAndNewlines)
+        if !description.contains(disclaimer) {
+            FileHandle.standardError.write(
+                Data("R-115 dashboard description is missing the canonical disclaimer\n".utf8)
+            )
+            exit(1)
+        }
+        let readmeText = try String(contentsOf: readme, encoding: .utf8)
+        if !readmeText.contains("docker compose up") {
+            FileHandle.standardError.write(Data("receiver/README.md must document docker compose up\n".utf8))
+            exit(1)
+        }
+        if readmeText.lowercased().contains("published to the grafana") {
+            FileHandle.standardError.write(
+                Data("do not claim the Grafana catalogue listing; that upload is external\n".utf8)
+            )
+            exit(1)
+        }
+        print("policycheck R-115 compose and Classic dashboard: ok")
     }
 
     static func dumpPackageJSON(root: URL) throws -> Any {

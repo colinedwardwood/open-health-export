@@ -23,7 +23,7 @@
       "role": "Stage 4 FIX-* meta-test input; every t0 ID has a Linux witness"
     },
     "receiver-sequence.ndjson": {
-      "role": "G3/G4 forward-compatibility and convergent-upsert input"
+      "role": "G3/G4 forward-compatibility and convergent-upsert input; R-115 serve --seed"
     },
     "receiver-expected-state.json": {
       "role": "G4 expected final state"

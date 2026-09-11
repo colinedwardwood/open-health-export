@@ -7,19 +7,23 @@ public struct ReferenceReceiver: Sendable, Equatable {
     public var structuralRecords: [String: String]
     public var tombstones: Set<String>
     public var ingested: Int
+    /// uuid → wire metricId for live quantities. Not part of G4 expectedState.
+    public var quantityMetrics: [String: String]
 
     public init(
         quantities: [String: Double] = [:],
         categories: [String: Int] = [:],
         structuralRecords: [String: String] = [:],
         tombstones: Set<String> = [],
-        ingested: Int = 0
+        ingested: Int = 0,
+        quantityMetrics: [String: String] = [:]
     ) {
         self.quantities = quantities
         self.categories = categories
         self.structuralRecords = structuralRecords
         self.tombstones = tombstones
         self.ingested = ingested
+        self.quantityMetrics = quantityMetrics
     }
 
     public mutating func ingest(ndjson: String) throws {
@@ -46,6 +50,7 @@ public struct ReferenceReceiver: Sendable, Equatable {
                 throw JSONSchemaError.missingRequired("uuid")
             }
             quantities[uuid] = doubleValue(object["value"])
+            quantityMetrics[uuid] = object["metricId"] as? String ?? "unknown"
             categories.removeValue(forKey: uuid)
             tombstones.remove(uuid)
         case "sample.category":
@@ -56,6 +61,7 @@ public struct ReferenceReceiver: Sendable, Equatable {
             }
             categories[uuid] = value.intValue
             quantities.removeValue(forKey: uuid)
+            quantityMetrics.removeValue(forKey: uuid)
             tombstones.remove(uuid)
         case "sample.correlation", "workout",
              "sample.stateOfMind", "sample.ecg", "sample.audiogram", "medicationDose",
@@ -66,6 +72,7 @@ public struct ReferenceReceiver: Sendable, Equatable {
             }
             structuralRecords[uuid] = kind
             quantities.removeValue(forKey: uuid)
+            quantityMetrics.removeValue(forKey: uuid)
             categories.removeValue(forKey: uuid)
             tombstones.remove(uuid)
         case "tombstone":
@@ -73,6 +80,7 @@ public struct ReferenceReceiver: Sendable, Equatable {
                 throw JSONSchemaError.missingRequired("uuid")
             }
             quantities.removeValue(forKey: uuid)
+            quantityMetrics.removeValue(forKey: uuid)
             categories.removeValue(forKey: uuid)
             structuralRecords.removeValue(forKey: uuid)
             tombstones.insert(uuid)
@@ -100,6 +108,62 @@ public struct ReferenceReceiver: Sendable, Equatable {
             }
         }
         return state
+    }
+
+    /// Prometheus text for Grafana. Live last-values are the records the operator posted.
+    public func prometheusExposition() -> String {
+        var last: [String: Double] = [:]
+        var counts: [String: Int] = [:]
+        for uuid in quantities.keys.sorted() {
+            let metric = prometheusLabel(quantityMetrics[uuid] ?? "unknown")
+            counts[metric, default: 0] += 1
+            last[metric] = quantities[uuid] ?? 0
+        }
+        var lines = [
+            "# HELP ohe_receiver_ingested_lines NDJSON lines accepted, including unknown kinds.",
+            "# TYPE ohe_receiver_ingested_lines counter",
+            "ohe_receiver_ingested_lines \(ingested)",
+            "# HELP ohe_receiver_live_quantities Quantity records currently held.",
+            "# TYPE ohe_receiver_live_quantities gauge",
+            "ohe_receiver_live_quantities \(quantities.count)",
+            "# HELP ohe_receiver_tombstones Tombstone uuids currently held.",
+            "# TYPE ohe_receiver_tombstones gauge",
+            "ohe_receiver_tombstones \(tombstones.count)",
+            "# HELP ohe_receiver_live_quantity_count Live quantity records per wire metric id.",
+            "# TYPE ohe_receiver_live_quantity_count gauge",
+        ]
+        for metric in counts.keys.sorted() {
+            lines.append(
+                "ohe_receiver_live_quantity_count{metric_id=\"\(metric)\"} \(counts[metric]!)"
+            )
+        }
+        lines.append("# HELP ohe_receiver_live_quantity_last Last live value per wire metric id.")
+        lines.append("# TYPE ohe_receiver_live_quantity_last gauge")
+        for metric in counts.keys.sorted() {
+            lines.append(
+                "ohe_receiver_live_quantity_last{metric_id=\"\(metric)\"} \(formatPrometheus(last[metric] ?? 0))"
+            )
+        }
+        lines.append("")
+        return lines.joined(separator: "\n")
+    }
+
+    private func prometheusLabel(_ raw: String) -> String {
+        let filtered = raw.unicodeScalars.map { scalar -> Character in
+            if CharacterSet.alphanumerics.contains(scalar) || scalar == "_" || scalar == ":" {
+                return Character(scalar)
+            }
+            return "_"
+        }
+        let label = String(filtered)
+        return label.isEmpty ? "unknown" : label
+    }
+
+    private func formatPrometheus(_ value: Double) -> String {
+        if value.rounded() == value, value >= Double(Int.min), value <= Double(Int.max) {
+            return String(Int(value))
+        }
+        return String(value)
     }
 
     private func isNumber(_ any: Any?) -> Bool {

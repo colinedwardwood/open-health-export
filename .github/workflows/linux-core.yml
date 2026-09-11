@@ -66,3 +66,21 @@ jobs:
           swift run wirefuzz --iterations 200000
           swift run wirefuzz --seed 0x1 --iterations 200000
           swift run wirefuzz --seed $(date +%s) --iterations 200000
+      - name: Reference receiver HTTP surface
+        run: |
+          swift run receiver serve --port 18080 --seed spec/v1.0.0/fixtures/receiver-sequence.ndjson &
+          pid=$!
+          trap 'kill $pid 2>/dev/null || true' EXIT
+          ok=0
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:18080/health >/dev/null; then
+              ok=1
+              break
+            fi
+            sleep 1
+          done
+          test "$ok" = 1
+          curl -fsS http://127.0.0.1:18080/metrics | grep 'ohe_receiver_live_quantity_last{metric_id="heart_rate"} 72'
+          printf '%s\n' '{"kind":"sample.quantity","metricId":"step_count","uuid":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","value":3}' \
+            | curl -fsS -X POST --data-binary @- http://127.0.0.1:18080/ingest
+          curl -fsS http://127.0.0.1:18080/metrics | grep 'metric_id="step_count"'

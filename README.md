@@ -122,3 +122,5 @@ Version streams: `VERSIONING.md`. What R-108 claims: `PROVENANCE.md`. Runtime li
 Monitoring signal and failure taxonomy: `docs/03-implementation/r27-failure-taxonomy.md`.
 Volunteer device runs: `qa/community-device-matrix/CHECKLIST.md`. Energy measurement
 (not a CI gate): `qa/energy-protocol.md`.
+Reference receiver and Grafana lab stack: `receiver/README.md` (`docker compose up` from
+`receiver/`). Grafana community-catalogue upload is not part of this repository.

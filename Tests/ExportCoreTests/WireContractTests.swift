@@ -599,3 +599,20 @@ private func sleepCategory(value: Int = 3) -> CategoryRecord {
     #expect(again.json == artifacts.json)
     #expect(again.csvQuantity == artifacts.csvQuantity)
 }
+
+@Test func referenceReceiverPrometheusOmitsTombstonedQuantities() throws {
+    let ndjson = try String(
+        decoding: WireContractFixture.data("spec/v1.0.0/fixtures/receiver-sequence.ndjson"),
+        as: UTF8.self
+    )
+    var receiver = ReferenceReceiver()
+    try receiver.ingest(ndjson: ndjson)
+    let text = receiver.prometheusExposition()
+    #expect(text.contains("ohe_receiver_ingested_lines 5"))
+    #expect(text.contains("ohe_receiver_live_quantities 1"))
+    #expect(text.contains("ohe_receiver_tombstones 1"))
+    #expect(text.contains("metric_id=\"heart_rate\""))
+    #expect(text.contains("ohe_receiver_live_quantity_last{metric_id=\"heart_rate\"} 72"))
+    #expect(!text.contains("step_count"))
+    #expect(!text.contains("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
+}

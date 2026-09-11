@@ -22,6 +22,7 @@ requests do not execute credentialed jobs.
 - Apple Developer and App Store Connect administration.
 - Developer ID and App Store distribution through the existing team.
 - Security-advisory signing-key rotation and control of the advisory hostname.
+- Grafana community-catalogue publishing (no project Grafana Cloud account is held yet).
 
 Private signing keys, Apple credentials, and service tokens are not committed
 or shared through this repository. A successor cannot impersonate the existing
