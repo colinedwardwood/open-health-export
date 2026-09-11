@@ -184,7 +184,11 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 last_emitted_day TEXT,
                 decision TEXT
             );
-            PRAGMA user_version = 12;
+            CREATE TABLE IF NOT EXISTS destination_scopes (
+                destination_id TEXT PRIMARY KEY,
+                payload BLOB NOT NULL
+            );
+            PRAGMA user_version = 13;
             """)
     }
 
@@ -847,6 +851,36 @@ private final class SQLiteTransaction: StateTransaction {
         try stepDone(stmt)
     }
 
+    func loadDestinationScope(destinationID: String) throws -> DestinationExportScope? {
+        let stmt = try store.prepare(
+            "SELECT payload FROM destination_scopes WHERE destination_id = ? LIMIT 1;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, destinationID)
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
+        // SEC-16: bytes we cannot read grant nothing. Returning nil instead would read as
+        // "never configured" and invite the app migration to write a default grant over a
+        // scope somebody chose.
+        let payload = blob(stmt, 0)
+        if let stored = try? DestinationScopePayload.decoded(
+            payload,
+            destinationID: destinationID
+        ) {
+            return stored
+        }
+        return try DestinationExportScope(destinationID: destinationID)
+    }
+
+    func upsertDestinationScope(_ scope: DestinationExportScope) throws {
+        let stmt = try store.prepare(
+            "INSERT INTO destination_scopes (destination_id, payload) VALUES (?, ?) ON CONFLICT(destination_id) DO UPDATE SET payload = excluded.payload;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, scope.destinationID)
+        bindBlob(stmt, 2, try DestinationScopePayload.encoded(scope))
+        try stepDone(stmt)
+    }
+
     func purgeMetricState(metric: MetricID) throws {
         for table in ["cursors", "census", "dirty", "emitted_index", "anchor_holds"] {
             let stmt = try store.prepare("DELETE FROM \(table) WHERE metric = ?;")
@@ -869,7 +903,7 @@ private final class SQLiteTransaction: StateTransaction {
         for table in [
             "journal", "ledger", "cursors", "census", "dirty", "pending_batches",
             "deliveries", "gaps", "emitted_index", "aggregate_emit", "type_status",
-            "backfill_checkpoints", "anchor_holds",
+            "backfill_checkpoints", "anchor_holds", "destination_scopes",
         ] {
             try store.exec("DELETE FROM \(table);")
         }
@@ -928,5 +962,33 @@ private final class SQLiteTransaction: StateTransaction {
         guard status == SQLITE_DONE else {
             throw StorageError.execFailed("step \(status)")
         }
+    }
+}
+
+/// One row, one scope: the document wrapper belongs to the preference file, not to a
+/// table that already keys by destination.
+private enum DestinationScopePayload {
+    static func encoded(_ scope: DestinationExportScope) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .millisecondsSince1970
+        encoder.outputFormatting = [.sortedKeys]
+        return try encoder.encode(scope)
+    }
+
+    static func decoded(_ data: Data, destinationID: String) throws -> DestinationExportScope {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .millisecondsSince1970
+        let stored = try decoder.decode(DestinationExportScope.self, from: data)
+        guard stored.destinationID == destinationID else {
+            throw StorageError.execFailed("destination scope identity mismatch")
+        }
+        // The synthesised decoder skips the initialiser, so the interval check has to run
+        // here: a range the type rejects is not one the row gets to keep.
+        return try DestinationExportScope(
+            destinationID: stored.destinationID,
+            metrics: stored.metrics,
+            startInclusive: stored.startInclusive,
+            endExclusive: stored.endExclusive
+        )
     }
 }

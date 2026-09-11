@@ -432,6 +432,10 @@ public protocol StateTransaction: AnyObject {
     func upsertAnchorHold(_ hold: AnchorHold) throws
     func clearAnchorHold(metric: MetricID) throws
     func loadAnchorHolds() throws -> [AnchorHold]
+    /// SEC-16: `nil` is "no scope was ever stored", which the app migration must be able
+    /// to tell apart from a stored scope that happens to grant nothing.
+    func loadDestinationScope(destinationID: String) throws -> DestinationExportScope?
+    func upsertDestinationScope(_ scope: DestinationExportScope) throws
     func purgeMetricState(metric: MetricID) throws
     /// Clears every table. Returns pending payload paths to unlink after COMMIT (R-43).
     func wipe(atEpoch: TimeInterval) throws -> [String]

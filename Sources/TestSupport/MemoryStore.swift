@@ -20,6 +20,7 @@ public final class MemoryTransaction: StateTransaction {
     public var aggregateEmitSeq: [String: Int] = [:]
     public var typeStatus: [MetricID: TypeStatus] = [:]
     public var anchorHolds: [MetricID: AnchorHold] = [:]
+    public var destinationScopes: [String: DestinationExportScope] = [:]
     private var pendingOrder: [BatchID] = []
 
     public init() {}
@@ -222,6 +223,14 @@ public final class MemoryTransaction: StateTransaction {
         anchorHolds.removeValue(forKey: metric)
     }
 
+    public func loadDestinationScope(destinationID: String) throws -> DestinationExportScope? {
+        destinationScopes[destinationID]
+    }
+
+    public func upsertDestinationScope(_ scope: DestinationExportScope) throws {
+        destinationScopes[scope.destinationID] = scope
+    }
+
     public func purgeMetricState(metric: MetricID) throws {
         cursors.removeValue(forKey: metric)
         census = census.filter { $0.value.metric != metric }
@@ -248,6 +257,7 @@ public final class MemoryTransaction: StateTransaction {
         aggregateEmitSeq = [:]
         typeStatus = [:]
         anchorHolds = [:]
+        destinationScopes = [:]
         try appendLedger(
             EgressEntry(
                 destination: "local-device",
