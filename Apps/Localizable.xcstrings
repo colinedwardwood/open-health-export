@@ -1388,6 +1388,17 @@
         }
       }
     },
+    "Send traceparent to Mac companion (opt-in)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send traceparent to Mac companion (opt-in)"
+          }
+        }
+      }
+    },
     "Sensitive type — type Archive folder to add it individually.": {
       "extractionState": "manual",
       "localizations": {

@@ -25,6 +25,7 @@ private struct CompanionVerificationRecord: Codable {
     var serviceName: String
     var macInstallationID: String
     var report: DestinationTestReport
+    var propagateTraceparent: Bool?
 }
 
 private struct HTTPSVerificationRecord: Codable {
@@ -728,6 +729,7 @@ enum HarnessExport {
         let deliveryPipe = ByteStreamCompanionPipe(
             stream: NWByteStream(service: discovered, options: options)
         )
+        let emission = TraceparentEmission(enabled: storedCompanionTraceparent())
         let verified: VerifiedDestination
         let verificationURL = companionTestReportURL(root: root)
         if let data = try? Data(contentsOf: verificationURL),
@@ -738,7 +740,8 @@ enum HarnessExport {
             verified = try CompanionDestinationEnable.resume(
                 deliveryPipe: deliveryPipe,
                 installationID: session.localInstallationID,
-                testReport: saved.report
+                testReport: saved.report,
+                traceparent: emission
             )
         } else {
             let testPipe = ByteStreamCompanionPipe(
@@ -748,13 +751,15 @@ enum HarnessExport {
                 testPipe: testPipe,
                 deliveryPipe: deliveryPipe,
                 installationID: session.localInstallationID,
-                emittedAt: Date().ISO8601Format()
+                emittedAt: Date().ISO8601Format(),
+                traceparent: emission
             )
             verified = completed.destination
             let record = CompanionVerificationRecord(
                 serviceName: session.serviceName,
                 macInstallationID: session.macInstallationID,
-                report: completed.report
+                report: completed.report,
+                propagateTraceparent: emission.header(seed: "preview") != nil
             )
             try JSONEncoder().encode(record).write(to: verificationURL, options: .atomic)
             if let snapshotURL = StatusSnapshotLocation.url(destinationID: "companion") {
@@ -800,6 +805,10 @@ enum HarnessExport {
             let outcome = try await run.run()
             WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
             lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
+        }
+        if emission.autoDisabled {
+            try setCompanionTraceparent(false)
+            lines.append("traceparent auto-disabled after a header-plausible failure")
         }
         lines.append("Companion: \(session.serviceName)")
         return lines
@@ -1609,6 +1618,23 @@ enum HarnessExport {
         try JSONEncoder().encode(record).write(to: url, options: .atomic)
     }
 
+    static func storedCompanionTraceparent() -> Bool {
+        UserDefaults.standard.bool(forKey: "ohe.companion.propagateTraceparent")
+    }
+
+    static func setCompanionTraceparent(_ enabled: Bool) throws {
+        UserDefaults.standard.set(enabled, forKey: "ohe.companion.propagateTraceparent")
+        let root = try applicationSupportRoot()
+        let url = companionTestReportURL(root: root)
+        guard let data = try? Data(contentsOf: url),
+              var record = try? JSONDecoder().decode(CompanionVerificationRecord.self, from: data)
+        else {
+            return
+        }
+        record.propagateTraceparent = enabled
+        try JSONEncoder().encode(record).write(to: url, options: .atomic)
+    }
+
     static func storedOTLPURL() -> String {
         guard let root = try? applicationSupportRoot(),
               let data = try? Data(contentsOf: root.appendingPathComponent("otlp-destination.json")),
@@ -1847,6 +1873,7 @@ enum HarnessExport {
             at: root.appendingPathComponent("backfill-aggregate.json")
         )
         try await vault().forget()
+        UserDefaults.standard.removeObject(forKey: "ohe.companion.propagateTraceparent")
         if let directory = StatusSnapshotLocation.directory() {
             try? FileManager.default.removeItem(at: directory)
         }

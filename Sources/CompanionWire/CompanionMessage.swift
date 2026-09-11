@@ -7,6 +7,7 @@ public struct CompanionOffer: Sendable, Equatable {
     public var schemaVersion: String
     public var byteCount: UInt64
     public var digest: String
+    public var traceparent: String?
 
     public init(
         batchID: String,
@@ -14,7 +15,8 @@ public struct CompanionOffer: Sendable, Equatable {
         format: String = "ohe.wire/1",
         schemaVersion: String = "1.0",
         byteCount: UInt64,
-        digest: String
+        digest: String,
+        traceparent: String? = nil
     ) {
         self.batchID = batchID
         self.idempotencyKey = idempotencyKey
@@ -22,6 +24,7 @@ public struct CompanionOffer: Sendable, Equatable {
         self.schemaVersion = schemaVersion
         self.byteCount = byteCount
         self.digest = digest
+        self.traceparent = traceparent
     }
 }
 
@@ -80,6 +83,13 @@ public enum CompanionMessage: Sendable, Equatable {
             let byteCount = CompanionBinary.readU64(bytes, at: i)
             i += 8
             let digest = try CompanionBinary.readString(bytes, i: &i)
+            var traceparent: String?
+            if i < bytes.count {
+                traceparent = try CompanionBinary.readString(bytes, i: &i)
+                if traceparent?.isEmpty == true {
+                    traceparent = nil
+                }
+            }
             guard i == bytes.count else { throw CompanionCodecError.trailingBytes }
             return .offer(CompanionOffer(
                 batchID: batchID,
@@ -87,7 +97,8 @@ public enum CompanionMessage: Sendable, Equatable {
                 format: format,
                 schemaVersion: schemaVersion,
                 byteCount: byteCount,
-                digest: digest
+                digest: digest,
+                traceparent: traceparent
             ))
         case .resume:
             guard bytes.count == 4 else { throw CompanionCodecError.trailingBytes }
@@ -140,6 +151,9 @@ public enum CompanionMessage: Sendable, Equatable {
             try CompanionBinary.writeString(offer.schemaVersion, into: &data)
             data.append(contentsOf: CompanionBinary.u64(offer.byteCount))
             try CompanionBinary.writeString(offer.digest, into: &data)
+            if let traceparent = offer.traceparent, !traceparent.isEmpty {
+                try CompanionBinary.writeString(traceparent, into: &data)
+            }
         case .resume(let fromChunk):
             data.append(contentsOf: CompanionBinary.u32(fromChunk))
         case .receipt(let batchID, let digest):

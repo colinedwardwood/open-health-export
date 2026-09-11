@@ -39,6 +39,7 @@ struct HarnessView: View {
     @State private var httpsBearer = ""
     @State private var allowInsecureHTTP = false
     @State private var propagateTraceparent = false
+    @State private var companionTraceparent = false
     @State private var httpsTestLines: [String] = []
     @State private var mqttURL = ""
     @State private var mqttClientID = "ohe-iphone"
@@ -219,6 +220,7 @@ struct HarnessView: View {
                 otlpURL = HarnessExport.storedOTLPURL()
             }
             propagateTraceparent = HarnessExport.storedHTTPSTraceparent()
+            companionTraceparent = HarnessExport.storedCompanionTraceparent()
             let selected = Set(HarnessExport.selectedMetrics())
             browserBaseline = selected
             browserSelection = selected
@@ -850,6 +852,12 @@ struct HarnessView: View {
                 Task { await forgetPairing() }
             }
             .disabled(phase == .working)
+            Toggle("Send traceparent to Mac companion (opt-in)", isOn: $companionTraceparent)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("companion-traceparent")
+                .onChange(of: companionTraceparent) { _, enabled in
+                    try? HarnessExport.setCompanionTraceparent(enabled)
+                }
         }
         .buttonStyle(HarnessButtonStyle())
         .controlSize(.large)

@@ -1,6 +1,7 @@
 import CoreDomain
 import DestinationTrust
 import Foundation
+import NetEgress
 import WireFormat
 
 /// Completes R-25 before a companion destination can carry health payloads.
@@ -10,7 +11,8 @@ public enum CompanionDestinationEnable {
         deliveryPipe: any CompanionBytePipe,
         installationID: String,
         emittedAt: String,
-        canaryCode: String = "OHE1-COMP"
+        canaryCode: String = "OHE1-COMP",
+        traceparent: TraceparentEmission? = nil
     ) async throws -> (
         destination: VerifiedDestination,
         events: [TrustEvent],
@@ -40,7 +42,11 @@ public enum CompanionDestinationEnable {
         )
         try setup.recordTest(report)
         let destination = try setup.enable(
-            sink: CompanionSink(pipe: deliveryPipe, installationID: installationID)
+            sink: CompanionSink(
+                pipe: deliveryPipe,
+                installationID: installationID,
+                traceparent: traceparent
+            )
         )
         return (destination, setup.drainEvents(), report)
     }
@@ -48,12 +54,17 @@ public enum CompanionDestinationEnable {
     public static func resume(
         deliveryPipe: any CompanionBytePipe,
         installationID: String,
-        testReport: DestinationTestReport
+        testReport: DestinationTestReport,
+        traceparent: TraceparentEmission? = nil
     ) throws -> VerifiedDestination {
         var setup = DestinationSetup()
         try setup.resumeEnabled(testReport: testReport)
         return try setup.enable(
-            sink: CompanionSink(pipe: deliveryPipe, installationID: installationID)
+            sink: CompanionSink(
+                pipe: deliveryPipe,
+                installationID: installationID,
+                traceparent: traceparent
+            )
         )
     }
 }

@@ -2,6 +2,7 @@ import CompanionWire
 import CoreDomain
 import EnginePorts
 import Foundation
+import NetEgress
 import WireFormat
 
 public protocol CompanionBytePipe: Sendable {
@@ -20,11 +21,18 @@ public struct CompanionSink: DestinationSink, Sendable {
     public var pipe: any CompanionBytePipe
     public var installationID: String
     public var chunkSize: Int
+    public var traceparent: TraceparentEmission?
 
-    public init(pipe: any CompanionBytePipe, installationID: String, chunkSize: Int = 16_384) {
+    public init(
+        pipe: any CompanionBytePipe,
+        installationID: String,
+        chunkSize: Int = 16_384,
+        traceparent: TraceparentEmission? = nil
+    ) {
         self.pipe = pipe
         self.installationID = installationID
         self.chunkSize = max(1, min(chunkSize, CompanionFrame.maxPayload - 4))
+        self.traceparent = traceparent
     }
 
     public func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt {
@@ -45,19 +53,39 @@ public struct CompanionSink: DestinationSink, Sendable {
             capabilities: CompanionReceiver.capabilities
         ))
         let hello = try await session.receive()
+        var peerAllowsTraceparent = false
         switch hello {
-        case .hello(let version, _, _):
+        case .hello(let version, _, let capabilities):
             if version != CompanionReceiver.protocolVersion { throw CompanionCodecError.protocolVersion }
+            peerAllowsTraceparent = capabilities.contains("traceparent")
         case .reject(let errorClass, let detail, let retryable):
             throw CompanionError.rejected(errorClass: errorClass, detail: detail, retryable: retryable)
         default:
             throw CompanionError.unexpected
         }
-        try await session.send(.offer(offer))
-        switch try await session.receive() {
+        var outbound = offer
+        if peerAllowsTraceparent {
+            outbound.traceparent = traceparent?.header(seed: idempotencyKey.rawValue)
+        }
+        try await session.send(.offer(outbound))
+        var reply = try await session.receive()
+        var autoDisabled = false
+        if case .reject = reply, outbound.traceparent != nil {
+            outbound.traceparent = nil
+            traceparent?.noteAutoDisabled()
+            autoDisabled = true
+            try await session.send(.offer(outbound))
+            reply = try await session.receive()
+        }
+        switch reply {
         case .receipt(let batchID, let ackedDigest):
             guard batchID == offer.batchID, ackedDigest == digest else { throw CompanionError.digestMismatch }
-            return DeliveryReceipt(batchID: idempotencyKey, accepted: count, statusOnly: false)
+            return DeliveryReceipt(
+                batchID: idempotencyKey,
+                accepted: count,
+                statusOnly: false,
+                traceparentAutoDisabled: autoDisabled
+            )
         case .resume(let fromChunk):
             let parts = CompanionChunks.split(payload, size: chunkSize)
             var seq = fromChunk
@@ -72,7 +100,12 @@ public struct CompanionSink: DestinationSink, Sendable {
             switch try await session.receive() {
             case .receipt(let batchID, let ackedDigest):
                 guard batchID == offer.batchID, ackedDigest == digest else { throw CompanionError.digestMismatch }
-                return DeliveryReceipt(batchID: idempotencyKey, accepted: count, statusOnly: false)
+                return DeliveryReceipt(
+                    batchID: idempotencyKey,
+                    accepted: count,
+                    statusOnly: false,
+                    traceparentAutoDisabled: autoDisabled
+                )
             case .reject(let errorClass, let detail, let retryable):
                 throw CompanionError.rejected(errorClass: errorClass, detail: detail, retryable: retryable)
             default:

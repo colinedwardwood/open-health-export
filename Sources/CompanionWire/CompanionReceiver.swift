@@ -32,7 +32,7 @@ public struct CompanionTurn: Sendable, Equatable {
 
 public struct CompanionReceiver: Sendable {
     public static let protocolVersion: UInt8 = 1
-    public static let capabilities = ["resume", "ohe.wire/1"]
+    public static let capabilities = ["resume", "ohe.wire/1", "traceparent"]
 
     public var installationID: String
     private var receipts: [String: String]
@@ -55,6 +55,7 @@ public struct CompanionReceiver: Sendable {
                     .reject(errorClass: "internalFault", detail: "protocolVersion", retryable: false)
                 ])
             }
+            // Inbound trace context, if a peer ever sent one, is ignored: this hello starts a root.
             return CompanionTurn(
                 replies: [.hello(
                     protocolVersion: Self.protocolVersion,
@@ -91,6 +92,8 @@ public struct CompanionReceiver: Sendable {
     }
 
     private mutating func respond(to offer: CompanionOffer) -> CompanionMessage {
+        var offer = offer
+        offer.traceparent = nil
         if let stored = receipts[offer.batchID] {
             if stored == offer.digest {
                 return .receipt(batchID: offer.batchID, digest: stored)

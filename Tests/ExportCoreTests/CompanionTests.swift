@@ -5,6 +5,7 @@ import DestinationTrust
 import EnginePorts
 import FileWriteKit
 import Foundation
+import NetEgress
 import SinkCompanion
 import TestSupport
 import Testing
@@ -193,4 +194,84 @@ private func writeCompanionPayload() throws -> (URL, BatchID, String) {
         testReport: enabled.report
     )
     _ = resumed.sink
+}
+
+@Test func companionOfferTraceparentRoundTripsAndReceiverNeverContinuesIt() throws {
+    let inbound = Traceparent.make(seed: "attacker")
+    let offer = CompanionOffer(
+        batchID: "batch-tp",
+        idempotencyKey: "batch-tp",
+        byteCount: 4,
+        digest: ContentSHA256.digest(Data("abcd".utf8)),
+        traceparent: inbound
+    )
+    let encoded = try CompanionMessage.offer(offer).encodedFrame()
+    let decoded = try #require(try CompanionFrame.decodePrefix(encoded))
+    let message = try CompanionMessage.decode(decoded.frame)
+    guard case .offer(let parsed) = message else {
+        Issue.record("expected offer")
+        return
+    }
+    #expect(parsed.traceparent == inbound)
+
+    var receiver = CompanionReceiver(installationID: "mac-root")
+    _ = receiver.handle(.hello(
+        protocolVersion: 1,
+        installationID: "phone",
+        capabilities: CompanionReceiver.capabilities
+    ))
+    _ = receiver.handle(.offer(parsed))
+    #expect(receiver.exportReceipts().isEmpty)
+    #expect(CompanionReceiver.capabilities.contains("traceparent"))
+}
+
+@Test func companionSinkOmitsTraceparentByDefault() async throws {
+    let (file, batchID, _) = try writeCompanionPayload()
+    let broker = LoopbackCompanionBroker()
+    let capture = CompanionOfferCapture(inner: broker)
+    let sink = CompanionSink(pipe: capture, installationID: "phone", chunkSize: 32)
+    _ = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
+    let offers = await capture.offers
+    #expect(!offers.isEmpty)
+    #expect(offers.allSatisfy { $0.traceparent == nil })
+}
+
+@Test func companionSinkSendsTraceparentWhenPeerAdvertisesIt() async throws {
+    let (file, batchID, _) = try writeCompanionPayload()
+    let broker = LoopbackCompanionBroker()
+    let capture = CompanionOfferCapture(inner: broker)
+    let emission = TraceparentEmission(enabled: true)
+    let sink = CompanionSink(
+        pipe: capture,
+        installationID: "phone",
+        chunkSize: 32,
+        traceparent: emission
+    )
+    _ = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
+    let offers = await capture.offers
+    #expect(offers.contains { $0.traceparent == Traceparent.make(seed: batchID.rawValue) })
+}
+
+private actor CompanionOfferCapture: CompanionBytePipe {
+    let inner: LoopbackCompanionBroker
+    var offers: [CompanionOffer] = []
+
+    init(inner: LoopbackCompanionBroker) {
+        self.inner = inner
+    }
+
+    func send(_ data: Data) async throws {
+        var remainder = data
+        while let decoded = try CompanionFrame.decodePrefix(remainder) {
+            remainder.removeFirst(decoded.consumed)
+            if case .offer(let offer) = try CompanionMessage.decode(decoded.frame) {
+                offers.append(offer)
+            }
+        }
+        try await inner.send(data)
+    }
+
+    func receive(max: Int) async throws -> Data {
+        try await inner.receive(max: max)
+    }
 }
