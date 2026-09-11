@@ -1,0 +1,3 @@
+# Generated from Package.swift. Do not edit by hand.
+sqlite3	system	CSQLite
+zlib	system	CZlib

@@ -16,6 +16,12 @@ and `COPYING`. Third-party and system-library attribution is generated into `NOT
 shown in the in-app Acknowledgements screen. Contributions require DCO sign-off
 (`git commit -s`).
 
+You can read the exact source of any released version, verify that every artifact we publish
+came from that source, and build a working app yourself from a clean machine.
+You cannot verify that the App Store binary matches, because Apple re-signs and encrypts
+App Store binaries before delivering them. If bit-for-bit verification matters to you, build
+from source — and that path is tested on every release precisely so that it works.
+
 ## Build
 
 Toolchain: Swift 6.3.3. The core package builds on Linux.
@@ -93,3 +99,5 @@ Minimum iOS 18.0. Mac companion is a notarised Developer ID app, not Mac App Sto
 
 How to contribute: `CONTRIBUTING.md`. Vulnerabilities: `SECURITY.md`. Support limits:
 `SUPPORT.md`. Conduct: `CODE_OF_CONDUCT.md`. Continuity: `CONTINUITY.md`.
+Version streams: `VERSIONING.md`. What R-108 claims: `PROVENANCE.md`. Runtime licences:
+`dependencies/policy.md`.

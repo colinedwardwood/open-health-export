@@ -178,6 +178,7 @@ struct PolicyCheck {
         }
         print("policycheck no third-party runtime package: ok")
         try checkNotice(root: root, manifest: manifest)
+        try checkLicencesLock(root: root, manifest: manifest)
         try checkSponsorGating(root: root)
         let requiredPrivacyManifests = [
             apps.appendingPathComponent("Exporter-iOS/PrivacyInfo.xcprivacy"),
@@ -505,6 +506,9 @@ struct PolicyCheck {
             "GOVERNANCE.md",
             "CODE_OF_CONDUCT.md",
             "MAINTAINERS.md",
+            "VERSIONING.md",
+            "PROVENANCE.md",
+            "dependencies/policy.md",
         ] {
             let url = root.appendingPathComponent(relative)
             guard FileManager.default.fileExists(atPath: url.path) else { continue }
@@ -571,6 +575,10 @@ struct PolicyCheck {
             ("MAINTAINERS.md", ["colinedwardwood"]),
             ("CHANGELOG.md", ["changes/unreleased"]),
             ("NOTICE", ["no third-party Swift packages", "sqlite3", "zlib"]),
+            ("VERSIONING.md", ["The streams do not imply each other", "policycheck spec-freeze"]),
+            ("PROVENANCE.md", ["Auditable source", "R-84 is about export output", "gh attestation verify"]),
+            ("dependencies/policy.md", ["90 days", "licences.lock"]),
+            ("dependencies/licences.lock", ["sqlite3", "zlib"]),
             ("CODEOWNERS", ["@colinedwardwood"]),
             (".github/PULL_REQUEST_TEMPLATE.md", ["DCO"]),
             (".github/ISSUE_TEMPLATE/bug.yml", ["Do not paste real HealthKit"]),
@@ -589,10 +597,36 @@ struct PolicyCheck {
             }
         }
         let readme = try String(contentsOf: root.appendingPathComponent("README.md"), encoding: .utf8)
-        for linked in ["CONTRIBUTING.md", "SECURITY.md", "SUPPORT.md", "CODE_OF_CONDUCT.md", "NOTICE"]
+        for linked in [
+            "CONTRIBUTING.md",
+            "SECURITY.md",
+            "SUPPORT.md",
+            "CODE_OF_CONDUCT.md",
+            "NOTICE",
+            "VERSIONING.md",
+            "PROVENANCE.md",
+        ]
             where !readme.contains(linked)
         {
             missing.append("README.md does not link \(linked)")
+        }
+        let compatibility = root.appendingPathComponent("spec/compatibility.json")
+        guard let data = try? Data(contentsOf: compatibility),
+              let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              json["defaultSpec"] as? String == "1.0.0"
+        else {
+            missing.append("spec/compatibility.json missing or defaultSpec is not 1.0.0")
+            FileHandle.standardError.write(Data((missing.joined(separator: "\n") + "\n").utf8))
+            exit(1)
+        }
+        let provenanceSentence =
+            "You cannot verify that the App Store binary matches"
+        if !readme.contains(provenanceSentence) {
+            missing.append("README.md does not contain the R-108 provenance sentence")
+        }
+        let provenance = try String(contentsOf: root.appendingPathComponent("PROVENANCE.md"), encoding: .utf8)
+        if !provenance.contains(provenanceSentence) {
+            missing.append("PROVENANCE.md does not contain the R-108 provenance sentence")
         }
         if !missing.isEmpty {
             FileHandle.standardError.write(Data((missing.joined(separator: "\n") + "\n").utf8))
@@ -696,6 +730,32 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck NOTICE matches Package.swift: ok")
+    }
+
+    static func generatedLicencesLock(from manifest: String) -> String {
+        var rows = ["# Generated from Package.swift. Do not edit by hand."]
+        if manifest.contains("name: \"CSQLite\"") {
+            rows.append("sqlite3\tsystem\tCSQLite")
+        }
+        if manifest.contains("name: \"CZlib\"") {
+            rows.append("zlib\tsystem\tCZlib")
+        }
+        return rows.joined(separator: "\n") + "\n"
+    }
+
+    static func checkLicencesLock(root: URL, manifest: String) throws {
+        let expected = generatedLicencesLock(from: manifest)
+        let observed = try String(
+            contentsOf: root.appendingPathComponent("dependencies/licences.lock"),
+            encoding: .utf8
+        )
+        guard observed == expected else {
+            FileHandle.standardError.write(
+                Data("dependencies/licences.lock is stale; regenerate from Package.swift:\n\(expected)".utf8)
+            )
+            exit(1)
+        }
+        print("policycheck licences.lock matches Package.swift: ok")
     }
 
     static func generatedNotice(from manifest: String) -> String {
@@ -973,6 +1033,9 @@ struct PolicyCheck {
                 FileHandle.standardError.write(Data(("breaking frozen schema change:\n" + failure + "\n").utf8))
                 exit(1)
             }
+            print("policycheck spec-freeze: ok")
+        } else {
+            print("policycheck spec-freeze: ok (spec/v1.0.0 not marked FROZEN)")
         }
         try checkG1Fixtures(spec: spec)
         try checkFaultSeamsAbsentOutsideDebug(root: root)

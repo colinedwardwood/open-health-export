@@ -1,0 +1,10 @@
+{
+  "defaultSpec": "1.0.0",
+  "profile": "ohe.wire/1",
+  "app": {
+    "0.1.0": {
+      "emits": ["1.0.0"],
+      "default": "1.0.0"
+    }
+  }
+}
