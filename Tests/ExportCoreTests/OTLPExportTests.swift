@@ -11,6 +11,62 @@ import StorageSQLite
 import TestSupport
 import Testing
 
+/// OBS-22 / R-52. The export cycle's half of this is
+/// `p16DefaultLocalFileExportMakesNoAttributableNetworkDials`; this is the telemetry
+/// subsystem's half, which is the one the requirement actually names. A real loopback
+/// listener is reachable for the whole test, so nothing about the environment is what
+/// prevents a connection — only the default configuration is.
+@Test func defaultTelemetryConfigurationOpensNoConnection() async throws {
+    let interceptor = ScriptableHTTPServer()
+    try interceptor.start()
+    defer { interceptor.stop() }
+    interceptor.setFallback(ScriptableHTTPServer.Script(status: 200))
+
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-obs22-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let event = RunEvent(
+        runID: RunID(rawValue: "run-obs22"),
+        outcomeKind: "success",
+        detail: "",
+        trigger: .bgProcessing,
+        wallTimeEpoch: 1_700_000_000
+    )
+
+    let recorder = EgressAttemptLog.Recorder()
+    let exported = try await EgressAttemptLog.$recorder.withValue(recorder) {
+        try await OTLPExporter(
+            settings: .disabled,
+            transport: URLSessionHTTPTransport()
+        ).export(events: [event], bodyDirectory: directory)
+    }
+
+    #expect(exported == false)
+    #expect(OTLPExportSettings.disabled.endpoint == nil)
+    #expect(recorder.snapshot().isEmpty, "default telemetry dialled \(recorder.snapshot())")
+    #expect(interceptor.requests().isEmpty, "default telemetry reached the interceptor")
+
+    // The control. Without it, an interceptor that quietly stopped listening would
+    // make every assertion above pass forever.
+    let enabled = try OTLPSettingsGate.enabledSettings(
+        urlString: interceptor.origin.absoluteString,
+        allowInsecureHTTP: true,
+        previewCompleted: true
+    )
+    let control = EgressAttemptLog.Recorder()
+    let sent = try await EgressAttemptLog.$recorder.withValue(control) {
+        try await OTLPExporter(
+            settings: enabled,
+            transport: URLSessionHTTPTransport()
+        ).export(events: [event], bodyDirectory: directory)
+    }
+    #expect(sent)
+    #expect(control.snapshot().contains { $0.kind == .http })
+    #expect(!interceptor.requests().isEmpty)
+}
+
 @Test func otlpProjectionContainsOnlyDeclaredAttributes() {
     let event = RunEvent(
         runID: RunID(rawValue: "run-secret-identifier"),
