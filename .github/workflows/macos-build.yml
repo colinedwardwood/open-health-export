@@ -108,6 +108,16 @@ jobs:
           path: ${{ runner.temp }}/ohe-ui.xcresult
           retention-days: 7
 
+  from-source:
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the tools the README names
+        run: brew install xcodegen
+      - name: Build from source the way the README says
+        run: ./scripts/build-from-source.sh
+
   mac-companion:
     runs-on: macos-26
     timeout-minutes: 20

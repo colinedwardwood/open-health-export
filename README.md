@@ -36,13 +36,19 @@ fields while applying quantity upserts and tombstones.
 iOS harness (M0 / R-70):
 
 ```
-./scripts/generate-project.sh
-open OpenHealthExporter.xcodeproj
+./scripts/build-from-source.sh
 ```
 
-Requires [XcodeGen](https://github.com/yonaskolb/XcodeGen). The `.xcodeproj` is generated and
-not committed. Run on a physical iPhone (REF-B or iPhone XR) for a populated Health store.
-Acknowledge the locked-device disclosure before Health permission.
+That is the stranger-test path (QA-30): generate the project, then ad-hoc-sign the
+simulator app and the Mac companion. It needs [XcodeGen](https://github.com/yonaskolb/XcodeGen)
+(`brew install xcodegen`) and no Apple Developer Program membership. The `.xcodeproj` is
+generated and not committed.
+
+A physical iPhone needs a free personal team in Xcode — the device SDK will not accept
+ad-hoc identity, and HealthKit entitlements require a development certificate. Open
+`OpenHealthExporter.xcodeproj`, pick your Personal Team, and run on the phone (REF-B or
+iPhone XR) for a populated Health store. Acknowledge the locked-device disclosure before
+Health permission.
 
 Full-history backfill is user-initiated. On iOS 26 and later it uses the
 system's continued-processing UI and can finish unattended. On iOS 18–25 it
@@ -60,7 +66,8 @@ HTTPS and MQTT destinations show a confirmation card with the grouped certificat
 and a dry-run canary **before** Health data can move. An unacknowledged destination change
 keeps a non-dismissible in-app banner until you acknowledge it.
 HTTPS POSTs that file with `Idempotency-Key` and `Content-Type: application/x-ndjson; profile="ohe.wire/1"`.
-JSON document, CSV, and the Health Auto Export profile are specified but not emitted yet.
+A local-file destination also writes JSON, CSV, and Health Auto Export sidecars next to the
+NDJSON. Those sidecars are convenience views of the same batch, not a second source of truth.
 
 Deletion tombstones are **best-effort** because HealthKit provides no deletion
 callback and iOS may not wake the app when a deletion occurs. A later

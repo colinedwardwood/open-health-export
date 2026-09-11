@@ -103,7 +103,7 @@ final class ExporterUITests: XCTestCase {
     }
 
     /// QA-14: the three states a person needs to tell apart, on the surface they read.
-    func testDestinationStatusShowsSuccessStaleAndFailedWithItsReason() {
+    func testDestinationStatusShowsSuccessStaleAndFailedWithItsReason() throws {
         let healthy = destinationLine(seeding: "success")
         XCTAssertTrue(healthy.contains("Home Assistant"), healthy)
         XCTAssertTrue(healthy.contains("healthy"), healthy)
@@ -118,6 +118,7 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(failed.contains("destinationUnreachable"), failed)
         // A failure still says when it last worked, which is what makes it reportable.
         XCTAssertTrue(failed.contains("last success"), failed)
+        try performAccessibilityAudit()
     }
 
     private func destinationLine(seeding scenario: String) -> String {
@@ -259,7 +260,7 @@ final class ExporterUITests: XCTestCase {
         try performAccessibilityAudit()
     }
 
-    func testDestinationSectionExposesTheEmptyStateAndRefreshControl() {
+    func testDestinationSectionExposesTheEmptyStateAndRefreshControl() throws {
         enterControls()
         let title = scrollToHittable(app.staticTexts["destination-title"])
         XCTAssertEqual(title.label, "Where your data goes")
@@ -270,6 +271,7 @@ final class ExporterUITests: XCTestCase {
         )
         XCTAssertFalse(app.otherElements["destination-change-banner"].exists)
         XCTAssertFalse(app.staticTexts["destination-change-banner"].exists)
+        try performAccessibilityAudit()
     }
 
     private func enterControls() {
@@ -279,13 +281,35 @@ final class ExporterUITests: XCTestCase {
     }
 
     private func performAccessibilityAudit() throws {
-        try app.performAccessibilityAudit { issue in
-            // Xcode 26 audits system-rendered disabled SwiftUI controls as low
-            // contrast. Suppress only that exact SDK-owned state; all enabled
-            // contrast findings and every other audit type still fail.
-            // Tracking: https://github.com/colinedwardwood/open-health-export/issues/4
-            issue.auditType == .contrast && issue.element?.isEnabled == false
+        let suppressions = AccessibilityAuditSuppression.all
+        for suppression in suppressions {
+            XCTAssertFalse(
+                suppression.issueURL.isEmpty,
+                "QA-26: suppression \(suppression.id) has no linked issue"
+            )
         }
+        try app.performAccessibilityAudit { issue in
+            suppressions.contains { $0.matches(issue) }
+        }
+    }
+
+    /// QA-26: each suppressed finding must name why and carry an issue. Xcode 26
+    /// audits system-rendered disabled SwiftUI controls as low contrast; that is
+    /// SDK-owned, not ours.
+    private struct AccessibilityAuditSuppression {
+        var id: String
+        var issueURL: String
+        var matches: (XCUIAccessibilityAuditIssue) -> Bool
+
+        static let all: [AccessibilityAuditSuppression] = [
+            AccessibilityAuditSuppression(
+                id: "disabled-control-contrast",
+                issueURL: "https://github.com/colinedwardwood/open-health-export/issues/4",
+                matches: { issue in
+                    issue.auditType == .contrast && issue.element?.isEnabled == false
+                }
+            )
+        ]
     }
 
     private func filterBrowserToHeartRate() {

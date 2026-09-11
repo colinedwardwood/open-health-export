@@ -79,6 +79,37 @@ struct PolicyCheck {
         }
         print("policycheck iOS XCUITest target is wired: ok")
 
+        // QA-21: Swift Testing owns unit and integration tests. XCTest stays for UI
+        // automation (and, if they appear, XCTMetric / ObjC exception targets).
+        var xctestOutsideUI: [String] = []
+        let testsRoot = root.appendingPathComponent("Tests")
+        if let testFiles = FileManager.default.enumerator(
+            at: testsRoot,
+            includingPropertiesForKeys: nil
+        ) {
+            for case let file as URL in testFiles where file.pathExtension == "swift" {
+                let relative = file.path.replacingOccurrences(of: testsRoot.path + "/", with: "")
+                if relative.hasPrefix("ExporterUITests/") { continue }
+                let text = try String(contentsOf: file, encoding: .utf8)
+                if text.contains(": XCTestCase") {
+                    xctestOutsideUI.append(relative)
+                }
+            }
+        }
+        if !xctestOutsideUI.isEmpty {
+            FileHandle.standardError.write(
+                Data(
+                    (
+                        "QA-21: XCTestCase belongs in UI or performance targets, not "
+                            + xctestOutsideUI.joined(separator: ", ")
+                            + "\n"
+                    ).utf8
+                )
+            )
+            exit(1)
+        }
+        print("policycheck XCTest stays in UI automation: ok")
+
         let exporterEntitlements = apps
             .appendingPathComponent("Exporter-iOS/Exporter.entitlements")
         let entitlementText = try String(contentsOf: exporterEntitlements, encoding: .utf8)

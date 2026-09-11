@@ -53,11 +53,13 @@ body:
       options:
         - label: All three version streams and compatibility metadata are correct.
           required: true
-        - label: Required CI, container contracts, upstream canaries, and spec-freeze checks are green.
+        - label: T0–T3 CI is green (linux-core, macos-build including from-source, container-contracts, secrets, spec-freeze, DCO).
           required: true
         - label: No QA-22 upstream canary has been red for more than 24 hours without an accepted tracking issue.
           required: true
-        - label: Device, soak, accessibility, performance, migration, and flake evidence is attached.
+        - label: Device, soak, accessibility, localisation, performance, energy, migration, and flake evidence is attached.
+          required: true
+        - label: Upgrade-from-previous-release was exercised against a migrated store, or this is the first release.
           required: true
         - label: There are no open P0 or P1 defects accepted into this release.
           required: true
