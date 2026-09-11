@@ -86,10 +86,16 @@ jobs:
           # One simulator per runner. Three clones on a runner this size timed out
           # launching the app, which reads as a test failure and is not one. The
           # parallelism lives in the shards now, where it costs no simulator memory.
+          #
+          # A single retry covers the launch timeouts that remain: they come from the
+          # simulator, not the app, and a case that genuinely fails still fails twice.
+          # The result bundle keeps the first attempt either way.
           xcodebuild test-without-building \
             -xctestrun "$RUNNER_TEMP"/products/*.xctestrun \
             -destination "platform=iOS Simulator,id=${DESTINATION_ID}" \
             -parallel-testing-enabled NO \
+            -test-iterations 2 \
+            -retry-tests-on-failure \
             -resultBundlePath "$RUNNER_TEMP/ohe-ui.xcresult" \
             $(bash scripts/ui-test-shard.sh ${{ matrix.shard }} 3)
       # xcodebuild's summary names the failing case but not the assertion, which
