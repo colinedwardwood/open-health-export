@@ -88,3 +88,6 @@ Freshness target: pending R-71 device evidence. The overdue alarm floor is
 
 `seeking-maintainers` — v1 is not yet released and the project currently has one maintainer.
 Minimum iOS 18.0. Mac companion is a notarised Developer ID app, not Mac App Store.
+
+How to contribute: `CONTRIBUTING.md`. Vulnerabilities: `SECURITY.md`. Support limits:
+`SUPPORT.md`. Conduct: `CODE_OF_CONDUCT.md`. Continuity: `CONTINUITY.md`.

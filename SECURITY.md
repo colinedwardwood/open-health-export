@@ -3,8 +3,13 @@
 This project handles HealthKit data. Please report vulnerabilities privately to the address
 listed on the GitHub Security Advisories tab for this repository.
 
-There is currently one maintainer and no deputy. We will look at reports as soon as we can.
-This file does not promise a response time.
+There is currently one maintainer and no deputy. **Target** for an initial
+acknowledgement of a private report is 14 days. That is a target, not a staffed SLA;
+this file does not promise we will hit it.
+
+Coordinated disclosure: we prefer to ship a fix before a public write-up. If we cannot
+respond, you may disclose after 90 days from the report. Do not include HealthKit
+sample values in either the private report or the public write-up.
 
 Do not file security issues in the public tracker.
 

@@ -45,6 +45,22 @@ By making a contribution to this project, I certify that:
 Signing off also grants the **Additional permission under GNU AGPL version 3 section 7**
 reproduced verbatim in `COPYING`.
 
+Copy-paste:
+
+```
+git commit -s
+```
+
+## Review
+
+Open a pull request against `main`. Expected review latency is best-effort; with one
+maintainer it may be days. The PR template is the checklist. Licence and governance
+rules are in `GOVERNANCE.md`.
+
+The **public API** for versioning is the export wire (`spec/`, `ohe.wire/1`) and the
+documented HTTPS/MQTT contracts. Removing a schema field is a major bump even if no
+Swift symbol changed. App UI is not that API.
+
 ## Rules
 
 - No real health data in the repo, issues, or CI, including your own. If that happens, follow

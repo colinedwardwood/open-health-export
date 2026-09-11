@@ -1,0 +1,14 @@
+---
+name: Feature
+description: A change you want. Not a vulnerability report.
+title: "Feature: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: ask
+    attributes:
+      label: What should change
+      description: Tie it to a requirement ID if you can (R-xx / QA-xx). Do not include health values.
+    validations:
+      required: true
+---

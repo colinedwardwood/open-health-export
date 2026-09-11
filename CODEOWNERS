@@ -1,5 +1,8 @@
-# Security-sensitive paths. Changing the golden advisory request is a telemetry change.
+# Every top-level path has an owner. One person until D-10.
 
-spec/v1.0.0/fixtures/advisory-golden-request.txt @colinedwardwood
-Sources/NetEgress/ @colinedwardwood
-Sources/WireFormat/AdvisoryFeed.swift @colinedwardwood
+* @colinedwardwood
+/compliance/ @colinedwardwood
+/spec/ @colinedwardwood
+/Sources/NetEgress/ @colinedwardwood
+/Sources/WireFormat/AdvisoryFeed.swift @colinedwardwood
+/spec/v1.0.0/fixtures/advisory-golden-request.txt @colinedwardwood

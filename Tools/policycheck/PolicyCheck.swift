@@ -494,7 +494,17 @@ struct PolicyCheck {
             }
         }
 
-        for relative in ["README.md", "CONTINUITY.md", "CHANGELOG.md"] {
+        for relative in [
+            "README.md",
+            "CONTINUITY.md",
+            "CHANGELOG.md",
+            "CONTRIBUTING.md",
+            "SECURITY.md",
+            "SUPPORT.md",
+            "GOVERNANCE.md",
+            "CODE_OF_CONDUCT.md",
+            "MAINTAINERS.md",
+        ] {
             let url = root.appendingPathComponent(relative)
             guard FileManager.default.fileExists(atPath: url.path) else { continue }
             consider(
@@ -546,6 +556,47 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck published copy denylist: ok (\(suppressions) allowlisted)")
+        try checkGovernanceArtifacts(root: root)
+    }
+
+    /// OSS-07: the files a stranger looks for before trusting a health-data project.
+    static func checkGovernanceArtifacts(root: URL) throws {
+        let required: [(String, [String])] = [
+            ("CONTRIBUTING.md", ["git commit -s", "inbound licence equals outbound"]),
+            ("CODE_OF_CONDUCT.md", ["Enforcement contact"]),
+            ("SECURITY.md", ["14 days"]),
+            ("SUPPORT.md", ["best-effort"]),
+            ("GOVERNANCE.md", ["consent of all copyright holders", "90"]),
+            ("MAINTAINERS.md", ["colinedwardwood"]),
+            ("CHANGELOG.md", ["changes/unreleased"]),
+            ("CODEOWNERS", ["@colinedwardwood"]),
+            (".github/PULL_REQUEST_TEMPLATE.md", ["DCO"]),
+            (".github/ISSUE_TEMPLATE/bug.yml", ["Do not paste real HealthKit"]),
+        ]
+        var missing: [String] = []
+        for (relative, needles) in required {
+            let url = root.appendingPathComponent(relative)
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                missing.append("missing \(relative)")
+                continue
+            }
+            let text = try String(contentsOf: url, encoding: .utf8)
+            let lowered = text.lowercased()
+            for needle in needles where !lowered.contains(needle.lowercased()) {
+                missing.append("\(relative) does not contain \(needle)")
+            }
+        }
+        let readme = try String(contentsOf: root.appendingPathComponent("README.md"), encoding: .utf8)
+        for linked in ["CONTRIBUTING.md", "SECURITY.md", "SUPPORT.md", "CODE_OF_CONDUCT.md"]
+            where !readme.contains(linked)
+        {
+            missing.append("README.md does not link \(linked)")
+        }
+        if !missing.isEmpty {
+            FileHandle.standardError.write(Data((missing.joined(separator: "\n") + "\n").utf8))
+            exit(1)
+        }
+        print("policycheck governance artifacts: ok")
     }
 
     static func checkHostTZDataPin(root: URL) throws {

@@ -1,0 +1,41 @@
+---
+name: Bug
+description: Something is wrong. Do not paste real health data.
+title: "Bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not paste real HealthKit values, tokens, private hostnames, or unredacted
+        diagnostics.** Use the in-app diagnostic preview and share only what you have
+        already read. Accidental leaks: `SECURITY.md`.
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      placeholder: git SHA or tag
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: OS version
+      placeholder: iOS 18.5 / macOS 26.0
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device
+      placeholder: iPhone 16 / Simulator
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Redact sample values. Name metric types, not readings.
+    validations:
+      required: true
+---
