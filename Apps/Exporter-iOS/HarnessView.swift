@@ -473,6 +473,11 @@ struct HarnessView: View {
             Text(FreshnessTarget.provisionalDisclosure)
                 .font(.footnote)
                 .accessibilityIdentifier("freshness-target")
+            ForEach(FreshnessClass.allCases, id: \.self) { freshnessClass in
+                Text(FreshnessTarget.classDisclosure(freshnessClass))
+                    .font(.footnote)
+                    .accessibilityIdentifier("freshness-class-\(freshnessClass.rawValue)")
+            }
             if !wakeAttribution.isEmpty {
                 Text(wakeAttribution)
                     .font(.footnote)

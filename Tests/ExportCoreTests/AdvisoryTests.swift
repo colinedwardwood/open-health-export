@@ -236,6 +236,15 @@ private actor ToggleDestinationSink: DestinationSink {
     #expect(FreshnessTarget.alarmFloor == 6 * 60 * 60)
     #expect(FreshnessTarget.provisionalDisclosure.contains("6 hours"))
     #expect(FreshnessTarget.provisionalDisclosure.contains("not a delivery promise"))
+    for freshnessClass in FreshnessClass.allCases {
+        let line = FreshnessTarget.classDisclosure(freshnessClass)
+        #expect(line.contains("Class \(freshnessClass.rawValue.uppercased())"))
+        #expect(line.contains("pending R-71"))
+        #expect(line.contains("not a delivery promise"))
+    }
+    let measured = FreshnessTarget.classDisclosure(.a, localP95: 4 * 3600)
+    #expect(measured.contains("this device's p95 is 4"))
+    #expect(measured.contains("The overdue alarm uses 8"))
 }
 
 @Test func overdueNotificationScheduleUsesLastSuccessAndNeverInventsAThreshold() {

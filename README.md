@@ -89,8 +89,9 @@ user-visible foreground launch, never during export, and is disableable in the a
 carries marketing major.minor in `User-Agent` and nothing else identifying. Block it at your
 resolver if you do not want the fetch.
 
-Freshness target: pending R-71 device evidence. The overdue alarm floor is
-**6 hours**; this is not a delivery promise.
+Freshness target N is per class A–D. Each class is pending R-71 device evidence until that
+device has ≥14 days and ≥100 samples in the class; then N is that device's measured p95.
+The overdue alarm floor is **6 hours**; this is not a delivery promise.
 
 ## Status
 

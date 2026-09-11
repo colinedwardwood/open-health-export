@@ -315,6 +315,20 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(body.label.contains("zlib"), body.label)
     }
 
+    func testFreshnessTargetsAreShownPerClassWhileR71IsPending() {
+        enterControls()
+        _ = scrollToHittable(app.staticTexts["freshness-target"])
+        for freshnessClass in ["a", "b", "c", "d"] {
+            let line = app.staticTexts["freshness-class-\(freshnessClass)"]
+            XCTAssertTrue(
+                line.waitForExistence(timeout: uiWait),
+                "available identifiers: \(visibleIdentifiers())"
+            )
+            XCTAssertTrue(line.label.contains("pending R-71"), line.label)
+            XCTAssertTrue(line.label.contains("not a delivery promise"), line.label)
+        }
+    }
+
     private func enterControls() {
         let disclosure = app.buttons["disclosure-continue"]
         XCTAssertTrue(disclosure.waitForExistence(timeout: uiWait))

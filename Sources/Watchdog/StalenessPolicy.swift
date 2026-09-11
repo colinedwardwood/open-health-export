@@ -43,6 +43,27 @@ public enum FreshnessTarget {
     public static let provisionalDisclosure =
         "Freshness target pending R-71 evidence. The overdue alarm floor is 6 hours; this is not a delivery promise."
 
+    public static func classDisclosure(
+        _ freshnessClass: FreshnessClass,
+        localP95: TimeInterval? = nil
+    ) -> String {
+        let name = "Class \(freshnessClass.rawValue.uppercased())"
+        if let localP95 {
+            let hours = localP95 / 3600
+            let alarm = alarmThreshold(p95: localP95) / 3600
+            return
+                "\(name): this device's p95 is \(hours) hours. "
+                    + "The overdue alarm uses \(alarm) hours (floor 6, cap 48)."
+        }
+        return
+            "\(name): freshness target N pending R-71. "
+                + "The overdue alarm floor is 6 hours; this is not a delivery promise."
+    }
+
+    public static var pendingClassDisclosures: [String] {
+        FreshnessClass.allCases.map { classDisclosure($0) }
+    }
+
     /// Device-local p95 becomes eligible only with ≥100 observations spanning ≥14 days.
     public static func localP95(observations: [FreshnessObservation]) -> TimeInterval? {
         guard observations.count >= minimumSamples,
