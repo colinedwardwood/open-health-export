@@ -525,6 +525,9 @@ struct PolicyCheck {
             "VERSIONING.md",
             "PROVENANCE.md",
             "dependencies/policy.md",
+            "qa/energy-protocol.md",
+            "qa/community-device-matrix/CHECKLIST.md",
+            "docs/03-implementation/r27-failure-taxonomy.md",
         ] {
             let url = root.appendingPathComponent(relative)
             guard FileManager.default.fileExists(atPath: url.path) else { continue }
@@ -658,6 +661,10 @@ struct PolicyCheck {
             ("CODEOWNERS", ["@colinedwardwood"]),
             (".github/PULL_REQUEST_TEMPLATE.md", ["DCO"]),
             (".github/ISSUE_TEMPLATE/bug.yml", ["Do not paste real HealthKit"]),
+            ("docs/03-implementation/r27-failure-taxonomy.md", ["age_seconds", "jq"]),
+            ("qa/community-device-matrix/CHECKLIST.md", ["results.csv", "Do not paste real HealthKit"]),
+            ("qa/community-device-matrix/results.csv", ["device_class", "os_version", "outcome"]),
+            ("qa/energy-protocol.md", ["not a CI gate", "Instruments"]),
         ]
         var missing: [String] = []
         for (relative, needles) in required {
@@ -681,6 +688,9 @@ struct PolicyCheck {
             "NOTICE",
             "VERSIONING.md",
             "PROVENANCE.md",
+            "docs/03-implementation/r27-failure-taxonomy.md",
+            "qa/community-device-matrix/CHECKLIST.md",
+            "qa/energy-protocol.md",
         ]
             where !readme.contains(linked)
         {

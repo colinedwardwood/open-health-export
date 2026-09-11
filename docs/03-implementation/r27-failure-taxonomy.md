@@ -35,4 +35,4 @@ jq -e '
 ```
 
 Until R-71 ratifies a threshold, both threshold fields are absent. Consumers
-must choose their own threshold rather than treating absence as zero.
+must choose their own threshold rather than reading a missing field as zero.

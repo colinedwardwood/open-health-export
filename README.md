@@ -103,3 +103,6 @@ How to contribute: `CONTRIBUTING.md`. Vulnerabilities: `SECURITY.md`. Support li
 `SUPPORT.md`. Conduct: `CODE_OF_CONDUCT.md`. Continuity: `CONTINUITY.md`.
 Version streams: `VERSIONING.md`. What R-108 claims: `PROVENANCE.md`. Runtime licences:
 `dependencies/policy.md`. App Store listing copy (not submitted): `store/en/`.
+Monitoring signal and failure taxonomy: `docs/03-implementation/r27-failure-taxonomy.md`.
+Volunteer device runs: `qa/community-device-matrix/CHECKLIST.md`. Energy measurement
+(not a CI gate): `qa/energy-protocol.md`.
