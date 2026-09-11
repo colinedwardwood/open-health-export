@@ -31,6 +31,9 @@ targets:
           - "*.entitlements"
       - path: Apps/AppShared
       - path: Apps/Localizable.xcstrings
+      - path: NOTICE
+        type: file
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(PRODUCT_BUNDLE_IDENTIFIER_ROOT).ios
@@ -110,6 +113,9 @@ targets:
           - Info.plist
           - "*.entitlements"
       - path: Apps/Localizable.xcstrings
+      - path: NOTICE
+        type: file
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(PRODUCT_BUNDLE_IDENTIFIER_ROOT).mac

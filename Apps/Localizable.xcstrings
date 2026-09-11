@@ -57,6 +57,17 @@
         }
       }
     },
+    "Acknowledgements": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acknowledgements"
+          }
+        }
+      }
+    },
     "Acknowledge destination changes": {
       "extractionState": "manual",
       "localizations": {

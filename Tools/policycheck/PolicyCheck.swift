@@ -177,6 +177,7 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck no third-party runtime package: ok")
+        try checkNotice(root: root, manifest: manifest)
         try checkSponsorGating(root: root)
         let requiredPrivacyManifests = [
             apps.appendingPathComponent("Exporter-iOS/PrivacyInfo.xcprivacy"),
@@ -569,6 +570,7 @@ struct PolicyCheck {
             ("GOVERNANCE.md", ["consent of all copyright holders", "90"]),
             ("MAINTAINERS.md", ["colinedwardwood"]),
             ("CHANGELOG.md", ["changes/unreleased"]),
+            ("NOTICE", ["no third-party Swift packages", "sqlite3", "zlib"]),
             ("CODEOWNERS", ["@colinedwardwood"]),
             (".github/PULL_REQUEST_TEMPLATE.md", ["DCO"]),
             (".github/ISSUE_TEMPLATE/bug.yml", ["Do not paste real HealthKit"]),
@@ -587,7 +589,7 @@ struct PolicyCheck {
             }
         }
         let readme = try String(contentsOf: root.appendingPathComponent("README.md"), encoding: .utf8)
-        for linked in ["CONTRIBUTING.md", "SECURITY.md", "SUPPORT.md", "CODE_OF_CONDUCT.md"]
+        for linked in ["CONTRIBUTING.md", "SECURITY.md", "SUPPORT.md", "CODE_OF_CONDUCT.md", "NOTICE"]
             where !readme.contains(linked)
         {
             missing.append("README.md does not link \(linked)")
@@ -661,6 +663,61 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck upstream version pins match container contracts: ok")
+    }
+
+    /// OSS-18: NOTICE is generated from Package.swift and must match the committed file.
+    static func checkNotice(root: URL, manifest: String) throws {
+        let expected = generatedNotice(from: manifest)
+        let observed = try String(contentsOf: root.appendingPathComponent("NOTICE"), encoding: .utf8)
+        guard observed == expected else {
+            FileHandle.standardError.write(
+                Data("NOTICE is stale; regenerate from Package.swift:\n\(expected)".utf8)
+            )
+            exit(1)
+        }
+        let harness = try String(
+            contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
+            encoding: .utf8
+        )
+        if !harness.contains("acknowledgements-body") || !harness.contains("forResource: \"NOTICE\"") {
+            FileHandle.standardError.write(
+                Data("in-app Acknowledgements must load NOTICE from the app bundle\n".utf8)
+            )
+            exit(1)
+        }
+        let companion = try String(
+            contentsOf: root.appendingPathComponent("Apps/Companion-macOS/CompanionApp.swift"),
+            encoding: .utf8
+        )
+        if !companion.contains("acknowledgements-body") || !companion.contains("forResource: \"NOTICE\"") {
+            FileHandle.standardError.write(
+                Data("Mac companion Acknowledgements must load NOTICE from the app bundle\n".utf8)
+            )
+            exit(1)
+        }
+        print("policycheck NOTICE matches Package.swift: ok")
+    }
+
+    static func generatedNotice(from manifest: String) -> String {
+        var libraries: [String] = []
+        if manifest.contains("name: \"CSQLite\"") {
+            libraries.append("- sqlite3 (CSQLite)")
+        }
+        if manifest.contains("name: \"CZlib\"") {
+            libraries.append("- zlib (CZlib)")
+        }
+        return """
+        Open Health Exporter
+        Copyright (c) 2026 Colin Edward Wood and contributors
+
+        Licensed under AGPL-3.0-or-later with the additional permission in COPYING.
+
+        This binary contains no third-party Swift packages.
+
+        System libraries declared in Package.swift:
+        \(libraries.joined(separator: "\n"))
+
+        """
     }
 
     static func checkSponsorGating(root: URL) throws {

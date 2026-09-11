@@ -290,7 +290,7 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(line.label.contains("overdue"), line.label)
     }
 
-    func testDestinationSectionExposesTheEmptyStateAndRefreshControl() {
+    func testDestinationSectionExposesTheEmptyStateAndRefreshControl() throws {
         enterControls()
         let title = scrollToHittable(app.staticTexts["destination-title"])
         XCTAssertEqual(title.label, "Where your data goes")
@@ -301,6 +301,18 @@ final class ExporterUITests: XCTestCase {
         )
         XCTAssertFalse(app.otherElements["destination-change-banner"].exists)
         XCTAssertFalse(app.staticTexts["destination-change-banner"].exists)
+        try performAccessibilityAudit()
+    }
+
+    func testAcknowledgementsRenderTheGeneratedNotice() {
+        enterControls()
+        let body = scrollToHittable(app.staticTexts["acknowledgements-body"])
+        XCTAssertTrue(
+            body.label.contains("no third-party Swift packages"),
+            body.label
+        )
+        XCTAssertTrue(body.label.contains("sqlite3"), body.label)
+        XCTAssertTrue(body.label.contains("zlib"), body.label)
     }
 
     private func enterControls() {

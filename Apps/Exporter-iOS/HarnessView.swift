@@ -95,6 +95,15 @@ struct HarnessView: View {
     private var displayUnitPolicy: UnitDisplayPolicy {
         displayUnitPreference.policy(locale: Locale.current)
     }
+
+    private var acknowledgementsText: String {
+        guard let url = Bundle.main.url(forResource: "NOTICE", withExtension: nil),
+              let text = try? String(contentsOf: url, encoding: .utf8)
+        else {
+            return "NOTICE is missing from this build."
+        }
+        return text
+    }
     @AppStorage("ohe.advisoryEnabled")
     private var advisoryEnabled = true
     @State private var advisoryBanner: String?
@@ -415,6 +424,7 @@ struct HarnessView: View {
             TextField("Type local-file to confirm demo export", text: $demoConfirmName)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
+                .frame(minHeight: 44)
                 .accessibilityIdentifier("demo-confirm")
             Button("Export demo dataset (every catalogue metric)") {
                 Task { await runDemoExport() }
@@ -436,6 +446,7 @@ struct HarnessView: View {
             Text("This is the sole built-in host. The app never sends Health data there. Fetch happens only on a visible foreground launch, never during export.")
                 .font(.footnote)
             Toggle("Fetch security advisories", isOn: $advisoryEnabled)
+                .frame(minHeight: 44)
             if let advisoryBanner {
                 Text(advisoryBanner)
                     .font(.footnote)
@@ -485,12 +496,15 @@ struct HarnessView: View {
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .keyboardType(.URL)
+                .frame(minHeight: 44)
                 .accessibilityIdentifier("https-url")
             SecureField("Bearer token (optional)", text: $httpsBearer)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
+                .frame(minHeight: 44)
                 .accessibilityIdentifier("https-bearer")
             Toggle("Allow plain HTTP (unsafe)", isOn: $allowInsecureHTTP)
+                .frame(minHeight: 44)
                 .accessibilityIdentifier("https-insecure")
             if allowInsecureHTTP {
                 Text("Plain HTTP exposes health exports to anyone able to observe this network.")
@@ -517,14 +531,17 @@ struct HarnessView: View {
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .keyboardType(.URL)
+                .frame(minHeight: 44)
                 .accessibilityIdentifier("mqtt-url")
             TextField("MQTT client ID", text: $mqttClientID)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
+                .frame(minHeight: 44)
                 .accessibilityIdentifier("mqtt-client-id")
             TextField("MQTT topic template", text: $mqttTopic)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
+                .frame(minHeight: 44)
                 .accessibilityIdentifier("mqtt-topic")
             Text("Use {{exporterId|raw}} and {{batchId|raw}} if the broker needs a templated topic.")
                 .font(.footnote)
@@ -533,6 +550,7 @@ struct HarnessView: View {
                 Text("At most once (0)").tag(UInt8(0))
                 Text("At least once (1)").tag(UInt8(1))
             }
+            .frame(minHeight: 44)
             .accessibilityIdentifier("mqtt-qos")
             Button("Choose MQTT client PKCS#12") {
                 pickingMQTTPKCS12 = true
@@ -543,6 +561,7 @@ struct HarnessView: View {
                 .accessibilityIdentifier("mqtt-pkcs12-name")
             SecureField("PKCS#12 password", text: $mqttPKCS12Password)
                 .textContentType(.password)
+                .frame(minHeight: 44)
                 .accessibilityIdentifier("mqtt-pkcs12-password")
             if mqttPKCS12Data != nil {
                 Button("Clear client certificate") {
@@ -555,11 +574,14 @@ struct HarnessView: View {
             TextField("MQTT username", text: $mqttUsername)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
+                .frame(minHeight: 44)
                 .accessibilityIdentifier("mqtt-username")
             SecureField("MQTT password", text: $mqttPassword)
                 .textContentType(.password)
+                .frame(minHeight: 44)
                 .accessibilityIdentifier("mqtt-password")
             Toggle("Allow plain MQTT (unsafe)", isOn: $allowInsecureMQTT)
+                .frame(minHeight: 44)
                 .accessibilityIdentifier("mqtt-insecure")
             if allowInsecureMQTT {
                 Text("Plain MQTT exposes health exports to anyone able to observe this network.")
@@ -616,6 +638,13 @@ struct HarnessView: View {
                     .font(.system(.footnote, design: .monospaced))
                     .textSelection(.enabled)
             }
+            Text("Acknowledgements")
+                .font(.headline)
+                .accessibilityIdentifier("acknowledgements-title")
+            Text(acknowledgementsText)
+                .font(.footnote)
+                .textSelection(.enabled)
+                .accessibilityIdentifier("acknowledgements-body")
             Button("Show export history (problems first)") {
                 Task { await loadHistory() }
             }
@@ -662,12 +691,14 @@ struct HarnessView: View {
                 value: $diagnosticMinimumRuns,
                 in: 1 ... 100
             )
+            .frame(minHeight: 44)
             .accessibilityIdentifier("diagnostic-minimum-runs")
             Stepper(
                 "Include runs from \(diagnosticWindowHours) hours",
                 value: $diagnosticWindowHours,
                 in: 1 ... 168
             )
+            .frame(minHeight: 44)
             .accessibilityIdentifier("diagnostic-window-hours")
             Button("Build diagnostic bundle") {
                 buildDiagnostic()
@@ -736,6 +767,8 @@ struct HarnessView: View {
             }
             .disabled(phase == .working)
         }
+        .buttonStyle(HarnessButtonStyle())
+        .controlSize(.large)
     }
 
     private func buildDiagnostic() {
@@ -1601,5 +1634,14 @@ struct HarnessView: View {
         } catch {
             status = "Background Health delivery registration failed: \(error.localizedDescription)"
         }
+    }
+}
+
+private struct HarnessButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+            .opacity(configuration.isPressed ? 0.7 : 1)
     }
 }

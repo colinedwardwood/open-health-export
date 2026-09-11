@@ -67,9 +67,24 @@ struct CompanionView: View {
             .disabled(listening)
             Text("Source offer: this receiver is AGPL-3.0. If you run it for someone else, you must offer them the source.")
                 .font(.footnote)
+            Text("Acknowledgements")
+                .font(.headline)
+            Text(acknowledgementsText)
+                .font(.footnote)
+                .textSelection(.enabled)
+                .accessibilityIdentifier("acknowledgements-body")
         }
         .padding()
         .frame(minWidth: 480, minHeight: 320)
+    }
+
+    private var acknowledgementsText: String {
+        guard let url = Bundle.main.url(forResource: "NOTICE", withExtension: nil),
+              let text = try? String(contentsOf: url, encoding: .utf8)
+        else {
+            return "NOTICE is missing from this build."
+        }
+        return text
     }
 
     private func pickFolder() {

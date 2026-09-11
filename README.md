@@ -12,7 +12,9 @@ Do not hide this app to watch someone else's health data.
 ## Licence
 
 AGPL-3.0 with an additional permission under §7 for App Store distribution. See `LICENSE`
-and `COPYING`. Contributions require DCO sign-off (`git commit -s`).
+and `COPYING`. Third-party and system-library attribution is generated into `NOTICE` and
+shown in the in-app Acknowledgements screen. Contributions require DCO sign-off
+(`git commit -s`).
 
 ## Build
 

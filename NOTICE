@@ -1,0 +1,10 @@
+Open Health Exporter
+Copyright (c) 2026 Colin Edward Wood and contributors
+
+Licensed under AGPL-3.0-or-later with the additional permission in COPYING.
+
+This binary contains no third-party Swift packages.
+
+System libraries declared in Package.swift:
+- sqlite3 (CSQLite)
+- zlib (CZlib)
