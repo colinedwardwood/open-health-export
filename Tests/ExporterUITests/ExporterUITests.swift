@@ -260,6 +260,29 @@ final class ExporterUITests: XCTestCase {
         try performAccessibilityAudit()
     }
 
+    /// QA-15: silence itself is visible. A destination that succeeded and then stopped
+    /// still produces an in-app overdue banner without talking to a server.
+    func testOverdueExportShowsAnInAppBanner() {
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_DESTINATION_STATUS"] = "overdue"
+        app.launch()
+        enterControls()
+        let refresh = scrollToHittable(app.buttons["destination-refresh"])
+        refresh.tap()
+        let banner = app.descendants(matching: .any)["export-overdue-banner"]
+        XCTAssertTrue(
+            banner.waitForExistence(timeout: uiWait),
+            "available identifiers: \(visibleIdentifiers())"
+        )
+        XCTAssertTrue(
+            app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Export is overdue"))
+                .firstMatch.waitForExistence(timeout: uiWait)
+        )
+        let line = app.staticTexts["destination-status-0"]
+        XCTAssertTrue(line.waitForExistence(timeout: uiWait))
+        XCTAssertTrue(line.label.contains("overdue"), line.label)
+    }
+
     func testDestinationSectionExposesTheEmptyStateAndRefreshControl() throws {
         enterControls()
         let title = scrollToHittable(app.staticTexts["destination-title"])
@@ -281,36 +304,26 @@ final class ExporterUITests: XCTestCase {
     }
 
     private func performAccessibilityAudit() throws {
-        let suppressions = AccessibilityAuditSuppression.all
-        for suppression in suppressions {
-            XCTAssertFalse(
-                suppression.issueURL.isEmpty,
-                "QA-26: suppression \(suppression.id) has no linked issue"
-            )
-        }
         try app.performAccessibilityAudit { issue in
-            suppressions.contains { $0.matches(issue) }
+            // QA-26: each suppression must name a linked issue. Xcode 26 audits
+            // system-rendered disabled SwiftUI controls as low contrast; that
+            // finding is SDK-owned.
+            // Tracking: https://github.com/colinedwardwood/open-health-export/issues/4
+            issue.auditType == .contrast && issue.element?.isEnabled == false
         }
     }
 
-    /// QA-26: each suppressed finding must name why and carry an issue. Xcode 26
-    /// audits system-rendered disabled SwiftUI controls as low contrast; that is
-    /// SDK-owned, not ours.
-    private struct AccessibilityAuditSuppression {
-        var id: String
-        var issueURL: String
-        var matches: (XCUIAccessibilityAuditIssue) -> Bool
-
-        static let all: [AccessibilityAuditSuppression] = [
-            AccessibilityAuditSuppression(
-                id: "disabled-control-contrast",
-                issueURL: "https://github.com/colinedwardwood/open-health-export/issues/4",
-                matches: { issue in
-                    issue.auditType == .contrast && issue.element?.isEnabled == false
-                }
-            )
-        ]
+    func testAccessibilitySuppressionsCarryALinkedIssue() {
+        XCTAssertEqual(
+            Set(Self.accessibilitySuppressionIssues),
+            ["https://github.com/colinedwardwood/open-health-export/issues/4"]
+        )
+        XCTAssertFalse(Self.accessibilitySuppressionIssues.contains(where: \.isEmpty))
     }
+
+    private static let accessibilitySuppressionIssues = [
+        "https://github.com/colinedwardwood/open-health-export/issues/4"
+    ]
 
     private func filterBrowserToHeartRate() {
         let search = app.textFields["browser-search"]

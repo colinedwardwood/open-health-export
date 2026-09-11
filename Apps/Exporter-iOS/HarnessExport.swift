@@ -863,6 +863,18 @@ enum HarnessExport {
         return DestinationChangeBanner.detail(snapshots)
     }
 
+    /// QA-15 / R-23: the in-app rung. Staleness is computed at read time, so a destination
+    /// that succeeded once and then went quiet still surfaces without a server.
+    static func overdueBannerDetail() -> String? {
+        let now = Date().timeIntervalSince1970
+        let overdue = StatusSnapshotLocation.readAll().filter {
+            $0.state(at: now) == .overdue
+        }
+        guard !overdue.isEmpty else { return nil }
+        let names = overdue.map(\.destinationLabel).joined(separator: ", ")
+        return "\(names). \(EscalationCopy.overdue)"
+    }
+
     static func anchorHolds() async throws -> [AnchorHold] {
         let root = try applicationSupportRoot()
         let store = try SQLiteStateStore(
@@ -922,6 +934,17 @@ enum HarnessExport {
                 enabled: true,
                 lastOutcome: "success",
                 lastSuccessEpoch: now - (3 * day),
+                staleThresholdSeconds: day,
+                overdueThresholdSeconds: 7 * day,
+                writtenAtEpoch: now
+            )
+        case "overdue":
+            snapshot = DestinationStatusSnapshot(
+                destinationID: "home-assistant",
+                destinationLabel: "Home Assistant",
+                enabled: true,
+                lastOutcome: "success",
+                lastSuccessEpoch: now - (8 * day),
                 staleThresholdSeconds: day,
                 overdueThresholdSeconds: 7 * day,
                 writtenAtEpoch: now

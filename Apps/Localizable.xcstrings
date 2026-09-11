@@ -541,6 +541,17 @@
         }
       }
     },
+    "Export overdue": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export overdue"
+          }
+        }
+      }
+    },
     "Export status": {
       "extractionState": "manual",
       "localizations": {

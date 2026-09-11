@@ -100,6 +100,7 @@ struct HarnessView: View {
     @State private var advisoryBanner: String?
     @State private var advisoryItems: [AdvisoryItem] = []
     @State private var destinationChangeBanner: String?
+    @State private var overdueBanner: String?
     @State private var anchorHolds: [AnchorHold] = []
     @State private var confirmationCard: DestinationConfirmationCard?
     @State private var confirmationKind: PendingConfirmationKind?
@@ -140,6 +141,20 @@ struct HarnessView: View {
             .navigationTitle("M0 harness")
         }
         .tint(.primary)
+        .safeAreaInset(edge: .top) {
+            if let overdueBanner {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Export overdue")
+                        .font(.headline)
+                    Text(overdueBanner)
+                        .font(.footnote)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(.yellow)
+                .accessibilityIdentifier("export-overdue-banner")
+            }
+        }
         .safeAreaInset(edge: .top) {
             if let destinationChangeBanner {
                 VStack(alignment: .leading, spacing: 4) {
@@ -1377,6 +1392,7 @@ struct HarnessView: View {
     private func refreshDestinationSurfaces() {
         destinationStatusLines = HarnessExport.destinationStatusLines()
         destinationChangeBanner = HarnessExport.destinationChangeBannerDetail()
+        overdueBanner = HarnessExport.overdueBannerDetail()
     }
 
     @ViewBuilder
