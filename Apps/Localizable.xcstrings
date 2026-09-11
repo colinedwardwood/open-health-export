@@ -508,6 +508,17 @@
         }
       }
     },
+    "Export one page": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export one page"
+          }
+        }
+      }
+    },
     "Export one page (HTTPS destination)": {
       "extractionState": "manual",
       "localizations": {
@@ -1274,6 +1285,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Share diagnostic"
+          }
+        }
+      }
+    },
+    "Shortcuts can run one page to the local archive after you enable it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shortcuts can run one page to the local archive after you enable it."
           }
         }
       }

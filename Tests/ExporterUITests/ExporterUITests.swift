@@ -38,6 +38,10 @@ final class ExporterUITests: XCTestCase {
             "This is not a medical device. It does not diagnose or treat anything."
         )
         XCTAssertTrue(app.buttons["history-load"].exists)
+        XCTAssertEqual(
+            app.staticTexts["shortcut-export"].label,
+            "Shortcuts can run one page to the local archive after you enable it."
+        )
     }
 
     func testDisclosureAndMainControlsPassAccessibilityAudit() throws {

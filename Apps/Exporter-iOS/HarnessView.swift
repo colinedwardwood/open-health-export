@@ -357,6 +357,10 @@ struct HarnessView: View {
             }
             .disabled(phase == .working)
             .accessibilityHint("Writes NDJSON under Application Support using the engine and local-file sink.")
+            Text("Shortcuts can run one page to the local archive after you enable it.")
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("shortcut-export")
             Text("Backfill runs newest-first and resumes from an inspectable checkpoint. On iOS 26 or later it continues unattended after you leave the app. On iOS 18 through 25, keep this screen open; the app prevents idle sleep while it works.")
                 .font(.footnote)
                 .fixedSize(horizontal: false, vertical: true)

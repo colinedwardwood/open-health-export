@@ -86,6 +86,48 @@ struct LastSuccessfulExportIntent: AppIntent {
     }
 }
 
+enum ShortcutExportError: Error, LocalizedError {
+    case disclosureRequired
+    case destinationDisabled
+
+    var errorDescription: String? {
+        switch self {
+        case .disclosureRequired:
+            ShortcutExportAuthorization.denyReason(
+                disclosureAcknowledged: false,
+                localFileEnabled: true
+            )
+        case .destinationDisabled:
+            ShortcutExportAuthorization.denyReason(
+                disclosureAcknowledged: true,
+                localFileEnabled: false
+            )
+        }
+    }
+}
+
+struct ExportOnePageIntent: AppIntent {
+    static let title: LocalizedStringResource = "Export one page"
+    static let description = IntentDescription(
+        "Runs one anchored page per selected type to the enabled local archive. Outcomes are kinds, not health values."
+    )
+    static let openAppWhenRun = false
+
+    func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        if let reason = ShortcutExportAuthorization.denyReason(
+            disclosureAcknowledged: UserDefaults.standard.bool(forKey: "ohe.disclosureAcknowledged"),
+            localFileEnabled: HarnessExport.isLocalFileEnabled()
+        ) {
+            if reason.contains("disclosure") {
+                throw ShortcutExportError.disclosureRequired
+            }
+            throw ShortcutExportError.destinationDisabled
+        }
+        let lines = try await HarnessExport.runOnePageEachMetric(trigger: .shortcut)
+        return .result(value: lines.joined(separator: "\n"))
+    }
+}
+
 struct ExporterShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
@@ -96,6 +138,15 @@ struct ExporterShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Last export status",
             systemImageName: "heart.text.clipboard"
+        )
+        AppShortcut(
+            intent: ExportOnePageIntent(),
+            phrases: [
+                "Export one page with \(.applicationName)",
+                "Run a local export with \(.applicationName)",
+            ],
+            shortTitle: "Export one page",
+            systemImageName: "square.and.arrow.up"
         )
     }
 }

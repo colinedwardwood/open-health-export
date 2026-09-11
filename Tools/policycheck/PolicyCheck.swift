@@ -78,6 +78,21 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck iOS XCUITest target is wired: ok")
+        let shortcutIntent = try String(
+            contentsOf: root.appendingPathComponent(
+                "Apps/Exporter-iOS/LastSuccessfulExportIntent.swift"
+            ),
+            encoding: .utf8
+        )
+        if !shortcutIntent.contains("struct ExportOnePageIntent")
+            || !shortcutIntent.contains("trigger: .shortcut")
+        {
+            FileHandle.standardError.write(
+                Data("R-68 export App Intent must run with RunTrigger.shortcut\n".utf8)
+            )
+            exit(1)
+        }
+        print("policycheck shortcut export intent uses RunTrigger.shortcut: ok")
 
         // QA-21: Swift Testing owns unit and integration tests. XCTest stays for UI
         // automation (and, if they appear, XCTMetric / ObjC exception targets).

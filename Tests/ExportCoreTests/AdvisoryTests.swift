@@ -247,6 +247,28 @@ private actor ToggleDestinationSink: DestinationSink {
     #expect(measured.contains("The overdue alarm uses 8"))
 }
 
+@Test func shortcutExportRequiresDisclosureAndEnabledLocalArchive() {
+    #expect(
+        ShortcutExportAuthorization.denyReason(
+            disclosureAcknowledged: false,
+            localFileEnabled: false
+        )?.contains("disclosure") == true
+    )
+    #expect(
+        ShortcutExportAuthorization.denyReason(
+            disclosureAcknowledged: true,
+            localFileEnabled: false
+        )?.contains("local archive") == true
+    )
+    #expect(
+        ShortcutExportAuthorization.denyReason(
+            disclosureAcknowledged: true,
+            localFileEnabled: true
+        ) == nil
+    )
+    #expect(RunTrigger.shortcut.rawValue == "shortcut")
+}
+
 @Test func overdueNotificationScheduleUsesLastSuccessAndNeverInventsAThreshold() {
     var snapshot = DestinationStatusSnapshot(
         destinationID: "local-file",
