@@ -1,0 +1,7 @@
+{
+  "synthetic": true,
+  "licence": "CC0-1.0",
+  "generator": "open-health-exporter",
+  "generatorVersion": 1,
+  "role": "G3/G4 receiver forward-compatibility sequence"
+}

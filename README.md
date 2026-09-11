@@ -76,7 +76,8 @@ and a dry-run canary **before** Health data can move. An unacknowledged destinat
 keeps a non-dismissible in-app banner until you acknowledge it.
 HTTPS POSTs that file with `Idempotency-Key` and `Content-Type: application/x-ndjson; profile="ohe.wire/1"`.
 A local-file destination also writes JSON, CSV, and Health Auto Export sidecars next to the
-NDJSON. Those sidecars are convenience views of the same batch, not a second source of truth.
+NDJSON. Native `ohe.wire/1` is the archive. The HAE sidecar is a compatibility export —
+correctness claims do not apply — and never arms freshness, overdue, or monitoring surfaces.
 
 Deletion tombstones are **best-effort** because HealthKit provides no deletion
 callback and iOS may not wake the app when a deletion occurs. A later

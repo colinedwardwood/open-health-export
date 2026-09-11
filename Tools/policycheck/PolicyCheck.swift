@@ -1001,6 +1001,8 @@ struct PolicyCheck {
             exit(1)
         }
 
+        try checkFixtureProvenance(fixtures: spec.appendingPathComponent("fixtures"))
+
         let receiverInput = try String(
             contentsOf: spec.appendingPathComponent("fixtures/receiver-sequence.ndjson"),
             encoding: .utf8
@@ -1116,6 +1118,58 @@ struct PolicyCheck {
         try checkG1Fixtures(spec: spec)
         try checkFaultSeamsAbsentOutsideDebug(root: root)
         print("policycheck schema, corpus, receiver, freeze, G1, and R-83 source gate: ok")
+    }
+
+    /// QA-09: every committed NDJSON fixture is synthetic. Frozen encoder outputs cannot
+    /// grow a batch.header field without breaking G1, so those files carry a sibling
+    /// provenance document instead.
+    static func checkFixtureProvenance(fixtures: URL) throws {
+        var missing: [String] = []
+        guard let files = FileManager.default.enumerator(
+            at: fixtures,
+            includingPropertiesForKeys: nil
+        ) else {
+            FileHandle.standardError.write(Data("spec fixtures directory missing\n".utf8))
+            exit(1)
+        }
+        for case let file as URL in files where file.pathExtension == "ndjson" {
+            if hasInlineSyntheticHeader(file) { continue }
+            let sibling = file.deletingPathExtension().appendingPathExtension("provenance.json")
+            guard let data = try? Data(contentsOf: sibling),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  json["synthetic"] as? Bool == true,
+                  (json["licence"] as? String)?.uppercased().contains("CC0") == true,
+                  json["role"] as? String != nil || json["seed"] != nil
+            else {
+                missing.append(
+                    file.path.replacingOccurrences(of: fixtures.path + "/", with: "")
+                )
+                continue
+            }
+        }
+        if !missing.isEmpty {
+            FileHandle.standardError.write(
+                Data(
+                    (
+                        "QA-09 fixture provenance missing for:\n"
+                            + missing.joined(separator: "\n")
+                            + "\n"
+                    ).utf8
+                )
+            )
+            exit(1)
+        }
+        print("policycheck fixture provenance headers: ok")
+    }
+
+    static func hasInlineSyntheticHeader(_ file: URL) -> Bool {
+        guard let text = try? String(contentsOf: file, encoding: .utf8),
+              let first = text.split(whereSeparator: \.isNewline).first,
+              let json = try? JSONSerialization.jsonObject(with: Data(first.utf8)) as? [String: Any]
+        else {
+            return false
+        }
+        return json["synthetic"] as? Bool == true
     }
 
     static func checkG1Fixtures(spec: URL) throws {

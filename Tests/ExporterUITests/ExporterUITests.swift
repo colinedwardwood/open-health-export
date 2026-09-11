@@ -324,6 +324,11 @@ final class ExporterUITests: XCTestCase {
             app.staticTexts["destination-empty"].label,
             "No destination snapshots yet."
         )
+        let hae = scrollToHittable(app.staticTexts["hae-compatibility-label"])
+        XCTAssertEqual(
+            hae.label,
+            "compatibility export — correctness claims do not apply"
+        )
         XCTAssertFalse(app.otherElements["destination-change-banner"].exists)
         XCTAssertFalse(app.staticTexts["destination-change-banner"].exists)
         try performAccessibilityAudit()

@@ -498,6 +498,10 @@ struct HarnessView: View {
             }
             .disabled(phase == .working)
             .accessibilityHint("Writes a canary file, reads it back, then enables the local-file destination.")
+            Text(ExportProfile.haeCompatibility.label)
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("hae-compatibility-label")
             TextField("HTTPS destination URL", text: $httpsURL)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
