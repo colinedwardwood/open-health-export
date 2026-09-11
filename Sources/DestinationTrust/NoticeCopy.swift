@@ -12,65 +12,79 @@ public struct LocalizedNotice: Sendable, Equatable {
 }
 
 public enum NoticeCopy {
+    /// SEC-27: a notification body is Lock Screen content, so it may not read out a
+    /// destination hostname. Labels are names a person chose ("Home Assistant",
+    /// "Archive folder"); an identifier that is really an address is replaced rather
+    /// than shown. Erring towards the generic term is the safe direction — the worst
+    /// case is a vaguer notification, not an address on a locked screen.
+    static func safeLabel(_ destination: String) -> String {
+        let addressLike = destination.contains("://")
+            || destination.contains(":")
+            || destination.contains("/")
+            || destination.contains(".")
+        return addressLike ? "A destination" : destination
+    }
+
     public static func render(_ notice: UserNotice) -> LocalizedNotice {
+        let label = safeLabel(notice.destination)
         switch notice.kind {
         case .destinationVerified:
             return LocalizedNotice(
                 title: "Destination verified",
-                body: "\(notice.destination) accepted the test payload. It is not enabled yet."
+                body: "\(label) accepted the test payload. It is not enabled yet."
             )
         case .destinationPinned:
             if let fingerprint = notice.fingerprint {
                 return LocalizedNotice(
                     title: "Destination pinned",
-                    body: "\(notice.destination) is pinned to \(fingerprint). A later change will halt export."
+                    body: "\(label) is pinned to \(fingerprint). A later change will halt export."
                 )
             }
             return LocalizedNotice(
                 title: "Destination pinned",
-                body: "\(notice.destination) is pinned without TLS. Use this only on a network you control."
+                body: "\(label) is pinned without TLS. Use this only on a network you control."
             )
         case .destinationRepointed:
             let previous = notice.previousFingerprint ?? "the previous pin"
             let observed = notice.fingerprint ?? "a different identity"
             return LocalizedNotice(
                 title: "Destination halted",
-                body: "\(notice.destination) presented \(observed) instead of \(previous). Export is halted until you re-verify."
+                body: "\(label) presented \(observed) instead of \(previous). Export is halted until you re-verify."
             )
         case .destinationEnabled:
             return LocalizedNotice(
                 title: "Destination enabled",
-                body: "\(notice.destination) can receive exports."
+                body: "\(label) can receive exports."
             )
         case .destinationTrustLost:
             return LocalizedNotice(
                 title: "Destination unpaired",
-                body: "\(notice.destination) is no longer trusted. Export is halted."
+                body: "\(label) is no longer trusted. Export is halted."
             )
         case .anchorInvalidated:
             return LocalizedNotice(
                 title: "Export paused for some data",
-                body: "The export lost its place in some of your Health data. Nothing more is being sent to \(notice.destination) for it until you choose whether to send that history again."
+                body: "The export lost its place in some of your Health data. Nothing more is being sent to \(label) for it until you choose whether to send that history again."
             )
         case .queueEvicted:
             return LocalizedNotice(
                 title: "Queued export data removed",
-                body: "\(notice.destination) reached its storage limit. Open Data gaps to re-export the affected date range."
+                body: "\(label) reached its storage limit. Open Data gaps to re-export the affected date range."
             )
         case .queueExpired:
             return LocalizedNotice(
                 title: "Queued exports expired",
-                body: "\(notice.destination) had queued data older than seven days. It was deleted instead of being sent late."
+                body: "\(label) had queued data older than seven days. It was deleted instead of being sent late."
             )
         case .exportOverdue:
             return LocalizedNotice(
                 title: "Export overdue",
-                body: "\(notice.destination) has not completed a successful export within the freshness window."
+                body: "\(label) has not completed a successful export within the freshness window."
             )
         case .healthAccessRevoked:
             return LocalizedNotice(
                 title: "Health access changed",
-                body: "\(notice.destination) was disabled and its queued payloads were deleted after the app observed that Health access was revoked."
+                body: "\(label) was disabled and its queued payloads were deleted after the app observed that Health access was revoked."
             )
         }
     }

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import CoreDomain
+import DestinationTrust
 import DiagnosticBundle
 import EnginePorts
 import Foundation
@@ -12,6 +13,63 @@ import WireFormat
 
 @Test func redactionSinkRegistryMatchesTheCommittedCanaryList() {
     #expect(RedactionSink.allCases.map(\.rawValue).sorted() == CanarySinkRegistry.expected)
+}
+
+/// SEC-27: a notification is Lock Screen content, so it carries an outcome and nothing
+/// else — no health value, no type name, no destination address. Enumerating `Kind`
+/// means a notice added later cannot ship unchecked, and feeding the renderer addresses
+/// it should never print proves the copy cannot be talked into leaking one.
+@Test func notificationBodiesNameNoAddressAndNoHealthType() {
+    let addresses = [
+        "ha.example.com",
+        "https://ha.example.com:8123",
+        "192.168.1.50",
+        "fe80::1",
+        "homeassistant.local:1883",
+        "/var/mobile/Containers/archive",
+    ]
+    for kind in UserNotice.Kind.allCases {
+        for address in addresses {
+            let rendered = NoticeCopy.render(
+                UserNotice(
+                    kind: kind,
+                    destination: address,
+                    fingerprint: "AA:BB:CC",
+                    previousFingerprint: "DD:EE:FF"
+                )
+            )
+            let text = rendered.title + " " + rendered.body
+            #expect(!text.contains(address), "\(kind) printed \(address): \(text)")
+            // Fragments matter too: a split address is still an address.
+            for fragment in ["example.com", "192.168", "fe80", "homeassistant", "/var/"] {
+                #expect(!text.contains(fragment), "\(kind) printed \(fragment): \(text)")
+            }
+        }
+
+        let labelled = NoticeCopy.render(
+            UserNotice(kind: kind, destination: "Home Assistant", fingerprint: "AA:BB")
+        )
+        let text = labelled.title + " " + labelled.body
+        #expect(!labelled.title.isEmpty)
+        #expect(!labelled.body.isEmpty)
+        // A notice may say an export paused; it may not say which type paused.
+        for declaration in MetricCatalog.selectable {
+            #expect(!text.contains(declaration.wireId), "\(kind) named \(declaration.wireId)")
+            #expect(
+                !text.contains(declaration.hkIdentifier),
+                "\(kind) named \(declaration.hkIdentifier)"
+            )
+        }
+    }
+}
+
+/// SEC-27 again, from the other side: a label a person chose still reads back, or the
+/// notification stops being useful.
+@Test func notificationBodiesKeepAPlainDestinationLabel() {
+    let rendered = NoticeCopy.render(
+        UserNotice(kind: .destinationEnabled, destination: "Archive folder")
+    )
+    #expect(rendered.body.contains("Archive folder"))
 }
 
 @Test func diagnosticBundleCanaryStaysGreen() throws {

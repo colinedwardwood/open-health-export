@@ -1827,6 +1827,17 @@
           }
         }
       }
+    },
+    "I understand — show sharing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I understand — show sharing"
+          }
+        }
+      }
     }
   }
 }

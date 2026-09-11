@@ -21,6 +21,9 @@ final class ExporterUITests: XCTestCase {
             "-ohe.advisoryEnabled", "false",
             "-ohe.browserDemoMode", "true",
             "-ohe.browserOnlyWithData", "true",
+            // SEC-45's warning is one-time and gates the share control. Cases that are
+            // about something else start past it; the SEC-45 case turns it back on.
+            "-ohe.shareProtectionAcknowledged", "true",
         ]
         app.launch()
     }
@@ -199,6 +202,88 @@ final class ExporterUITests: XCTestCase {
             "share never appeared after traversing to the bundle's end"
         )
         XCTAssertGreaterThan(share.frame.minY, end.frame.minY)
+    }
+
+    /// SEC-64: the keychain is device-only, so the cost of that shows up before the
+    /// user types a secret, not after a restore has already lost it.
+    func testCredentialDisclosurePrecedesEveryCredentialField() {
+        enterControls()
+        for (disclosure, field) in [
+            ("credential-disclosure-https", "https-bearer"),
+            ("credential-disclosure-mqtt", "mqtt-password"),
+        ] {
+            let copy = scrollToHittable(app.staticTexts[disclosure])
+            XCTAssertTrue(
+                copy.waitForExistence(timeout: uiWait),
+                "no \(disclosure); available: \(visibleIdentifiers())"
+            )
+            XCTAssertTrue(copy.label.contains("never synced to iCloud"), copy.label)
+            XCTAssertTrue(copy.label.contains("enter them again"), copy.label)
+
+            let secure = app.secureTextFields[field]
+            XCTAssertTrue(secure.waitForExistence(timeout: uiWait), field)
+            // "Precedes" is a layout claim, so it is asserted as one.
+            XCTAssertLessThan(copy.frame.minY, secure.frame.minY, "\(disclosure) sits below \(field)")
+        }
+    }
+
+    /// SEC-45: sharing ends our protection over those bytes, so consent is a tap on the
+    /// warning rather than an inference from a tap on the share button.
+    func testShareWarningIsShownOnceAndGatesTheShareControl() {
+        app.terminate()
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "false",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.browserDemoMode", "true",
+            "-ohe.browserOnlyWithData", "true",
+        ]
+        // Cleared rather than overridden, so the app's own write is what dismisses it.
+        app.launchEnvironment["OHE_SEED_SHARE_ACK"] = "clear"
+        app.launch()
+        enterControls()
+        scrollToHittable(app.buttons["diagnostic-build"]).tap()
+
+        // R-26 still decides where this lives: nothing about sharing is reachable until
+        // the bundle's last line has been traversed.
+        let end = app.staticTexts["diagnostic-end"]
+        XCTAssertTrue(end.waitForExistence(timeout: uiWait))
+        scrollToHittable(end)
+        let warning = app.staticTexts["share-protection-warning"]
+        for _ in 0 ..< 10 where !warning.exists {
+            app.swipeUp()
+            _ = warning.waitForExistence(timeout: 2)
+        }
+        XCTAssertTrue(warning.waitForExistence(timeout: uiWait), "no SEC-45 warning after traversal")
+        XCTAssertTrue(warning.label.contains("protection no longer applies"), warning.label)
+        XCTAssertFalse(app.buttons["diagnostic-share"].exists, "share was reachable before the warning")
+
+        scrollToHittable(app.buttons["share-protection-continue"]).tap()
+        // Acknowledging replaces three lines of warning with one control, so the share
+        // button lands below the fold and has to be traversed to like anything else.
+        let revealed = app.buttons["diagnostic-share"]
+        for _ in 0 ..< 10 where !revealed.exists {
+            app.swipeUp()
+            _ = revealed.waitForExistence(timeout: 2)
+        }
+        XCTAssertTrue(revealed.waitForExistence(timeout: uiWait), "share never appeared after acknowledgement")
+        XCTAssertFalse(app.staticTexts["share-protection-warning"].exists)
+
+        // One-time: acknowledging survives a relaunch, or it is not a warning, it is a
+        // nag, and people learn to tap through it.
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_SHARE_ACK"] = "keep"
+        app.launch()
+        enterControls()
+        scrollToHittable(app.buttons["diagnostic-build"]).tap()
+        XCTAssertTrue(app.staticTexts["diagnostic-end"].waitForExistence(timeout: uiWait))
+        scrollToHittable(app.staticTexts["diagnostic-end"])
+        let share = app.buttons["diagnostic-share"]
+        for _ in 0 ..< 10 where !share.exists {
+            app.swipeUp()
+            _ = share.waitForExistence(timeout: 2)
+        }
+        XCTAssertTrue(share.waitForExistence(timeout: uiWait), "warning came back after acknowledgement")
+        XCTAssertFalse(app.staticTexts["share-protection-warning"].exists)
     }
 
     func testExplicitTypeStopRequiresTwoTaps() {

@@ -94,6 +94,9 @@ struct HarnessView: View {
     @State private var foregroundCatchUpStarted = false
     @AppStorage("ohe.browserOnlyWithData")
     private var browserOnlyWithData = true
+    /// SEC-45: one-time, so it persists past the run that acknowledged it.
+    @AppStorage("ohe.shareProtectionAcknowledged")
+    private var shareProtectionAcknowledged = false
     @AppStorage("ohe.browserDemoMode")
     private var browserDemoMode = false
     @AppStorage("ohe.displayUnitPreference")
@@ -261,6 +264,13 @@ struct HarnessView: View {
                    let url = URL(string: raw)
                 {
                     applyWidgetStatusURL(url)
+                }
+                // SEC-45 is a one-time warning, so exercising it needs the
+                // acknowledgement cleared rather than overridden: a launch argument
+                // lands in the read-only argument domain, where the app's own write
+                // could never take effect and the warning could never be dismissed.
+                if ProcessInfo.processInfo.environment["OHE_SEED_SHARE_ACK"] == "clear" {
+                    UserDefaults.standard.removeObject(forKey: "ohe.shareProtectionAcknowledged")
                 }
                 #endif
                 await refreshQueueGaps()
@@ -525,6 +535,10 @@ struct HarnessView: View {
                 .keyboardType(.URL)
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("https-url")
+            Text(CredentialDisclosure.copy)
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("credential-disclosure-https")
             SecureField("Bearer token (optional)", text: $httpsBearer)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -611,6 +625,10 @@ struct HarnessView: View {
                 .autocorrectionDisabled()
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("mqtt-username")
+            Text(CredentialDisclosure.copy)
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("credential-disclosure-mqtt")
             SecureField("MQTT password", text: $mqttPassword)
                 .textContentType(.password)
                 .frame(minHeight: 44)
@@ -813,10 +831,26 @@ struct HarnessView: View {
                         if visible { revealDiagnosticShare() }
                     }
                 if let diagnosticShareURL {
-                    ShareLink(item: diagnosticShareURL) {
-                        Text("Share diagnostic")
+                    // SEC-45: the warning is shown once, and acknowledging it is what
+                    // reveals the share control. R-26 still governs where this sits —
+                    // below the bundle's last line — so the two gates compose rather
+                    // than one replacing the other.
+                    if shareProtectionAcknowledged {
+                        ShareLink(item: diagnosticShareURL) {
+                            Text("Share diagnostic")
+                        }
+                        .accessibilityIdentifier("diagnostic-share")
+                    } else {
+                        Text(ShareDisclosure.copy)
+                            .font(.footnote)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("share-protection-warning")
+                        Button("I understand — show sharing") {
+                            shareProtectionAcknowledged = true
+                        }
+                        .frame(minHeight: 44)
+                        .accessibilityIdentifier("share-protection-continue")
                     }
-                    .accessibilityIdentifier("diagnostic-share")
                 }
             }
 
