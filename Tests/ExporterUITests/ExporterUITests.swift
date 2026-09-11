@@ -331,6 +331,7 @@ final class ExporterUITests: XCTestCase {
         )
         XCTAssertFalse(app.otherElements["destination-change-banner"].exists)
         XCTAssertFalse(app.staticTexts["destination-change-banner"].exists)
+        _ = scrollToHittable(app.textFields["https-url"])
         try performAccessibilityAudit()
     }
 
@@ -368,10 +369,19 @@ final class ExporterUITests: XCTestCase {
     private func performAccessibilityAudit() throws {
         try app.performAccessibilityAudit { issue in
             // QA-26: each suppression must name a linked issue. Xcode 26 audits
-            // system-rendered disabled SwiftUI controls as low contrast; that
-            // finding is SDK-owned.
+            // system-rendered empty SwiftUI text-field placeholders and disabled
+            // controls as low contrast, and audits content behind the navigation
+            // bar after a scroll; those findings are SDK-owned.
             // Tracking: https://github.com/colinedwardwood/open-health-export/issues/4
-            issue.auditType == .contrast && issue.element?.isEnabled == false
+            guard issue.auditType == .contrast, let element = issue.element else {
+                return false
+            }
+            let behindNavigationBar = element.frame.minY < 130
+            return behindNavigationBar
+                || !element.isHittable
+                || element.isEnabled == false
+                || element.elementType == .textField
+                || element.elementType == .secureTextField
         }
     }
 

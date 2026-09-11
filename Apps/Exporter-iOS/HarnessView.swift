@@ -443,7 +443,7 @@ struct HarnessView: View {
                 .font(.headline)
             Text(AdvisoryPinnedKeys.urlString)
                 .font(.footnote)
-                .textSelection(.enabled)
+                .accessibilityLabel("Security advisory endpoint")
             Text("This is the sole built-in host. The app never sends Health data there. Fetch happens only on a visible foreground launch, never during export.")
                 .font(.footnote)
             Toggle("Fetch security advisories", isOn: $advisoryEnabled)
@@ -463,7 +463,7 @@ struct HarnessView: View {
                         .font(.footnote)
                     Text(item.url)
                         .font(.footnote)
-                        .textSelection(.enabled)
+                        .accessibilityLabel("Security advisory web link")
                 }
                 .accessibilityIdentifier("advisory-\(item.id)")
             }
@@ -487,6 +487,7 @@ struct HarnessView: View {
             if !ledgerWarning.isEmpty {
                 Text(ledgerWarning)
                     .font(.footnote)
+                    .fixedSize(horizontal: false, vertical: true)
                     .foregroundStyle(.primary)
                     .fontWeight(ledgerWarning.hasPrefix("WARNING") ? .semibold : .regular)
                     .accessibilityLabel("Ledger status: \(ledgerWarning)")

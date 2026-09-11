@@ -1223,6 +1223,28 @@
         }
       }
     },
+    "Security advisory endpoint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Security advisory endpoint"
+          }
+        }
+      }
+    },
+    "Security advisory web link": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Security advisory web link"
+          }
+        }
+      }
+    },
     "Security advisories": {
       "extractionState": "manual",
       "localizations": {
