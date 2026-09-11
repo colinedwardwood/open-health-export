@@ -65,5 +65,10 @@
 	<string>The camera is used only to read a pairing QR from your Mac. The image is not stored or sent anywhere.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

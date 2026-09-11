@@ -89,6 +89,22 @@ The sole built-in network host is the security advisory feed
 user-visible foreground launch, never during export, and is disableable in the app. The GET
 carries marketing major.minor in `User-Agent` and nothing else identifying. Block it at your
 resolver if you do not want the fetch.
+Plain HTTP on the LAN is allowed only through `NSAllowsLocalNetworking`. Any
+`NSAllowsArbitraryLoads` key in an app Info.plist fails `policycheck`.
+
+First-run type selection is the Core Daily preset (named routine metrics only).
+Sensitive types and blood glucose are in the picker, not in that preset. The data browser
+filter **Only types with data** is on by default.
+
+Store characterisation (QA-08, opt-in, no Health values):
+
+```
+swift run characterise path/to/export.ndjson
+```
+
+The JSON is counts, month ranges, source classes, and histograms. It must not contain sample
+values or identifiers. Paste it into an issue if you volunteer a real store; two recorded
+stores are still required before v1 claims corpus realism.
 
 Freshness target N is per class A–D. Each class is pending R-71 device evidence until that
 device has ≥14 days and ≥100 samples in the class; then N is that device's measured p95.

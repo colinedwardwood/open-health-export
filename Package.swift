@@ -74,6 +74,11 @@ let linuxCore: [Target] = [
         path: "Tools/corpusgen"
     ),
     .executableTarget(
+        name: "characterise",
+        dependencies: ["MetricCatalog"],
+        path: "Tools/characterise"
+    ),
+    .executableTarget(
         name: "policycheck",
         dependencies: ["MetricCatalog", "WireFormat"],
         path: "Tools/policycheck"

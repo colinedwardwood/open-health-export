@@ -142,12 +142,17 @@ private func browserSample(
 
 @Test func coreDailyPresetContainsOnlyRoutineMetrics() {
     #expect(!MetricCatalog.coreDaily.isEmpty)
+    #expect(MetricCatalog.coreDaily.count >= 8)
+    #expect(MetricCatalog.coreDaily.count <= 28)
     #expect(MetricCatalog.coreDaily.allSatisfy { $0.sensitivity == .routine })
+    #expect(Set(MetricCatalog.coreDaily.map(\.id)).isSubset(of: Set(MetricCatalog.all.map(\.id))))
     #expect(
         Set(MetricCatalog.coreDaily.map(\.id)).isDisjoint(
             with: Set(MetricCatalog.all.filter { $0.sensitivity == .sensitive }.map(\.id))
         )
     )
+    #expect(!MetricCatalog.coreDaily.contains { $0.id == MetricCatalog.bloodGlucose.id })
+    #expect(Set(MetricCatalog.coreDaily.map(\.id)).count == MetricCatalog.coreDaily.count)
 }
 
 /// R-65's locale matrix. The regions are chosen for the cases a single metric/imperial

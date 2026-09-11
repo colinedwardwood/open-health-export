@@ -226,6 +226,7 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck privacy manifests declare zero collection: ok")
+        try checkATS(root: root)
         let ambient = ["Date()", "Calendar.current", "TimeZone.current", "Locale.current"]
         let allowedAmbient = Set(["CoreTemporal", "HealthKitSource"])
         var ambientHits: [String] = []
@@ -286,6 +287,72 @@ struct PolicyCheck {
         try checkHealthKitSymbolsStayInAdapter(sources: sources)
         try checkSpecArtifacts(root: root)
         try checkHostTZDataPin(root: root)
+    }
+
+    /// R-35 / SEC-19: App Transport Security stays on. The only allowed exception is
+    /// `NSAllowsLocalNetworking` on the iOS exporter. Arbitrary-loads keys fail even when false.
+    static func checkATS(root: URL) throws {
+        let arbitrary = [
+            "NSAllowsArbitraryLoads",
+            "NSAllowsArbitraryLoadsForMedia",
+            "NSAllowsArbitraryLoadsInWebContent",
+        ]
+        let apps = root.appendingPathComponent("Apps")
+        let ios = apps.appendingPathComponent("Exporter-iOS/Info.plist")
+        let iosPlist = try loadInfoPlist(ios)
+        guard let ats = iosPlist["NSAppTransportSecurity"] as? [String: Any] else {
+            FileHandle.standardError.write(
+                Data("R-35: NSAppTransportSecurity missing from Apps/Exporter-iOS/Info.plist\n".utf8)
+            )
+            exit(1)
+        }
+        for key in arbitrary where ats[key] != nil {
+            FileHandle.standardError.write(
+                Data("R-35 / SEC-19: \(key) must be absent from Exporter-iOS ATS\n".utf8)
+            )
+            exit(1)
+        }
+        let extras = Set(ats.keys).subtracting(["NSAllowsLocalNetworking"])
+        if !extras.isEmpty {
+            FileHandle.standardError.write(
+                Data(
+                    "R-35: undeclared ATS keys \(extras.sorted().joined(separator: ", "))\n".utf8
+                )
+            )
+            exit(1)
+        }
+        guard ats["NSAllowsLocalNetworking"] as? Bool == true else {
+            FileHandle.standardError.write(
+                Data("R-35: NSAllowsLocalNetworking must be true and the sole ATS exception\n".utf8)
+            )
+            exit(1)
+        }
+        if let files = FileManager.default.enumerator(at: apps, includingPropertiesForKeys: nil) {
+            for case let file as URL in files where file.lastPathComponent == "Info.plist" {
+                if file.path.contains("Exporter-iOS/") { continue }
+                let plist = try loadInfoPlist(file)
+                guard let otherATS = plist["NSAppTransportSecurity"] as? [String: Any] else {
+                    continue
+                }
+                for key in arbitrary where otherATS[key] != nil {
+                    FileHandle.standardError.write(
+                        Data("R-35 / SEC-19: \(key) must be absent from \(file.path)\n".utf8)
+                    )
+                    exit(1)
+                }
+            }
+        }
+        print("policycheck ATS local-networking only: ok")
+    }
+
+    static func loadInfoPlist(_ url: URL) throws -> [String: Any] {
+        let data = try Data(contentsOf: url)
+        let object = try PropertyListSerialization.propertyList(from: data, format: nil)
+        guard let plist = object as? [String: Any] else {
+            FileHandle.standardError.write(Data("\(url.path): Info.plist is not a dictionary\n".utf8))
+            exit(1)
+        }
+        return plist
     }
 
     static func checkStringCatalog(root: URL) throws {

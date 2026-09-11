@@ -470,9 +470,22 @@ public enum MetricCatalog {
         all.first { $0.id == id }
     }
 
-    /// First-run preset. Sensitive types are visible but can only be added individually.
+    /// First-run preset (R-61 / UX-13). Sensitive types stay visible but are never in this list.
     public static var coreDaily: [MetricDeclaration] {
-        all.filter { $0.sensitivity == .routine }
+        [
+            stepCount,
+            walkingRunningDistance,
+            cyclingDistance,
+            activeEnergy,
+            basalEnergy,
+            exerciseTime,
+            standTime,
+            flightsClimbed,
+            heartRate,
+            restingHeartRate,
+            walkingHeartRateAverage,
+            dietaryWater,
+        ]
     }
 
     /// Metrics whose canonical aggregate is HealthKit's statistic (R-80 exception list).

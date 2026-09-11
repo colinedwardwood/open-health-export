@@ -267,6 +267,13 @@
       ]
     },
     {
+      "name": "characterise",
+      "type": "executable",
+      "dependencies": [
+        "MetricCatalog"
+      ]
+    },
+    {
       "name": "corpusgen",
       "type": "executable",
       "dependencies": [
