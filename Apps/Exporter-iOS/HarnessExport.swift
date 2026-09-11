@@ -207,45 +207,95 @@ private actor ObserverExportGate {
 }
 
 enum HarnessExport {
-    private static let selectedMetricsKey = "ohe.selectedMetrics"
+    static let healthDestinationIDs = ["local-file", "https", "mqtt", "companion"]
 
-    static func selectedMetrics() -> [MetricID] {
-        let allowed = Set(MetricCatalog.selectable.map(\.id))
-        if let stored = UserDefaults.standard.stringArray(forKey: selectedMetricsKey) {
-            return stored.map(MetricID.init(rawValue:)).filter { allowed.contains($0) }
+    static func destinationScope(_ destinationID: String) async throws -> DestinationExportScope {
+        let root = try applicationSupportRoot()
+        let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+        return try await store.transact { tx in
+            try tx.loadDestinationScope(destinationID: destinationID)
+                ?? DestinationExportScope(destinationID: destinationID)
         }
-        return MetricCatalog.coreDaily.map(\.id)
     }
 
-    static func saveSelectedMetrics(_ metrics: Set<MetricID>) {
-        let allowed = Set(MetricCatalog.selectable.map(\.id))
-        UserDefaults.standard.set(
-            metrics.intersection(allowed).map(\.rawValue).sorted(),
-            forKey: selectedMetricsKey
+    static func destinationScopes() async throws -> [DestinationExportScope] {
+        var scopes: [DestinationExportScope] = []
+        for destinationID in healthDestinationIDs {
+            scopes.append(try await destinationScope(destinationID))
+        }
+        return scopes
+    }
+
+    static func selectedMetrics() async throws -> [MetricID] {
+        let union = try await destinationScopes().reduce(into: Set<MetricID>()) {
+            guard isDestinationEnabled($1.destinationID) else { return }
+            $0.formUnion($1.metrics)
+        }
+        return union.sorted { $0.rawValue < $1.rawValue }
+    }
+
+    static func isDestinationEnabled(_ destinationID: String) -> Bool {
+        guard let root = try? applicationSupportRoot() else { return false }
+        switch destinationID {
+        case "local-file":
+            return isLocalFileEnabled()
+        case "https":
+            guard let data = try? Data(
+                contentsOf: root.appendingPathComponent("https-destination.json")
+            ), let record = try? JSONDecoder().decode(HTTPSVerificationRecord.self, from: data)
+            else { return false }
+            return record.report.allowsEnablement
+        case "mqtt":
+            guard let data = try? Data(
+                contentsOf: root.appendingPathComponent("mqtt-destination.json")
+            ), let record = try? JSONDecoder().decode(MQTTVerificationRecord.self, from: data)
+            else { return false }
+            return record.report.allowsEnablement
+        case "companion":
+            guard let data = try? Data(contentsOf: companionTestReportURL(root: root)),
+                  let record = try? JSONDecoder().decode(CompanionVerificationRecord.self, from: data)
+            else { return false }
+            return record.report.allowsEnablement
+        default:
+            return false
+        }
+    }
+
+    private static func requestScopeAuthorizationIfConfigured(
+        _ destinationID: String
+    ) async throws {
+        let scope = try await destinationScope(destinationID)
+        guard scope.isConfigured else { return }
+        try await HealthKitAuthorization.requestReadAccess(
+            metrics: scope.metrics.sorted { $0.rawValue < $1.rawValue }
         )
     }
 
-    static func applySelectedMetrics(
-        _ metrics: Set<MetricID>,
-        removing: Set<MetricID>
+    static func saveDestinationScope(_ scope: DestinationExportScope) async throws {
+        let allowed = Set(MetricCatalog.selectable.map(\.id))
+        let sanitized = try DestinationExportScope(
+            destinationID: scope.destinationID,
+            metrics: scope.metrics.intersection(allowed),
+            startInclusive: scope.startInclusive,
+            endExclusive: scope.endExclusive
+        )
+        let root = try applicationSupportRoot()
+        let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+        try await store.transact { try $0.upsertDestinationScope(sanitized) }
+    }
+
+    static func applyDestinationScope(
+        _ scope: DestinationExportScope,
+        previousMetrics: Set<MetricID>
     ) async throws {
         let root = try applicationSupportRoot()
         let store = try SQLiteStateStore(
             path: root.appendingPathComponent("state.sqlite").path
         )
-        let now = Date().timeIntervalSince1970
-        for metric in removing {
-            try await store.purgeType(
-                metric: metric,
-                reason: TypeDisableReason.explicitStop,
-                destination: "local-file",
-                atEpoch: now
-            )
-        }
-        for metric in metrics.subtracting(removing) {
+        try await saveDestinationScope(scope)
+        for metric in scope.metrics.subtracting(previousMetrics) {
             try await store.reenableType(metric: metric, reason: "user_selected")
         }
-        saveSelectedMetrics(metrics)
     }
 
     @MainActor
@@ -310,7 +360,12 @@ enum HarnessExport {
         metrics: [MetricID]? = nil,
         trigger: RunTrigger = .manual
     ) async throws -> [String] {
-        let metrics = metrics ?? selectedMetrics()
+        let scope = try await destinationScope("local-file")
+        try ExportScopeGate.requireConfigured(scope)
+        let metrics = metrics ?? scope.metrics.sorted { $0.rawValue < $1.rawValue }
+        for metric in metrics {
+            try ExportScopeGate.require(metric: metric, scope: scope)
+        }
         let fm = FileManager.default
         let root = try applicationSupportRoot()
         let sqliteURL = root.appendingPathComponent("state.sqlite")
@@ -326,7 +381,11 @@ enum HarnessExport {
         let (verified, events) = try verifiedLocalFile(root: root, destinationDirectory: dest)
         try await emitTrustNotices(events)
         let context = TemporalContext.utcHost
-        let source = HealthKitAnchoredSource(context: context, limit: 1000)
+        let source = HealthKitAnchoredSource(
+            context: context,
+            limit: 1000,
+            window: HealthKitQueryWindow(scope: scope)
+        )
         let observations = HealthKitDayObservationSource(context: context, limit: 1000)
         let statistics = HealthKitStatisticsSource(context: context)
         let now = Date().ISO8601Format()
@@ -357,7 +416,8 @@ enum HarnessExport {
                 snapshotURL: snapshotURL,
                 externalStatusURL: dest.appendingPathComponent("status.json"),
                 ledgerHeadSeal: ledgerSeal,
-                ledgerSealURL: ledgerSealURL
+                ledgerSealURL: ledgerSealURL,
+                scope: scope
             )
             let outcome = try await run.run()
             WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
@@ -386,7 +446,8 @@ enum HarnessExport {
                 snapshotURL: snapshotURL,
                 externalStatusURL: dest.appendingPathComponent("status.json"),
                 ledgerHeadSeal: ledgerSeal,
-                ledgerSealURL: ledgerSealURL
+                ledgerSealURL: ledgerSealURL,
+                scope: scope
             )
             let reconciled = try await reconcile.run(throughDay: String(now.prefix(10)))
             lines.append("\(metric.rawValue) reconcile: \(reconciled.kind.rawValue)")
@@ -420,7 +481,12 @@ enum HarnessExport {
     static func runFullReconcile(
         metrics: [MetricID]? = nil
     ) async throws -> [String] {
-        let metrics = metrics ?? selectedMetrics()
+        let scope = try await destinationScope("local-file")
+        try ExportScopeGate.requireConfigured(scope)
+        let metrics = metrics ?? scope.metrics.sorted { $0.rawValue < $1.rawValue }
+        for metric in metrics {
+            try ExportScopeGate.require(metric: metric, scope: scope)
+        }
         let root = try applicationSupportRoot()
         let dest = root.appendingPathComponent("exports", isDirectory: true)
         let scratch = root.appendingPathComponent("scratch", isDirectory: true)
@@ -470,7 +536,8 @@ enum HarnessExport {
                 snapshotURL: StatusSnapshotLocation.url(destinationID: "local-file"),
                 externalStatusURL: dest.appendingPathComponent("status.json"),
                 ledgerHeadSeal: seal,
-                ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json")
+                ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
+                scope: scope
             ).runFullHistory(throughDay: String(now.prefix(10)))
             lines.append("\(metric.rawValue) full reconcile: \(outcome.kind.rawValue)")
         }
@@ -504,16 +571,27 @@ enum HarnessExport {
         try await emitTrustNotices(events)
         let context = TemporalContext.utcHost
         let observations = HealthKitDayObservationSource(context: context, limit: 1000)
+        let scope = try await destinationScope("local-file")
+        try ExportScopeGate.requireConfigured(scope)
+        let scopeStartDay = String(
+            (scope.startInclusive ?? .distantFuture).ISO8601Format().prefix(10)
+        )
+        let scopeEndDay = scope.endExclusive.map {
+            String($0.addingTimeInterval(-1).ISO8601Format().prefix(10))
+        }
         var metrics: [MetricID] = []
         var firstDay: String?
         var lastDay: String?
-        for metric in selectedMetrics() {
+        for metric in scope.metrics.sorted(by: { $0.rawValue < $1.rawValue }) {
             guard let range = try? await observations.availableDayRange(metric: metric) else {
                 continue
             }
+            let lower = max(range.lowerBound, scopeStartDay)
+            let upper = min(range.upperBound, scopeEndDay ?? range.upperBound)
+            guard lower <= upper else { continue }
             metrics.append(metric)
-            firstDay = min(firstDay ?? range.lowerBound, range.lowerBound)
-            lastDay = max(lastDay ?? range.upperBound, range.upperBound)
+            firstDay = min(firstDay ?? lower, lower)
+            lastDay = max(lastDay ?? upper, upper)
         }
         guard let firstDay, let lastDay, !metrics.isEmpty else {
             return ["No supported Health history is available for backfill."]
@@ -777,15 +855,22 @@ enum HarnessExport {
             }
             try await emitTrustNotices(completed.events, destination: session.serviceName)
         }
+        try await requestScopeAuthorizationIfConfigured("companion")
+        let scope = try await destinationScope("companion")
+        try ExportScopeGate.requireConfigured(scope)
         let context = TemporalContext.utcHost
-        let source = HealthKitAnchoredSource(context: context, limit: 1000)
+        let source = HealthKitAnchoredSource(
+            context: context,
+            limit: 1000,
+            window: HealthKitQueryWindow(scope: scope)
+        )
         let observations = HealthKitDayObservationSource(context: context, limit: 1000)
         let statistics = HealthKitStatisticsSource(context: context)
         let now = Date().ISO8601Format()
         let ledgerSeal = ledgerHeadSeal()
         let ledgerSealURL = root.appendingPathComponent("ledger-head-seal.json")
         var lines: [String] = []
-        for metric in [MetricCatalog.heartRate.id, MetricCatalog.stepCount.id] {
+        for metric in scope.metrics.sorted(by: { $0.rawValue < $1.rawValue }) {
             let run = ExportRun(
                 source: source,
                 destination: verified,
@@ -804,7 +889,8 @@ enum HarnessExport {
                 observations: observations,
                 snapshotURL: StatusSnapshotLocation.url(destinationID: "companion"),
                 ledgerHeadSeal: ledgerSeal,
-                ledgerSealURL: ledgerSealURL
+                ledgerSealURL: ledgerSealURL,
+                scope: scope
             )
             let outcome = try await run.run()
             WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
@@ -1203,6 +1289,7 @@ enum HarnessExport {
             )
         }
         try await emitTrustNotices(events, destination: pending.host)
+        try await requestScopeAuthorizationIfConfigured("https")
         if pending.allowInsecureHTTP {
             let store = try SQLiteStateStore(
                 path: root.appendingPathComponent("state.sqlite").path
@@ -1343,6 +1430,7 @@ enum HarnessExport {
             )
         }
         try await emitTrustNotices(events, destination: pending.host)
+        try await requestScopeAuthorizationIfConfigured("mqtt")
         if pending.allowInsecure {
             let store = try SQLiteStateStore(
                 path: root.appendingPathComponent("state.sqlite").path
@@ -1429,11 +1517,17 @@ enum HarnessExport {
             withIntermediateDirectories: true
         )
         let context = TemporalContext.utcHost
-        let source = HealthKitAnchoredSource(context: context, limit: 1000)
         let now = Date().ISO8601Format()
         let exporterID = try installationID()
         var lines: [String] = []
-        for metric in selectedMetrics() {
+        let scope = try await destinationScope("mqtt")
+        try ExportScopeGate.requireConfigured(scope)
+        let source = HealthKitAnchoredSource(
+            context: context,
+            limit: 1000,
+            window: HealthKitQueryWindow(scope: scope)
+        )
+        for metric in scope.metrics.sorted(by: { $0.rawValue < $1.rawValue }) {
             let outcome = try await ExportRun(
                 source: source,
                 destination: verified,
@@ -1453,7 +1547,8 @@ enum HarnessExport {
                 trigger: .manual,
                 snapshotURL: StatusSnapshotLocation.url(destinationID: "mqtt"),
                 ledgerHeadSeal: ledgerHeadSeal(),
-                ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json")
+                ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
+                scope: scope
             ).run()
             lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
         }
@@ -1523,11 +1618,17 @@ enum HarnessExport {
             withIntermediateDirectories: true
         )
         let context = TemporalContext.utcHost
-        let source = HealthKitAnchoredSource(context: context, limit: 1000)
         let now = Date().ISO8601Format()
         let exporterID = try installationID()
         var lines: [String] = []
-        for metric in selectedMetrics() {
+        let scope = try await destinationScope("https")
+        try ExportScopeGate.requireConfigured(scope)
+        let source = HealthKitAnchoredSource(
+            context: context,
+            limit: 1000,
+            window: HealthKitQueryWindow(scope: scope)
+        )
+        for metric in scope.metrics.sorted(by: { $0.rawValue < $1.rawValue }) {
             let outcome = try await ExportRun(
                 source: source,
                 destination: verified,
@@ -1547,7 +1648,8 @@ enum HarnessExport {
                 trigger: .manual,
                 snapshotURL: StatusSnapshotLocation.url(destinationID: "https"),
                 ledgerHeadSeal: ledgerHeadSeal(),
-                ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json")
+                ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
+                scope: scope
             ).run()
             lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
         }
@@ -1566,6 +1668,7 @@ enum HarnessExport {
         try? FileManager.default.removeItem(at: localFileTestReportURL(root: root))
         let (_, events) = try verifiedLocalFile(root: root, destinationDirectory: dest)
         try await emitTrustNotices(events)
+        try await requestScopeAuthorizationIfConfigured("local-file")
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
         return destinationStatusLines()
     }
@@ -1991,7 +2094,7 @@ enum HarnessExport {
         let root = try applicationSupportRoot()
         let grant = HealthAuthorizationGrant(
             id: "core-activity",
-            metrics: selectedMetrics()
+            metrics: try await selectedMetrics()
         )
         let observer = HealthAuthorizationObserver(
             recordURL: root.appendingPathComponent("health-authorization.json")
@@ -2027,7 +2130,7 @@ enum HarnessExport {
     static func reenableCoreActivityAfterAuthorizationRequest() async throws {
         let root = try applicationSupportRoot()
         let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
-        for metric in selectedMetrics() {
+        for metric in try await selectedMetrics() {
             try await store.reenableType(
                 metric: metric,
                 reason: "user_requested_core_activity"
@@ -2040,7 +2143,7 @@ enum HarnessExport {
             wakeLedger: try wakeLedger()
         )
         try await coordinator.start(
-            metrics: selectedMetrics()
+            metrics: try await selectedMetrics()
         ) { metric in
             try? await observeAuthorizationChanges()
             await ObserverExportGate.shared.enqueue(metric)

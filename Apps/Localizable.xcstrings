@@ -57,17 +57,6 @@
         }
       }
     },
-    "Acknowledgements": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Acknowledgements"
-          }
-        }
-      }
-    },
     "Acknowledge destination changes": {
       "extractionState": "manual",
       "localizations": {
@@ -75,6 +64,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Acknowledge destination changes"
+          }
+        }
+      }
+    },
+    "Acknowledgements": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acknowledgements"
           }
         }
       }
@@ -310,6 +310,17 @@
         }
       }
     },
+    "Configure and enable a destination scope before requesting Health access.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configure and enable a destination scope before requesting Health access."
+          }
+        }
+      }
+    },
     "Confirm sensitive type": {
       "extractionState": "manual",
       "localizations": {
@@ -497,13 +508,13 @@
         }
       }
     },
-    "Enable local archive folder (R-25 test)": {
+    "Each destination starts with zero types. Choose a destination, types, and the earliest date it may receive.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Enable local archive folder (R-25 test)"
+            "value": "Each destination starts with zero types. Choose a destination, types, and the earliest date it may receive."
           }
         }
       }
@@ -519,13 +530,13 @@
         }
       }
     },
-    "End of diagnostic bundle": {
+    "Enable local archive folder (R-25 test)": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "End of diagnostic bundle"
+            "value": "Enable local archive folder (R-25 test)"
           }
         }
       }
@@ -541,6 +552,17 @@
         }
       }
     },
+    "End of diagnostic bundle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "End of diagnostic bundle"
+          }
+        }
+      }
+    },
     "Export demo dataset (every catalogue metric)": {
       "extractionState": "manual",
       "localizations": {
@@ -548,6 +570,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Export demo dataset (every catalogue metric)"
+          }
+        }
+      }
+    },
+    "Export destination": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export destination"
           }
         }
       }
@@ -706,6 +739,17 @@
         }
       }
     },
+    "HTTPS": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HTTPS"
+          }
+        }
+      }
+    },
     "HTTPS destination URL": {
       "extractionState": "manual",
       "localizations": {
@@ -735,6 +779,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "I understand — continue"
+          }
+        }
+      }
+    },
+    "I understand — show sharing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I understand — show sharing"
           }
         }
       }
@@ -838,6 +893,17 @@
         }
       }
     },
+    "MQTT": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MQTT"
+          }
+        }
+      }
+    },
     "MQTT QoS": {
       "extractionState": "manual",
       "localizations": {
@@ -911,6 +977,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac"
+          }
+        }
+      }
+    },
+    "Mac companion": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac companion"
           }
         }
       }
@@ -1003,6 +1080,17 @@
         }
       }
     },
+    "OTLP collector URL": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OTLP collector URL"
+          }
+        }
+      }
+    },
     "Off by default. Never sends tracestate or baggage.": {
       "extractionState": "manual",
       "localizations": {
@@ -1032,17 +1120,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Open receive window"
-          }
-        }
-      }
-    },
-    "OTLP collector URL": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "OTLP collector URL"
           }
         }
       }
@@ -1245,6 +1322,17 @@
         }
       }
     },
+    "Removing a type does not delete data already sent to this destination.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Removing a type does not delete data already sent to this destination."
+          }
+        }
+      }
+    },
     "Request Health read access for selected types": {
       "extractionState": "manual",
       "localizations": {
@@ -1311,6 +1399,17 @@
         }
       }
     },
+    "Scope required: this destination cannot export until at least one type is selected.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scope required: this destination cannot export until at least one type is selected."
+          }
+        }
+      }
+    },
     "Search types": {
       "extractionState": "manual",
       "localizations": {
@@ -1318,6 +1417,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Search types"
+          }
+        }
+      }
+    },
+    "Security advisories": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Security advisories"
           }
         }
       }
@@ -1344,17 +1454,6 @@
         }
       }
     },
-    "Security advisories": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Security advisories"
-          }
-        }
-      }
-    },
     "Select": {
       "extractionState": "manual",
       "localizations": {
@@ -1373,6 +1472,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Send sample destination-enabled notice"
+          }
+        }
+      }
+    },
+    "Send samples starting": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send samples starting"
           }
         }
       }
@@ -1509,6 +1619,17 @@
         }
       }
     },
+    "Stop before": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop before"
+          }
+        }
+      }
+    },
     "Stop exporting heart rate": {
       "extractionState": "manual",
       "localizations": {
@@ -1516,6 +1637,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Stop exporting heart rate"
+          }
+        }
+      }
+    },
+    "Stop sending after a date": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop sending after a date"
           }
         }
       }
@@ -1696,6 +1828,17 @@
         }
       }
     },
+    "Use Core Daily": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use Core Daily"
+          }
+        }
+      }
+    },
     "Use {{exporterId|raw}} and {{batchId|raw}} if the broker needs a templated topic.": {
       "extractionState": "manual",
       "localizations": {
@@ -1824,17 +1967,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "unknown"
-          }
-        }
-      }
-    },
-    "I understand — show sharing": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "I understand — show sharing"
           }
         }
       }

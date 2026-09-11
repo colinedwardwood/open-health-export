@@ -35,6 +35,7 @@ public struct ReconcileSweep: Sendable {
     public var externalStatusURL: URL?
     public var ledgerHeadSeal: (any LedgerHeadSeal)?
     public var ledgerSealURL: URL?
+    public var scope: DestinationExportScope?
 
     public init(
         observations: any DayObservationSource,
@@ -51,7 +52,8 @@ public struct ReconcileSweep: Sendable {
         snapshotURL: URL? = nil,
         externalStatusURL: URL? = nil,
         ledgerHeadSeal: (any LedgerHeadSeal)? = nil,
-        ledgerSealURL: URL? = nil
+        ledgerSealURL: URL? = nil,
+        scope: DestinationExportScope? = nil
     ) {
         self.observations = observations
         self.destination = destination
@@ -68,6 +70,7 @@ public struct ReconcileSweep: Sendable {
         self.externalStatusURL = externalStatusURL
         self.ledgerHeadSeal = ledgerHeadSeal
         self.ledgerSealURL = ledgerSealURL
+        self.scope = scope
     }
 
     public func run(throughDay: String) async throws -> RunOutcome {
@@ -130,6 +133,29 @@ public struct ReconcileSweep: Sendable {
         reason: String,
         includeRaw: Bool = true
     ) async throws -> RunOutcome {
+        var permittedDays = days
+        if let scope {
+            try ExportScopeGate.require(metric: metric, scope: scope)
+            permittedDays = []
+            for day in days {
+                do {
+                    try ExportScopeGate.require(
+                        metric: metric,
+                        rangeStartDay: day,
+                        rangeEndDay: day,
+                        scope: scope
+                    )
+                    permittedDays.append(day)
+                } catch let violation as ExportScopeViolation {
+                    switch violation {
+                    case .rangeBeforeStart, .rangeAtOrAfterEnd:
+                        continue
+                    default:
+                        throw violation
+                    }
+                }
+            }
+        }
         if let status = try await store.transact({ try $0.loadTypeStatus(metric: metric) }),
            status.disabled {
             let tally = RunTally(
@@ -145,7 +171,7 @@ public struct ReconcileSweep: Sendable {
         var samples: [SampleRecord] = []
         var observedSamples: [SampleRecord] = []
         var tombstones: [TombstoneRecord] = []
-        for day in days {
+        for day in permittedDays {
             let observed = try await observations.samples(metric: metric, day: day)
             observedSamples.append(contentsOf: observed)
             let plan = try await store.transact { tx in
@@ -243,7 +269,8 @@ public struct ReconcileSweep: Sendable {
             destination: destination,
             destinationName: destinationName,
             store: store,
-            clock: clock
+            clock: clock,
+            scope: scope
         )
         var tally = RunTally(
             read: recordCount,

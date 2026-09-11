@@ -29,6 +29,7 @@ public struct ExportRun: Sendable {
     public var externalStatusURL: URL?
     public var ledgerHeadSeal: (any LedgerHeadSeal)?
     public var ledgerSealURL: URL?
+    public var scope: DestinationExportScope?
     /// QA-17: the page size above which a delta is treated as a replayed store.
     public var replaySampleLimit: Int
     #if DEBUG
@@ -53,6 +54,7 @@ public struct ExportRun: Sendable {
         externalStatusURL: URL? = nil,
         ledgerHeadSeal: (any LedgerHeadSeal)? = nil,
         ledgerSealURL: URL? = nil,
+        scope: DestinationExportScope? = nil,
         replaySampleLimit: Int = AnchorGuard.implausibleDeltaSamples
     ) {
         self.source = source
@@ -72,10 +74,14 @@ public struct ExportRun: Sendable {
         self.externalStatusURL = externalStatusURL
         self.ledgerHeadSeal = ledgerHeadSeal
         self.ledgerSealURL = ledgerSealURL
+        self.scope = scope
         self.replaySampleLimit = replaySampleLimit
     }
 
     public func run() async throws -> RunOutcome {
+        if let scope {
+            try ExportScopeGate.require(metric: metric, scope: scope)
+        }
         let typeStatus = try await store.transact {
             try $0.loadTypeStatus(metric: metric)
         }
@@ -269,7 +275,8 @@ public struct ExportRun: Sendable {
                 destinationName: destinationName,
                 store: store,
                 faults: faults,
-                clock: clock
+                clock: clock,
+                scope: scope
             )
             #else
             receipt = try await DeliveryExecutor.send(
@@ -277,7 +284,8 @@ public struct ExportRun: Sendable {
                 destination: destination,
                 destinationName: destinationName,
                 store: store,
-                clock: clock
+                clock: clock,
+                scope: scope
             )
             #endif
         } catch let error as DestinationSendError {

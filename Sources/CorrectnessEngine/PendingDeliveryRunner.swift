@@ -13,6 +13,7 @@ public struct PendingDeliveryRunner: Sendable {
     public var store: any StateStore
     public var destinationName: String
     public var clock: any Clock
+    public var scope: DestinationExportScope?
     #if DEBUG
     public var faults: any ExportFaultInjector = NoExportFaults()
     #endif
@@ -21,12 +22,14 @@ public struct PendingDeliveryRunner: Sendable {
         destination: VerifiedDestination,
         store: any StateStore,
         destinationName: String = "destination",
-        clock: any Clock = SystemClock()
+        clock: any Clock = SystemClock(),
+        scope: DestinationExportScope? = nil
     ) {
         self.destination = destination
         self.store = store
         self.destinationName = destinationName
         self.clock = clock
+        self.scope = scope
     }
 
     @discardableResult
@@ -40,7 +43,8 @@ public struct PendingDeliveryRunner: Sendable {
             destinationName: destinationName,
             store: store,
             faults: faults,
-            clock: clock
+            clock: clock,
+            scope: scope
         )
         #else
         let receipt = try await DeliveryExecutor.send(
@@ -48,7 +52,8 @@ public struct PendingDeliveryRunner: Sendable {
             destination: destination,
             destinationName: destinationName,
             store: store,
-            clock: clock
+            clock: clock,
+            scope: scope
         )
         #endif
         #if DEBUG

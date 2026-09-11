@@ -15,7 +15,8 @@ enum DeliveryExecutor {
         destination: VerifiedDestination,
         destinationName: String,
         store: any StateStore,
-        clock: any Clock = SystemClock()
+        clock: any Clock = SystemClock(),
+        scope: DestinationExportScope? = nil
     ) async throws -> DeliveryReceipt {
         try await sendImpl(
             batch: batch,
@@ -23,6 +24,7 @@ enum DeliveryExecutor {
             destinationName: destinationName,
             store: store,
             clock: clock,
+            scope: scope,
             beforeAckObservation: {}
         )
     }
@@ -34,7 +36,8 @@ enum DeliveryExecutor {
         destinationName: String,
         store: any StateStore,
         faults: any ExportFaultInjector,
-        clock: any Clock = SystemClock()
+        clock: any Clock = SystemClock(),
+        scope: DestinationExportScope? = nil
     ) async throws -> DeliveryReceipt {
         try await sendImpl(
             batch: batch,
@@ -42,6 +45,7 @@ enum DeliveryExecutor {
             destinationName: destinationName,
             store: store,
             clock: clock,
+            scope: scope,
             beforeAckObservation: { try faults.hit(.afterDestinationWriteBeforeAck) }
         )
     }
@@ -53,8 +57,17 @@ enum DeliveryExecutor {
         destinationName: String,
         store: any StateStore,
         clock: any Clock,
+        scope: DestinationExportScope?,
         beforeAckObservation: () throws -> Void
     ) async throws -> DeliveryReceipt {
+        if let scope {
+            try ExportScopeGate.require(
+                metric: batch.metric,
+                rangeStartDay: batch.rangeStartDay,
+                rangeEndDay: batch.rangeEndDay,
+                scope: scope
+            )
+        }
         let attemptID = UUID().uuidString.lowercased()
         try await append(
             phase: "attempt",

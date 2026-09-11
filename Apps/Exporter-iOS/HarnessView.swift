@@ -84,8 +84,12 @@ struct HarnessView: View {
     @State private var browserSearch = ""
     @State private var browserSelecting = false
     @State private var browserReviewVisible = false
-    @State private var browserBaseline = Set(MetricCatalog.coreDaily.map(\.id))
-    @State private var browserSelection = Set(MetricCatalog.coreDaily.map(\.id))
+    @State private var browserBaseline = Set<MetricID>()
+    @State private var browserSelection = Set<MetricID>()
+    @State private var scopeDestinationID = "local-file"
+    @State private var scopeStartDate = Date()
+    @State private var scopeEndEnabled = false
+    @State private var scopeEndDate = Date().addingTimeInterval(365 * 24 * 60 * 60)
     @State private var selectedBrowserMetric: MetricID?
     @State private var pendingSensitiveMetric: MetricID?
     @State private var sensitiveDestinationConfirmation = ""
@@ -229,14 +233,12 @@ struct HarnessView: View {
             }
             propagateTraceparent = HarnessExport.storedHTTPSTraceparent()
             companionTraceparent = HarnessExport.storedCompanionTraceparent()
-            let selected = Set(HarnessExport.selectedMetrics())
-            browserBaseline = selected
-            browserSelection = selected
             if disclosureAcknowledged {
                 phase = .ready
                 status = "Ready."
             }
             Task {
+                await loadDestinationScope(scopeDestinationID)
                 do {
                     let expired = try await HarnessExport.expireQueuesAndNotify()
                     if expired.expiredBatches > 0 {
@@ -1062,25 +1064,53 @@ struct HarnessView: View {
     }
 
     @MainActor
+    private func loadDestinationScope(_ destinationID: String) async {
+        do {
+            let scope = try await HarnessExport.destinationScope(destinationID)
+            scopeDestinationID = destinationID
+            browserBaseline = scope.metrics
+            browserSelection = scope.metrics
+            scopeStartDate = scope.startInclusive ?? Date()
+            scopeEndEnabled = scope.endExclusive != nil
+            scopeEndDate = scope.endExclusive
+                ?? max(Date().addingTimeInterval(24 * 60 * 60), scopeStartDate.addingTimeInterval(24 * 60 * 60))
+            browserReviewVisible = false
+            browserSelecting = false
+        } catch {
+            browserBaseline = []
+            browserSelection = []
+            status = "Failed to load \(destinationID) scope: \(error.localizedDescription)"
+        }
+    }
+
+    @MainActor
     private func applyBrowserSelection() async {
         phase = .working
-        let adding = browserSelection.subtracting(browserBaseline)
-        let removing = browserBaseline.subtracting(browserSelection)
         do {
+            let priorUnion = Set(try await HarnessExport.selectedMetrics())
+            let scope = try DestinationExportScope(
+                destinationID: scopeDestinationID,
+                metrics: browserSelection,
+                startInclusive: scopeStartDate,
+                endExclusive: scopeEndEnabled ? scopeEndDate : nil
+            )
+            let adding = HarnessExport.isDestinationEnabled(scopeDestinationID)
+                ? scope.metrics.subtracting(priorUnion)
+                : []
             if !adding.isEmpty {
                 try await HealthKitAuthorization.requestReadAccess(
                     metrics: adding.sorted { $0.rawValue < $1.rawValue }
                 )
             }
-            try await HarnessExport.applySelectedMetrics(
-                browserSelection,
-                removing: removing
+            try await HarnessExport.applyDestinationScope(
+                scope,
+                previousMetrics: browserBaseline
             )
             browserBaseline = browserSelection
             browserReviewVisible = false
             AppLifecycleCoordinator.shared.stopObservers()
             await startHealthObserversIfEligible()
-            status = "Ready. Export selection updated."
+            status = "Ready. \(scopeDestinationID) export scope updated."
         } catch {
             status = "Failed: \(error.localizedDescription)"
         }
@@ -1092,8 +1122,14 @@ struct HarnessView: View {
         phase = .working
         status = "Working: Health authorisation."
         do {
+            let metrics = try await HarnessExport.selectedMetrics()
+            guard !metrics.isEmpty else {
+                status = "Configure and enable a destination scope before requesting Health access."
+                phase = .ready
+                return
+            }
             try await HealthKitAuthorization.requestReadAccess(
-                metrics: HarnessExport.selectedMetrics()
+                metrics: metrics
             )
             try await HarnessExport.observeAuthorizationChanges()
             try await HarnessExport.reenableCoreActivityAfterAuthorizationRequest()
@@ -1214,6 +1250,47 @@ struct HarnessView: View {
                 .foregroundStyle(.primary)
                 .fontWeight(browserDemoMode ? .semibold : .regular)
 
+            if selectedDetail == nil {
+                Picker("Export destination", selection: $scopeDestinationID) {
+                    Text("Archive folder").tag("local-file")
+                    Text("HTTPS").tag("https")
+                    Text("MQTT").tag("mqtt")
+                    Text("Mac companion").tag("companion")
+                }
+                .accessibilityIdentifier("scope-destination")
+                .onChange(of: scopeDestinationID) { _, destinationID in
+                    Task { await loadDestinationScope(destinationID) }
+                }
+                Text("Each destination starts with zero types. Choose a destination, types, and the earliest date it may receive.")
+                    .font(.footnote)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("scope-zero-default")
+                if browserSelection.isEmpty {
+                    Text("Scope required: this destination cannot export until at least one type is selected.")
+                        .font(.footnote)
+                        .foregroundStyle(.primary)
+                        .fontWeight(.semibold)
+                        .accessibilityIdentifier("scope-required")
+                }
+                DatePicker(
+                    "Send samples starting",
+                    selection: $scopeStartDate,
+                    displayedComponents: .date
+                )
+                .accessibilityIdentifier("scope-start-date")
+                Toggle("Stop sending after a date", isOn: $scopeEndEnabled)
+                    .accessibilityIdentifier("scope-end-enabled")
+                if scopeEndEnabled {
+                    DatePicker(
+                        "Stop before",
+                        selection: $scopeEndDate,
+                        in: scopeStartDate.addingTimeInterval(24 * 60 * 60)...,
+                        displayedComponents: .date
+                    )
+                    .accessibilityIdentifier("scope-end-date")
+                }
+            }
+
             if let detail = selectedDetail {
                 Button(browserLoadingHealth ? "Loading Health data…" : "Load 30 days from Health") {
                     Task { await loadBrowserSamples(metric: detail.metric) }
@@ -1224,6 +1301,10 @@ struct HarnessView: View {
             } else {
                 if browserSelecting {
                     HStack {
+                        Button("Use Core Daily") {
+                            browserSelection = Set(MetricCatalog.coreDaily.map(\.id))
+                        }
+                        .accessibilityIdentifier("browser-core-daily")
                         Button("Invert routine") {
                             var draft = DataSelectionDraft(baseline: browserSelection)
                             draft.invertRoutine(MetricCatalog.selectable.map(\.id))
@@ -1246,7 +1327,7 @@ struct HarnessView: View {
                         Text("Removing \(removing.count) types")
                             .accessibilityIdentifier("browser-review-removing")
                         if !removing.isEmpty {
-                            Text("Removing a type does not delete data already sent to Archive folder.")
+                            Text("Removing a type does not delete data already sent to this destination.")
                                 .font(.footnote)
                                 .foregroundStyle(.primary)
                                 .fontWeight(.semibold)
@@ -1258,17 +1339,17 @@ struct HarnessView: View {
                     }
                 }
                 if let pendingSensitiveMetric {
-                    Text("Sensitive type — type Archive folder to add it individually.")
+                    Text("Sensitive type — type \(scopeDestinationID) to add it individually.")
                         .font(.footnote)
-                    TextField("Archive folder", text: $sensitiveDestinationConfirmation)
+                    TextField(scopeDestinationID, text: $sensitiveDestinationConfirmation)
                     Button("Confirm sensitive type") {
-                        if sensitiveDestinationConfirmation == "Archive folder" {
+                        if sensitiveDestinationConfirmation == scopeDestinationID {
                             browserSelection.insert(pendingSensitiveMetric)
                             self.pendingSensitiveMetric = nil
                             sensitiveDestinationConfirmation = ""
                         }
                     }
-                    .disabled(sensitiveDestinationConfirmation != "Archive folder")
+                    .disabled(sensitiveDestinationConfirmation != scopeDestinationID)
                 }
                 Toggle("Only types with data", isOn: $browserOnlyWithData)
                     .accessibilityIdentifier("browser-only-with-data")

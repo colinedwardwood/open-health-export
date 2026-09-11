@@ -2148,6 +2148,46 @@ private func anchorHoldFixture(
     return (store, ReadCountingSource(page: page), dest)
 }
 
+@Test func exportRunChecksDestinationScopeBeforeReadingTheSource() async throws {
+    let metric = MetricID(rawValue: "heart_rate")
+    let page = SamplePage(
+        samples: [],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([1]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let source = ReadCountingSource(page: page)
+    let store = MemoryStateStore()
+    let destination = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-scope-read-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+    let scope = try DestinationExportScope(
+        destinationID: "local-file",
+        metrics: [MetricID(rawValue: "step_count")],
+        startInclusive: Date(timeIntervalSince1970: 0)
+    )
+    let run = ExportRun(
+        source: source,
+        destination: .testing(LocalFileSink(directory: destination)),
+        store: store,
+        metric: metric,
+        scratchDirectory: destination,
+        envelope: testEnvelope(),
+        scope: scope
+    )
+
+    await #expect(
+        throws: ExportScopeViolation.metricNotSelected(
+            destinationID: "local-file",
+            metric: metric
+        )
+    ) {
+        try await run.run()
+    }
+    #expect(source.reads == 0)
+}
+
 /// The metric has exported before, so an absent cursor is a lost anchor, not a first
 /// run. Reading with no anchor would send the whole store again (QA-17).
 @Test func aLostAnchorHoldsTheMetricInsteadOfReExportingEverything() async throws {

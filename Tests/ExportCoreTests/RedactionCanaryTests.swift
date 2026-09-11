@@ -163,9 +163,45 @@ enum LeakMutant: String, CaseIterable {
         contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
         encoding: .utf8
     )
-    #expect(harness.contains("metrics: HarnessExport.selectedMetrics()"))
+    #expect(harness.contains("let metrics = try await HarnessExport.selectedMetrics()"))
+    #expect(harness.contains("HarnessExport.destinationScope(destinationID)"))
     #expect(harness.contains("metrics: adding.sorted"))
     #expect(!harness.contains("requestReadAccess(\n                    metrics: MetricCatalog.all"))
     #expect(!harness.contains("requestReadAccess(metrics: MetricCatalog.all"))
     #expect(!harness.contains("requestReadAccess(metrics: MetricCatalog.selectable"))
+}
+
+@Test func sec16AppRoutesEveryHealthDestinationThroughItsOwnScope() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let exportHarness = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift"),
+        encoding: .utf8
+    )
+    let viewHarness = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
+        encoding: .utf8
+    )
+
+    for destinationID in ["local-file", "https", "mqtt", "companion"] {
+        #expect(exportHarness.contains("destinationScope(\"\(destinationID)\")"))
+        #expect(exportHarness.contains(
+            "requestScopeAuthorizationIfConfigured(\"\(destinationID)\")"
+        ))
+    }
+    #expect(exportHarness.contains("guard isDestinationEnabled($1.destinationID)"))
+    #expect(exportHarness.contains("window: HealthKitQueryWindow(scope: scope)"))
+    #expect(exportHarness.contains("try ExportScopeGate.requireConfigured(scope)"))
+    #expect(!exportHarness.contains(
+        "for metric in [MetricCatalog.heartRate.id, MetricCatalog.stepCount.id]"
+    ))
+    #expect(!exportHarness.contains("metrics ?? selectedMetrics()"))
+    #expect(viewHarness.contains("@State private var browserSelection = Set<MetricID>()"))
+    #expect(viewHarness.contains("Button(\"Use Core Daily\")"))
+    #expect(viewHarness.contains("HarnessExport.isDestinationEnabled(scopeDestinationID)"))
+    #expect(viewHarness.contains("? scope.metrics.subtracting(priorUnion)"))
+    #expect(viewHarness.contains("startInclusive: scopeStartDate"))
+    #expect(viewHarness.contains("endExclusive: scopeEndEnabled ? scopeEndDate : nil"))
 }

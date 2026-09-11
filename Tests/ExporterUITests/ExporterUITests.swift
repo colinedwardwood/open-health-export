@@ -351,6 +351,21 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Measurements"].exists == false)
     }
 
+    func testDestinationScopeStartsEmptyAndOffersAnExplicitPreset() {
+        enterControls()
+        let required = app.staticTexts["scope-required"]
+        XCTAssertTrue(scrollToHittable(required).exists)
+        XCTAssertTrue(app.descendants(matching: .any)["scope-destination"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["scope-start-date"].exists)
+
+        let select = scrollToHittable(app.buttons["browser-select"])
+        select.tap()
+        XCTAssertTrue(
+            scrollToHittable(app.buttons["browser-core-daily"]).exists,
+            "Core Daily must be an explicit action, not a destination default."
+        )
+    }
+
     func testDataBrowserShowsAnExplicitEmptySearchState() {
         enterControls()
         let search = scrollToHittable(app.textFields["browser-search"])

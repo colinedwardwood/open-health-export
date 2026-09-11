@@ -3,12 +3,49 @@
 
 import CoreDomain
 import CorrectnessEngine
+import DestinationTrust
+import EnginePorts
 import Foundation
+import SinkLocalFile
+import TestSupport
 import Testing
 
 private let gateDestination = "https"
 private let gateHeart = MetricID(rawValue: "heart_rate")
 private let gateSteps = MetricID(rawValue: "step_count")
+
+@Test func narrowedScopeBlocksAnAlreadyQueuedBatch() async throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-scope-queue-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let store = MemoryStateStore()
+    let pending = PendingBatch(
+        id: BatchID(rawValue: "queued-heart-rate"),
+        payloadURL: root.appendingPathComponent("queued.ndjson").path,
+        expectedRecords: 1,
+        metric: gateHeart,
+        rangeStartDay: "2024-01-12",
+        rangeEndDay: "2024-01-12"
+    )
+    try await store.transact { try $0.enqueuePending(pending) }
+    let narrowed = try gateScope(metrics: [gateSteps])
+    let runner = PendingDeliveryRunner(
+        destination: .testing(LocalFileSink(directory: root)),
+        store: store,
+        destinationName: gateDestination,
+        scope: narrowed
+    )
+
+    await #expect(
+        throws: ExportScopeViolation.metricNotSelected(
+            destinationID: gateDestination,
+            metric: gateHeart
+        )
+    ) {
+        try await runner.runOnce()
+    }
+    #expect(try await store.transact { try $0.pendingBatches() } == [pending])
+}
 
 /// Grant covering 2024-01-10 up to, but not including, 2024-02-01, all UTC.
 private func gateScope(
