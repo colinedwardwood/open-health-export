@@ -624,20 +624,61 @@ public enum HealthKitAuthorization {
     }
 }
 
+/// SEC-16: the slice of history one destination may read, start-inclusive and
+/// end-exclusive. Unbounded is the default, which reads the whole store.
+public struct HealthKitQueryWindow: Sendable, Equatable {
+    public static let unbounded = HealthKitQueryWindow()
+
+    public let startInclusive: Date?
+    public let endExclusive: Date?
+
+    public init(startInclusive: Date? = nil, endExclusive: Date? = nil) {
+        self.startInclusive = startInclusive
+        self.endExclusive = endExclusive
+    }
+
+    /// Reads the grant's dates only. Metric membership stays with the scope itself.
+    public init(scope: DestinationExportScope) {
+        self.init(
+            startInclusive: scope.startInclusive,
+            endExclusive: scope.endExclusive
+        )
+    }
+
+    public var isUnbounded: Bool {
+        startInclusive == nil && endExclusive == nil
+    }
+
+    /// `nil` for an unbounded window: HealthKit reads an absent predicate as every
+    /// sample, and `.strictStartDate` matches the scope's start-time semantics
+    /// (`startDate >= startInclusive AND startDate < endExclusive`).
+    public var samplePredicate: NSPredicate? {
+        if isUnbounded { return nil }
+        return HKQuery.predicateForSamples(
+            withStart: startInclusive,
+            end: endExclusive,
+            options: .strictStartDate
+        )
+    }
+}
+
 /// Routes each metric to the HealthKit sample family that owns its anchored query.
 public final class HealthKitAnchoredSource: SampleSource, @unchecked Sendable {
     private let store: HKHealthStore
     private let context: TemporalContext
     private let limit: Int
+    private let window: HealthKitQueryWindow
 
     public init(
         store: HKHealthStore = HKHealthStore(),
         context: TemporalContext,
-        limit: Int = SamplePaging.defaultPageLimit
+        limit: Int = SamplePaging.defaultPageLimit,
+        window: HealthKitQueryWindow = .unbounded
     ) {
         self.store = store
         self.context = context
         self.limit = limit
+        self.window = window
     }
 
     public func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage {
@@ -645,27 +686,31 @@ public final class HealthKitAnchoredSource: SampleSource, @unchecked Sendable {
             return try await HealthKitSampleSource(
                 store: store,
                 context: context,
-                limit: limit
+                limit: limit,
+                window: window
             ).page(metric: metric, afterAnchor: afterAnchor)
         }
         if CategoryConversion.categoryType(for: metric) != nil {
             return try await HealthKitCategorySource(
                 store: store,
                 context: context,
-                limit: limit
+                limit: limit,
+                window: window
             ).page(metric: metric, afterAnchor: afterAnchor)
         }
         if CorrelationConversion.correlationType(for: metric) != nil {
             return try await HealthKitCorrelationSource(
                 store: store,
                 context: context,
-                limit: limit
+                limit: limit,
+                window: window
             ).page(metric: metric, afterAnchor: afterAnchor)
         }
         return try await HealthKitStructuredSource(
             store: store,
             context: context,
-            limit: limit
+            limit: limit,
+            window: window
         ).page(metric: metric, afterAnchor: afterAnchor)
     }
 }
@@ -674,15 +719,18 @@ public final class HealthKitStructuredSource: SampleSource, @unchecked Sendable 
     private let store: HKHealthStore
     private let context: TemporalContext
     private let limit: Int
+    private let window: HealthKitQueryWindow
 
     public init(
         store: HKHealthStore = HKHealthStore(),
         context: TemporalContext,
-        limit: Int = SamplePaging.defaultPageLimit
+        limit: Int = SamplePaging.defaultPageLimit,
+        window: HealthKitQueryWindow = .unbounded
     ) {
         self.store = store
         self.context = context
         self.limit = limit
+        self.window = window
     }
 
     public func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage {
@@ -707,7 +755,7 @@ public final class HealthKitStructuredSource: SampleSource, @unchecked Sendable 
         return try await withCheckedThrowingContinuation { continuation in
             let query = HKAnchoredObjectQuery(
                 type: type,
-                predicate: nil,
+                predicate: window.samplePredicate,
                 anchor: anchor,
                 limit: limit
             ) { _, samples, deleted, newAnchor, error in
@@ -775,11 +823,18 @@ public final class HealthKitSampleSource: SampleSource, @unchecked Sendable {
     private let store: HKHealthStore
     private let context: TemporalContext
     private let limit: Int
+    private let window: HealthKitQueryWindow
 
-    public init(store: HKHealthStore = HKHealthStore(), context: TemporalContext, limit: Int = SamplePaging.defaultPageLimit) {
+    public init(
+        store: HKHealthStore = HKHealthStore(),
+        context: TemporalContext,
+        limit: Int = SamplePaging.defaultPageLimit,
+        window: HealthKitQueryWindow = .unbounded
+    ) {
         self.store = store
         self.context = context
         self.limit = limit
+        self.window = window
     }
 
     public func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage {
@@ -793,7 +848,7 @@ public final class HealthKitSampleSource: SampleSource, @unchecked Sendable {
         return try await withCheckedThrowingContinuation { continuation in
             let query = HKAnchoredObjectQuery(
                 type: type,
-                predicate: nil,
+                predicate: window.samplePredicate,
                 anchor: anchor,
                 limit: limit
             ) { _, samples, deleted, newAnchor, error in
@@ -837,15 +892,18 @@ public final class HealthKitCategorySource: SampleSource, @unchecked Sendable {
     private let store: HKHealthStore
     private let context: TemporalContext
     private let limit: Int
+    private let window: HealthKitQueryWindow
 
     public init(
         store: HKHealthStore = HKHealthStore(),
         context: TemporalContext,
-        limit: Int = SamplePaging.defaultPageLimit
+        limit: Int = SamplePaging.defaultPageLimit,
+        window: HealthKitQueryWindow = .unbounded
     ) {
         self.store = store
         self.context = context
         self.limit = limit
+        self.window = window
     }
 
     public func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage {
@@ -859,7 +917,7 @@ public final class HealthKitCategorySource: SampleSource, @unchecked Sendable {
         return try await withCheckedThrowingContinuation { continuation in
             let query = HKAnchoredObjectQuery(
                 type: type,
-                predicate: nil,
+                predicate: window.samplePredicate,
                 anchor: anchor,
                 limit: limit
             ) { _, samples, deleted, newAnchor, error in
@@ -910,15 +968,18 @@ public final class HealthKitCorrelationSource: SampleSource, @unchecked Sendable
     private let store: HKHealthStore
     private let context: TemporalContext
     private let limit: Int
+    private let window: HealthKitQueryWindow
 
     public init(
         store: HKHealthStore = HKHealthStore(),
         context: TemporalContext,
-        limit: Int = SamplePaging.defaultPageLimit
+        limit: Int = SamplePaging.defaultPageLimit,
+        window: HealthKitQueryWindow = .unbounded
     ) {
         self.store = store
         self.context = context
         self.limit = limit
+        self.window = window
     }
 
     public func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage {
@@ -932,7 +993,7 @@ public final class HealthKitCorrelationSource: SampleSource, @unchecked Sendable
         return try await withCheckedThrowingContinuation { continuation in
             let query = HKAnchoredObjectQuery(
                 type: type,
-                predicate: nil,
+                predicate: window.samplePredicate,
                 anchor: anchor,
                 limit: limit
             ) { _, samples, deleted, newAnchor, error in
