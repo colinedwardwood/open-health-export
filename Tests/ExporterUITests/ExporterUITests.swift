@@ -25,10 +25,18 @@ final class ExporterUITests: XCTestCase {
     func testDisclosurePrecedesHealthPermissionControl() {
         let disclosure = app.buttons["disclosure-continue"]
         XCTAssertTrue(disclosure.waitForExistence(timeout: uiWait))
+        XCTAssertEqual(
+            app.staticTexts["first-run-disclaimer"].label,
+            "This is not a medical device. It does not diagnose or treat anything."
+        )
         XCTAssertFalse(app.buttons["health-request"].exists)
 
         disclosure.tap()
         XCTAssertTrue(app.buttons["health-request"].waitForExistence(timeout: uiWait))
+        XCTAssertEqual(
+            app.staticTexts["about-disclaimer"].label,
+            "This is not a medical device. It does not diagnose or treat anything."
+        )
         XCTAssertTrue(app.buttons["history-load"].exists)
     }
 

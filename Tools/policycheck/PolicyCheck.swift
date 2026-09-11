@@ -263,6 +263,7 @@ struct PolicyCheck {
         print("policycheck no alternate icons: ok")
         try checkStringCatalog(root: root)
         try checkNoHealthDenialClaims(root: root)
+        try checkDisclaimerAndCopyDenylist(root: root)
         try checkUpstreamVersionPins(root: root)
         try checkAdjacency(root: root)
         try checkHealthKitSymbolsStayInAdapter(sources: sources)
@@ -382,6 +383,169 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck no copy claims a Health read was denied: ok")
+    }
+
+    /// R-109: the canonical disclaimer must appear on every public surface we have.
+    /// R-113: published copy must not claim medical, diagnostic, clinical, FDA/CE or
+    /// HIPAA status unless the sentence also negates the claim, or the remaining hit
+    /// is listed in compliance/allowlist.txt with a reason.
+    static func checkDisclaimerAndCopyDenylist(root: URL) throws {
+        let disclaimer = try String(
+            contentsOf: root.appendingPathComponent("compliance/disclaimer.txt"),
+            encoding: .utf8
+        )
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !disclaimer.isEmpty else {
+            FileHandle.standardError.write(Data("compliance/disclaimer.txt is empty\n".utf8))
+            exit(1)
+        }
+        var missingDisclaimer: [String] = []
+        for relative in [
+            "README.md",
+            "Apps/Exporter-iOS/HarnessView.swift",
+            "Apps/Localizable.xcstrings",
+        ] {
+            let text = try String(
+                contentsOf: root.appendingPathComponent(relative),
+                encoding: .utf8
+            )
+            if !text.contains(disclaimer) {
+                missingDisclaimer.append(relative)
+            }
+        }
+        if !missingDisclaimer.isEmpty {
+            FileHandle.standardError.write(
+                Data(
+                    (
+                        "R-109 disclaimer missing from: "
+                            + missingDisclaimer.joined(separator: ", ")
+                            + "\n"
+                    ).utf8
+                )
+            )
+            exit(1)
+        }
+        print("policycheck canonical disclaimer is on public surfaces: ok")
+
+        let allowlistURL = root.appendingPathComponent("compliance/allowlist.txt")
+        let allowlistText = try String(contentsOf: allowlistURL, encoding: .utf8)
+        var allowlist: [(phrase: String, reason: String)] = []
+        for raw in allowlistText.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline) {
+            let line = String(raw)
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty || trimmed.hasPrefix("#") { continue }
+            let parts = trimmed.split(separator: "\t", maxSplits: 1)
+            guard parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty else {
+                FileHandle.standardError.write(
+                    Data("compliance/allowlist.txt line needs phrase<TAB>reason: \(line)\n".utf8)
+                )
+                exit(1)
+            }
+            allowlist.append((phrase: String(parts[0]).lowercased(), reason: String(parts[1])))
+        }
+
+        let denylist = [
+            #"diagnos\w*"#,
+            #"clinical\w*"#,
+            #"\btreat(?:s|ed|ing|ment)?\b"#,
+            #"\bscreening\b"#,
+            #"\bscreen for\b"#,
+            #"medical device"#,
+            #"\bFDA\b"#,
+            #"510\(k\)"#,
+            #"CE mark\w*"#,
+            #"\bHIPAA\b"#,
+            #"\bPHI\b"#,
+            #"prescription"#,
+            #"therap\w*"#,
+            #"monitor your condition"#,
+            #"\bsymptom\w*"#,
+            #"\bdisease\b"#,
+        ].map { try! NSRegularExpression(pattern: $0, options: [.caseInsensitive]) }
+        let negation = try NSRegularExpression(
+            pattern: #"\b(not a|is not|does not|do not|we do not|never)\b"#,
+            options: [.caseInsensitive]
+        )
+
+        var hits: [String] = []
+        var suppressions = 0
+        func consider(source: String, text: String) {
+            let ns = text as NSString
+            let full = NSRange(location: 0, length: ns.length)
+            for pattern in denylist {
+                for match in pattern.matches(in: text, range: full) {
+                    let start = max(0, match.range.location - 48)
+                    let end = min(ns.length, match.range.location + match.range.length + 48)
+                    let window = ns.substring(
+                        with: NSRange(location: start, length: end - start)
+                    )
+                    let windowRange = NSRange(location: 0, length: (window as NSString).length)
+                    if negation.firstMatch(in: window, range: windowRange) != nil {
+                        continue
+                    }
+                    let lowered = window.lowercased()
+                    if allowlist.contains(where: { lowered.contains($0.phrase) }) {
+                        suppressions += 1
+                        continue
+                    }
+                    let snippet = window.replacingOccurrences(of: "\n", with: " ")
+                    hits.append("\(source): \(snippet)")
+                }
+            }
+        }
+
+        for relative in ["README.md", "CONTINUITY.md", "CHANGELOG.md"] {
+            let url = root.appendingPathComponent(relative)
+            guard FileManager.default.fileExists(atPath: url.path) else { continue }
+            consider(
+                source: relative,
+                text: try String(contentsOf: url, encoding: .utf8)
+            )
+        }
+        let catalogURL = root.appendingPathComponent("Apps/Localizable.xcstrings")
+        if let data = try? Data(contentsOf: catalogURL),
+           let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let strings = json["strings"] as? [String: Any]
+        {
+            for (key, value) in strings {
+                let entry = value as? [String: Any]
+                let locales = entry?["localizations"] as? [String: Any]
+                let unit = (locales?["en"] as? [String: Any])?["stringUnit"] as? [String: Any]
+                let shown = (unit?["value"] as? String) ?? key
+                consider(source: "Localizable.xcstrings", text: shown)
+            }
+        }
+        let changes = root.appendingPathComponent("changes/unreleased")
+        if let files = FileManager.default.enumerator(at: changes, includingPropertiesForKeys: nil) {
+            for case let file as URL in files where file.pathExtension == "md" {
+                consider(
+                    source: "changes/unreleased/\(file.lastPathComponent)",
+                    text: try String(contentsOf: file, encoding: .utf8)
+                )
+            }
+        }
+        let store = root.appendingPathComponent("store")
+        if let files = FileManager.default.enumerator(at: store, includingPropertiesForKeys: nil) {
+            for case let file as URL in files where file.pathExtension == "txt" {
+                consider(
+                    source: "store/\(file.lastPathComponent)",
+                    text: try String(contentsOf: file, encoding: .utf8)
+                )
+            }
+        }
+        if !hits.isEmpty {
+            FileHandle.standardError.write(
+                Data(
+                    (
+                        "R-113 published copy matches a medical-claim denylist term:\n"
+                            + hits.joined(separator: "\n")
+                            + "\n"
+                    ).utf8
+                )
+            )
+            exit(1)
+        }
+        print("policycheck published copy denylist: ok (\(suppressions) allowlisted)")
     }
 
     static func checkHostTZDataPin(root: URL) throws {

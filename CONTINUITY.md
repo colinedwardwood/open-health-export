@@ -35,9 +35,11 @@ service roles, completes the stranger-test release checklist, and is recorded
 in `MAINTAINERS.md`.
 
 If Apple distribution becomes unavailable, the last published binary remains
-independent of the repository. A fork can publish a separately identified app,
-subject to Apple's rules and the licence, but cannot issue an in-place update
-signed as this project.
+independent of the repository. Under individual enrolment the App Store channel
+has a bus factor of one. That is mitigated by the documented build-from-source
+path (R-108) and by the licence permitting a rebranded fork. A fork can publish
+a separately identified app, subject to Apple's rules and the licence, but cannot
+issue an in-place update signed as this project.
 
 ## Incident continuity
 

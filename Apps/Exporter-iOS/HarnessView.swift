@@ -308,6 +308,7 @@ struct HarnessView: View {
                 .font(.headline)
             Text("This is not a medical device. It does not diagnose or treat anything.")
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("first-run-disclaimer")
             Text("When the phone is locked, Apple withholds Health data after a short window. Background export is best-effort: iOS may not wake the app, and we will say so instead of pretending a schedule ran.")
                 .fixedSize(horizontal: false, vertical: true)
             Text("You choose what is read. We do not hide destinations, and we do not send telemetry to the maintainers.")
@@ -334,6 +335,7 @@ struct HarnessView: View {
             Text("This is not a medical device. It does not diagnose or treat anything.")
                 .font(.footnote)
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("about-disclaimer")
 
             Text("HealthKit provides no deletion callback. Tombstones are best-effort when iOS next reports a deletion; a full reconcile repairs deletions that were not reported.")
                 .font(.footnote)

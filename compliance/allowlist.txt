@@ -1,0 +1,6 @@
+# R-113: remaining denylist hits must appear here with a reason, or policycheck fails.
+# Each non-comment line is: <substring><TAB><reason>
+# The substring must occur in the same window as the hit (case-insensitive).
+diagnostic	in-app observability artifact, not a medical diagnosis
+diagnostics	in-app screen name for that artifact
+diagnosing	salvage reader describing a corrupt store, not a person

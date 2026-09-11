@@ -6,7 +6,8 @@ An Apple Health exporter that tells you the truth about what it did.
 This repository is in Stage 3 (implementation). Requirements: `docs/01-prd/PRD.md`.
 Design: `docs/02-design/00-system-design.md`.
 
-**Not a medical device.** Do not hide this app to watch someone else's health data.
+**Not a medical device.** This is not a medical device. It does not diagnose or treat anything.
+Do not hide this app to watch someone else's health data.
 
 ## Licence
 
