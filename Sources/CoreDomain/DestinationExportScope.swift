@@ -41,6 +41,34 @@ public struct DestinationExportScope: Sendable, Codable, Equatable {
         }
         return endExclusive.map { sampleStart < $0 } ?? true
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case destinationID
+        case metrics
+        case startInclusive
+        case endExclusive
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(
+            destinationID: values.decode(String.self, forKey: .destinationID),
+            metrics: Set(values.decode([MetricID].self, forKey: .metrics)),
+            startInclusive: values.decodeIfPresent(Date.self, forKey: .startInclusive),
+            endExclusive: values.decodeIfPresent(Date.self, forKey: .endExclusive)
+        )
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(destinationID, forKey: .destinationID)
+        try values.encode(
+            metrics.sorted { $0.rawValue < $1.rawValue },
+            forKey: .metrics
+        )
+        try values.encodeIfPresent(startInclusive, forKey: .startInclusive)
+        try values.encodeIfPresent(endExclusive, forKey: .endExclusive)
+    }
 }
 
 /// Versioned as one document so updating a destination's types and dates is one atomic

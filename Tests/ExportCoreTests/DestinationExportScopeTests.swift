@@ -69,3 +69,34 @@ import Testing
     #expect(try DestinationScopeDocument.decoded(first).scope(for: "https") == scope)
     #expect(try DestinationScopeDocument.decoded(first).scope(for: "new").metrics.isEmpty)
 }
+
+@Test func destinationScopeEncodingSortsMetricsIndependentlyOfSetIterationOrder() throws {
+    let ascending = [
+        MetricID(rawValue: "heart_rate"),
+        MetricID(rawValue: "sleep_analysis"),
+        MetricID(rawValue: "step_count"),
+    ]
+    let first = try DestinationScopeDocument(
+        scopes: [
+            "https": DestinationExportScope(
+                destinationID: "https",
+                metrics: Set(ascending),
+                startInclusive: Date(timeIntervalSince1970: 100)
+            ),
+        ]
+    ).encoded()
+    let second = try DestinationScopeDocument(
+        scopes: [
+            "https": DestinationExportScope(
+                destinationID: "https",
+                metrics: Set(ascending.reversed()),
+                startInclusive: Date(timeIntervalSince1970: 100)
+            ),
+        ]
+    ).encoded()
+
+    #expect(first == second)
+    #expect(String(decoding: first, as: UTF8.self).contains(
+        #""metrics":["heart_rate","sleep_analysis","step_count"]"#
+    ))
+}
