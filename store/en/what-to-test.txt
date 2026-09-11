@@ -1,0 +1,3 @@
+This is not a medical device. It does not diagnose or treat anything. Do not attach real HealthKit values to feedback.
+
+Enable a local-file destination, export one page, and check last success and last failure. Confirm the locked-device disclosure before Health permission. If you are a maintainer, the overdue banner can be seeded in the UI tests.

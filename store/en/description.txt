@@ -1,0 +1,9 @@
+Open Health Exporter sends the Apple Health types you choose to destinations you enable: a local folder, HTTPS, MQTT, or a Mac companion. It shows last success, last failure with a reason code, and an overdue banner when export has been quiet too long.
+
+This is not a medical device. It does not diagnose or treat anything.
+
+Background delivery is best-effort. Freshness target N is per class A–D and is pending device soak evidence; the overdue alarm floor is 6 hours and is not a delivery promise. Deletion tombstones are best-effort because HealthKit provides no deletion callback.
+
+iOS can hide this app. The binary has no stealth mode, alternate icons, or second name. If it disappears, check Settings → Apps → Hidden Apps, Screen Time, Battery, and App Store purchase history.
+
+Build from source is documented in the README. Licence: AGPL-3.0 with an additional permission for App Store distribution.

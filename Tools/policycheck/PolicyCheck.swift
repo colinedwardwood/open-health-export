@@ -428,6 +428,7 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck canonical disclaimer is on public surfaces: ok")
+        try checkStoreCopy(root: root, disclaimer: disclaimer)
 
         let allowlistURL = root.appendingPathComponent("compliance/allowlist.txt")
         let allowlistText = try String(contentsOf: allowlistURL, encoding: .utf8)
@@ -542,8 +543,9 @@ struct PolicyCheck {
         let store = root.appendingPathComponent("store")
         if let files = FileManager.default.enumerator(at: store, includingPropertiesForKeys: nil) {
             for case let file as URL in files where file.pathExtension == "txt" {
+                let relative = file.path.replacingOccurrences(of: root.path + "/", with: "")
                 consider(
-                    source: "store/\(file.lastPathComponent)",
+                    source: relative,
                     text: try String(contentsOf: file, encoding: .utf8)
                 )
             }
@@ -562,6 +564,65 @@ struct PolicyCheck {
         }
         print("policycheck published copy denylist: ok (\(suppressions) allowlisted)")
         try checkGovernanceArtifacts(root: root)
+    }
+
+    /// R-113: App Store / TestFlight copy lives in-repo so the denylist can see it.
+    /// Fielding it only in App Store Connect would make the gate unenforceable.
+    static func checkStoreCopy(root: URL, disclaimer: String) throws {
+        let brand = try String(contentsOf: root.appendingPathComponent("Brand.xcconfig"), encoding: .utf8)
+        var displayName = "Open Health Exporter"
+        for raw in brand.split(whereSeparator: \.isNewline) {
+            let line = String(raw).trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("DISPLAY_NAME") {
+                displayName = line.split(separator: "=", maxSplits: 1)
+                    .last?
+                    .trimmingCharacters(in: .whitespaces) ?? displayName
+            }
+        }
+        let limits: [(String, Int)] = [
+            ("name", 30),
+            ("subtitle", 30),
+            ("keywords", 100),
+            ("promotional-text", 170),
+            ("description", 4000),
+            ("whats-new", 4000),
+            ("what-to-test", 4000),
+        ]
+        let disclaimerFields: Set<String> = [
+            "description",
+            "promotional-text",
+            "whats-new",
+            "what-to-test",
+        ]
+        var problems: [String] = []
+        let locale = "en"
+        for (field, limit) in limits {
+            let relative = "store/\(locale)/\(field).txt"
+            let url = root.appendingPathComponent(relative)
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                problems.append("missing \(relative)")
+                continue
+            }
+            let text = try String(contentsOf: url, encoding: .utf8)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if text.isEmpty {
+                problems.append("\(relative) is empty")
+            }
+            if text.count > limit {
+                problems.append("\(relative) is \(text.count) characters; App Store limit is \(limit)")
+            }
+            if disclaimerFields.contains(field), !text.contains(disclaimer) {
+                problems.append("\(relative) is missing the canonical disclaimer")
+            }
+            if field == "name", text != displayName {
+                problems.append("\(relative) must match Brand.xcconfig DISPLAY_NAME (\(displayName))")
+            }
+        }
+        if !problems.isEmpty {
+            FileHandle.standardError.write(Data((problems.joined(separator: "\n") + "\n").utf8))
+            exit(1)
+        }
+        print("policycheck store/\(locale) listing copy: ok")
     }
 
     /// OSS-07: the files a stranger looks for before trusting a health-data project.

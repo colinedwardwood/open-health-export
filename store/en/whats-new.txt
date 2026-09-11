@@ -1,0 +1,3 @@
+First source-available 0.1.0 build. This is not a medical device. It does not diagnose or treat anything.
+
+Local folder, HTTPS, MQTT, and Mac companion destinations. Overdue in-app banner. Acknowledgements from NOTICE. Freshness class A–D still pending soak evidence.

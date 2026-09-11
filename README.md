@@ -101,4 +101,4 @@ Minimum iOS 18.0. Mac companion is a notarised Developer ID app, not Mac App Sto
 How to contribute: `CONTRIBUTING.md`. Vulnerabilities: `SECURITY.md`. Support limits:
 `SUPPORT.md`. Conduct: `CODE_OF_CONDUCT.md`. Continuity: `CONTINUITY.md`.
 Version streams: `VERSIONING.md`. What R-108 claims: `PROVENANCE.md`. Runtime licences:
-`dependencies/policy.md`.
+`dependencies/policy.md`. App Store listing copy (not submitted): `store/en/`.
