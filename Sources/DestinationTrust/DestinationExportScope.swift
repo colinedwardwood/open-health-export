@@ -1,0 +1,85 @@
+// SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+import CoreDomain
+import Foundation
+
+public enum DestinationScopeError: Error, Equatable {
+    case invalidDateRange
+}
+
+/// SEC-16: the complete health-data grant for one destination. Absence is deny, not
+/// "use the global default": a new destination has neither types nor a start date and
+/// therefore cannot receive a health record until both are chosen interactively.
+public struct DestinationExportScope: Sendable, Codable, Equatable {
+    public var destinationID: String
+    public var metrics: Set<MetricID>
+    public var startInclusive: Date?
+    public var endExclusive: Date?
+
+    public init(
+        destinationID: String,
+        metrics: Set<MetricID> = [],
+        startInclusive: Date? = nil,
+        endExclusive: Date? = nil
+    ) throws {
+        if let startInclusive, let endExclusive, endExclusive <= startInclusive {
+            throw DestinationScopeError.invalidDateRange
+        }
+        self.destinationID = destinationID
+        self.metrics = metrics
+        self.startInclusive = startInclusive
+        self.endExclusive = endExclusive
+    }
+
+    public var isConfigured: Bool {
+        !metrics.isEmpty && startInclusive != nil
+    }
+
+    public func allows(metric: MetricID, sampleStart: Date) -> Bool {
+        guard metrics.contains(metric), let startInclusive, sampleStart >= startInclusive else {
+            return false
+        }
+        return endExclusive.map { sampleStart < $0 } ?? true
+    }
+}
+
+/// Versioned as one document so updating a destination's types and dates is one atomic
+/// preference write. Decoding failure is fail-closed at the app boundary.
+public struct DestinationScopeDocument: Sendable, Codable, Equatable {
+    public var schemaVersion: Int
+    public var scopes: [String: DestinationExportScope]
+
+    public init(scopes: [String: DestinationExportScope] = [:]) {
+        schemaVersion = 1
+        self.scopes = scopes
+    }
+
+    public func scope(for destinationID: String) throws -> DestinationExportScope {
+        if let scope = scopes[destinationID] { return scope }
+        return try DestinationExportScope(destinationID: destinationID)
+    }
+
+    public mutating func set(_ scope: DestinationExportScope) {
+        scopes[scope.destinationID] = scope
+    }
+
+    public func encoded() throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .millisecondsSince1970
+        encoder.outputFormatting = [.sortedKeys]
+        return try encoder.encode(self)
+    }
+
+    public static func decoded(_ data: Data) throws -> DestinationScopeDocument {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .millisecondsSince1970
+        let document = try decoder.decode(DestinationScopeDocument.self, from: data)
+        guard document.schemaVersion == 1 else {
+            throw DecodingError.dataCorrupted(
+                .init(codingPath: [], debugDescription: "unsupported destination-scope schema")
+            )
+        }
+        return document
+    }
+}
