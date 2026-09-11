@@ -12,19 +12,22 @@ public struct HTTPSSink: DestinationSink, Sendable {
     public var headerTemplates: [String: String]
     public var bodyTemplate: String?
     public var secrets: (any TemplateSecrets)?
+    public var traceparent: TraceparentEmission?
 
     public init(
         destination: HTTPSDestination,
         transport: any HTTPTransport,
         headerTemplates: [String: String] = [:],
         bodyTemplate: String? = nil,
-        secrets: (any TemplateSecrets)? = nil
+        secrets: (any TemplateSecrets)? = nil,
+        traceparent: TraceparentEmission? = nil
     ) {
         self.destination = destination
         self.transport = transport
         self.headerTemplates = headerTemplates
         self.bodyTemplate = bodyTemplate
         self.secrets = secrets
+        self.traceparent = traceparent
     }
 
     public func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt {
@@ -67,11 +70,49 @@ public struct HTTPSSink: DestinationSink, Sendable {
             .appendingPathComponent("\(idempotencyKey.rawValue).gz")
         try FileWriteKit.writeAtomically(gzipped, to: gzipURL)
         headers["Content-Encoding"] = "gzip"
+        headers = Traceparent.stripForbidden(headers)
+        let emitted = traceparent?.header(seed: idempotencyKey.rawValue)
+        if let emitted {
+            headers[Traceparent.headerName] = emitted
+        }
+        let response: OutboundHTTPResponse
+        var autoDisabled = false
+        do {
+            response = try await execute(headers: headers, bodyFile: gzipURL)
+        } catch {
+            guard emitted != nil, Traceparent.isHeaderPlausibleFailure(error) else {
+                throw error
+            }
+            let retryHeaders = Traceparent.stripForbidden(headers)
+            response = try await execute(headers: retryHeaders, bodyFile: gzipURL)
+            traceparent?.noteAutoDisabled()
+            autoDisabled = true
+        }
+        if let accepted = parseAccepted(response.body) {
+            return DeliveryReceipt(
+                batchID: idempotencyKey,
+                accepted: accepted,
+                statusOnly: false,
+                traceparentAutoDisabled: autoDisabled
+            )
+        }
+        return DeliveryReceipt(
+            batchID: idempotencyKey,
+            accepted: recordCount,
+            statusOnly: true,
+            traceparentAutoDisabled: autoDisabled
+        )
+    }
+
+    private func execute(
+        headers: [String: String],
+        bodyFile: URL
+    ) async throws -> OutboundHTTPResponse {
         let request = OutboundHTTPRequest(
             method: "POST",
             url: destination.url,
             headers: headers,
-            bodyFile: gzipURL
+            bodyFile: bodyFile
         )
         let response = try await transport.execute(request)
         guard (200..<300).contains(response.status) else {
@@ -80,10 +121,7 @@ public struct HTTPSSink: DestinationSink, Sendable {
             }
             throw EgressError.httpStatus(response.status)
         }
-        if let accepted = parseAccepted(response.body) {
-            return DeliveryReceipt(batchID: idempotencyKey, accepted: accepted, statusOnly: false)
-        }
-        return DeliveryReceipt(batchID: idempotencyKey, accepted: recordCount, statusOnly: true)
+        return response
     }
 }
 

@@ -8,6 +8,7 @@ public actor RecordingHTTPTransport: HTTPTransport {
     public var tls: TLSIdentity?
 
     public var queued: [OutboundHTTPResponse] = []
+    public var throwOnce: EgressError?
 
     public init(response: OutboundHTTPResponse, error: EgressError? = nil, tls: TLSIdentity? = nil) {
         self.response = response
@@ -19,12 +20,20 @@ public actor RecordingHTTPTransport: HTTPTransport {
         queued.append(next)
     }
 
+    public func failOnce(_ error: EgressError) {
+        throwOnce = error
+    }
+
     public func identityProbe() async throws -> TLSIdentity? {
         tls
     }
 
     public func execute(_ request: OutboundHTTPRequest) async throws -> OutboundHTTPResponse {
         requests.append(request)
+        if let once = throwOnce {
+            throwOnce = nil
+            throw once
+        }
         if let error {
             throw error
         }

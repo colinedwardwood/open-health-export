@@ -38,6 +38,7 @@ struct HarnessView: View {
     @State private var httpsURL = ""
     @State private var httpsBearer = ""
     @State private var allowInsecureHTTP = false
+    @State private var propagateTraceparent = false
     @State private var httpsTestLines: [String] = []
     @State private var mqttURL = ""
     @State private var mqttClientID = "ohe-iphone"
@@ -217,6 +218,7 @@ struct HarnessView: View {
             if otlpURL.isEmpty {
                 otlpURL = HarnessExport.storedOTLPURL()
             }
+            propagateTraceparent = HarnessExport.storedHTTPSTraceparent()
             let selected = Set(HarnessExport.selectedMetrics())
             browserBaseline = selected
             browserSelection = selected
@@ -532,6 +534,14 @@ struct HarnessView: View {
                     .foregroundStyle(.primary)
                     .fontWeight(.semibold)
             }
+            Toggle("Send traceparent header (opt-in)", isOn: $propagateTraceparent)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("https-traceparent")
+                .onChange(of: propagateTraceparent) { _, enabled in
+                    try? HarnessExport.setHTTPSTraceparent(enabled)
+                }
+            Text("Off by default. Never sends tracestate or baggage.")
+                .font(.footnote)
             Button("Test HTTPS destination") {
                 Task { await testHTTPS() }
             }
@@ -1548,7 +1558,9 @@ struct HarnessView: View {
         do {
             switch confirmationKind {
             case .https:
-                httpsTestLines = try await HarnessExport.confirmPendingHTTPSDestination()
+                httpsTestLines = try await HarnessExport.confirmPendingHTTPSDestination(
+                    propagateTraceparent: propagateTraceparent
+                )
                 httpsBearer = ""
                 status = "Ready. Network destination passed its real-path test and is enabled."
             case .mqtt:

@@ -36,6 +36,7 @@ private struct HTTPSVerificationRecord: Codable {
     var issuerSPKISha256: String?
     var firstSeen: String
     var hasBearer: Bool
+    var propagateTraceparent: Bool?
 }
 
 private struct OTLPDestinationRecord: Codable {
@@ -1145,7 +1146,7 @@ enum HarnessExport {
         )
     }
 
-    static func confirmPendingHTTPSDestination() async throws -> [String] {
+    static func confirmPendingHTTPSDestination(propagateTraceparent: Bool = false) async throws -> [String] {
         guard let pending = await PendingDestination.shared.takeHTTPS() else {
             throw SetupError.verificationRequired
         }
@@ -1159,7 +1160,8 @@ enum HarnessExport {
             leafSPKISha256: probe.identity?.leafSPKISha256,
             issuerSPKISha256: probe.identity?.issuerSPKISha256,
             firstSeen: pending.firstSeen,
-            hasBearer: pending.bearer != nil
+            hasBearer: pending.bearer != nil,
+            propagateTraceparent: propagateTraceparent
         )
         let root = try applicationSupportRoot()
         let bearerStore = KeychainSecretStore(
@@ -1486,10 +1488,15 @@ enum HarnessExport {
         } else {
             transport = base
         }
+        let emission = TraceparentEmission(enabled: saved.propagateTraceparent ?? false)
         var setup = DestinationSetup()
         try setup.resumeEnabled(testReport: saved.report)
         let verified = try setup.enable(
-            sink: HTTPSSink(destination: destination, transport: transport)
+            sink: HTTPSSink(
+                destination: destination,
+                transport: transport,
+                traceparent: emission
+            )
         )
         let store = try SQLiteStateStore(
             path: root.appendingPathComponent("state.sqlite").path
@@ -1527,6 +1534,10 @@ enum HarnessExport {
                 ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json")
             ).run()
             lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
+        }
+        if emission.autoDisabled {
+            try setHTTPSTraceparent(false)
+            lines.append("traceparent auto-disabled after a header-plausible failure")
         }
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
         return lines
@@ -1574,6 +1585,28 @@ enum HarnessExport {
             UserNotice(kind: .queueExpired, destination: "Configured destinations")
         )
         return result
+    }
+
+    static func storedHTTPSTraceparent() -> Bool {
+        guard let root = try? applicationSupportRoot(),
+              let data = try? Data(contentsOf: root.appendingPathComponent("https-destination.json")),
+              let record = try? JSONDecoder().decode(HTTPSVerificationRecord.self, from: data)
+        else {
+            return false
+        }
+        return record.propagateTraceparent ?? false
+    }
+
+    static func setHTTPSTraceparent(_ enabled: Bool) throws {
+        let root = try applicationSupportRoot()
+        let url = root.appendingPathComponent("https-destination.json")
+        guard let data = try? Data(contentsOf: url),
+              var record = try? JSONDecoder().decode(HTTPSVerificationRecord.self, from: data)
+        else {
+            return
+        }
+        record.propagateTraceparent = enabled
+        try JSONEncoder().encode(record).write(to: url, options: .atomic)
     }
 
     static func storedOTLPURL() -> String {

@@ -66,6 +66,18 @@ enum DeliveryExecutor {
                 fileHandle: batch.payloadURL,
                 idempotencyKey: batch.id
             )
+            if receipt.traceparentAutoDisabled {
+                try await store.transact { tx in
+                    try tx.appendJournal(
+                        RunEvent(
+                            runID: RunID(rawValue: batch.id.rawValue),
+                            outcomeKind: "traceparent_auto_disabled",
+                            detail: "retried_without_header",
+                            wallTimeEpoch: clock.now().timeIntervalSince1970
+                        )
+                    )
+                }
+            }
             try beforeAckObservation()
             let phase: String
             if receipt.unconfirmed > 0 {

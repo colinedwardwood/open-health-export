@@ -226,11 +226,19 @@ public struct DeliveryReceipt: Sendable {
     public var accepted: Int
     public var statusOnly: Bool
     public var unconfirmed: Int
-    public init(batchID: BatchID, accepted: Int, statusOnly: Bool, unconfirmed: Int = 0) {
+    public var traceparentAutoDisabled: Bool
+    public init(
+        batchID: BatchID,
+        accepted: Int,
+        statusOnly: Bool,
+        unconfirmed: Int = 0,
+        traceparentAutoDisabled: Bool = false
+    ) {
         self.batchID = batchID
         self.accepted = accepted
         self.statusOnly = statusOnly
         self.unconfirmed = unconfirmed
+        self.traceparentAutoDisabled = traceparentAutoDisabled
     }
 }
 

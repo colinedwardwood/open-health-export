@@ -67,6 +67,9 @@ import WireFormat
     #expect(requests[0].headers["Idempotency-Key"] == batchID.rawValue)
     #expect(requests[0].headers["Content-Type"] == "application/x-ndjson; profile=\"ohe.wire/1\"")
     #expect(requests[0].headers["Content-Encoding"] == "gzip")
+    #expect(requests[0].headers["traceparent"] == nil)
+    #expect(requests[0].headers["tracestate"] == nil)
+    #expect(requests[0].headers["baggage"] == nil)
 }
 
 @Test func duplicateHTTPSDeliveryConvergesAtTheReceiver() async throws {

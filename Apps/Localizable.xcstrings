@@ -1003,6 +1003,17 @@
         }
       }
     },
+    "Off by default. Never sends tracestate or baggage.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Off by default. Never sends tracestate or baggage."
+          }
+        }
+      }
+    },
     "Only types with data": {
       "extractionState": "manual",
       "localizations": {
@@ -1362,6 +1373,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Send sample destination-enabled notice"
+          }
+        }
+      }
+    },
+    "Send traceparent header (opt-in)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send traceparent header (opt-in)"
           }
         }
       }
