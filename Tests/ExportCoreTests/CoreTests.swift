@@ -2187,6 +2187,43 @@ private func anchorHoldFixture(
     #expect(!AnchorGuard.cursorIsLost(hasCursor: true, lastEmittedDay: "2026-09-08"))
 }
 
+/// QA-14: the line a user reads has to answer "is it working" and, when it is not,
+/// "why". A stored state cannot answer the first, because a destination that succeeded
+/// and then stopped keeps saying healthy for as long as nobody recomputes it.
+@Test func theDestinationLineAgesAndNamesItsReason() {
+    let day: TimeInterval = 86_400
+    let base = DestinationStatusSnapshot(
+        destinationID: "ha",
+        destinationLabel: "Home Assistant",
+        enabled: true,
+        lastOutcome: "success",
+        lastSuccessEpoch: 1_000_000,
+        errorClass: ErrorClass.none.rawValue,
+        staleThresholdSeconds: day,
+        overdueThresholdSeconds: 7 * day,
+        writtenAtEpoch: 1_000_000
+    )
+    func line(_ snapshot: DestinationStatusSnapshot, at epoch: TimeInterval) -> String {
+        DestinationStatusLine.render(snapshot, nowEpoch: epoch) { _ in "a moment ago" }
+    }
+
+    #expect(line(base, at: 1_000_060).contains("healthy"))
+    // Same snapshot, later reading: the answer has to change without anything running.
+    #expect(line(base, at: 1_000_000 + (2 * day)).contains("stale"))
+    #expect(line(base, at: 1_000_000 + (8 * day)).contains("overdue"))
+    // A success does not carry a reason code, so nothing is appended.
+    #expect(!line(base, at: 1_000_060).contains(ErrorClass.none.rawValue))
+
+    var failed = base
+    failed.lastOutcome = "failed"
+    failed.state = .failing
+    failed.errorClass = ErrorClass.destinationUnreachable.rawValue
+    let failedLine = line(failed, at: 1_000_060)
+    #expect(failedLine.contains("failing"))
+    #expect(failedLine.contains(ErrorClass.destinationUnreachable.rawValue))
+    #expect(failedLine.contains("last success"))
+}
+
 @Test func queueAdmissionEvictsOldestBatchesAndRecordsGaps() async throws {
     let metric = MetricID(rawValue: "heartRate")
     let page = SamplePage(

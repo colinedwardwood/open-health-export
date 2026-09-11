@@ -205,6 +205,12 @@ struct HarnessView: View {
                 await refreshWakeAttribution()
                 await refreshSecurityAdvisory()
                 #if DEBUG
+                if let scenario = ProcessInfo.processInfo
+                    .environment["OHE_SEED_DESTINATION_STATUS"]
+                {
+                    try? HarnessExport.seedDestinationStatusForUITests(scenario: scenario)
+                    refreshDestinationSurfaces()
+                }
                 if let held = ProcessInfo.processInfo.environment["OHE_SEED_ANCHOR_HOLD"] {
                     try? await HarnessExport.seedAnchorHoldForUITests(
                         metric: MetricID(rawValue: held)

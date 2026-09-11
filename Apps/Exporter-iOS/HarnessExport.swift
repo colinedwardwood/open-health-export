@@ -848,14 +848,12 @@ enum HarnessExport {
 
     static func destinationStatusLines() -> [String] {
         let snapshots = StatusSnapshotLocation.readAll()
-        guard !snapshots.isEmpty else { return ["No destination snapshots yet."] }
+        guard !snapshots.isEmpty else { return [DestinationStatusLine.emptyCopy] }
+        let now = Date().timeIntervalSince1970
         return snapshots.map { snapshot in
-            let last = snapshot.lastSuccessEpoch.map {
+            DestinationStatusLine.render(snapshot, nowEpoch: now) {
                 Date(timeIntervalSince1970: $0).formatted(date: .abbreviated, time: .shortened)
-            } ?? "never"
-            let changes = snapshot.unacknowledgedSecurityEventCount
-            let changeSuffix = changes > 0 ? " · \(changes) unacknowledged change(s)" : ""
-            return "\(snapshot.destinationLabel): \(snapshot.state.rawValue) · last success \(last)\(changeSuffix)"
+            }
         }
     }
 
@@ -908,6 +906,59 @@ enum HarnessExport {
     }
 
     #if DEBUG
+    /// QA-14 wants the success, stale and failed surfaces asserted. Reaching them for
+    /// real needs a destination, a network and a clock that has moved on by days, none
+    /// of which a UI test has. Seeding the snapshot exercises the same read path the
+    /// app uses in the field.
+    static func seedDestinationStatusForUITests(scenario: String) throws {
+        let now = Date().timeIntervalSince1970
+        let day: TimeInterval = 86_400
+        let snapshot: DestinationStatusSnapshot
+        switch scenario {
+        case "stale":
+            snapshot = DestinationStatusSnapshot(
+                destinationID: "home-assistant",
+                destinationLabel: "Home Assistant",
+                enabled: true,
+                lastOutcome: "success",
+                lastSuccessEpoch: now - (3 * day),
+                staleThresholdSeconds: day,
+                overdueThresholdSeconds: 7 * day,
+                writtenAtEpoch: now
+            )
+        case "failed":
+            snapshot = DestinationStatusSnapshot(
+                destinationID: "home-assistant",
+                destinationLabel: "Home Assistant",
+                enabled: true,
+                lastOutcome: "failed",
+                lastSuccessEpoch: now - (2 * day),
+                errorClass: ErrorClass.destinationUnreachable.rawValue,
+                writtenAtEpoch: now
+            )
+        default:
+            snapshot = DestinationStatusSnapshot(
+                destinationID: "home-assistant",
+                destinationLabel: "Home Assistant",
+                enabled: true,
+                lastOutcome: "success",
+                lastSuccessEpoch: now - 60,
+                errorClass: ErrorClass.none.rawValue,
+                staleThresholdSeconds: day,
+                writtenAtEpoch: now
+            )
+        }
+        guard let url = StatusSnapshotLocation.url(destinationID: snapshot.destinationID)
+        else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try DestinationSnapshotFile.write(snapshot, to: url)
+    }
+
     /// A hold can only arise from state the simulator has no way to produce — a cursor
     /// that went missing behind a real HealthKit history. Seeding one is the only way a
     /// UI test can assert what the user sees when it happens.

@@ -6,11 +6,25 @@ enum StatusSnapshotLocation {
         Bundle.main.object(forInfoDictionaryKey: "OHEAppGroupIdentifier") as? String
     }
 
+    /// The shared container is what the widget reads, so that is where status belongs
+    /// when it exists. When it does not — an unsigned build, a missing entitlement —
+    /// the app still has to be able to show its own last success and last failure.
+    /// Going blank there would hide exactly the silent failure this surface exists to
+    /// reveal, so fall back to the app's own storage rather than showing nothing.
     static func directory(fileManager: FileManager = .default) -> URL? {
-        guard let appGroupIdentifier, !appGroupIdentifier.isEmpty else { return nil }
-        return fileManager
-            .containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier)?
-            .appendingPathComponent("DestinationStatus", isDirectory: true)
+        if let appGroupIdentifier, !appGroupIdentifier.isEmpty,
+           let shared = fileManager
+           .containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier)
+        {
+            return shared.appendingPathComponent("DestinationStatus", isDirectory: true)
+        }
+        return try? fileManager.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        .appendingPathComponent("DestinationStatus", isDirectory: true)
     }
 
     static func url(

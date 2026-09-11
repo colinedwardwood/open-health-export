@@ -102,6 +102,39 @@ final class ExporterUITests: XCTestCase {
         )
     }
 
+    /// QA-14: the three states a person needs to tell apart, on the surface they read.
+    func testDestinationStatusShowsSuccessStaleAndFailedWithItsReason() {
+        let healthy = destinationLine(seeding: "success")
+        XCTAssertTrue(healthy.contains("Home Assistant"), healthy)
+        XCTAssertTrue(healthy.contains("healthy"), healthy)
+        XCTAssertTrue(healthy.contains("last success"), healthy)
+
+        // Nothing ran in between. Only the reading moved, and the answer changed.
+        let stale = destinationLine(seeding: "stale")
+        XCTAssertTrue(stale.contains("stale"), stale)
+
+        let failed = destinationLine(seeding: "failed")
+        XCTAssertTrue(failed.contains("failing"), failed)
+        XCTAssertTrue(failed.contains("destinationUnreachable"), failed)
+        // A failure still says when it last worked, which is what makes it reportable.
+        XCTAssertTrue(failed.contains("last success"), failed)
+    }
+
+    private func destinationLine(seeding scenario: String) -> String {
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_DESTINATION_STATUS"] = scenario
+        app.launch()
+        enterControls()
+        let refresh = scrollToHittable(app.buttons["destination-refresh"])
+        refresh.tap()
+        let line = app.staticTexts["destination-status-0"]
+        XCTAssertTrue(
+            line.waitForExistence(timeout: uiWait),
+            "no destination line for \(scenario); available: \(visibleIdentifiers())"
+        )
+        return line.label
+    }
+
     func testDiagnosticShareExistsOnlyPastTheBundlesLastLine() {
         enterControls()
         let build = scrollToHittable(app.buttons["diagnostic-build"])
