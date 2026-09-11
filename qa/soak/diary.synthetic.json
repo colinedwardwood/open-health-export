@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "runId": "00000000-0000-4000-8000-000000000088",
+  "device": {
+    "model": "Synthetic Phone",
+    "osBuild": "synthetic-os",
+    "appBuild": "synthetic-app"
+  },
+  "destinationProfile": "local-file",
+  "entries": [
+    {"date":"2026-01-01","recordedAt":"2026-01-01T12:00:00Z","installed":true,"destinationConfigured":true,"successfulCheckVisible":true,"events":["none"],"evidenceRef":"synthetic:d01","note":""},
+    {"date":"2026-01-02","recordedAt":"2026-01-02T12:00:00Z","installed":true,"destinationConfigured":true,"successfulCheckVisible":true,"events":["none"],"evidenceRef":"synthetic:d02","note":""},
+    {"date":"2026-01-03","recordedAt":"2026-01-03T12:00:00Z","installed":true,"destinationConfigured":true,"successfulCheckVisible":true,"events":["restart"],"evidenceRef":"synthetic:d03","note":""},
+    {"date":"2026-01-04","recordedAt":"2026-01-04T12:00:00Z","installed":true,"destinationConfigured":true,"successfulCheckVisible":true,"events":["none"],"evidenceRef":"synthetic:d04","note":""},
+    {"date":"2026-01-05","recordedAt":"2026-01-05T12:00:00Z","installed":true,"destinationConfigured":true,"successfulCheckVisible":true,"events":["none"],"evidenceRef":"synthetic:d05","note":""},
+    {"date":"2026-01-06","recordedAt":"2026-01-06T12:00:00Z","installed":true,"destinationConfigured":true,"successfulCheckVisible":true,"events":["none"],"evidenceRef":"synthetic:d06","note":""},
+    {"date":"2026-01-07","recordedAt":"2026-01-07T12:00:00Z","installed":true,"destinationConfigured":true,"successfulCheckVisible":true,"events":["none"],"evidenceRef":"synthetic:d07","note":""},
+    {"date":"2026-01-08","recordedAt":"2026-01-08T12:00:00Z","installed":true,"destinationConfigured":true,"successfulCheckVisible":true,"events":["offline"],"evidenceRef":"synthetic:d08","note":"Synthetic event."},
+    {"date":"2026-01-09","recordedAt":"2026-01-09T12:00:00Z","installed":true,"destinationConfigured":true,"successfulCheckVisible":true,"events":["none"],"evidenceRef":"synthetic:d09","note":""},
+    {"date":"2026-01-10","recordedAt":"2026-01-10T12:00:00Z","installed":true,"destinationConfigured":true,"successfulCheckVisible":true,"events":["none"],"evidenceRef":"synthetic:d10","note":""},
+    {"date":"2026-01-11","recordedAt":"2026-01-11T12:00:00Z","installed":true,"destinationConfigured":true,"successfulCheckVisible":true,"events":["none"],"evidenceRef":"synthetic:d11","note":""},
+    {"date":"2026-01-12","recordedAt":"2026-01-12T12:00:00Z","installed":true,"destinationConfigured":true,"successfulCheckVisible":true,"events":["none"],"evidenceRef":"synthetic:d12","note":""},
+    {"date":"2026-01-13","recordedAt":"2026-01-13T12:00:00Z","installed":true,"destinationConfigured":true,"successfulCheckVisible":true,"events":["none"],"evidenceRef":"synthetic:d13","note":""},
+    {"date":"2026-01-14","recordedAt":"2026-01-14T12:00:00Z","installed":true,"destinationConfigured":true,"successfulCheckVisible":true,"events":["none"],"evidenceRef":"synthetic:d14","note":""},
+    {"date":"2026-01-15","recordedAt":"2026-01-15T12:00:00Z","installed":true,"destinationConfigured":true,"successfulCheckVisible":true,"events":["app-update"],"evidenceRef":"synthetic:d15","note":""},
+    {"date":"2026-01-16","recordedAt":"2026-01-16T12:00:00Z","installed":true,"destinationConfigured":true,"successfulCheckVisible":true,"events":["none"],"evidenceRef":"synthetic:d16","note":""},
+    {"date":"2026-01-17","recordedAt":"2026-01-17T12:00:00Z","installed":true,"destinationConfigured":true,"successfulCheckVisible":true,"events":["none"],"evidenceRef":"synthetic:d17","note":""},
+    {"date":"2026-01-18","recordedAt":"2026-01-18T12:00:00Z","installed":true,"destinationConfigured":true,"successfulCheckVisible":true,"events":["none"],"evidenceRef":"synthetic:d18","note":""},
+    {"date":"2026-01-19","recordedAt":"2026-01-19T12:00:00Z","installed":true,"destinationConfigured":true,"successfulCheckVisible":true,"events":["none"],"evidenceRef":"synthetic:d19","note":""},
+    {"date":"2026-01-20","recordedAt":"2026-01-20T12:00:00Z","installed":true,"destinationConfigured":true,"successfulCheckVisible":true,"events":["none"],"evidenceRef":"synthetic:d20","note":""},
+    {"date":"2026-01-21","recordedAt":"2026-01-21T12:00:00Z","installed":true,"destinationConfigured":true,"successfulCheckVisible":true,"events":["none"],"evidenceRef":"synthetic:d21","note":""}
+  ]
+}

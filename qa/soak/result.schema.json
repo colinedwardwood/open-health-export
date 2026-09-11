@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://open-health-exporter.invalid/qa/soak/result.schema.json",
+  "title": "R-88 reconciliation result",
+  "type": "object",
+  "required": ["schemaVersion", "runId", "window", "reconciliation", "signoff"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "runId": { "type": "string", "format": "uuid" },
+    "window": {
+      "type": "object",
+      "required": ["startDate", "endDate"],
+      "properties": {
+        "startDate": { "type": "string", "format": "date" },
+        "endDate": { "type": "string", "format": "date" }
+      },
+      "additionalProperties": false
+    },
+    "reconciliation": {
+      "type": "object",
+      "required": ["completed", "cellsCompared", "discrepancies", "unexplained", "evidenceDigest"],
+      "properties": {
+        "completed": { "type": "boolean" },
+        "cellsCompared": { "type": "integer", "minimum": 1 },
+        "discrepancies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["class", "count", "issueRef"],
+            "properties": {
+              "class": {
+                "enum": [
+                  "healthkit-no-callback-deletion",
+                  "r71-platform-cap",
+                  "queue-eviction-with-gap",
+                  "hae-profile-limitation"
+                ]
+              },
+              "count": { "type": "integer", "minimum": 1 },
+              "issueRef": { "type": "string", "minLength": 1 }
+            },
+            "additionalProperties": false
+          }
+        },
+        "unexplained": { "type": "integer", "minimum": 0 },
+        "evidenceDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    "signoff": {
+      "type": "object",
+      "required": ["operator", "reviewer", "completedAt", "outcome"],
+      "properties": {
+        "operator": { "type": "string", "minLength": 1 },
+        "reviewer": { "type": "string", "minLength": 1 },
+        "completedAt": { "type": "string", "format": "date-time" },
+        "outcome": { "enum": ["pass", "fail"] }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

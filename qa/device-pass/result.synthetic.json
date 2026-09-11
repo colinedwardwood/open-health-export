@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "runId": "00000000-0000-4000-8000-000000000087",
+  "releaseCandidate": "synthetic-fixture-only",
+  "device": {
+    "model": "Synthetic Phone",
+    "osBuild": "synthetic-os",
+    "appBuild": "synthetic-app"
+  },
+  "store": {
+    "historyDays": 730,
+    "sourceCount": 3,
+    "characteristics": ["phone", "watch", "third-party"]
+  },
+  "checks": [
+    {"id": "onboarding-disclosure", "outcome": "pass", "evidenceRef": "synthetic:e1", "note": ""},
+    {"id": "authorization-states", "outcome": "pass", "evidenceRef": "synthetic:e2", "note": ""},
+    {"id": "health-browser-comparison", "outcome": "pass", "evidenceRef": "synthetic:e3", "note": ""},
+    {"id": "destination-canary", "outcome": "pass", "evidenceRef": "synthetic:e4", "note": ""},
+    {"id": "destination-change-notice", "outcome": "pass", "evidenceRef": "synthetic:e5", "note": ""},
+    {"id": "certificate-change-halt", "outcome": "pass", "evidenceRef": "synthetic:e6", "note": ""},
+    {"id": "diagnostic-second-person", "outcome": "pass", "evidenceRef": "synthetic:e7", "note": ""},
+    {"id": "hidden-destination-prohibited", "outcome": "pass", "evidenceRef": "synthetic:e8", "note": ""},
+    {"id": "statistics-comparison", "outcome": "pass", "evidenceRef": "synthetic:e9", "note": ""},
+    {"id": "encrypted-backup", "outcome": "pass", "evidenceRef": "synthetic:e10", "note": ""},
+    {"id": "delete-all", "outcome": "pass", "evidenceRef": "synthetic:e11", "note": ""},
+    {"id": "status-widget", "outcome": "pass", "evidenceRef": "synthetic:e12", "note": ""},
+    {"id": "voiceover-critical-flows", "outcome": "pass", "evidenceRef": "synthetic:e13", "note": ""}
+  ],
+  "signoff": {
+    "operator": "synthetic-operator",
+    "reviewer": "synthetic-reviewer",
+    "completedAt": "2026-01-01T00:00:00Z",
+    "outcome": "pass"
+  }
+}

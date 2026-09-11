@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://open-health-exporter.invalid/qa/soak/diary.schema.json",
+  "title": "R-88 value-free daily diary",
+  "type": "object",
+  "required": ["schemaVersion", "runId", "device", "destinationProfile", "entries"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "runId": { "type": "string", "format": "uuid" },
+    "device": {
+      "type": "object",
+      "required": ["model", "osBuild", "appBuild"],
+      "properties": {
+        "model": { "type": "string", "minLength": 1 },
+        "osBuild": { "type": "string", "minLength": 1 },
+        "appBuild": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "destinationProfile": { "enum": ["local-file", "https", "mqtt", "companion", "hae"] },
+    "entries": {
+      "type": "array",
+      "minItems": 21,
+      "items": {
+        "type": "object",
+        "required": ["date", "recordedAt", "installed", "destinationConfigured", "successfulCheckVisible", "events", "evidenceRef", "note"],
+        "properties": {
+          "date": { "type": "string", "format": "date" },
+          "recordedAt": { "type": "string", "format": "date-time" },
+          "installed": { "type": "boolean" },
+          "destinationConfigured": { "type": "boolean" },
+          "successfulCheckVisible": { "type": "boolean" },
+          "events": {
+            "type": "array",
+            "items": { "enum": ["none", "restart", "os-update", "app-update", "offline", "queue-gap", "other"] },
+            "uniqueItems": true
+          },
+          "evidenceRef": { "type": "string", "minLength": 1 },
+          "note": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

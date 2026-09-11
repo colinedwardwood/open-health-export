@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://open-health-exporter.invalid/qa/device-pass/result.schema.json",
+  "title": "R-87 device pass record",
+  "type": "object",
+  "required": ["schemaVersion", "runId", "releaseCandidate", "device", "store", "checks", "signoff"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "runId": { "type": "string", "format": "uuid" },
+    "releaseCandidate": { "type": "string", "minLength": 1 },
+    "device": {
+      "type": "object",
+      "required": ["model", "osBuild", "appBuild"],
+      "properties": {
+        "model": { "type": "string", "minLength": 1 },
+        "osBuild": { "type": "string", "minLength": 1 },
+        "appBuild": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "store": {
+      "type": "object",
+      "required": ["historyDays", "sourceCount", "characteristics"],
+      "properties": {
+        "historyDays": { "type": "integer", "minimum": 730 },
+        "sourceCount": { "type": "integer", "minimum": 3 },
+        "characteristics": {
+          "type": "array",
+          "items": { "enum": ["phone", "watch", "third-party", "clinical", "manual-entry", "other"] },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "outcome", "evidenceRef", "note"],
+        "properties": {
+          "id": { "type": "string" },
+          "outcome": { "enum": ["pass", "fail", "blocked"] },
+          "evidenceRef": { "type": "string", "minLength": 1 },
+          "note": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "signoff": {
+      "type": "object",
+      "required": ["operator", "reviewer", "completedAt", "outcome"],
+      "properties": {
+        "operator": { "type": "string", "minLength": 1 },
+        "reviewer": { "type": "string", "minLength": 1 },
+        "completedAt": { "type": "string", "format": "date-time" },
+        "outcome": { "enum": ["pass", "fail"] }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

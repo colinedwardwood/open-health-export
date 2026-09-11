@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "runId": "00000000-0000-4000-8000-000000000088",
+  "window": {
+    "startDate": "2026-01-01",
+    "endDate": "2026-01-21"
+  },
+  "reconciliation": {
+    "completed": true,
+    "cellsCompared": 21,
+    "discrepancies": [],
+    "unexplained": 0,
+    "evidenceDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000088"
+  },
+  "signoff": {
+    "operator": "synthetic-operator",
+    "reviewer": "synthetic-reviewer",
+    "completedAt": "2026-01-21T13:00:00Z",
+    "outcome": "pass"
+  }
+}
