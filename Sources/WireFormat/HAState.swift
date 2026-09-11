@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import Foundation
 
 /// Non-retained Home Assistant state JSON. Sample UUIDs and HAE `qty` never appear here.

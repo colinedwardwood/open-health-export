@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import Foundation
 
 /// One attributable network action (R-52). Health values never appear here.

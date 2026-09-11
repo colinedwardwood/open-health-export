@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import Foundation
 import MetricCatalog
 import WireFormat
@@ -791,6 +794,45 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck governance artifacts: ok")
+        try checkLicenceTexts(root: root)
+    }
+
+    /// OSS-15: `reuse lint` proves every file is annotated, but it cannot tell that the
+    /// copy of the licence under `LICENSES/` still says what the root grant says. Two
+    /// copies of the same text is what REUSE asks for, so the identity is asserted here
+    /// rather than left to whoever edits one of them.
+    static func checkLicenceTexts(root: URL) throws {
+        var problems: [String] = []
+        let manifest = root.appendingPathComponent("REUSE.toml")
+        guard let toml = try? String(contentsOf: manifest, encoding: .utf8) else {
+            FileHandle.standardError.write(Data("REUSE.toml is missing\n".utf8))
+            exit(1)
+        }
+
+        let grant = try String(contentsOf: root.appendingPathComponent("LICENSE"), encoding: .utf8)
+        let copy = root.appendingPathComponent("LICENSES/AGPL-3.0-or-later.txt")
+        if (try? String(contentsOf: copy, encoding: .utf8)) != grant {
+            problems.append("LICENSES/AGPL-3.0-or-later.txt is not byte-identical to LICENSE")
+        }
+
+        // Every identifier the manifest names needs its verbatim text on disk, or the
+        // lint passes locally and fails for whoever packages a release.
+        for line in toml.split(whereSeparator: \.isNewline)
+            where line.contains("SPDX-License-Identifier")
+        {
+            guard let quoted = line.split(separator: "\"").dropFirst().first else { continue }
+            let identifier = String(quoted)
+            let text = root.appendingPathComponent("LICENSES/\(identifier).txt")
+            if !FileManager.default.fileExists(atPath: text.path) {
+                problems.append("REUSE.toml names \(identifier) with no LICENSES/\(identifier).txt")
+            }
+        }
+
+        if !problems.isEmpty {
+            FileHandle.standardError.write(Data((problems.joined(separator: "\n") + "\n").utf8))
+            exit(1)
+        }
+        print("policycheck licence texts: ok")
     }
 
     static func checkHostTZDataPin(root: URL) throws {

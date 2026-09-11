@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import Foundation
 
 /// R-65: display units follow the region, per measurement family rather than per

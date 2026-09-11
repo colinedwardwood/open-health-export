@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 #if DEBUG
 /// R-83's six stable pipeline locations. The injected vocabulary lives in test support; release
 /// builds contain neither this protocol nor calls to it.

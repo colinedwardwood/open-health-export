@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
 set -euo pipefail
 # Xcode Cloud / laptop / Actions: one generator entry point.
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

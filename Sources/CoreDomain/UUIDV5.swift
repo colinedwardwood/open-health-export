@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import Foundation
 
 /// RFC 4122 UUID version 5 (SHA-1 name-based). Used for deterministic series chunk IDs.

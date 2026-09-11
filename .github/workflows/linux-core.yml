@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 name: linux-core
 on:
   push:
@@ -11,6 +14,20 @@ concurrency:
   group: linux-core-${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
+  # OSS-15. Kept separate from export-core so a licence-header slip reports as a
+  # licence failure rather than hiding inside a 90-minute test job.
+  licence-headers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      # Pinned: an unpinned linter turns someone else's release into our red build.
+      # charset-normalizer replaces libmagic, which reuse otherwise needs from apt.
+      - name: Install REUSE
+        run: pipx install 'reuse[charset-normalizer]==6.2.0'
+      - name: Lint licence and copyright headers
+        run: reuse lint
+
   export-core:
     runs-on: ubuntu-latest
     timeout-minutes: 90

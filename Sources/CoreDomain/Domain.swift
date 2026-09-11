@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// Domain values. No I/O, no Foundation calendars, no HealthKit.
 public struct MetricID: Hashable, Sendable, Codable, RawRepresentable {
     public var rawValue: String

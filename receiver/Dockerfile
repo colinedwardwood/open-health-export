@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 FROM swift:6.3.3-jammy AS build
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libsqlite3-dev zlib1g-dev \

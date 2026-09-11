@@ -1,0 +1,33 @@
+version = 1
+SPDX-PackageName = "open-health-exporter"
+SPDX-PackageSupplier = "Colin Edward Wood <woodce@gmail.com>"
+SPDX-PackageDownloadLocation = "https://github.com/colinedwardwood/open-health-export"
+
+# OSS-15 / REUSE 3.3. Source files carry their own SPDX headers; these annotations
+# cover the files that cannot hold a comment — JSON, NDJSON fixtures, plists, string
+# catalogues — and restate the split already written down in COPYING. `precedence =
+# "aggregate"` means a file's own header always wins over the glob.
+#
+# The catch-all comes first so a newly added data file inherits the outbound licence
+# rather than silently failing the lint. Later entries win, so the narrower docs and
+# spec globs override it.
+
+[[annotations]]
+path = "**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Colin Edward Wood and contributors"
+SPDX-License-Identifier = "AGPL-3.0-or-later"
+
+[[annotations]]
+path = "docs/**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Colin Edward Wood and contributors"
+SPDX-License-Identifier = "CC-BY-4.0"
+
+# The wire format is the interoperability surface. Copyleft on it would defeat the
+# point of anyone else implementing a receiver, so it stays public domain.
+[[annotations]]
+path = "spec/**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Colin Edward Wood and contributors"
+SPDX-License-Identifier = "CC0-1.0"

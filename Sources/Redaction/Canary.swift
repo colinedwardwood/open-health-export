@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// Seeded R-51 canary values. Every egress-capable sink is grepped for these tokens.
 #if DEBUG
 public enum RedactionCanary {

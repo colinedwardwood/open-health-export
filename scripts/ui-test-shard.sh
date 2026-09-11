@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Prints the -only-testing arguments for one shard of the XCUITest suite.
 #
 # The list is derived from the test source rather than maintained by hand, so a new

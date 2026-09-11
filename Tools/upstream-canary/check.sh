@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # QA-22: compare declared HA/Mosquitto pins to current upstream stables.
 # Never a required PR check. A divergence fails this job and opens one tracking issue.
 set -euo pipefail

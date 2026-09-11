@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// Per-class registry. `record(for:)` is a total `switch` so a new `ErrorClass` case is a compile
 /// error until the table grows. The bijection test still asserts unique copy keys (DP-6).
 public struct ErrorClassRecord: Sendable, Equatable {

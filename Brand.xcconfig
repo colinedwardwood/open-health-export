@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // D-06 is open. This is the only file that may contain a user-visible product name.
 PRODUCT_NAME = OpenHealthExporter
 PRODUCT_BUNDLE_IDENTIFIER_ROOT = app.openhealthexporter

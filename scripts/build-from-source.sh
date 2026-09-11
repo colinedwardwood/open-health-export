@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # QA-30 / R-108: the stranger-test build. No paid Apple Developer Program, no App
 # Store Connect, and no flags that skip signing.
 #
