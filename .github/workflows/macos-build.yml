@@ -34,51 +34,64 @@ jobs:
           done
           swift test --filter MosquittoExternalBrokerTests
 
-  ios-app:
+  ios-build:
     runs-on: macos-26
-    # The whole suite on one runner ran to 26 minutes and was cut off mid-run. Split
-    # across two runners it is half that, and the split is derived from the test source
-    # so a new case cannot land outside every shard.
-    timeout-minutes: 40
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [0, 1]
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Install build tools
         run: brew install xcodegen
       - name: Generate Xcode project
         run: xcodegen generate
-      - name: Build iOS exporter and widget
+      - name: Build the app and its UI tests once
         run: |
           xcodebuild \
             -project OpenHealthExporter.xcodeproj \
-            -target ExporteriOS \
+            -scheme ExporteriOS \
             -sdk iphonesimulator \
             -configuration Debug \
+            -derivedDataPath "$RUNNER_TEMP/ohe-dd" \
             CODE_SIGNING_ALLOWED=NO \
-            build
-      - name: Test critical iOS UI paths (shard ${{ matrix.shard }} of 2)
+            build-for-testing
+      - name: Publish the built products for the test shards
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ios-test-products
+          path: ${{ runner.temp }}/ohe-dd/Build/Products
+          retention-days: 1
+
+  ios-ui:
+    needs: ios-build
+    runs-on: macos-26
+    # The suite ran to the wall on one runner. Three runners share it, and they run the
+    # products the build job already produced rather than each rebuilding the app.
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collect the built products
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ios-test-products
+          path: ${{ runner.temp }}/products
+      - name: Test critical iOS UI paths (shard ${{ matrix.shard }} of 3)
         run: |
           DESTINATION_ID="$(
             xcrun simctl list devices available -j |
               python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for runtime in d.values() for x in runtime if "iPhone" in x["name"]))'
           )"
-          # Each UI case drives its own simulator clone, so the suite scales with
-          # the runner instead of serialising fourteen app launches.
-          xcodebuild \
-            -project OpenHealthExporter.xcodeproj \
-            -scheme ExporteriOS \
-            -sdk iphonesimulator \
+          # Each UI case drives its own simulator clone, so a shard scales with the
+          # runner instead of serialising its app launches.
+          xcodebuild test-without-building \
+            -xctestrun "$RUNNER_TEMP"/products/*.xctestrun \
             -destination "platform=iOS Simulator,id=${DESTINATION_ID}" \
-            -configuration Debug \
             -parallel-testing-enabled YES \
             -maximum-parallel-testing-workers 3 \
-            CODE_SIGNING_ALLOWED=NO \
             -resultBundlePath "$RUNNER_TEMP/ohe-ui.xcresult" \
-            $(bash scripts/ui-test-shard.sh ${{ matrix.shard }} 2) \
-            test
+            $(bash scripts/ui-test-shard.sh ${{ matrix.shard }} 3)
       # xcodebuild's summary names the failing case but not the assertion, which
       # leaves a red UI run with nothing to diagnose it from.
       - name: Keep the UI result bundle when a case fails

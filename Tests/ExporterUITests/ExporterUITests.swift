@@ -116,8 +116,19 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(end.waitForExistence(timeout: uiWait))
         scrollToHittable(end)
 
+        // The reveal is driven by the end marker's scroll visibility, and a marker that
+        // has only just become hittable can sit far enough off the edge that no
+        // visibility change is delivered. Keep traversing until the bundle's last line
+        // is genuinely on screen rather than technically reachable.
         let share = app.buttons["diagnostic-share"]
-        XCTAssertTrue(share.waitForExistence(timeout: uiWait))
+        for _ in 0 ..< 10 where !share.exists {
+            app.swipeUp()
+            _ = share.waitForExistence(timeout: 2)
+        }
+        XCTAssertTrue(
+            share.waitForExistence(timeout: uiWait),
+            "share never appeared after traversing to the bundle's end"
+        )
         XCTAssertGreaterThan(share.frame.minY, end.frame.minY)
     }
 
