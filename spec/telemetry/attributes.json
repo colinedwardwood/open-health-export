@@ -1,0 +1,45 @@
+{
+  "schema": "ohe.telemetry.attributes/1",
+  "attributes": [
+    {
+      "key": "service.name",
+      "type": "string",
+      "healthDerived": false,
+      "domain": ["open-health-exporter"],
+      "justification": "Names the locally built service in the user's collector."
+    },
+    {
+      "key": "outcome",
+      "type": "string",
+      "healthDerived": false,
+      "domain": [
+        "success",
+        "successNothingDue",
+        "partial",
+        "unknownAck",
+        "failed",
+        "abandonedNoBudget",
+        "cancelledBySystem",
+        "blockedDeviceLocked",
+        "localNetworkDenied"
+      ],
+      "justification": "Projects the closed journal outcome without free-form detail."
+    },
+    {
+      "key": "trigger",
+      "type": "string",
+      "healthDerived": false,
+      "domain": [
+        "manual",
+        "shortcut",
+        "observerQuery",
+        "bgAppRefresh",
+        "bgProcessing",
+        "appForeground",
+        "widgetControl",
+        "launch"
+      ],
+      "justification": "Projects the closed run trigger for user-owned operational analysis."
+    }
+  ]
+}

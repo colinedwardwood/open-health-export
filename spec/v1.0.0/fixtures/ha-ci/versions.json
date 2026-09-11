@@ -4,5 +4,7 @@
   "oldestInWindow": "2025.9.4",
   "image": "ghcr.io/home-assistant/home-assistant",
   "mosquittoImage": "eclipse-mosquitto",
-  "mosquittoTag": "2.0.22"
+  "mosquittoTag": "2.0.22",
+  "otelCollectorImage": "otel/opentelemetry-collector-contrib",
+  "otelCollectorTag": "0.160.0"
 }

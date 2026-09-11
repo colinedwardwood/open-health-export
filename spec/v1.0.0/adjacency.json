@@ -97,6 +97,7 @@
         "MQTTCodec",
         "MetricCatalog",
         "NetEgress",
+        "OTLPExport",
         "Redaction",
         "RequestTemplate",
         "RunJournal",
@@ -135,6 +136,16 @@
       "dependencies": [
         "EnginePorts",
         "RunJournal",
+        "WireFormat"
+      ]
+    },
+    {
+      "name": "OTLPExport",
+      "type": "regular",
+      "dependencies": [
+        "EnginePorts",
+        "NetEgress",
+        "Redaction",
         "WireFormat"
       ]
     },
@@ -309,6 +320,16 @@
       "name": "m0harness",
       "type": "executable",
       "dependencies": []
+    },
+    {
+      "name": "otlpcontract",
+      "type": "executable",
+      "dependencies": [
+        "CoreDomain",
+        "EnginePorts",
+        "NetEgress",
+        "OTLPExport"
+      ]
     },
     {
       "name": "pipelinecheck",

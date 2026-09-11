@@ -37,6 +37,10 @@ let linuxCore: [Target] = [
     ),
     .target(name: "SinkLocalFile", dependencies: ["EnginePorts", "FileWriteKit", "CoreDomain", "WireFormat", "DestinationTrust"]),
     .target(name: "NetEgress", dependencies: ["WireFormat", "EnginePorts", "RunJournal"]),
+    .target(
+        name: "OTLPExport",
+        dependencies: ["EnginePorts", "NetEgress", "Redaction", "WireFormat"]
+    ),
     .target(name: "DestinationTrust", dependencies: ["EnginePorts", "NetEgress"]),
     .target(name: "SinkHTTP", dependencies: ["EnginePorts", "NetEgress", "WireFormat", "CoreDomain", "MetricCatalog", "RequestTemplate", "FileWriteKit", "DestinationTrust"]),
     .target(name: "SinkCompanion", dependencies: ["CompanionWire", "EnginePorts", "NetEgress", "WireFormat", "CoreDomain", "FileWriteKit", "DestinationTrust"]),
@@ -95,6 +99,11 @@ let linuxCore: [Target] = [
         path: "Tools/hacontract"
     ),
     .executableTarget(
+        name: "otlpcontract",
+        dependencies: ["CoreDomain", "EnginePorts", "NetEgress", "OTLPExport"],
+        path: "Tools/otlpcontract"
+    ),
+    .executableTarget(
         name: "wirefuzz",
         dependencies: ["CompanionWire", "MQTTCodec", "WireFormat"],
         path: "Tools/wirefuzz"
@@ -136,6 +145,7 @@ let linuxCore: [Target] = [
             "FileWriteKit",
             "SinkLocalFile",
             "NetEgress",
+            "OTLPExport",
             "SinkHTTP",
             "RequestTemplate",
             "DestinationTrust",
@@ -182,6 +192,7 @@ var products: [Product] = [
         "FileWriteKit",
         "SinkLocalFile",
         "NetEgress",
+        "OTLPExport",
         "DestinationTrust",
         "SinkHTTP",
         "SinkCompanion",
@@ -192,6 +203,7 @@ var products: [Product] = [
     .executable(name: "m0harness", targets: ["m0harness"]),
     .executable(name: "receiver", targets: ["receiver"]),
     .executable(name: "hacontract", targets: ["hacontract"]),
+    .executable(name: "otlpcontract", targets: ["otlpcontract"]),
     .executable(name: "wirefuzz", targets: ["wirefuzz"]),
     .executable(name: "pipelinecheck", targets: ["pipelinecheck"]),
     .executable(name: "exportruncheck", targets: ["exportruncheck"]),

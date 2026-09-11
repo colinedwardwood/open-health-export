@@ -824,7 +824,8 @@ struct PolicyCheck {
             let pins = try JSONSerialization.jsonObject(with: Data(contentsOf: pinsURL)) as? [String: Any],
             let current = pins["currentStable"] as? String, !current.isEmpty,
             let oldest = pins["oldestInWindow"] as? String, !oldest.isEmpty,
-            let mosquitto = pins["mosquittoTag"] as? String, !mosquitto.isEmpty
+            let mosquitto = pins["mosquittoTag"] as? String, !mosquitto.isEmpty,
+            let otelCollector = pins["otelCollectorTag"] as? String, !otelCollector.isEmpty
         else {
             FileHandle.standardError.write(Data("ha-ci/versions.json is missing required pins\n".utf8))
             exit(1)
@@ -833,7 +834,7 @@ struct PolicyCheck {
             contentsOf: root.appendingPathComponent(".github/workflows/container-contracts.yml"),
             encoding: .utf8
         )
-        for token in [current, oldest, mosquitto] where !workflow.contains(token) {
+        for token in [current, oldest, mosquitto, otelCollector] where !workflow.contains(token) {
             FileHandle.standardError.write(
                 Data("container-contracts.yml does not pin declared upstream version \(token)\n".utf8)
             )

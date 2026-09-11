@@ -93,3 +93,36 @@ jobs:
           OHE_HA_URL: http://127.0.0.1:8123
           OHE_HA_WAIT_SECONDS: "480"
         run: swift run hacontract
+  otlp-http:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc
+        with:
+          swift-version: "6.3.3"
+      - name: Start OpenTelemetry Collector 0.160.0
+        run: |
+          docker run -d --name ohe-otel \
+            -p 4318:4318 \
+            -v "$PWD/spec/v1.0.0/fixtures/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro" \
+            otel/opentelemetry-collector-contrib:0.160.0
+          for i in $(seq 1 30); do
+            nc -z 127.0.0.1 4318 && exit 0
+            sleep 1
+          done
+          docker logs ohe-otel
+          exit 1
+      - name: OTLP HTTP protobuf contract
+        env:
+          OHE_OTLP_ENDPOINT: http://127.0.0.1:4318/v1/traces
+        run: |
+          swift run otlpcontract
+          for i in $(seq 1 30); do
+            if docker logs ohe-otel 2>&1 | grep -q 'Name[[:space:]]*: export.run'; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs ohe-otel
+          exit 1
