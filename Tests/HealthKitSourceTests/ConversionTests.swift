@@ -88,6 +88,16 @@ import WireFormat
         HealthKitAuthorization.readTypes(for: [CategoryConversion.sleepMetric])
             .contains(HKCategoryType(.sleepAnalysis))
     )
+    #expect(MetricCatalog.sleepAnalysis.id == CategoryConversion.sleepMetric)
+    #expect(MetricCatalog.workout.id == WorkoutConversion.metric)
+    #expect(
+        HealthKitAuthorization.readTypes(for: [MetricCatalog.mindfulSession.id])
+            .contains(HKCategoryType(.mindfulSession))
+    )
+    #expect(
+        HealthKitAuthorization.readTypes(for: [MetricCatalog.workout.id])
+            .contains(HKWorkoutType.workoutType())
+    )
 }
 
 @Test func everyDeclaredCategoryMetricResolvesToItsHealthKitType() {

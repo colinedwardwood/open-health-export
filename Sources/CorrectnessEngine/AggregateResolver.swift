@@ -16,7 +16,8 @@ enum AggregateResolver {
         observedAt: String,
         now: Date
     ) async throws -> [AggregateDayPlan] {
-        guard let declaration = MetricCatalog.declaration(for: metric) else {
+        guard let declaration = MetricCatalog.declaration(for: metric),
+              declaration.kind == "sample.quantity" else {
             return []
         }
         var plans: [AggregateDayPlan] = []

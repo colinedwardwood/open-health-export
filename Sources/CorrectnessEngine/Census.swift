@@ -45,7 +45,7 @@ enum Census {
                     digest: String(digestXor, radix: 16)
                 )
             )
-            if MetricCatalog.declaration(for: page.metric) != nil {
+            if MetricCatalog.declaration(for: page.metric)?.kind == "sample.quantity" {
                 try tx.markDirty(metric: page.metric, day: day)
             }
         }

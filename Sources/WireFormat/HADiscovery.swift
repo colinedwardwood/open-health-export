@@ -45,6 +45,7 @@ public enum HADiscovery {
             guard let declaration = MetricCatalog.declaration(for: metric) else {
                 throw HADiscoveryError.unknownMetric
             }
+            guard declaration.kind == "sample.quantity" else { continue }
             let (key, object) = component(declaration: declaration, exporterId: id, shortId: short)
             components[key] = object
         }

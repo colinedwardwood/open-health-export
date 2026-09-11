@@ -74,12 +74,12 @@ enum LeakMutant: String, CaseIterable {
 
 @Test func dataBrowserNeverClaimsDenialAndDemoFillsEveryRow() {
     let empty = DataBrowser.rows(latest: [:], exported: [MetricCatalog.heartRate.id])
-    #expect(empty.count == MetricCatalog.all.count)
+    #expect(empty.count == MetricCatalog.selectable.count)
     #expect(empty.allSatisfy { $0.subtitle == DataBrowser.noDataCopy })
     #expect(!empty.contains { $0.subtitle.lowercased().contains("denied") })
     #expect(empty.first { $0.metric == MetricCatalog.heartRate.id }?.exported == true)
 
-    let latest = Dictionary(uniqueKeysWithValues: MetricCatalog.all.enumerated().map { index, declaration in
+    let latest = Dictionary(uniqueKeysWithValues: MetricCatalog.selectable.enumerated().map { index, declaration in
         (declaration.id, DemoCorpus.sample(at: index, seed: 1, declaration: declaration))
     })
     let filled = DataBrowser.rows(latest: latest, search: "stepCount")
@@ -91,4 +91,20 @@ enum LeakMutant: String, CaseIterable {
     let sensitive = DataBrowser.rows(latest: latest).filter(\.sensitive)
     #expect(!sensitive.isEmpty)
     #expect(DataBrowser.rows(latest: [:], onlyWithData: true).isEmpty)
+}
+
+@Test func healthAuthorizationIsTiedToEnabledTypesNotTheFullCatalogue() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let harness = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
+        encoding: .utf8
+    )
+    #expect(harness.contains("metrics: HarnessExport.selectedMetrics()"))
+    #expect(harness.contains("metrics: adding.sorted"))
+    #expect(!harness.contains("requestReadAccess(\n                    metrics: MetricCatalog.all"))
+    #expect(!harness.contains("requestReadAccess(metrics: MetricCatalog.all"))
+    #expect(!harness.contains("requestReadAccess(metrics: MetricCatalog.selectable"))
 }

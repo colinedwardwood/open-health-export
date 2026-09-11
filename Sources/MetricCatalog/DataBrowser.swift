@@ -221,7 +221,7 @@ public enum DataBrowser {
         displayUnits: UnitDisplayPolicy = .canonical
     ) -> [DataBrowserRow] {
         let needle = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return MetricCatalog.all.compactMap { declaration in
+        return MetricCatalog.selectable.compactMap { declaration in
             let title = declaration.wireId.replacingOccurrences(of: "_", with: " ")
             let sample = latest[declaration.id]
             let subtitle: String

@@ -145,7 +145,7 @@ private func browserSample(
     #expect(MetricCatalog.coreDaily.count >= 8)
     #expect(MetricCatalog.coreDaily.count <= 28)
     #expect(MetricCatalog.coreDaily.allSatisfy { $0.sensitivity == .routine })
-    #expect(Set(MetricCatalog.coreDaily.map(\.id)).isSubset(of: Set(MetricCatalog.all.map(\.id))))
+    #expect(Set(MetricCatalog.coreDaily.map(\.id)).isSubset(of: Set(MetricCatalog.selectable.map(\.id))))
     #expect(
         Set(MetricCatalog.coreDaily.map(\.id)).isDisjoint(
             with: Set(MetricCatalog.all.filter { $0.sensitivity == .sensitive }.map(\.id))
@@ -153,10 +153,16 @@ private func browserSample(
     )
     #expect(!MetricCatalog.coreDaily.contains { $0.id == MetricCatalog.bloodGlucose.id })
     #expect(Set(MetricCatalog.coreDaily.map(\.id)).count == MetricCatalog.coreDaily.count)
-    #expect(MetricCatalog.coreDaily.count == 24)
+    #expect(MetricCatalog.coreDaily.count == 27)
     #expect(MetricCatalog.coreDaily.contains { $0.id == MetricCatalog.swimmingDistance.id })
     #expect(MetricCatalog.coreDaily.contains { $0.id == MetricCatalog.environmentalAudioExposure.id })
+    #expect(MetricCatalog.coreDaily.contains { $0.id == MetricCatalog.sleepAnalysis.id })
+    #expect(MetricCatalog.coreDaily.contains { $0.id == MetricCatalog.mindfulSession.id })
+    #expect(MetricCatalog.coreDaily.contains { $0.id == MetricCatalog.workout.id })
     #expect(MetricCatalog.shareDisallowedHKIdentifiers.contains(MetricCatalog.appleMoveTime.hkIdentifier))
+    #expect(Set(MetricCatalog.selectable.map(\.id)).count == MetricCatalog.selectable.count)
+    #expect(MetricCatalog.selectable.contains { $0.kind == "sample.category" })
+    #expect(MetricCatalog.all.allSatisfy { $0.kind == "sample.quantity" })
 }
 
 /// R-65's locale matrix. The regions are chosen for the cases a single metric/imperial

@@ -587,6 +587,23 @@ private struct DeviceLockedSource: SampleSource {
     }
 }
 
+@Test func homeAssistantDiscoveryOmitsCategoryAndWorkoutFamilies() throws {
+    let data = try HADiscovery.encodeDeviceConfig(
+        exporterId: "device-1234",
+        metrics: [
+            MetricCatalog.stepCount.id,
+            MetricCatalog.sleepAnalysis.id,
+            MetricCatalog.workout.id,
+        ]
+    )
+    let root = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let components = try #require(root["cmps"] as? [String: Any])
+    #expect(components.count == 1)
+    #expect(components.keys.contains { $0.hasPrefix("step_count_") })
+    #expect(!components.keys.contains { $0.contains("sleep") })
+    #expect(!components.keys.contains { $0.contains("workout") })
+}
+
 @Test func injectedTzDatabaseIdentityIsCommitted2024a() throws {
     let url = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()

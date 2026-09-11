@@ -16,6 +16,8 @@ public struct MetricDeclaration: Sendable {
     /// Omitted when nil (enum / timestamp / unmapped). Never `measurement` with energy/volume.
     public var haStateClass: String?
     public var haRequiresAggregate: Bool
+    /// Wire family: `sample.quantity`, `sample.category`, or `workout`.
+    public var kind: String
 
     public init(
         id: MetricID,
@@ -29,7 +31,8 @@ public struct MetricDeclaration: Sendable {
         haUnit: String?,
         haDeviceClass: String?,
         haStateClass: String?,
-        haRequiresAggregate: Bool
+        haRequiresAggregate: Bool,
+        kind: String = "sample.quantity"
     ) {
         self.id = id
         self.wireId = wireId
@@ -43,6 +46,7 @@ public struct MetricDeclaration: Sendable {
         self.haDeviceClass = haDeviceClass
         self.haStateClass = haStateClass
         self.haRequiresAggregate = haRequiresAggregate
+        self.kind = kind
     }
 }
 
@@ -658,8 +662,65 @@ public enum MetricCatalog {
         physicalEffort,
     ]
 
+    public static let sleepAnalysis = MetricDeclaration(
+        id: MetricID(rawValue: "sleep_analysis"),
+        wireId: "sleep_analysis",
+        hkIdentifier: "HKCategoryTypeIdentifierSleepAnalysis",
+        canonicalUnit: CanonicalUnit(symbol: "s"),
+        wireUnit: "s",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .routine,
+        haUnit: "s",
+        haDeviceClass: "duration",
+        haStateClass: nil,
+        haRequiresAggregate: false,
+        kind: "sample.category"
+    )
+
+    public static let mindfulSession = MetricDeclaration(
+        id: MetricID(rawValue: "mindful_session"),
+        wireId: "mindful_session",
+        hkIdentifier: "HKCategoryTypeIdentifierMindfulSession",
+        canonicalUnit: CanonicalUnit(symbol: "min"),
+        wireUnit: "min",
+        cumulative: true,
+        usesHealthKitStatistics: false,
+        sensitivity: .routine,
+        haUnit: "min",
+        haDeviceClass: "duration",
+        haStateClass: "total_increasing",
+        haRequiresAggregate: true,
+        kind: "sample.category"
+    )
+
+    public static let workout = MetricDeclaration(
+        id: MetricID(rawValue: "workout"),
+        wireId: "workout",
+        hkIdentifier: "HKWorkoutTypeIdentifier",
+        canonicalUnit: CanonicalUnit(symbol: "s"),
+        wireUnit: "s",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .routine,
+        haUnit: nil,
+        haDeviceClass: nil,
+        haStateClass: nil,
+        haRequiresAggregate: false,
+        kind: "workout"
+    )
+
+    /// Converted category and workout families that are selectable in-app.
+    public static let structural: [MetricDeclaration] = [
+        sleepAnalysis,
+        mindfulSession,
+        workout,
+    ]
+
+    public static var selectable: [MetricDeclaration] { all + structural }
+
     public static func declaration(for id: MetricID) -> MetricDeclaration? {
-        all.first { $0.id == id }
+        selectable.first { $0.id == id }
     }
 
     /// First-run preset (R-61 / UX-13). Sensitive types stay visible but are never in this list.
@@ -689,6 +750,9 @@ public enum MetricCatalog {
             environmentalAudioExposure,
             appleMoveTime,
             physicalEffort,
+            sleepAnalysis,
+            mindfulSession,
+            workout,
         ]
     }
 

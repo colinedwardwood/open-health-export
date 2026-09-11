@@ -1084,7 +1084,7 @@ struct HarnessView: View {
     }
 
     private var dataBrowser: some View {
-        let samples = MetricCatalog.all.enumerated().map { index, declaration in
+        let samples = MetricCatalog.selectable.enumerated().map { index, declaration in
             DemoCorpus.sample(at: index, seed: 1, declaration: declaration)
         }
         let demoLatest = Dictionary(
@@ -1166,7 +1166,7 @@ struct HarnessView: View {
                     HStack {
                         Button("Invert routine") {
                             var draft = DataSelectionDraft(baseline: browserSelection)
-                            draft.invertRoutine(MetricCatalog.all.map(\.id))
+                            draft.invertRoutine(MetricCatalog.selectable.map(\.id))
                             browserSelection = draft.selected
                         }
                         .accessibilityIdentifier("browser-invert-routine")
@@ -1328,6 +1328,45 @@ struct HarnessView: View {
         }
     }
 
+    private func browserRecords(from page: SamplePage) -> [SampleRecord] {
+        let unit = MetricCatalog.declaration(for: page.metric)?.canonicalUnit
+            ?? CanonicalUnit(symbol: "s")
+        var records = page.samples
+        records.append(contentsOf: page.categories.map { category in
+            SampleRecord(
+                key: category.key,
+                metric: category.metric,
+                start: category.start,
+                end: category.end,
+                timeZoneOffsetMinutes: category.timeZoneOffsetMinutes,
+                timeZoneSource: category.timeZoneSource,
+                value: category.durationSeconds ?? Double(category.categoryValue),
+                unit: unit,
+                observedAt: category.observedAt,
+                source: category.source,
+                device: category.device,
+                wasUserEntered: category.wasUserEntered
+            )
+        })
+        records.append(contentsOf: page.workouts.map { workout in
+            SampleRecord(
+                key: workout.key,
+                metric: workout.metric,
+                start: workout.start,
+                end: workout.end,
+                timeZoneOffsetMinutes: workout.timeZoneOffsetMinutes,
+                timeZoneSource: workout.timeZoneSource,
+                value: workout.durationSeconds,
+                unit: unit,
+                observedAt: workout.observedAt,
+                source: workout.source,
+                device: workout.device,
+                wasUserEntered: workout.wasUserEntered
+            )
+        })
+        return records
+    }
+
     @MainActor
     private func loadBrowserSamples(metric: MetricID) async {
         browserLoadingHealth = true
@@ -1338,24 +1377,30 @@ struct HarnessView: View {
             localeIdentifier: "en_US_POSIX",
             tzDatabaseVersion: TemporalContext.hostTzDatabaseVersion
         )
-        let source = HealthKitDayObservationSource(context: context, limit: 1000)
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = timeZone
-        let formatter = DateFormatter()
-        formatter.calendar = calendar
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = timeZone
-        formatter.dateFormat = "yyyy-MM-dd"
         var loaded: [SampleRecord] = []
         do {
-            for offset in 0 ..< DataBrowserPeriod.month.rawValue {
-                guard let date = calendar.date(byAdding: .day, value: -offset, to: Date()) else {
-                    continue
+            if MetricCatalog.declaration(for: metric)?.kind == "sample.quantity" {
+                let source = HealthKitDayObservationSource(context: context, limit: 1000)
+                var calendar = Calendar(identifier: .gregorian)
+                calendar.timeZone = timeZone
+                let formatter = DateFormatter()
+                formatter.calendar = calendar
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                formatter.timeZone = timeZone
+                formatter.dateFormat = "yyyy-MM-dd"
+                for offset in 0 ..< DataBrowserPeriod.month.rawValue {
+                    guard let date = calendar.date(byAdding: .day, value: -offset, to: Date()) else {
+                        continue
+                    }
+                    loaded.append(contentsOf: try await source.samples(
+                        metric: metric,
+                        day: formatter.string(from: date)
+                    ))
                 }
-                loaded.append(contentsOf: try await source.samples(
-                    metric: metric,
-                    day: formatter.string(from: date)
-                ))
+            } else {
+                let page = try await HealthKitAnchoredSource(context: context, limit: 1000)
+                    .page(metric: metric, afterAnchor: nil)
+                loaded = browserRecords(from: page)
             }
             liveBrowserSamples[metric] = loaded
             await refreshSentThroughDay(metric)

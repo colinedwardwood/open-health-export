@@ -206,7 +206,7 @@ enum HarnessExport {
     private static let selectedMetricsKey = "ohe.selectedMetrics"
 
     static func selectedMetrics() -> [MetricID] {
-        let allowed = Set(MetricCatalog.all.map(\.id))
+        let allowed = Set(MetricCatalog.selectable.map(\.id))
         if let stored = UserDefaults.standard.stringArray(forKey: selectedMetricsKey) {
             return stored.map(MetricID.init(rawValue:)).filter { allowed.contains($0) }
         }
@@ -214,7 +214,7 @@ enum HarnessExport {
     }
 
     static func saveSelectedMetrics(_ metrics: Set<MetricID>) {
-        let allowed = Set(MetricCatalog.all.map(\.id))
+        let allowed = Set(MetricCatalog.selectable.map(\.id))
         UserDefaults.standard.set(
             metrics.intersection(allowed).map(\.rawValue).sorted(),
             forKey: selectedMetricsKey
