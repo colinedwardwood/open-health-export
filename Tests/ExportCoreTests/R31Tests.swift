@@ -243,6 +243,36 @@ func sampleIdentity(leaf: String, issuer: String = "issuer00") -> TLSIdentity {
     #expect(card.lines.contains { $0.contains("\"kind\":\"canary\"") })
 }
 
+@Test func onlyPublicDestinationCardsRequireTheTypedPhrase() {
+    var publicIdentity = sampleIdentity(leaf: "aaaabbbbccccdddd")
+    publicIdentity.resolvedAddress = "203.0.113.10"
+    publicIdentity.addressClass = .publicUnicast
+    let publicCard = DestinationConfirmationCard(
+        host: "collector.example.com",
+        identity: publicIdentity,
+        preview: Data(),
+        insecureWithoutTLS: false
+    )
+    #expect(publicCard.requiresPublicAddressConfirmation)
+    #expect(ConfirmationCopy.publicAddressWarning.contains(ConfirmationCopy.publicAddressPhrase))
+
+    let privateCard = DestinationConfirmationCard(
+        host: "homeassistant.local",
+        identity: sampleIdentity(leaf: "aaaabbbbccccdddd"),
+        preview: Data(),
+        insecureWithoutTLS: false
+    )
+    #expect(!privateCard.requiresPublicAddressConfirmation)
+
+    let literalPublicHTTP = DestinationConfirmationCard(
+        host: "8.8.8.8",
+        identity: nil,
+        preview: Data(),
+        insecureWithoutTLS: true
+    )
+    #expect(literalPublicHTTP.requiresPublicAddressConfirmation)
+}
+
 @Test func resumeAfterPassedTestDoesNotReemitPinEvents() throws {
     var setup = DestinationSetup()
     try setup.resumeAfterPassedTest(

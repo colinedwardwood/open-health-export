@@ -227,6 +227,25 @@ final class ExporterUITests: XCTestCase {
         }
     }
 
+    /// SEC-14: a public address requires explicit typed confirmation before enable.
+    func testPublicDestinationStaysDisabledUntilPhraseIsEntered() {
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_PUBLIC_CONFIRMATION"] = "true"
+        app.launch()
+
+        let warning = app.staticTexts["public-destination-warning"]
+        XCTAssertTrue(warning.waitForExistence(timeout: uiWait))
+        XCTAssertTrue(warning.label.contains("public address"), warning.label)
+
+        let confirm = app.buttons["destination-confirm"]
+        XCTAssertTrue(confirm.exists)
+        XCTAssertFalse(confirm.isEnabled)
+
+        let phrase = app.textFields["public-destination-confirmation"]
+        type("send to public server", into: phrase)
+        XCTAssertTrue(confirm.isEnabled)
+    }
+
     /// SEC-45: sharing ends our protection over those bytes, so consent is a tap on the
     /// warning rather than an inference from a tap on the share button.
     func testShareWarningIsShownOnceAndGatesTheShareControl() {

@@ -45,6 +45,14 @@ public struct DestinationConfirmationCard: Sendable, Equatable {
         lines.append(String(decoding: preview, as: UTF8.self))
         return lines
     }
+
+    /// SEC-14: public destinations receive friction proportional to the irreversible
+    /// disclosure. The probe's resolved address is authoritative; a literal IP is the
+    /// fallback for unencrypted transports that have no TLS identity to report.
+    public var requiresPublicAddressConfirmation: Bool {
+        if identity?.addressClass == .publicUnicast { return true }
+        return identity == nil && AddressClassifying.classify(host) == .publicUnicast
+    }
 }
 
 public enum ConfirmationCopy {
@@ -54,6 +62,9 @@ public enum ConfirmationCopy {
     public static let approve = "This is my server"
     public static let cancel = "Cancel"
     public static let previewHeading = "Dry-run preview (no Health data)"
+    public static let publicAddressPhrase = "send to public server"
+    public static let publicAddressWarning =
+        "This server is on a public address. Type “send to public server” to enable it."
 
     public static func addressClassPhrase(_ addressClass: AddressClass) -> String {
         switch addressClass {

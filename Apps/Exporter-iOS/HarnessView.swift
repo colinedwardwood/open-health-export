@@ -10,6 +10,7 @@ import DiagnosticBundle
 import EnginePorts
 import HealthKitSource
 import MetricCatalog
+import NetEgress
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
@@ -127,6 +128,7 @@ struct HarnessView: View {
     @State private var anchorHolds: [AnchorHold] = []
     @State private var confirmationCard: DestinationConfirmationCard?
     @State private var confirmationKind: PendingConfirmationKind?
+    @State private var publicAddressConfirmation = ""
 
     var body: some View {
         NavigationStack {
@@ -271,6 +273,27 @@ struct HarnessView: View {
                 // could never take effect and the warning could never be dismissed.
                 if ProcessInfo.processInfo.environment["OHE_SEED_SHARE_ACK"] == "clear" {
                     UserDefaults.standard.removeObject(forKey: "ohe.shareProtectionAcknowledged")
+                }
+                if ProcessInfo.processInfo.environment["OHE_SEED_PUBLIC_CONFIRMATION"] == "true" {
+                    confirmationCard = DestinationConfirmationCard(
+                        host: "collector.example.com",
+                        identity: TLSIdentity(
+                            leafSPKISha256: "aaaa",
+                            issuerSPKISha256: "bbbb",
+                            tlsVersion: "TLS 1.3",
+                            cipherSuite: "test",
+                            leafSubject: "collector.example.com",
+                            leafIssuer: "Test CA",
+                            notBefore: "2026-01-01",
+                            notAfter: "2027-01-01",
+                            resolvedAddress: "203.0.113.10",
+                            addressClass: .publicUnicast,
+                            trustAnchorKind: "test"
+                        ),
+                        preview: Data("{\"kind\":\"canary\"}\n".utf8),
+                        insecureWithoutTLS: false
+                    )
+                    confirmationKind = .https
                 }
                 #endif
                 await refreshQueueGaps()
@@ -1661,6 +1684,7 @@ struct HarnessView: View {
             }
             confirmationCard = nil
             confirmationKind = nil
+            publicAddressConfirmation = ""
             refreshDestinationSurfaces()
             await refreshLedgerIntegrity()
         } catch {
@@ -1674,6 +1698,7 @@ struct HarnessView: View {
         HarnessExport.cancelPendingMQTTDestination()
         confirmationCard = nil
         confirmationKind = nil
+        publicAddressConfirmation = ""
     }
 
     private func applyWidgetStatusURL(_ url: URL) {
@@ -1705,9 +1730,27 @@ struct HarnessView: View {
                             .font(.footnote)
                             .textSelection(.enabled)
                     }
+                    if card.requiresPublicAddressConfirmation {
+                        Text(ConfirmationCopy.publicAddressWarning)
+                            .font(.footnote)
+                            .fontWeight(.semibold)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("public-destination-warning")
+                        TextField(
+                            ConfirmationCopy.publicAddressPhrase,
+                            text: $publicAddressConfirmation
+                        )
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .accessibilityIdentifier("public-destination-confirmation")
+                    }
                     Button("This is my server") {
                         Task { await confirmPendingDestination() }
                     }
+                    .disabled(
+                        card.requiresPublicAddressConfirmation
+                            && publicAddressConfirmation != ConfirmationCopy.publicAddressPhrase
+                    )
                     .accessibilityIdentifier("destination-confirm")
                     Button("Cancel") {
                         cancelDestinationConfirmation()
