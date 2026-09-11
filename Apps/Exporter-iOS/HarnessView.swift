@@ -51,6 +51,12 @@ struct HarnessView: View {
     @State private var mqttPKCS12Password = ""
     @State private var pickingMQTTPKCS12 = false
     @State private var mqttTestLines: [String] = []
+    @State private var otlpURL = ""
+    @State private var allowInsecureOTLP = false
+    @State private var otlpPreview = ""
+    @State private var otlpPayload: Data?
+    @State private var otlpGate = DiagnosticPreviewGate()
+    @State private var otlpLines: [String] = []
     @State private var showScanner = false
     @State private var diagnosticPreview = ""
     @State private var diagnosticPayload: Data?
@@ -208,6 +214,9 @@ struct HarnessView: View {
         .onAppear {
             timeToFirstFrameMS = LaunchMark.millisecondsToNow()
             refreshDestinationSurfaces()
+            if otlpURL.isEmpty {
+                otlpURL = HarnessExport.storedOTLPURL()
+            }
             let selected = Set(HarnessExport.selectedMetrics())
             browserBaseline = selected
             browserSelection = selected
@@ -615,6 +624,60 @@ struct HarnessView: View {
                     .font(.footnote)
                     .textSelection(.enabled)
             }
+            TextField("OTLP collector URL", text: $otlpURL)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.URL)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("otlp-url")
+            Toggle("Allow plain HTTP for OTLP (unsafe)", isOn: $allowInsecureOTLP)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("otlp-insecure")
+            if allowInsecureOTLP {
+                Text("Plain HTTP exposes traces to anyone able to observe this network.")
+                    .font(.footnote)
+                    .foregroundStyle(.primary)
+                    .fontWeight(.semibold)
+            }
+            Text("This preview is traces only. It does not include health values.")
+                .font(.footnote)
+            Button("Preview OTLP payload") {
+                Task { await previewOTLP() }
+            }
+            .disabled(phase == .working)
+            .accessibilityIdentifier("otlp-preview")
+            if !otlpPreview.isEmpty {
+                Text(otlpPreview)
+                    .font(.system(.footnote, design: .monospaced))
+                    .textSelection(.enabled)
+                    .accessibilityIdentifier("otlp-preview-body")
+                Text("End of OTLP preview")
+                    .font(.footnote)
+                    .accessibilityIdentifier("otlp-preview-end")
+                    .onScrollVisibilityChange(threshold: 0.1) { visible in
+                        if visible { revealOTLPEnable() }
+                    }
+            }
+            Button("Enable OTLP collector") {
+                Task { await enableOTLP() }
+            }
+            .disabled(phase == .working || otlpURL.isEmpty || otlpGate.sharePayload == nil)
+            .accessibilityIdentifier("otlp-enable")
+            Button("Project unprojected runs") {
+                Task { await projectOTLP() }
+            }
+            .disabled(phase == .working)
+            .accessibilityIdentifier("otlp-project")
+            Button("Disable OTLP collector") {
+                disableOTLP()
+            }
+            .disabled(phase == .working)
+            .accessibilityIdentifier("otlp-disable")
+            ForEach(Array(otlpLines.enumerated()), id: \.offset) { _, line in
+                Text(line)
+                    .font(.footnote)
+                    .textSelection(.enabled)
+            }
             Button("Refresh destination status") {
                 refreshDestinationSurfaces()
             }
@@ -809,6 +872,79 @@ struct HarnessView: View {
             try payload.write(to: url, options: .atomic)
             diagnosticShareURL = url
             status = "Ready. You reached the end of the bundle, so sharing it is available."
+        } catch {
+            status = "Failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func revealOTLPEnable() {
+        guard let otlpPayload else { return }
+        otlpGate.reachedEnd(of: otlpPayload)
+        status = "Ready. You reached the end of the OTLP preview, so enabling is available."
+    }
+
+    @MainActor
+    private func previewOTLP() async {
+        phase = .working
+        otlpGate = DiagnosticPreviewGate()
+        do {
+            let built = try await HarnessExport.previewOTLP()
+            otlpPreview = built.preview
+            otlpPayload = built.payload
+            status = "Ready. Enabling exists only below the preview's last line."
+        } catch {
+            otlpPreview = ""
+            otlpPayload = nil
+            status = "Failed: \(error.localizedDescription)"
+        }
+        phase = .ready
+    }
+
+    @MainActor
+    private func enableOTLP() async {
+        phase = .working
+        guard let preview = otlpGate.sharePayload else {
+            status = "Failed: preview the payload before enabling."
+            phase = .ready
+            return
+        }
+        do {
+            otlpLines = try await HarnessExport.enableOTLPCollector(
+                urlString: otlpURL,
+                allowInsecureHTTP: allowInsecureOTLP,
+                previewPayload: preview
+            )
+            refreshDestinationSurfaces()
+            status = "Ready. OTLP collector is enabled and off the health export path."
+        } catch {
+            status = "Failed: \(error.localizedDescription)"
+        }
+        phase = .ready
+    }
+
+    @MainActor
+    private func projectOTLP() async {
+        phase = .working
+        do {
+            let result = try await HarnessExport.projectOTLP()
+            otlpLines = [result]
+            refreshDestinationSurfaces()
+            await refreshLedgerIntegrity()
+            status = "Ready. \(result)"
+        } catch {
+            status = "Failed: \(error.localizedDescription)"
+        }
+        phase = .ready
+    }
+
+    private func disableOTLP() {
+        do {
+            try HarnessExport.disableOTLPCollector()
+            otlpGate = DiagnosticPreviewGate()
+            otlpPreview = ""
+            otlpPayload = nil
+            refreshDestinationSurfaces()
+            status = "Ready. OTLP collector is disabled."
         } catch {
             status = "Failed: \(error.localizedDescription)"
         }

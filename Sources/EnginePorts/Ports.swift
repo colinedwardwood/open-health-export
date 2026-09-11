@@ -255,6 +255,7 @@ public struct RunEvent: Sendable, Equatable {
     public var samplesAcked: Int
     public var wallTimeEpoch: TimeInterval
     public var errorClass: String?
+    public var projectedAtEpoch: TimeInterval?
 
     public init(
         runID: RunID,
@@ -265,7 +266,8 @@ public struct RunEvent: Sendable, Equatable {
         samplesCommitted: Int = 0,
         samplesAcked: Int = 0,
         wallTimeEpoch: TimeInterval = 0,
-        errorClass: String? = nil
+        errorClass: String? = nil,
+        projectedAtEpoch: TimeInterval? = nil
     ) {
         self.runID = runID
         self.outcomeKind = outcomeKind
@@ -276,6 +278,7 @@ public struct RunEvent: Sendable, Equatable {
         self.samplesAcked = samplesAcked
         self.wallTimeEpoch = wallTimeEpoch
         self.errorClass = errorClass
+        self.projectedAtEpoch = projectedAtEpoch
     }
 
     public var isProblemOutcome: Bool {
@@ -390,6 +393,8 @@ public protocol StateTransaction: AnyObject {
     func evict(_ batchID: BatchID, recording: GapRecord) throws
     func recordDelivery(_ receipt: DeliveryReceipt) throws
     func appendJournal(_ event: RunEvent) throws
+    func unprojectedJournal(limit: Int) throws -> [RunEvent]
+    func markJournalProjected(runIDs: [RunID], atEpoch: TimeInterval) throws
     func appendLedger(_ entry: EgressEntry) throws
     func loadLedger() throws -> [EgressEntry]
     func upsertCensus(_ row: CensusRow) throws

@@ -4,6 +4,7 @@ import Foundation
 import NetEgress
 import OTLPExport
 import Redaction
+import StorageSQLite
 import TestSupport
 import Testing
 
@@ -122,6 +123,99 @@ import Testing
     #expect(!body.isEmpty)
 }
 
+@Test func otlpSettingsStayDisabledUntilPreviewCompletes() {
+    #expect(throws: OTLPExportError.previewRequired) {
+        _ = try OTLPSettingsGate.enabledSettings(
+            urlString: "https://collector.example/v1/traces",
+            allowInsecureHTTP: false,
+            previewCompleted: false
+        )
+    }
+}
+
+@Test func otlpSettingsRequireAHost() {
+    #expect(throws: OTLPExportError.endpointRequired) {
+        _ = try OTLPSettingsGate.enabledSettings(
+            urlString: "not-a-url",
+            allowInsecureHTTP: false,
+            previewCompleted: true
+        )
+    }
+}
+
+@Test func otlpBacklogDropsAgeAndCountOverflowAndKeepsTheNewest() {
+    let now: TimeInterval = 2_000_000_000
+    let stale = otlpRunEvent(
+        id: "old",
+        wall: now - OTLPBacklog.maxAgeSeconds - 1
+    )
+    let overflow = (0 ..< 3).map { index in
+        otlpRunEvent(id: "overflow-\(index)", wall: now - 10 + TimeInterval(index))
+    }
+    let keep = otlpRunEvent(id: "keep", wall: now)
+    let already = otlpRunEvent(id: "done", wall: now, projected: now - 1)
+    let selection = OTLPBacklog.select(
+        events: [stale] + overflow + [keep, already],
+        nowEpoch: now,
+        cap: 1
+    )
+    #expect(selection.events.map(\.runID.rawValue) == ["keep"])
+    #expect(Set(selection.dropped.map(\.runID.rawValue)) == Set(["old", "overflow-0", "overflow-1", "overflow-2"]))
+}
+
+@Test func otlpPreviewBytesContainOnlyAllowlistedAttributes() {
+    let payload = OTLPPreview.payload(events: [otlpRunEvent()])
+    let text = OTLPPreview.text(payload: payload)
+    #expect(text.contains("attributes: outcome, service.name, trigger"))
+    #expect(text.contains("hex:"))
+    let decoded = String(decoding: payload, as: UTF8.self)
+    #expect(!decoded.contains("clinic"))
+    #expect(!text.contains("00000000-0000-4000-8000-000000000053"))
+}
+
+@Test func sqlitePersistsOTLPProjectionBookkeeping() async throws {
+    let path = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-otlp-journal-\(UUID().uuidString).sqlite")
+        .path
+    let store = try SQLiteStateStore(path: path)
+    let event = otlpRunEvent()
+    try await store.transact { try $0.appendJournal(event) }
+    let unprojected = try await store.transact { try $0.unprojectedJournal(limit: 10) }
+    #expect(unprojected == [event])
+    try await store.transact { tx in
+        try tx.markJournalProjected(runIDs: [event.runID], atEpoch: 99)
+        try tx.appendLedger(
+            EgressEntry(
+                destination: "otlp",
+                sampleCount: 0,
+                outcomeKind: "success",
+                byteCount: 12,
+                detail: "runs=1",
+                wallTimeEpoch: 99
+            )
+        )
+    }
+    let after = try await store.transact { try $0.loadJournal() }
+    #expect(after.first?.projectedAtEpoch == 99)
+    #expect(try await store.transact { try $0.unprojectedJournal(limit: 10) }.isEmpty)
+    let ledger = try await store.transact { try $0.loadLedger() }
+    #expect(ledger.last?.destination == "otlp")
+    #expect(ledger.last?.sampleCount == 0)
+}
+
+@Test func memoryStoreProjectionMarksSurviveALaterAppend() async throws {
+    let store = MemoryStateStore()
+    let first = otlpRunEvent(id: "a", wall: 1)
+    let second = otlpRunEvent(id: "b", wall: 2)
+    try await store.transact { tx in
+        try tx.appendJournal(first)
+        try tx.appendJournal(second)
+        try tx.markJournalProjected(runIDs: [first.runID], atEpoch: 5)
+    }
+    let leftover = try await store.transact { try $0.unprojectedJournal(limit: 8) }
+    #expect(leftover.map(\.runID.rawValue) == ["b"])
+}
+
 @Test func enabledOTLPRejectsNonSuccessStatus() async throws {
     let transport = RecordingHTTPTransport(
         response: OutboundHTTPResponse(status: 503, body: Data())
@@ -145,12 +239,17 @@ import Testing
     }
 }
 
-private func otlpRunEvent() -> RunEvent {
+private func otlpRunEvent(
+    id: String = "00000000-0000-4000-8000-000000000053",
+    wall: TimeInterval = 1_700_000_000,
+    projected: TimeInterval? = nil
+) -> RunEvent {
     RunEvent(
-        runID: RunID(rawValue: "00000000-0000-4000-8000-000000000053"),
+        runID: RunID(rawValue: id),
         outcomeKind: "success",
         detail: "",
         trigger: .manual,
-        wallTimeEpoch: 1_700_000_000
+        wallTimeEpoch: wall,
+        projectedAtEpoch: projected
     )
 }

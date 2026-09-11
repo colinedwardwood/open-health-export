@@ -116,7 +116,7 @@ public enum EgressURL {
     }
 }
 
-public struct HTTPSDestination: Sendable {
+public struct HTTPSDestination: Sendable, Equatable {
     public var url: URL
     public var allowInsecureHTTP: Bool
     public var authorizationBearer: String?

@@ -9,6 +9,7 @@ import Foundation
 import HealthKitSource
 import MetricCatalog
 import NetEgress
+import OTLPExport
 import RunJournal
 import SinkCompanion
 import SinkHTTP
@@ -35,6 +36,13 @@ private struct HTTPSVerificationRecord: Codable {
     var issuerSPKISha256: String?
     var firstSeen: String
     var hasBearer: Bool
+}
+
+private struct OTLPDestinationRecord: Codable {
+    var urlString: String
+    var allowedHosts: [String]
+    var allowInsecureHTTP: Bool
+    var previewDigest: String
 }
 
 private struct PendingHTTPS {
@@ -1568,6 +1576,223 @@ enum HarnessExport {
         return result
     }
 
+    static func storedOTLPURL() -> String {
+        guard let root = try? applicationSupportRoot(),
+              let data = try? Data(contentsOf: root.appendingPathComponent("otlp-destination.json")),
+              let record = try? JSONDecoder().decode(OTLPDestinationRecord.self, from: data)
+        else {
+            return ""
+        }
+        return record.urlString
+    }
+
+    static func previewOTLP() async throws -> (preview: String, payload: Data) {
+        let root = try applicationSupportRoot()
+        let store = try SQLiteStateStore(
+            path: root.appendingPathComponent("state.sqlite").path
+        )
+        let events = try await store.transact { try $0.loadJournal() }
+        let payload = OTLPPreview.payload(events: events)
+        return (OTLPPreview.text(payload: payload), payload)
+    }
+
+    static func enableOTLPCollector(
+        urlString: String,
+        allowInsecureHTTP: Bool,
+        previewPayload: Data
+    ) async throws -> [String] {
+        let settings = try OTLPSettingsGate.enabledSettings(
+            urlString: urlString,
+            allowInsecureHTTP: allowInsecureHTTP,
+            previewCompleted: !previewPayload.isEmpty
+        )
+        guard let endpoint = settings.endpoint, let host = endpoint.url.host else {
+            throw OTLPExportError.endpointRequired
+        }
+        let root = try applicationSupportRoot()
+        let record = OTLPDestinationRecord(
+            urlString: endpoint.url.absoluteString,
+            allowedHosts: [host],
+            allowInsecureHTTP: allowInsecureHTTP,
+            previewDigest: ContentSHA256.digest(previewPayload)
+        )
+        try JSONEncoder().encode(record).write(
+            to: root.appendingPathComponent("otlp-destination.json"),
+            options: .atomic
+        )
+        let now = Date().timeIntervalSince1970
+        if let snapshotURL = StatusSnapshotLocation.url(destinationID: "otlp") {
+            try DestinationSnapshotFile.write(
+                DestinationStatusSnapshot(
+                    destinationID: "otlp",
+                    destinationLabel: host,
+                    enabled: true,
+                    state: .noExportsYet,
+                    unacknowledgedSecurityEventCount: allowInsecureHTTP ? 1 : 0,
+                    writtenAtEpoch: now
+                ),
+                to: snapshotURL
+            )
+        }
+        if allowInsecureHTTP {
+            let store = try SQLiteStateStore(
+                path: root.appendingPathComponent("state.sqlite").path
+            )
+            try await store.transact { tx in
+                try tx.appendLedger(
+                    EgressEntry(
+                        destination: host,
+                        sampleCount: 0,
+                        outcomeKind: "security:insecure_http_enabled",
+                        detail: "explicit_user_opt_in otlp",
+                        wallTimeEpoch: now
+                    )
+                )
+            }
+        }
+        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+        return destinationStatusLines()
+    }
+
+    static func disableOTLPCollector() throws {
+        let root = try applicationSupportRoot()
+        try? FileManager.default.removeItem(
+            at: root.appendingPathComponent("otlp-destination.json")
+        )
+        if let snapshotURL = StatusSnapshotLocation.url(destinationID: "otlp") {
+            try? FileManager.default.removeItem(at: snapshotURL)
+        }
+        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+    }
+
+    static func projectOTLP() async throws -> String {
+        let root = try applicationSupportRoot()
+        guard let data = try? Data(
+            contentsOf: root.appendingPathComponent("otlp-destination.json")
+        ),
+            let record = try? JSONDecoder().decode(OTLPDestinationRecord.self, from: data)
+        else {
+            throw OTLPExportError.endpointRequired
+        }
+        let settings = try OTLPSettingsGate.enabledSettings(
+            urlString: record.urlString,
+            allowInsecureHTTP: record.allowInsecureHTTP,
+            previewCompleted: true
+        )
+        guard let endpoint = settings.endpoint else {
+            throw OTLPExportError.endpointRequired
+        }
+        let store = try SQLiteStateStore(
+            path: root.appendingPathComponent("state.sqlite").path
+        )
+        let now = Date().timeIntervalSince1970
+        let selection = try await store.transact { tx in
+            OTLPBacklog.select(events: try tx.loadJournal(), nowEpoch: now)
+        }
+        if !selection.dropped.isEmpty {
+            try await store.transact { tx in
+                try tx.markJournalProjected(
+                    runIDs: selection.dropped.map(\.runID),
+                    atEpoch: now
+                )
+                try tx.appendLedger(
+                    EgressEntry(
+                        destination: "otlp",
+                        sampleCount: 0,
+                        outcomeKind: "telemetry_dropped_backlog_cap",
+                        detail: "dropped=\(selection.dropped.count)",
+                        wallTimeEpoch: now
+                    )
+                )
+            }
+        }
+        guard !selection.events.isEmpty else {
+            return "No unprojected runs."
+        }
+        let scratch = root.appendingPathComponent("scratch", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: scratch,
+            withIntermediateDirectories: true
+        )
+        let transport = try SystemHTTPTransport.make(
+            probing: endpoint.url,
+            allowedHosts: Set(record.allowedHosts),
+            allowInsecureHTTP: record.allowInsecureHTTP
+        )
+        do {
+            let posted = try await OTLPExporter(
+                settings: settings,
+                transport: transport
+            ).export(events: selection.events, bodyDirectory: scratch)
+            let byteCount = OTLPProjector.traces(events: selection.events).count
+            try await store.transact { tx in
+                if posted {
+                    try tx.markJournalProjected(
+                        runIDs: selection.events.map(\.runID),
+                        atEpoch: now
+                    )
+                }
+                try tx.appendLedger(
+                    EgressEntry(
+                        destination: "otlp",
+                        sampleCount: 0,
+                        outcomeKind: posted ? "success" : "disabled",
+                        byteCount: byteCount,
+                        detail: "runs=\(selection.events.count)",
+                        wallTimeEpoch: now
+                    )
+                )
+            }
+            if posted, let snapshotURL = StatusSnapshotLocation.url(destinationID: "otlp") {
+                try DestinationSnapshotFile.write(
+                    DestinationStatusSnapshot(
+                        destinationID: "otlp",
+                        destinationLabel: endpoint.url.host ?? "otlp",
+                        enabled: true,
+                        state: .healthy,
+                        lastOutcome: "success",
+                        lastSuccessEpoch: now,
+                        lastConfirmedAckEpoch: now,
+                        writtenAtEpoch: now
+                    ),
+                    to: snapshotURL
+                )
+            }
+            WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+            return posted
+                ? "Projected \(selection.events.count) run(s)."
+                : "OTLP is disabled."
+        } catch {
+            try await store.transact { tx in
+                try tx.appendLedger(
+                    EgressEntry(
+                        destination: "otlp",
+                        sampleCount: 0,
+                        outcomeKind: "failed",
+                        detail: "projection_failed",
+                        wallTimeEpoch: now
+                    )
+                )
+            }
+            if let snapshotURL = StatusSnapshotLocation.url(destinationID: "otlp") {
+                try DestinationSnapshotFile.write(
+                    DestinationStatusSnapshot(
+                        destinationID: "otlp",
+                        destinationLabel: endpoint.url.host ?? "otlp",
+                        enabled: true,
+                        state: .failing,
+                        lastOutcome: "failed",
+                        errorClass: "otlp_projection",
+                        writtenAtEpoch: now
+                    ),
+                    to: snapshotURL
+                )
+            }
+            WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+            throw error
+        }
+    }
+
     static func wipeEverything() async throws {
         let root = try applicationSupportRoot()
         let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
@@ -1583,6 +1808,7 @@ enum HarnessExport {
         )
         try? FileManager.default.removeItem(at: localFileTestReportURL(root: root))
         try? FileManager.default.removeItem(at: companionTestReportURL(root: root))
+        try? FileManager.default.removeItem(at: root.appendingPathComponent("otlp-destination.json"))
         try? FileManager.default.removeItem(at: root.appendingPathComponent("backfill-raw.json"))
         try? FileManager.default.removeItem(
             at: root.appendingPathComponent("backfill-aggregate.json")

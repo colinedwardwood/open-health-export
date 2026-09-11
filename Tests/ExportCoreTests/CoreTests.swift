@@ -1893,6 +1893,7 @@ private func runUntilProcessExitSeam() async throws {
     #expect(journal.map(\.runID.rawValue) == ["legacy-run"])
     #expect(journal.first?.outcomeKind == "success")
     #expect(journal.first?.trigger == .manual)
+    #expect(journal.first?.projectedAtEpoch == nil)
 }
 
 @Test func p12CheckpointBytesDoNotEmbedSampleIdentifiers() {

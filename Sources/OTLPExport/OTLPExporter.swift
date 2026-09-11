@@ -2,7 +2,12 @@ import EnginePorts
 import Foundation
 import NetEgress
 
-public struct OTLPExportSettings: Sendable {
+public enum OTLPExportError: Error, Equatable {
+    case previewRequired
+    case endpointRequired
+}
+
+public struct OTLPExportSettings: Sendable, Equatable {
     public var enabled: Bool
     public var endpoint: HTTPSDestination?
 

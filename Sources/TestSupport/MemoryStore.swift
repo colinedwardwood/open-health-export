@@ -92,6 +92,19 @@ public final class MemoryTransaction: StateTransaction {
         journal.append(event)
     }
 
+    public func unprojectedJournal(limit: Int) throws -> [RunEvent] {
+        Array(journal.filter { $0.projectedAtEpoch == nil }.prefix(max(0, limit)))
+    }
+
+    public func markJournalProjected(runIDs: [RunID], atEpoch: TimeInterval) throws {
+        let ids = Set(runIDs)
+        for index in journal.indices where ids.contains(journal[index].runID) {
+            if journal[index].projectedAtEpoch == nil {
+                journal[index].projectedAtEpoch = atEpoch
+            }
+        }
+    }
+
     public func appendLedger(_ entry: EgressEntry) throws {
         ledger.append(
             LedgerChain.seal(

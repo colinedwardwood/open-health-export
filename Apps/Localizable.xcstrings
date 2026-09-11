@@ -90,6 +90,17 @@
         }
       }
     },
+    "Allow plain HTTP for OTLP (unsafe)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow plain HTTP for OTLP (unsafe)"
+          }
+        }
+      }
+    },
     "Allow plain MQTT (unsafe)": {
       "extractionState": "manual",
       "localizations": {
@@ -464,6 +475,17 @@
         }
       }
     },
+    "Disable OTLP collector": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disable OTLP collector"
+          }
+        }
+      }
+    },
     "Display units": {
       "extractionState": "manual",
       "localizations": {
@@ -486,6 +508,17 @@
         }
       }
     },
+    "Enable OTLP collector": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enable OTLP collector"
+          }
+        }
+      }
+    },
     "End of diagnostic bundle": {
       "extractionState": "manual",
       "localizations": {
@@ -493,6 +526,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "End of diagnostic bundle"
+          }
+        }
+      }
+    },
+    "End of OTLP preview": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "End of OTLP preview"
           }
         }
       }
@@ -981,6 +1025,17 @@
         }
       }
     },
+    "OTLP collector URL": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OTLP collector URL"
+          }
+        }
+      }
+    },
     "Overdue": {
       "extractionState": "manual",
       "localizations": {
@@ -1080,6 +1135,17 @@
         }
       }
     },
+    "Plain HTTP exposes traces to anyone able to observe this network.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plain HTTP exposes traces to anyone able to observe this network."
+          }
+        }
+      }
+    },
     "Plain MQTT exposes health exports to anyone able to observe this network.": {
       "extractionState": "manual",
       "localizations": {
@@ -1087,6 +1153,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Plain MQTT exposes health exports to anyone able to observe this network."
+          }
+        }
+      }
+    },
+    "Preview OTLP payload": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview OTLP payload"
+          }
+        }
+      }
+    },
+    "Project unprojected runs": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Project unprojected runs"
           }
         }
       }
@@ -1505,6 +1593,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "This must match the Mac after the phone connects."
+          }
+        }
+      }
+    },
+    "This preview is traces only. It does not include health values.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This preview is traces only. It does not include health values."
           }
         }
       }

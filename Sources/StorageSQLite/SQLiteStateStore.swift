@@ -72,6 +72,7 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
             "ALTER TABLE type_status ADD COLUMN generation INTEGER NOT NULL DEFAULT 1;",
             "ALTER TABLE journal ADD COLUMN wall_time_epoch REAL NOT NULL DEFAULT 0;",
             "ALTER TABLE journal ADD COLUMN error_class TEXT;",
+            "ALTER TABLE journal ADD COLUMN projected_at_epoch REAL;",
         ] {
             do { try exec(sql) } catch { _ = error }
         }
@@ -96,7 +97,8 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 samples_committed INTEGER NOT NULL DEFAULT 0,
                 samples_acked INTEGER NOT NULL DEFAULT 0,
                 wall_time_epoch REAL NOT NULL DEFAULT 0,
-                error_class TEXT
+                error_class TEXT,
+                projected_at_epoch REAL
             );
             CREATE TABLE IF NOT EXISTS ledger (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -179,7 +181,7 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 last_emitted_day TEXT,
                 decision TEXT
             );
-            PRAGMA user_version = 11;
+            PRAGMA user_version = 12;
             """)
     }
 
@@ -425,7 +427,7 @@ private final class SQLiteTransaction: StateTransaction {
 
     func appendJournal(_ event: RunEvent) throws {
         let stmt = try store.prepare(
-            "INSERT INTO journal (run_id, outcome, detail, trigger, samples_read, samples_committed, samples_acked, wall_time_epoch, error_class) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);"
+            "INSERT INTO journal (run_id, outcome, detail, trigger, samples_read, samples_committed, samples_acked, wall_time_epoch, error_class, projected_at_epoch) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"
         )
         defer { sqlite3_finalize(stmt) }
         bindText(stmt, 1, event.runID.rawValue)
@@ -441,7 +443,33 @@ private final class SQLiteTransaction: StateTransaction {
         } else {
             sqlite3_bind_null(stmt, 9)
         }
+        if let projected = event.projectedAtEpoch {
+            sqlite3_bind_double(stmt, 10, projected)
+        } else {
+            sqlite3_bind_null(stmt, 10)
+        }
         try stepDone(stmt)
+    }
+
+    func unprojectedJournal(limit: Int) throws -> [RunEvent] {
+        let stmt = try store.prepare(
+            "SELECT run_id, outcome, detail, trigger, samples_read, samples_committed, samples_acked, wall_time_epoch, error_class, projected_at_epoch FROM journal WHERE projected_at_epoch IS NULL ORDER BY id LIMIT ?;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_int64(stmt, 1, sqlite3_int64(max(0, limit)))
+        return try readJournalRows(stmt)
+    }
+
+    func markJournalProjected(runIDs: [RunID], atEpoch: TimeInterval) throws {
+        for runID in runIDs {
+            let stmt = try store.prepare(
+                "UPDATE journal SET projected_at_epoch = ? WHERE run_id = ? AND projected_at_epoch IS NULL;"
+            )
+            defer { sqlite3_finalize(stmt) }
+            sqlite3_bind_double(stmt, 1, atEpoch)
+            bindText(stmt, 2, runID.rawValue)
+            try stepDone(stmt)
+        }
     }
 
     func appendLedger(_ entry: EgressEntry) throws {
@@ -649,9 +677,13 @@ private final class SQLiteTransaction: StateTransaction {
 
     func loadJournal() throws -> [RunEvent] {
         let stmt = try store.prepare(
-            "SELECT run_id, outcome, detail, trigger, samples_read, samples_committed, samples_acked, wall_time_epoch, error_class FROM journal ORDER BY id;"
+            "SELECT run_id, outcome, detail, trigger, samples_read, samples_committed, samples_acked, wall_time_epoch, error_class, projected_at_epoch FROM journal ORDER BY id;"
         )
         defer { sqlite3_finalize(stmt) }
+        return try readJournalRows(stmt)
+    }
+
+    private func readJournalRows(_ stmt: OpaquePointer) throws -> [RunEvent] {
         var events: [RunEvent] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
             events.append(
@@ -666,7 +698,10 @@ private final class SQLiteTransaction: StateTransaction {
                     wallTimeEpoch: sqlite3_column_double(stmt, 7),
                     errorClass: sqlite3_column_type(stmt, 8) == SQLITE_NULL
                         ? nil
-                        : text(stmt, 8)
+                        : text(stmt, 8),
+                    projectedAtEpoch: sqlite3_column_type(stmt, 9) == SQLITE_NULL
+                        ? nil
+                        : sqlite3_column_double(stmt, 9)
                 )
             )
         }
