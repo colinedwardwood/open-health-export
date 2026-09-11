@@ -162,3 +162,23 @@ private func writeStreamPayload(uuid: String) throws -> (URL, BatchID) {
     try FileWriteKit.writeAtomically(data, to: file)
     return (file, batchID)
 }
+
+/// SEC-30 / T-16: asserting the flag reads back, not just that the call was made. A
+/// resource value that fails quietly would leave queued health payloads in every
+/// iCloud and Finder backup while the code above looks correct.
+@Test func backupExclusionIsSetOnTheDirectoryAndReadsBack() throws {
+    #if canImport(Darwin)
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-backup-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let before = try directory.resourceValues(forKeys: [.isExcludedFromBackupKey])
+    #expect(before.isExcludedFromBackup != true)
+
+    try FileWriteKit.excludeFromBackup(directory)
+
+    let after = try directory.resourceValues(forKeys: [.isExcludedFromBackupKey])
+    #expect(after.isExcludedFromBackup == true)
+    #endif
+}

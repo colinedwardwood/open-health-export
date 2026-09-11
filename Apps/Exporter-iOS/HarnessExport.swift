@@ -8,6 +8,7 @@ import CorrectnessEngine
 import DestinationTrust
 import DiagnosticBundle
 import EnginePorts
+import FileWriteKit
 import Foundation
 import HealthKitSource
 import MetricCatalog
@@ -831,6 +832,9 @@ enum HarnessExport {
             withIntermediateDirectories: true,
             attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
         )
+        // SEC-30: everything the engine keeps — state, journal, queued payloads — lives
+        // under here, and none of it may reach a backup.
+        try FileWriteKit.excludeFromBackup(root)
         return root
     }
 

@@ -24,6 +24,23 @@ public enum FileWriteKit {
     @TaskLocal public static var fault: Fault = .none
     #endif
 
+    /// SEC-30 / OBS-33 / T-16: a Data Protection class is inherited by new files in a
+    /// directory, but backup exclusion is not — it has to be set on the directory
+    /// itself. Without it, queued payloads and the journal are swept into an iCloud or
+    /// encrypted Finder backup and can be restored onto a device that was never
+    /// authorised to read this Health data.
+    ///
+    /// Not applied to a folder the user chose as an export destination: excluding
+    /// someone's own Files folder from their backups is not ours to decide.
+    public static func excludeFromBackup(_ url: URL) throws {
+        #if canImport(Darwin)
+        var target = url
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try target.setResourceValues(values)
+        #endif
+    }
+
     /// Write bytes via a sibling temp file then POSIX `rename`. Survives a crash mid-write:
     /// the destination is the previous complete file or absent, never a torn file.
     /// `FileManager.replaceItemAt` is not reliable on swift-corelibs-foundation.

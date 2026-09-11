@@ -291,6 +291,8 @@ struct PolicyCheck {
         try checkReceiverQuickstart(root: root)
         try checkHealthKitSymbolsStayInAdapter(sources: sources)
         try checkSpecArtifacts(root: root)
+        try checkBackupExclusion(root: root)
+        try checkHealthAuthorizationScope(root: root)
         try checkHostTZDataPin(root: root)
     }
 
@@ -1063,6 +1065,66 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck HealthKit types stay in HealthKitSource: ok")
+    }
+
+    /// SEC-30: the app's storage root holds the state database, the journal and queued
+    /// payloads. Creating it without excluding it from backup is the whole of T-16, and
+    /// the omission is invisible in review because the protection class next to it looks
+    /// like the mitigation. Asserted where the directory is made, not where it is used.
+    static func checkBackupExclusion(root: URL) throws {
+        let file = root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift")
+        let text = try String(contentsOf: file, encoding: .utf8)
+        guard let body = text.range(of: "applicationSupportRoot() throws -> URL") else {
+            FileHandle.standardError.write(
+                Data("HarnessExport.applicationSupportRoot is gone; SEC-30 gate needs rewiring\n".utf8)
+            )
+            exit(1)
+        }
+        // The call has to be inside the function that creates the directory.
+        let remainder = text[body.upperBound...]
+        let end = remainder.range(of: "\n    }")?.lowerBound ?? remainder.endIndex
+        guard remainder[..<end].contains("excludeFromBackup") else {
+            FileHandle.standardError.write(
+                Data("SEC-30: applicationSupportRoot does not exclude the storage root from backup\n".utf8)
+            )
+            exit(1)
+        }
+        print("policycheck SEC-30 storage root excluded from backup: ok")
+    }
+
+    /// R-62: authorisation is requested per feature, for the types that feature will
+    /// actually read. Asking for the whole catalogue trains people to say no to
+    /// everything, and it is the request a reviewer cannot justify. The existing test
+    /// only watched one file; a new call site anywhere else is the realistic way this
+    /// regresses, so the scan is repo-wide.
+    static func checkHealthAuthorizationScope(root: URL) throws {
+        let wholeCatalogue = ["MetricCatalog.all", "MetricCatalog.selectable"]
+        var hits: [String] = []
+        for directory in ["Sources", "Apps"] {
+            let base = root.appendingPathComponent(directory)
+            guard let files = FileManager.default.enumerator(
+                at: base,
+                includingPropertiesForKeys: nil
+            ) else { continue }
+            for case let file as URL in files where file.pathExtension == "swift" {
+                let text = try String(contentsOf: file, encoding: .utf8)
+                var searched = text.startIndex
+                while let call = text.range(of: "requestReadAccess", range: searched ..< text.endIndex) {
+                    // The argument list, not the rest of the file.
+                    let window = text[call.upperBound...].prefix(240)
+                    let arguments = window.prefix(while: { $0 != ")" })
+                    for token in wholeCatalogue where arguments.contains(token) {
+                        hits.append("\(file.lastPathComponent): requestReadAccess asks for \(token)")
+                    }
+                    searched = call.upperBound
+                }
+            }
+        }
+        if !hits.isEmpty {
+            FileHandle.standardError.write(Data((hits.joined(separator: "\n") + "\n").utf8))
+            exit(1)
+        }
+        print("policycheck R-62 authorisation stays per-feature: ok")
     }
 
     static func checkSpecArtifacts(root: URL) throws {
