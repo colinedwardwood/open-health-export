@@ -128,6 +128,27 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(failed.contains("last success"), failed)
     }
 
+    func testWidgetURLOpensDestinationStatusAfterDisclosure() {
+        app.terminate()
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.browserDemoMode", "true",
+            "-ohe.browserOnlyWithData", "true",
+        ]
+        app.launchEnvironment["OHE_SEED_DESTINATION_STATUS"] = "success"
+        app.launchEnvironment["OHE_OPEN_URL"] =
+            "openhealthexporter://status?destination=home-assistant"
+        app.launch()
+        let status = app.staticTexts["status-line"]
+        XCTAssertTrue(status.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertTrue(
+            status.label.contains("Opened destination status for home-assistant"),
+            status.label
+        )
+        XCTAssertTrue(app.staticTexts["destination-status-0"].waitForExistence(timeout: uiWait))
+    }
+
     private func destinationLine(seeding scenario: String) -> String {
         app.terminate()
         app.launchEnvironment["OHE_SEED_DESTINATION_STATUS"] = scenario

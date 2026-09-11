@@ -189,6 +189,7 @@ struct ExportStatusWidgetView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+        .accessibilityIdentifier("widget-empty")
     }
 
     private var worstSnapshot: DestinationStatusSnapshot? {

@@ -123,6 +123,7 @@ struct HarnessView: View {
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityLabel("Status: \(status)")
+                        .accessibilityIdentifier("status-line")
 
                     Text("Time to first screen: \(timeToFirstFrameMS, specifier: "%.0f") ms (foreground; R-73 is a background-launch budget).")
                         .font(.footnote)
@@ -240,6 +241,11 @@ struct HarnessView: View {
                         metric: MetricID(rawValue: held)
                     )
                 }
+                if let raw = ProcessInfo.processInfo.environment["OHE_OPEN_URL"],
+                   let url = URL(string: raw)
+                {
+                    applyWidgetStatusURL(url)
+                }
                 #endif
                 await refreshQueueGaps()
                 if disclosureAcknowledged,
@@ -251,16 +257,7 @@ struct HarnessView: View {
             }
         }
         .onOpenURL { url in
-            guard let route = WidgetStatusRoute(url: url) else { return }
-            refreshDestinationSurfaces()
-            if disclosureAcknowledged {
-                phase = .ready
-                status = route.destinationID.map {
-                    "Ready. Opened destination status for \($0) from the widget."
-                } ?? "Ready. Opened destination status from the widget."
-            } else {
-                status = "Review the disclosure before opening destination status."
-            }
+            applyWidgetStatusURL(url)
         }
         .onChange(of: scenePhase) { _, next in
             guard next == .active else { return }
@@ -1427,6 +1424,19 @@ struct HarnessView: View {
         HarnessExport.cancelPendingMQTTDestination()
         confirmationCard = nil
         confirmationKind = nil
+    }
+
+    private func applyWidgetStatusURL(_ url: URL) {
+        guard let route = WidgetStatusRoute(url: url) else { return }
+        refreshDestinationSurfaces()
+        if disclosureAcknowledged {
+            phase = .ready
+            status = route.destinationID.map {
+                "Ready. Opened destination status for \($0) from the widget."
+            } ?? "Ready. Opened destination status from the widget."
+        } else {
+            status = "Review the disclosure before opening destination status."
+        }
     }
 
     private func refreshDestinationSurfaces() {
