@@ -90,7 +90,11 @@ let linuxCore: [Target] = [
         dependencies: ["MetricCatalog", "WireFormat"],
         path: "Tools/policycheck"
     ),
-    .executableTarget(name: "m0harness", path: "Tools/m0harness"),
+    .executableTarget(
+        name: "m0harness",
+        path: "Tools/m0harness",
+        linkerSettings: [.linkedLibrary("sqlite3")]
+    ),
     .executableTarget(
         name: "receiver",
         dependencies: ["WireFormat"],
