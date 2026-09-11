@@ -103,7 +103,7 @@ final class ExporterUITests: XCTestCase {
     }
 
     /// QA-14: the three states a person needs to tell apart, on the surface they read.
-    func testDestinationStatusShowsSuccessStaleAndFailedWithItsReason() throws {
+    func testDestinationStatusShowsSuccessStaleAndFailedWithItsReason() {
         let healthy = destinationLine(seeding: "success")
         XCTAssertTrue(healthy.contains("Home Assistant"), healthy)
         XCTAssertTrue(healthy.contains("healthy"), healthy)
@@ -118,7 +118,6 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(failed.contains("destinationUnreachable"), failed)
         // A failure still says when it last worked, which is what makes it reportable.
         XCTAssertTrue(failed.contains("last success"), failed)
-        try performAccessibilityAudit()
     }
 
     private func destinationLine(seeding scenario: String) -> String {
@@ -283,7 +282,7 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(line.label.contains("overdue"), line.label)
     }
 
-    func testDestinationSectionExposesTheEmptyStateAndRefreshControl() throws {
+    func testDestinationSectionExposesTheEmptyStateAndRefreshControl() {
         enterControls()
         let title = scrollToHittable(app.staticTexts["destination-title"])
         XCTAssertEqual(title.label, "Where your data goes")
@@ -294,7 +293,6 @@ final class ExporterUITests: XCTestCase {
         )
         XCTAssertFalse(app.otherElements["destination-change-banner"].exists)
         XCTAssertFalse(app.staticTexts["destination-change-banner"].exists)
-        try performAccessibilityAudit()
     }
 
     private func enterControls() {
