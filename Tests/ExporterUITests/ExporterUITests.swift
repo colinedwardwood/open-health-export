@@ -335,6 +335,75 @@ final class ExporterUITests: XCTestCase {
         try performAccessibilityAudit()
     }
 
+    /// QA-26 names permission-denied and permission-limited as audited states. R-60 is
+    /// why neither gets its own rendering: a denied read and absent data are
+    /// indistinguishable to us, so the no-data state *is* the denied state, and it is
+    /// the one that has to survive the audit.
+    func testPermissionLimitedStatesPassAccessibilityAudit() throws {
+        app.terminate()
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "false",
+            "-ohe.advisoryEnabled", "false",
+            // Live values with the filter off: every catalogue row renders without data,
+            // which is what a partially authorised store looks like from inside the app.
+            "-ohe.browserDemoMode", "false",
+            "-ohe.browserOnlyWithData", "false",
+        ]
+        app.launch()
+        enterControls()
+        let row = app.descendants(matching: .any)["browser-row-heartRate"]
+        XCTAssertTrue(
+            row.waitForExistence(timeout: uiWait),
+            "available identifiers: \(visibleIdentifiers())"
+        )
+        scrollToHittable(row)
+        try performAccessibilityAudit("browser-permission-limited")
+
+        row.tap()
+        let empty = app.staticTexts["browser-detail-empty"]
+        XCTAssertTrue(empty.waitForExistence(timeout: uiWait))
+        // The copy must keep naming both causes, not resolve to a denial.
+        XCTAssertTrue(empty.label.contains("access is off in Health"), empty.label)
+        XCTAssertTrue(empty.label.contains("Sharing"), empty.label)
+        try performAccessibilityAudit("browser-detail-permission-denied")
+    }
+
+    /// QA-26's error state: a failing destination and an overdue export both escalate on
+    /// the surface a person reads, so both renderings are audited.
+    func testErrorStatesPassAccessibilityAudit() throws {
+        for scenario in ["failed", "overdue"] {
+            app.terminate()
+            app.launchEnvironment["OHE_SEED_DESTINATION_STATUS"] = scenario
+            app.launch()
+            enterControls()
+            let refresh = scrollToHittable(app.buttons["destination-refresh"])
+            refresh.tap()
+            let line = app.staticTexts["destination-status-0"]
+            XCTAssertTrue(
+                line.waitForExistence(timeout: uiWait),
+                "no destination line for \(scenario); available: \(visibleIdentifiers())"
+            )
+            try performAccessibilityAudit("destination-\(scenario)")
+        }
+    }
+
+    /// QA-17's paused type is the other half of permission-limited: the type is enabled
+    /// but not flowing, and the banner saying so is on the first screen.
+    func testPausedAnchorBannerPassesAccessibilityAudit() throws {
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_ANCHOR_HOLD"] = "heartRate"
+        app.launch()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["anchor-hold-banner"]
+                .waitForExistence(timeout: uiWait),
+            "available identifiers: \(visibleIdentifiers())"
+        )
+        try performAccessibilityAudit("anchor-hold-banner")
+        enterControls()
+        _ = scrollToHittable(app.staticTexts["anchor-hold-explanation-0"])
+        try performAccessibilityAudit("anchor-hold-explanation")
+    }
+
     func testAcknowledgementsRenderTheGeneratedNotice() {
         enterControls()
         let body = scrollToHittable(app.staticTexts["acknowledgements-body"])
@@ -366,35 +435,54 @@ final class ExporterUITests: XCTestCase {
         disclosure.tap()
     }
 
-    private func performAccessibilityAudit() throws {
+    private func performAccessibilityAudit(_ state: String = #function) throws {
         try app.performAccessibilityAudit { issue in
-            // QA-26: each suppression must name a linked issue. Xcode 26 audits
-            // system-rendered empty SwiftUI text-field placeholders and disabled
-            // controls as low contrast, and audits content behind the navigation
-            // bar after a scroll; those findings are SDK-owned.
-            // Tracking: https://github.com/colinedwardwood/open-health-export/issues/4
             guard issue.auditType == .contrast, let element = issue.element else {
                 return false
             }
-            let behindNavigationBar = element.frame.minY < 130
-            return behindNavigationBar
-                || !element.isHittable
-                || element.isEnabled == false
-                || element.elementType == .textField
-                || element.elementType == .secureTextField
+            guard let cause = Self.suppressionCause(for: element) else { return false }
+            // QA-26: a waiver is only valid with a tracking issue behind it. A cause
+            // that is not in the table cannot be suppressed, so adding one without a
+            // link fails the audit instead of passing quietly.
+            guard let link = Self.accessibilitySuppressionIssues[cause],
+                  link.hasPrefix("https://")
+            else {
+                XCTFail("suppressed \(cause) in \(state) with no linked issue")
+                return false
+            }
+            return true
         }
     }
 
-    func testAccessibilitySuppressionsCarryALinkedIssue() {
-        XCTAssertEqual(
-            Set(Self.accessibilitySuppressionIssues),
-            ["https://github.com/colinedwardwood/open-health-export/issues/4"]
-        )
-        XCTAssertFalse(Self.accessibilitySuppressionIssues.contains(where: \.isEmpty))
+    /// Xcode 26 audits system-rendered empty SwiftUI text-field placeholders and
+    /// disabled controls as low contrast, and audits content behind the navigation bar
+    /// after a scroll. Those findings are SDK-owned, so they are named rather than
+    /// silently tolerated.
+    private static func suppressionCause(for element: XCUIElement) -> String? {
+        if element.frame.minY < 130 { return "behindNavigationBar" }
+        if !element.isHittable { return "offscreenElement" }
+        if element.isEnabled == false { return "disabledControl" }
+        if element.elementType == .textField || element.elementType == .secureTextField {
+            return "systemTextFieldPlaceholder"
+        }
+        return nil
     }
 
-    private static let accessibilitySuppressionIssues = [
+    func testAccessibilitySuppressionsCarryALinkedIssue() {
+        XCTAssertFalse(Self.accessibilitySuppressionIssues.isEmpty)
+        for (cause, link) in Self.accessibilitySuppressionIssues {
+            XCTAssertTrue(link.hasPrefix("https://"), "\(cause) has no linked issue: \(link)")
+        }
+    }
+
+    private static let trackingIssue =
         "https://github.com/colinedwardwood/open-health-export/issues/4"
+
+    private static let accessibilitySuppressionIssues = [
+        "behindNavigationBar": trackingIssue,
+        "offscreenElement": trackingIssue,
+        "disabledControl": trackingIssue,
+        "systemTextFieldPlaceholder": trackingIssue,
     ]
 
     private func filterBrowserToHeartRate() {
