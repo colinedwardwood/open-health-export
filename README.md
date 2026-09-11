@@ -92,7 +92,7 @@ resolver if you do not want the fetch.
 Plain HTTP on the LAN is allowed only through `NSAllowsLocalNetworking`. Any
 `NSAllowsArbitraryLoads` key in an app Info.plist fails `policycheck`.
 
-First-run type selection is the Core Daily preset (named routine metrics only).
+First-run type selection is the Core Daily preset (24 named routine metrics).
 Sensitive types and blood glucose are in the picker, not in that preset. The data browser
 filter **Only types with data** is on by default.
 

@@ -53,13 +53,19 @@ enum SampleConversion {
             return .meter()
         case MetricCatalog.oxygenSaturation.id, MetricCatalog.bodyFatPercentage.id:
             return .percent()
-        case MetricCatalog.walkingRunningDistance.id, MetricCatalog.cyclingDistance.id:
+        case MetricCatalog.walkingRunningDistance.id,
+             MetricCatalog.cyclingDistance.id,
+             MetricCatalog.swimmingDistance.id,
+             MetricCatalog.wheelchairDistance.id:
             return .meter()
         case MetricCatalog.vo2Max.id:
             return HKUnit.literUnit(with: .milli).unitDivided(by: .gramUnit(with: .kilo).unitMultiplied(by: .minute()))
         case MetricCatalog.bloodGlucose.id:
             return HKUnit.gramUnit(with: .milli).unitDivided(by: .literUnit(with: .deci))
-        case MetricCatalog.exerciseTime.id, MetricCatalog.standTime.id:
+        case MetricCatalog.exerciseTime.id,
+             MetricCatalog.standTime.id,
+             MetricCatalog.timeInDaylight.id,
+             MetricCatalog.appleMoveTime.id:
             return .minute()
         case MetricCatalog.heartRateVariabilitySDNN.id:
             return .secondUnit(with: .milli)
@@ -69,6 +75,17 @@ enum SampleConversion {
             return .literUnit(with: .milli)
         case MetricCatalog.bloodPressureSystolic.id, MetricCatalog.bloodPressureDiastolic.id:
             return .millimeterOfMercury()
+        case MetricCatalog.walkingSpeed.id,
+             MetricCatalog.runningSpeed.id,
+             MetricCatalog.cyclingSpeed.id,
+             MetricCatalog.stairAscentSpeed.id:
+            return HKUnit.meter().unitDivided(by: .second())
+        case MetricCatalog.environmentalAudioExposure.id:
+            return .decibelAWeightedSoundPressureLevel()
+        case MetricCatalog.physicalEffort.id:
+            return HKUnit.kilocalorie().unitDivided(
+                by: .gramUnit(with: .kilo).unitMultiplied(by: .hour())
+            )
         default:
             return .count()
         }
@@ -78,7 +95,10 @@ enum SampleConversion {
         switch metric {
         case MetricCatalog.oxygenSaturation.id, MetricCatalog.bodyFatPercentage.id:
             return hkValue * 100
-        case MetricCatalog.walkingRunningDistance.id, MetricCatalog.cyclingDistance.id:
+        case MetricCatalog.walkingRunningDistance.id,
+             MetricCatalog.cyclingDistance.id,
+             MetricCatalog.swimmingDistance.id,
+             MetricCatalog.wheelchairDistance.id:
             return hkValue / 1000
         default:
             return hkValue

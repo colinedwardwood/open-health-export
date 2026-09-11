@@ -153,6 +153,10 @@ private func browserSample(
     )
     #expect(!MetricCatalog.coreDaily.contains { $0.id == MetricCatalog.bloodGlucose.id })
     #expect(Set(MetricCatalog.coreDaily.map(\.id)).count == MetricCatalog.coreDaily.count)
+    #expect(MetricCatalog.coreDaily.count == 24)
+    #expect(MetricCatalog.coreDaily.contains { $0.id == MetricCatalog.swimmingDistance.id })
+    #expect(MetricCatalog.coreDaily.contains { $0.id == MetricCatalog.environmentalAudioExposure.id })
+    #expect(MetricCatalog.shareDisallowedHKIdentifiers.contains(MetricCatalog.appleMoveTime.hkIdentifier))
 }
 
 /// R-65's locale matrix. The regions are chosen for the cases a single metric/imperial

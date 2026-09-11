@@ -490,7 +490,7 @@ private struct DeviceLockedSource: SampleSource {
     let measurementForbidden: Set<String> = [
         "date", "enum", "energy", "gas", "monetary", "timestamp", "volume", "water",
     ]
-    #expect(MetricCatalog.all.count == 26)
+    #expect(MetricCatalog.all.count == 38)
     #expect(MetricCatalog.height.haUnit == "cm")
     #expect(MetricCatalog.height.haDeviceClass == "distance")
     #expect(MetricCatalog.bodyFatPercentage.haDeviceClass == nil)

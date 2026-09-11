@@ -179,6 +179,14 @@ import Testing
     #expect(!parts[1].contains("runOnePageEachMetric"))
     #expect(parts[1].contains("requiresExternalPower = true"))
     #expect(parts[1].contains("requiresNetworkConnectivity = true"))
+
+    let launchParts = source.components(separatedBy: "didFinishLaunchingWithOptions")
+    #expect(launchParts.count == 2)
+    let launchBody = String(launchParts[1].prefix { $0 != "}" })
+    #expect(launchBody.contains("OTLPBackgroundCoordinator.register()"))
+    #expect(!launchBody.contains("projectOTLP"))
+    #expect(!launchBody.contains("OTLPProjector"))
+    #expect(!launchBody.contains("OTLPExporter"))
 }
 
 @Test func otlpSettingsStayDisabledUntilPreviewCompletes() {

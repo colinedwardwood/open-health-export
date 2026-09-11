@@ -9,6 +9,12 @@
     {"metricId":"flights_climbed","adr":"ADR-001","reason":"cumulative multi-source total"},
     {"metricId":"stand_time","adr":"ADR-001","reason":"cumulative multi-source total"},
     {"metricId":"step_count","adr":"ADR-001","reason":"cumulative multi-source total"},
-    {"metricId":"walking_running_distance","adr":"ADR-001","reason":"cumulative multi-source total"}
+    {"metricId":"walking_running_distance","adr":"ADR-001","reason":"cumulative multi-source total"},
+    {"metricId":"apple_move_time","adr":"ADR-002","reason":"cumulative multi-source total"},
+    {"metricId":"push_count","adr":"ADR-002","reason":"cumulative multi-source total"},
+    {"metricId":"swimming_distance","adr":"ADR-002","reason":"cumulative multi-source total"},
+    {"metricId":"swimming_stroke_count","adr":"ADR-002","reason":"cumulative multi-source total"},
+    {"metricId":"time_in_daylight","adr":"ADR-002","reason":"cumulative multi-source total"},
+    {"metricId":"wheelchair_distance","adr":"ADR-002","reason":"cumulative multi-source total"}
   ]
 }

@@ -437,6 +437,186 @@ public enum MetricCatalog {
         haRequiresAggregate: false
     )
 
+    public static let swimmingDistance = MetricDeclaration(
+        id: MetricID(rawValue: "swimmingDistance"),
+        wireId: "swimming_distance",
+        hkIdentifier: "HKQuantityTypeIdentifierDistanceSwimming",
+        canonicalUnit: CanonicalUnit(symbol: "km"),
+        wireUnit: "km",
+        cumulative: true,
+        usesHealthKitStatistics: true,
+        sensitivity: .routine,
+        haUnit: "km",
+        haDeviceClass: "distance",
+        haStateClass: "total_increasing",
+        haRequiresAggregate: true
+    )
+
+    public static let wheelchairDistance = MetricDeclaration(
+        id: MetricID(rawValue: "wheelchairDistance"),
+        wireId: "wheelchair_distance",
+        hkIdentifier: "HKQuantityTypeIdentifierDistanceWheelchair",
+        canonicalUnit: CanonicalUnit(symbol: "km"),
+        wireUnit: "km",
+        cumulative: true,
+        usesHealthKitStatistics: true,
+        sensitivity: .routine,
+        haUnit: "km",
+        haDeviceClass: "distance",
+        haStateClass: "total_increasing",
+        haRequiresAggregate: true
+    )
+
+    public static let pushCount = MetricDeclaration(
+        id: MetricID(rawValue: "pushCount"),
+        wireId: "push_count",
+        hkIdentifier: "HKQuantityTypeIdentifierPushCount",
+        canonicalUnit: CanonicalUnit(symbol: "count"),
+        wireUnit: "count",
+        cumulative: true,
+        usesHealthKitStatistics: true,
+        sensitivity: .routine,
+        haUnit: "pushes",
+        haDeviceClass: nil,
+        haStateClass: "total_increasing",
+        haRequiresAggregate: true
+    )
+
+    public static let swimmingStrokeCount = MetricDeclaration(
+        id: MetricID(rawValue: "swimmingStrokeCount"),
+        wireId: "swimming_stroke_count",
+        hkIdentifier: "HKQuantityTypeIdentifierSwimmingStrokeCount",
+        canonicalUnit: CanonicalUnit(symbol: "count"),
+        wireUnit: "count",
+        cumulative: true,
+        usesHealthKitStatistics: true,
+        sensitivity: .routine,
+        haUnit: "strokes",
+        haDeviceClass: nil,
+        haStateClass: "total_increasing",
+        haRequiresAggregate: true
+    )
+
+    public static let walkingSpeed = MetricDeclaration(
+        id: MetricID(rawValue: "walkingSpeed"),
+        wireId: "walking_speed",
+        hkIdentifier: "HKQuantityTypeIdentifierWalkingSpeed",
+        canonicalUnit: CanonicalUnit(symbol: "m/s"),
+        wireUnit: "m/s",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .routine,
+        haUnit: "m/s",
+        haDeviceClass: "speed",
+        haStateClass: "measurement",
+        haRequiresAggregate: false
+    )
+
+    public static let runningSpeed = MetricDeclaration(
+        id: MetricID(rawValue: "runningSpeed"),
+        wireId: "running_speed",
+        hkIdentifier: "HKQuantityTypeIdentifierRunningSpeed",
+        canonicalUnit: CanonicalUnit(symbol: "m/s"),
+        wireUnit: "m/s",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .routine,
+        haUnit: "m/s",
+        haDeviceClass: "speed",
+        haStateClass: "measurement",
+        haRequiresAggregate: false
+    )
+
+    public static let cyclingSpeed = MetricDeclaration(
+        id: MetricID(rawValue: "cyclingSpeed"),
+        wireId: "cycling_speed",
+        hkIdentifier: "HKQuantityTypeIdentifierCyclingSpeed",
+        canonicalUnit: CanonicalUnit(symbol: "m/s"),
+        wireUnit: "m/s",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .routine,
+        haUnit: "m/s",
+        haDeviceClass: "speed",
+        haStateClass: "measurement",
+        haRequiresAggregate: false
+    )
+
+    public static let stairAscentSpeed = MetricDeclaration(
+        id: MetricID(rawValue: "stairAscentSpeed"),
+        wireId: "stair_ascent_speed",
+        hkIdentifier: "HKQuantityTypeIdentifierStairAscentSpeed",
+        canonicalUnit: CanonicalUnit(symbol: "m/s"),
+        wireUnit: "m/s",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .routine,
+        haUnit: "m/s",
+        haDeviceClass: "speed",
+        haStateClass: "measurement",
+        haRequiresAggregate: false
+    )
+
+    public static let timeInDaylight = MetricDeclaration(
+        id: MetricID(rawValue: "timeInDaylight"),
+        wireId: "time_in_daylight",
+        hkIdentifier: "HKQuantityTypeIdentifierTimeInDaylight",
+        canonicalUnit: CanonicalUnit(symbol: "min"),
+        wireUnit: "min",
+        cumulative: true,
+        usesHealthKitStatistics: true,
+        sensitivity: .routine,
+        haUnit: "min",
+        haDeviceClass: "duration",
+        haStateClass: "total_increasing",
+        haRequiresAggregate: true
+    )
+
+    public static let environmentalAudioExposure = MetricDeclaration(
+        id: MetricID(rawValue: "environmentalAudioExposure"),
+        wireId: "environmental_audio_exposure",
+        hkIdentifier: "HKQuantityTypeIdentifierEnvironmentalAudioExposure",
+        canonicalUnit: CanonicalUnit(symbol: "dBASPL"),
+        wireUnit: "dBASPL",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .routine,
+        haUnit: "dBA",
+        haDeviceClass: "sound_pressure",
+        haStateClass: "measurement",
+        haRequiresAggregate: false
+    )
+
+    public static let appleMoveTime = MetricDeclaration(
+        id: MetricID(rawValue: "appleMoveTime"),
+        wireId: "apple_move_time",
+        hkIdentifier: "HKQuantityTypeIdentifierAppleMoveTime",
+        canonicalUnit: CanonicalUnit(symbol: "min"),
+        wireUnit: "min",
+        cumulative: true,
+        usesHealthKitStatistics: true,
+        sensitivity: .routine,
+        haUnit: "min",
+        haDeviceClass: "duration",
+        haStateClass: "total_increasing",
+        haRequiresAggregate: true
+    )
+
+    public static let physicalEffort = MetricDeclaration(
+        id: MetricID(rawValue: "physicalEffort"),
+        wireId: "physical_effort",
+        hkIdentifier: "HKQuantityTypeIdentifierPhysicalEffort",
+        canonicalUnit: CanonicalUnit(symbol: "kcal/kg/h"),
+        wireUnit: "kcal/kg/h",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .routine,
+        haUnit: "kcal/kg/h",
+        haDeviceClass: nil,
+        haStateClass: "measurement",
+        haRequiresAggregate: false
+    )
+
     public static let all: [MetricDeclaration] = [
         stepCount,
         heartRate,
@@ -464,6 +644,18 @@ public enum MetricCatalog {
         dietaryWater,
         bloodPressureSystolic,
         bloodPressureDiastolic,
+        swimmingDistance,
+        wheelchairDistance,
+        pushCount,
+        swimmingStrokeCount,
+        walkingSpeed,
+        runningSpeed,
+        cyclingSpeed,
+        stairAscentSpeed,
+        timeInDaylight,
+        environmentalAudioExposure,
+        appleMoveTime,
+        physicalEffort,
     ]
 
     public static func declaration(for id: MetricID) -> MetricDeclaration? {
@@ -485,6 +677,18 @@ public enum MetricCatalog {
             restingHeartRate,
             walkingHeartRateAverage,
             dietaryWater,
+            swimmingDistance,
+            wheelchairDistance,
+            pushCount,
+            swimmingStrokeCount,
+            walkingSpeed,
+            runningSpeed,
+            cyclingSpeed,
+            stairAscentSpeed,
+            timeInDaylight,
+            environmentalAudioExposure,
+            appleMoveTime,
+            physicalEffort,
         ]
     }
 
@@ -497,6 +701,7 @@ public enum MetricCatalog {
     public static let shareDisallowedHKIdentifiers: Set<String> = [
         "HKQuantityTypeIdentifierAppleExerciseTime",
         "HKQuantityTypeIdentifierAppleStandTime",
+        "HKQuantityTypeIdentifierAppleMoveTime",
         "HKDataTypeIdentifierElectrocardiogram",
     ]
 }

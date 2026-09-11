@@ -26,6 +26,18 @@
     {"metricId":"lean_body_mass","kind":"sample.quantity","canonicalUnit":"kg"},
     {"metricId":"dietary_water","kind":"sample.quantity","canonicalUnit":"mL"},
     {"metricId":"blood_pressure_systolic","kind":"sample.quantity","canonicalUnit":"mmHg"},
-    {"metricId":"blood_pressure_diastolic","kind":"sample.quantity","canonicalUnit":"mmHg"}
+    {"metricId":"blood_pressure_diastolic","kind":"sample.quantity","canonicalUnit":"mmHg"},
+    {"metricId":"swimming_distance","kind":"sample.quantity","canonicalUnit":"km"},
+    {"metricId":"wheelchair_distance","kind":"sample.quantity","canonicalUnit":"km"},
+    {"metricId":"push_count","kind":"sample.quantity","canonicalUnit":"count"},
+    {"metricId":"swimming_stroke_count","kind":"sample.quantity","canonicalUnit":"count"},
+    {"metricId":"walking_speed","kind":"sample.quantity","canonicalUnit":"m/s"},
+    {"metricId":"running_speed","kind":"sample.quantity","canonicalUnit":"m/s"},
+    {"metricId":"cycling_speed","kind":"sample.quantity","canonicalUnit":"m/s"},
+    {"metricId":"stair_ascent_speed","kind":"sample.quantity","canonicalUnit":"m/s"},
+    {"metricId":"time_in_daylight","kind":"sample.quantity","canonicalUnit":"min"},
+    {"metricId":"environmental_audio_exposure","kind":"sample.quantity","canonicalUnit":"dBASPL"},
+    {"metricId":"apple_move_time","kind":"sample.quantity","canonicalUnit":"min"},
+    {"metricId":"physical_effort","kind":"sample.quantity","canonicalUnit":"kcal/kg/h"}
   ]
 }

@@ -329,6 +329,30 @@ import WireFormat
         (MetricCatalog.height, .meter(), 1.78, 1.78),
         (MetricCatalog.bodyFatPercentage, .percent(), 0.185, 18.5),
         (MetricCatalog.bodyMassIndex, .count(), 22.4, 22.4),
+        (MetricCatalog.swimmingDistance, .meter(), 2_500, 2.5),
+        (MetricCatalog.wheelchairDistance, .meter(), 800, 0.8),
+        (MetricCatalog.pushCount, .count(), 40, 40),
+        (MetricCatalog.swimmingStrokeCount, .count(), 18, 18),
+        (MetricCatalog.walkingSpeed, HKUnit.meter().unitDivided(by: .second()), 1.4, 1.4),
+        (MetricCatalog.runningSpeed, HKUnit.meter().unitDivided(by: .second()), 3.2, 3.2),
+        (MetricCatalog.cyclingSpeed, HKUnit.meter().unitDivided(by: .second()), 6.1, 6.1),
+        (MetricCatalog.stairAscentSpeed, HKUnit.meter().unitDivided(by: .second()), 0.4, 0.4),
+        (MetricCatalog.timeInDaylight, .second(), 3_600, 60),
+        (
+            MetricCatalog.environmentalAudioExposure,
+            .decibelAWeightedSoundPressureLevel(),
+            65,
+            65
+        ),
+        (MetricCatalog.appleMoveTime, .second(), 900, 15),
+        (
+            MetricCatalog.physicalEffort,
+            HKUnit.kilocalorie().unitDivided(
+                by: .gramUnit(with: .kilo).unitMultiplied(by: .hour())
+            ),
+            4.5,
+            4.5
+        ),
     ]
     for (declaration, sourceUnit, sourceValue, expected) in fixtures {
         guard let type = SampleConversion.quantityType(for: declaration.id) else {
@@ -339,7 +363,7 @@ import WireFormat
             type: type,
             quantity: HKQuantity(unit: sourceUnit, doubleValue: sourceValue),
             start: start,
-            end: start
+            end: start.addingTimeInterval(1)
         )
         let record = SampleConversion.record(
             from: sample,
