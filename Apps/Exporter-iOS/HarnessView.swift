@@ -1309,8 +1309,8 @@ struct HarnessView: View {
         phase = .working
         do {
             historyLines = try await HarnessExport.historyLines()
-            status = historyLines.isEmpty
-                ? "Ready. No export history yet."
+            status = historyLines.contains(RunHistoryDetail.emptyStateCopy)
+                ? RunHistoryDetail.emptyStateCopy
                 : "Ready. Problems are listed before successful runs."
         } catch {
             historyLines = []

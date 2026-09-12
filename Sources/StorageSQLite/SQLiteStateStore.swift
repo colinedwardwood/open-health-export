@@ -77,6 +77,7 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
             "ALTER TABLE journal ADD COLUMN wall_time_epoch REAL NOT NULL DEFAULT 0;",
             "ALTER TABLE journal ADD COLUMN error_class TEXT;",
             "ALTER TABLE journal ADD COLUMN projected_at_epoch REAL;",
+            "ALTER TABLE journal ADD COLUMN history_facts TEXT;",
         ] {
             do { try exec(sql) } catch { _ = error }
         }
@@ -102,7 +103,8 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 samples_acked INTEGER NOT NULL DEFAULT 0,
                 wall_time_epoch REAL NOT NULL DEFAULT 0,
                 error_class TEXT,
-                projected_at_epoch REAL
+                projected_at_epoch REAL,
+                history_facts TEXT
             );
             CREATE TABLE IF NOT EXISTS ledger (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -206,7 +208,7 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
             );
-            PRAGMA user_version = 15;
+            PRAGMA user_version = 16;
             """)
     }
 
@@ -474,7 +476,7 @@ private final class SQLiteTransaction: StateTransaction {
 
     func appendJournal(_ event: RunEvent) throws {
         let stmt = try store.prepare(
-            "INSERT INTO journal (run_id, outcome, detail, trigger, samples_read, samples_committed, samples_acked, wall_time_epoch, error_class, projected_at_epoch) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"
+            "INSERT INTO journal (run_id, outcome, detail, trigger, samples_read, samples_committed, samples_acked, wall_time_epoch, error_class, projected_at_epoch, history_facts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"
         )
         defer { sqlite3_finalize(stmt) }
         bindText(stmt, 1, event.runID.rawValue)
@@ -495,6 +497,7 @@ private final class SQLiteTransaction: StateTransaction {
         } else {
             sqlite3_bind_null(stmt, 10)
         }
+        bindOptionalText(stmt, 11, event.facts.jsonString())
         try stepDone(stmt)
         // OBS-02: enforced here because this is the one place every journal row goes
         // through. Six call sites across the engine append runs, census records, queue
@@ -615,7 +618,7 @@ private final class SQLiteTransaction: StateTransaction {
 
     func unprojectedJournal(limit: Int) throws -> [RunEvent] {
         let stmt = try store.prepare(
-            "SELECT run_id, outcome, detail, trigger, samples_read, samples_committed, samples_acked, wall_time_epoch, error_class, projected_at_epoch FROM journal WHERE projected_at_epoch IS NULL ORDER BY id LIMIT ?;"
+            "SELECT run_id, outcome, detail, trigger, samples_read, samples_committed, samples_acked, wall_time_epoch, error_class, projected_at_epoch, history_facts FROM journal WHERE projected_at_epoch IS NULL ORDER BY id LIMIT ?;"
         )
         defer { sqlite3_finalize(stmt) }
         sqlite3_bind_int64(stmt, 1, sqlite3_int64(max(0, limit)))
@@ -966,7 +969,7 @@ private final class SQLiteTransaction: StateTransaction {
 
     func loadJournal() throws -> [RunEvent] {
         let stmt = try store.prepare(
-            "SELECT run_id, outcome, detail, trigger, samples_read, samples_committed, samples_acked, wall_time_epoch, error_class, projected_at_epoch FROM journal ORDER BY id;"
+            "SELECT run_id, outcome, detail, trigger, samples_read, samples_committed, samples_acked, wall_time_epoch, error_class, projected_at_epoch, history_facts FROM journal ORDER BY id;"
         )
         defer { sqlite3_finalize(stmt) }
         return try readJournalRows(stmt)
@@ -990,7 +993,12 @@ private final class SQLiteTransaction: StateTransaction {
                         : text(stmt, 8),
                     projectedAtEpoch: sqlite3_column_type(stmt, 9) == SQLITE_NULL
                         ? nil
-                        : sqlite3_column_double(stmt, 9)
+                        : sqlite3_column_double(stmt, 9),
+                    facts: RunHistoryFacts.decode(
+                        sqlite3_column_type(stmt, 10) == SQLITE_NULL
+                            ? nil
+                            : text(stmt, 10)
+                    )
                 )
             )
         }

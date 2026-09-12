@@ -4570,6 +4570,22 @@ private func anchorHoldFixture(
     #expect(event?.samplesRead == 2)
     #expect(event?.samplesAcked == 2)
     #expect(event?.outcomeKind == "success")
+    #expect(event?.facts.metric == "heartRate")
+    #expect(event?.facts.destinationID == "local-file")
+    #expect(event?.facts.stepTimings.map(\.name) == ["read", "transform", "enqueue", "send"])
+    #expect((event?.facts.byteCount ?? 0) > 0)
+    #expect(event?.facts.windowStartDay != nil)
+    #expect(event?.facts.redactedPayload?.contains("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa") == false)
+    let revealed = RunHistoryDetail.revealedPayload(for: try #require(event))
+    #expect(revealed.contains("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))
+    let detail = RunHistoryDetail.lines(for: try #require(event))
+    #expect(detail.contains { $0.hasPrefix("outcome:") })
+    #expect(detail.contains { $0.hasPrefix("trigger:") })
+    #expect(detail.contains { $0.hasPrefix("window:") })
+    #expect(detail.contains { $0.hasPrefix("bytes:") })
+    #expect(detail.contains { $0.hasPrefix("duration:") })
+    #expect(detail.contains { $0.hasPrefix("step send:") })
+    #expect(detail.contains { $0.contains("payload:") })
 }
 
 @Test func typePurgeDueOnlyOnGrantToDeniedOrExplicitStop() {

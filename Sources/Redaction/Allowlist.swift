@@ -35,6 +35,12 @@ public enum Allowlist {
         FieldPermission(key: "metric", sinks: [.journal, .ui], healthDerived: true),
         FieldPermission(key: "count", sinks: [.journal, .ui], healthDerived: true),
         FieldPermission(key: "errorClass", sinks: [.journal, .ui, .bundle], healthDerived: false),
+        FieldPermission(key: "destinationID", sinks: [.journal, .ui], healthDerived: false),
+        FieldPermission(key: "windowStartDay", sinks: [.journal, .ui], healthDerived: true),
+        FieldPermission(key: "windowEndDay", sinks: [.journal, .ui], healthDerived: true),
+        FieldPermission(key: "byteCount", sinks: [.journal, .ui, .bundle], healthDerived: true),
+        FieldPermission(key: "durationMillis", sinks: [.journal, .ui, .bundle], healthDerived: false),
+        FieldPermission(key: "payloadSHA256", sinks: [.journal, .ui, .bundle], healthDerived: false),
     ]
 
     public static var journalFields: Set<String> {

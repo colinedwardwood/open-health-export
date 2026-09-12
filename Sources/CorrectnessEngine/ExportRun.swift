@@ -79,6 +79,19 @@ public struct ExportRun: Sendable {
     }
 
     public func run() async throws -> RunOutcome {
+        let startedAt = clock.now()
+        var lastMark = startedAt
+        var timings: [RunStepTiming] = []
+        func mark(_ name: String) {
+            let now = clock.now()
+            timings.append(
+                RunStepTiming(
+                    name: name,
+                    durationMillis: max(0, Int((now.timeIntervalSince(lastMark) * 1000).rounded()))
+                )
+            )
+            lastMark = now
+        }
         if let scope {
             try ExportScopeGate.require(metric: metric, scope: scope)
         }
@@ -92,7 +105,7 @@ public struct ExportRun: Sendable {
                 partialCause: "types_purged"
             )
             let outcome = RunOutcome.derive(from: tally)
-            try await record(outcome: outcome, tally: tally, receipt: nil)
+            try await record(outcome: outcome, tally: tally, receipt: nil, startedAt: startedAt)
             return outcome
         }
         let effectiveEpoch = max(epoch, typeStatus?.generation ?? epoch)
@@ -102,7 +115,11 @@ public struct ExportRun: Sendable {
             guard openHold.decision == .reexportAuthorized else {
                 // Someone has to decide whether this metric re-exports its history.
                 // Until they do, running would make that decision for them.
-                return try await refuse(cause: AnchorGuard.heldJournalDetail)
+                return try await refuse(
+                    cause: AnchorGuard.heldJournalDetail,
+                    startedAt: startedAt,
+                    timings: timings
+                )
             }
             // Decided, and the decision was to send it all again. The guards below stay
             // quiet for this run so they do not re-hold what was just authorised.
@@ -117,7 +134,7 @@ public struct ExportRun: Sendable {
         } catch let error as CheckpointError {
             let tally = RunTally(failed: 1, terminalError: .internalFault, partialCause: "anchor_undecodable")
             let outcome = RunOutcome.derive(from: tally)
-            try await record(outcome: outcome, tally: tally, receipt: nil)
+            try await record(outcome: outcome, tally: tally, receipt: nil, startedAt: startedAt)
             throw error
         }
         let lastEmittedDay = try await store.transact { tx in
@@ -129,7 +146,11 @@ public struct ExportRun: Sendable {
             // Reading now would pass a nil anchor and pull the whole store back, which
             // is exactly the silent full re-export QA-17 forbids. Do not read at all.
             try await hold(reason: .cursorLost, observedSamples: 0, lastEmittedDay: lastEmittedDay)
-            return try await refuse(cause: AnchorGuard.journalDetail)
+            return try await refuse(
+                cause: AnchorGuard.journalDetail,
+                startedAt: startedAt,
+                timings: timings
+            )
         }
         let page: SamplePage
         do {
@@ -142,12 +163,13 @@ public struct ExportRun: Sendable {
                 partialCause: errorClass.rawValue
             )
             let outcome = RunOutcome.derive(from: tally)
-            try await record(outcome: outcome, tally: tally, receipt: nil)
+            try await record(outcome: outcome, tally: tally, receipt: nil, startedAt: startedAt)
             if errorClass == .deviceLocked || errorClass == .healthDataRestricted {
                 return outcome
             }
             throw error
         }
+        mark("read")
         #if DEBUG
         try faults.hit(.afterRead)
         #endif
@@ -167,12 +189,22 @@ public struct ExportRun: Sendable {
                 observedSamples: returned,
                 lastEmittedDay: lastEmittedDay
             )
-            return try await refuse(cause: AnchorGuard.journalDetail)
+            return try await refuse(
+                cause: AnchorGuard.journalDetail,
+                startedAt: startedAt,
+                timings: timings
+            )
         }
         let aggregates = try await drainPlans(for: page)
         if !page.hasRecords, aggregates.isEmpty {
             let outcome = RunOutcome.derive(from: RunTally(nothingDue: true))
-            try await record(outcome: outcome, tally: RunTally(nothingDue: true), receipt: nil)
+            try await record(
+                outcome: outcome,
+                tally: RunTally(nothingDue: true),
+                receipt: nil,
+                startedAt: startedAt,
+                timings: timings
+            )
             return outcome
         }
 
@@ -225,6 +257,7 @@ public struct ExportRun: Sendable {
             NativeWire.outputFileName(batchID: batchID, demo: envelope.demo)
         )
         try FileWriteKit.writeAtomically(payload, to: payloadURL)
+        mark("transform")
 
         let recordCount = page.censusKeys.count + page.tombstones.count + aggregates.count
         var rangeDays = page.censusKeys.map(\.day)
@@ -282,6 +315,7 @@ public struct ExportRun: Sendable {
             #endif
             return (evicted, census.undatableUUIDs)
         }
+        mark("enqueue")
         for victim in enqueue.victims {
             try? FileManager.default.removeItem(atPath: victim.payloadURL)
         }
@@ -311,6 +345,7 @@ public struct ExportRun: Sendable {
             )
             #endif
         } catch let error as DestinationSendError {
+            mark("send")
             let tally = RunTally(
                 read: recordCount,
                 committed: recordCount,
@@ -319,10 +354,19 @@ public struct ExportRun: Sendable {
                 partialCause: error.errorClass.rawValue
             )
             let outcome = RunOutcome.derive(from: tally)
-            try await record(outcome: outcome, tally: tally, receipt: nil)
+            try await record(
+                outcome: outcome,
+                tally: tally,
+                receipt: nil,
+                startedAt: startedAt,
+                timings: timings,
+                pending: pending,
+                payload: payload
+            )
             try await sweepUndatable(enqueue.undatable)
             return outcome
         }
+        mark("send")
         #if DEBUG
         try faults.hit(.afterAckBeforeRelease)
         #endif
@@ -341,7 +385,11 @@ public struct ExportRun: Sendable {
             outcome: outcome,
             tally: tally,
             receipt: receipt,
-            freshnessTiming: freshnessTiming
+            freshnessTiming: freshnessTiming,
+            startedAt: startedAt,
+            timings: timings,
+            pending: pending,
+            payload: payload
         )
         try await sweepUndatable(enqueue.undatable)
         return outcome
@@ -426,10 +474,20 @@ public struct ExportRun: Sendable {
         }
     }
 
-    private func refuse(cause: String) async throws -> RunOutcome {
+    private func refuse(
+        cause: String,
+        startedAt: Date,
+        timings: [RunStepTiming]
+    ) async throws -> RunOutcome {
         let tally = RunTally(failed: 1, terminalError: .internalFault, partialCause: cause)
         let outcome = RunOutcome.derive(from: tally)
-        try await record(outcome: outcome, tally: tally, receipt: nil)
+        try await record(
+            outcome: outcome,
+            tally: tally,
+            receipt: nil,
+            startedAt: startedAt,
+            timings: timings
+        )
         return outcome
     }
 
@@ -441,10 +499,45 @@ public struct ExportRun: Sendable {
             freshnessClass: FreshnessClass,
             firstObservedAtEpoch: TimeInterval,
             observationLatencySeconds: TimeInterval
-        )? = nil
+        )? = nil,
+        startedAt: Date? = nil,
+        timings: [RunStepTiming] = [],
+        pending: PendingBatch? = nil,
+        payload: Data? = nil
     ) async throws {
         let nowEpoch = clock.now().timeIntervalSince1970
         let runID = RunID(rawValue: "run-\(metric.rawValue)")
+        let durationMillis = startedAt.map {
+            max(0, Int((clock.now().timeIntervalSince($0) * 1000).rounded()))
+        } ?? 0
+        var payloadPath: String?
+        var payloadSHA: String?
+        if let payload {
+            let dir = scratchDirectory.appendingPathComponent("history-payloads", isDirectory: true)
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            let url = dir.appendingPathComponent("\(metric.rawValue)-\(Int(nowEpoch)).ndjson")
+            try FileWriteKit.writeAtomically(payload, to: url)
+            payloadPath = url.path
+            payloadSHA = ContentSHA256.hex(payload)
+        }
+        let facts = RunHistoryFacts(
+            destinationID: destinationName,
+            metric: metric.rawValue,
+            windowStartDay: pending?.rangeStartDay,
+            windowEndDay: pending?.rangeEndDay,
+            byteCount: pending?.byteCount ?? payload?.count ?? 0,
+            durationMillis: durationMillis,
+            stepTimings: timings,
+            payloadSHA256: payloadSHA,
+            redactedPayload: RunHistoryDetail.redactedPayload(
+                metric: metric.rawValue,
+                records: tally.committed,
+                byteCount: pending?.byteCount ?? payload?.count ?? 0,
+                windowStartDay: pending?.rangeStartDay,
+                windowEndDay: pending?.rangeEndDay
+            ),
+            payloadPath: payloadPath
+        )
         let freshnessLatency: RunFreshnessLatency?
         if !envelope.demo,
            outcome.kind == .success,
@@ -483,7 +576,8 @@ public struct ExportRun: Sendable {
                     wallTimeEpoch: nowEpoch,
                     errorClass: tally.terminalError == .none
                         ? nil
-                        : tally.terminalError.rawValue
+                        : tally.terminalError.rawValue,
+                    facts: facts
                 )
             )
             try tx.appendLedger(

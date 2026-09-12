@@ -272,6 +272,76 @@ public enum RunTrigger: String, Sendable, Codable, Equatable, CaseIterable {
     case launch
 }
 
+public struct RunStepTiming: Sendable, Equatable, Codable {
+    public var name: String
+    public var durationMillis: Int
+
+    public init(name: String, durationMillis: Int) {
+        self.name = name
+        self.durationMillis = durationMillis
+    }
+}
+
+/// UX-40 fields that sit beside the journal row. Exact payload bytes stay on disk
+/// (`payloadPath`); SQLite keeps a redacted summary and a digest.
+public struct RunHistoryFacts: Sendable, Equatable, Codable {
+    public var destinationID: String?
+    public var metric: String?
+    public var windowStartDay: String?
+    public var windowEndDay: String?
+    public var byteCount: Int
+    public var durationMillis: Int
+    public var stepTimings: [RunStepTiming]
+    public var payloadSHA256: String?
+    public var redactedPayload: String?
+    public var payloadPath: String?
+
+    public static let empty = RunHistoryFacts()
+
+    public init(
+        destinationID: String? = nil,
+        metric: String? = nil,
+        windowStartDay: String? = nil,
+        windowEndDay: String? = nil,
+        byteCount: Int = 0,
+        durationMillis: Int = 0,
+        stepTimings: [RunStepTiming] = [],
+        payloadSHA256: String? = nil,
+        redactedPayload: String? = nil,
+        payloadPath: String? = nil
+    ) {
+        self.destinationID = destinationID
+        self.metric = metric
+        self.windowStartDay = windowStartDay
+        self.windowEndDay = windowEndDay
+        self.byteCount = byteCount
+        self.durationMillis = durationMillis
+        self.stepTimings = stepTimings
+        self.payloadSHA256 = payloadSHA256
+        self.redactedPayload = redactedPayload
+        self.payloadPath = payloadPath
+    }
+
+    public var isEmpty: Bool { self == .empty }
+
+    public func jsonString() -> String? {
+        guard !isEmpty else { return nil }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        guard let data = try? encoder.encode(self) else { return nil }
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    public static func decode(_ json: String?) -> RunHistoryFacts {
+        guard let json, let data = json.data(using: .utf8),
+              let facts = try? JSONDecoder().decode(RunHistoryFacts.self, from: data)
+        else {
+            return .empty
+        }
+        return facts
+    }
+}
+
 public struct RunEvent: Sendable, Equatable {
     public var runID: RunID
     public var outcomeKind: String
@@ -283,6 +353,7 @@ public struct RunEvent: Sendable, Equatable {
     public var wallTimeEpoch: TimeInterval
     public var errorClass: String?
     public var projectedAtEpoch: TimeInterval?
+    public var facts: RunHistoryFacts
 
     public init(
         runID: RunID,
@@ -294,7 +365,8 @@ public struct RunEvent: Sendable, Equatable {
         samplesAcked: Int = 0,
         wallTimeEpoch: TimeInterval = 0,
         errorClass: String? = nil,
-        projectedAtEpoch: TimeInterval? = nil
+        projectedAtEpoch: TimeInterval? = nil,
+        facts: RunHistoryFacts = .empty
     ) {
         self.runID = runID
         self.outcomeKind = outcomeKind
@@ -306,6 +378,7 @@ public struct RunEvent: Sendable, Equatable {
         self.wallTimeEpoch = wallTimeEpoch
         self.errorClass = errorClass
         self.projectedAtEpoch = projectedAtEpoch
+        self.facts = facts
     }
 
     public var isProblemOutcome: Bool {

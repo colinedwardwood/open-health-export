@@ -1411,25 +1411,14 @@ enum HarnessExport {
             path: root.appendingPathComponent("state.sqlite").path
         )
         let events = try await store.transact { try $0.loadJournal() }
-        return RunHistory.problemsFirst(events).map { event in
-            let date = Date(timeIntervalSince1970: event.wallTimeEpoch)
-                .formatted(date: .abbreviated, time: .shortened)
-            let errorClass = event.errorClass
-            let errorCode = errorClass.flatMap { raw -> String? in
-                guard raw != ErrorClass.none.rawValue, !raw.isEmpty else { return nil }
-                return raw
-            }
-            let errorPhrase = ErrorClassManifest.userFacingReason(forRaw: errorClass)
-            var error = ""
-            if let errorCode {
-                error += " · \(errorCode)"
-                if let errorPhrase, errorPhrase != errorCode {
-                    error += " · \(errorPhrase)"
-                }
-            }
-            return "\(date) · \(event.outcomeKind)\(error) · "
-                + "\(event.samplesAcked)/\(event.samplesCommitted) acknowledged"
+        guard !events.isEmpty else {
+            return [RunHistoryDetail.emptyStateCopy, RunHistoryDetail.retentionCopy]
         }
+        var lines = [RunHistoryDetail.retentionCopy]
+        for event in RunHistory.problemsFirst(events) {
+            lines.append(contentsOf: RunHistoryDetail.lines(for: event))
+        }
+        return lines
     }
 
     static func sentThroughDay(metric: MetricID) async throws -> String? {
