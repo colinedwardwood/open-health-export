@@ -229,6 +229,16 @@ enum HarnessExport {
         )
     }
 
+    static func gzipLevel() -> Int32 {
+        isThermalDeferred() ? Gzip.storedLevel : Gzip.speedLevel
+    }
+
+    static func withThermalCompression<T>(
+        _ body: () async throws -> T
+    ) async rethrows -> T {
+        try await Gzip.$level.withValue(gzipLevel(), operation: body)
+    }
+
     static func freshnessCadenceSeconds() -> TimeInterval {
         let stored = UserDefaults.standard.object(forKey: "ohe.freshnessIntervalMinutes") as? Int
         return TimeInterval(max(1, stored ?? 15) * 60)
@@ -1618,14 +1628,16 @@ enum HarnessExport {
             allowInsecureHTTP: allowInsecureHTTP
         )
         let now = Date().ISO8601Format()
-        let probe = try await HTTPSDestinationEnable.probe(
-            destination: destination,
-            transport: transport,
-            exporterID: try installationID(),
-            emittedAt: now,
-            meteredPolicy: .fromAllowsMetered(allowsMeteredNetwork(destinationID: "https")),
-            pathConditions: networkPathConditions()
-        )
+        let probe = try await withThermalCompression {
+            try await HTTPSDestinationEnable.probe(
+                destination: destination,
+                transport: transport,
+                exporterID: try installationID(),
+                emittedAt: now,
+                meteredPolicy: .fromAllowsMetered(allowsMeteredNetwork(destinationID: "https")),
+                pathConditions: networkPathConditions()
+            )
+        }
         await PendingDestination.shared.setHTTPS(PendingHTTPS(
             probe: probe,
             host: host,
@@ -2000,6 +2012,14 @@ enum HarnessExport {
 
     static func runHTTPSDestination(
         onProgress: (@Sendable (Int, Int) async -> Void)? = nil
+    ) async throws -> [String] {
+        try await withThermalCompression {
+            try await runHTTPSDestinationUnscoped(onProgress: onProgress)
+        }
+    }
+
+    private static func runHTTPSDestinationUnscoped(
+        onProgress: (@Sendable (Int, Int) async -> Void)?
     ) async throws -> [String] {
         let root = try applicationSupportRoot()
         let data = try Data(

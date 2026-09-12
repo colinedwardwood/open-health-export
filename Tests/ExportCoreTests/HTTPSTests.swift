@@ -568,6 +568,13 @@ private func writeHTTPSPayload() throws -> (URL, BatchID) {
     let compressed = try Gzip.compress(original)
     #expect(try Gzip.decompress(compressed) == original)
     #expect(compressed.count < original.count)
+    let stored = try Gzip.compress(original, level: Gzip.storedLevel)
+    #expect(try Gzip.decompress(stored) == original)
+    #expect(stored.count > compressed.count)
+    let fromLocal = try Gzip.$level.withValue(Gzip.storedLevel) {
+        try Gzip.compress(original)
+    }
+    #expect(fromLocal.count == stored.count)
 }
 
 @Test func httpRetryAfterParsesDeltaSecondsAndHTTPDate() {

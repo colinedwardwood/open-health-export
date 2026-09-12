@@ -4922,6 +4922,7 @@ private func anchorHoldFixture(
     #expect(harness.contains("deferForLowPower: isLowPowerDeferred()"))
     #expect(harness.contains("deferForThermal: isThermalDeferred()"))
     #expect(harness.contains("thermalHalved: isThermalDeferred()"))
+    #expect(harness.contains("Gzip.$level.withValue(gzipLevel()"))
     #expect(harness.contains("thermalState"))
     #expect(harness.components(separatedBy: "try await applyQueueRedIfNeeded(").count - 1 == 4)
 }

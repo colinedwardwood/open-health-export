@@ -9,24 +9,29 @@ public enum GzipError: Error, Equatable {
     case inflate
 }
 
-/// Deterministic gzip at zlib level 1 (NFR-16). OS/mtime bytes come from zlib defaults;
-/// the deflate stream is what receivers gunzip.
+/// Deterministic gzip. Default zlib level 1 (NFR-16). Thermal ≥ serious uses
+/// stored (level 0) so the CPU work drops while the stream stays gunzip-compatible.
 public enum Gzip {
-    public static func compress(_ data: Data) throws -> Data {
-        try transcode(data, compressing: true)
+    public static let speedLevel: Int32 = 1
+    public static let storedLevel: Int32 = 0
+
+    @TaskLocal public static var level: Int32 = speedLevel
+
+    public static func compress(_ data: Data, level: Int32? = nil) throws -> Data {
+        try transcode(data, compressing: true, level: level ?? Self.level)
     }
 
     public static func decompress(_ data: Data) throws -> Data {
-        try transcode(data, compressing: false)
+        try transcode(data, compressing: false, level: speedLevel)
     }
 
-    private static func transcode(_ data: Data, compressing: Bool) throws -> Data {
+    private static func transcode(_ data: Data, compressing: Bool, level: Int32) throws -> Data {
         var stream = z_stream()
         let windowBits: Int32 = 15 + 16
         let initStatus: Int32 = compressing
             ? deflateInit2_(
                 &stream,
-                Z_BEST_SPEED,
+                level,
                 Z_DEFLATED,
                 windowBits,
                 8,
