@@ -1083,6 +1083,18 @@ enum HarnessExport {
                 errorClass: ErrorClass.destinationUnreachable.rawValue,
                 writtenAtEpoch: now
             )
+        case "changed":
+            snapshot = DestinationStatusSnapshot(
+                destinationID: "home-assistant",
+                destinationLabel: "Home Assistant",
+                enabled: true,
+                lastOutcome: "success",
+                lastSuccessEpoch: now - 60,
+                errorClass: ErrorClass.none.rawValue,
+                staleThresholdSeconds: day,
+                unacknowledgedSecurityEventCount: 2,
+                writtenAtEpoch: now
+            )
         default:
             snapshot = DestinationStatusSnapshot(
                 destinationID: "home-assistant",

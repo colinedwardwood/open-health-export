@@ -53,7 +53,7 @@ final class ExporterUITests: XCTestCase {
 
     /// SEC-29: failed owner authentication covers the entire UI. The production
     /// gate is optional and remains off in the common/default launch above.
-    func testOptionalPrivacyGateFailsClosedAndUsesInjectedAuthenticator() {
+    func testOptionalPrivacyGateFailsClosedAndUsesInjectedAuthenticator() throws {
         app.terminate()
         app.launchArguments = [
             "-ohe.disclosureAcknowledged", "true",
@@ -65,10 +65,12 @@ final class ExporterUITests: XCTestCase {
 
         XCTAssertTrue(app.buttons["privacy-gate-unlock"].waitForExistence(timeout: uiWait))
         XCTAssertFalse(app.buttons["health-request"].exists)
+        try performAccessibilityAudit("privacy-gate-locked")
 
         app.buttons["privacy-gate-unlock"].tap()
         XCTAssertTrue(app.staticTexts["privacy-gate-failure"].waitForExistence(timeout: uiWait))
         XCTAssertFalse(app.buttons["health-request"].exists)
+        try performAccessibilityAudit("privacy-gate-authentication-failed")
     }
 
     /// SEC-29: leaving the foreground immediately relocks presentation. The
@@ -279,7 +281,7 @@ final class ExporterUITests: XCTestCase {
     }
 
     /// SEC-14: a public address requires explicit typed confirmation before enable.
-    func testPublicDestinationStaysDisabledUntilPhraseIsEntered() {
+    func testPublicDestinationStaysDisabledUntilPhraseIsEntered() throws {
         app.terminate()
         app.launchEnvironment["OHE_SEED_PUBLIC_CONFIRMATION"] = "true"
         app.launch()
@@ -293,13 +295,14 @@ final class ExporterUITests: XCTestCase {
         XCTAssertFalse(confirm.isEnabled)
 
         let phrase = app.textFields["public-destination-confirmation"]
+        try performAccessibilityAudit("public-destination-confirmation")
         type("send to public server", into: phrase)
         XCTAssertTrue(confirm.isEnabled)
     }
 
     /// SEC-45: sharing ends our protection over those bytes, so consent is a tap on the
     /// warning rather than an inference from a tap on the share button.
-    func testShareWarningIsShownOnceAndGatesTheShareControl() {
+    func testShareWarningIsShownOnceAndGatesTheShareControl() throws {
         app.terminate()
         app.launchArguments = [
             "-ohe.disclosureAcknowledged", "false",
@@ -326,6 +329,7 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(warning.waitForExistence(timeout: uiWait), "no SEC-45 warning after traversal")
         XCTAssertTrue(warning.label.contains("protection no longer applies"), warning.label)
         XCTAssertFalse(app.buttons["diagnostic-share"].exists, "share was reachable before the warning")
+        try performAccessibilityAudit("diagnostic-preview-share-warning")
 
         scrollToHittable(app.buttons["share-protection-continue"]).tap()
         // Acknowledging replaces three lines of warning with one control, so the share
@@ -389,7 +393,7 @@ final class ExporterUITests: XCTestCase {
         )
     }
 
-    func testDataBrowserSelectAndEmptyMeasurementsAreVisibleAfterDisclosure() {
+    func testDataBrowserSelectAndEmptyMeasurementsAreVisibleAfterDisclosure() throws {
         enterControls()
         XCTAssertTrue(app.staticTexts["browser-title"].waitForExistence(timeout: uiWait))
         XCTAssertEqual(app.staticTexts["browser-title"].label, "Data")
@@ -400,6 +404,13 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(app.buttons["browser-clear-all"].exists)
         XCTAssertTrue(app.buttons["browser-review"].exists)
         XCTAssertTrue(app.staticTexts["Measurements"].exists == false)
+        try performAccessibilityAudit("browser-select")
+        app.buttons["browser-review"].tap()
+        XCTAssertTrue(
+            app.staticTexts["browser-review-title"]
+                .waitForExistence(timeout: uiWait)
+        )
+        try performAccessibilityAudit("browser-review")
     }
 
     func testDestinationScopeStartsEmptyAndOffersAnExplicitPreset() {
@@ -579,6 +590,29 @@ final class ExporterUITests: XCTestCase {
         }
     }
 
+    func testSuccessStaleAndDestinationChangeStatesPassAccessibilityAudit() throws {
+        for scenario in ["success", "stale", "changed"] {
+            app.terminate()
+            app.launchEnvironment["OHE_SEED_DESTINATION_STATUS"] = scenario
+            app.launch()
+            enterControls()
+            let refresh = scrollToHittable(app.buttons["destination-refresh"])
+            refresh.tap()
+            XCTAssertTrue(
+                app.staticTexts["destination-status-0"]
+                    .waitForExistence(timeout: uiWait),
+                "no destination line for \(scenario); available: \(visibleIdentifiers())"
+            )
+            if scenario == "changed" {
+                XCTAssertTrue(
+                    app.descendants(matching: .any)["destination-change-banner"]
+                        .waitForExistence(timeout: uiWait)
+                )
+            }
+            try performAccessibilityAudit("destination-\(scenario)")
+        }
+    }
+
     /// QA-17's paused type is the other half of permission-limited: the type is enabled
     /// but not flowing, and the banner saying so is on the first screen.
     func testPausedAnchorBannerPassesAccessibilityAudit() throws {
@@ -698,10 +732,24 @@ final class ExporterUITests: XCTestCase {
 
     private func performAccessibilityAudit(_ state: String = #function) throws {
         try app.performAccessibilityAudit { issue in
-            guard issue.auditType == .contrast, let element = issue.element else {
+            guard let element = issue.element else {
                 return false
             }
-            guard let cause = Self.suppressionCause(for: element) else { return false }
+            let cause: String?
+            if issue.auditType == .contrast {
+                cause = Self.suppressionCause(for: element)
+            } else {
+                cause = nil
+            }
+            guard let cause else {
+                print(
+                    "UNSUPPRESSED AX \(state): type=\(issue.auditType) "
+                        + "id=\(element.identifier) label=\(element.label) "
+                        + "enabled=\(element.isEnabled) hittable=\(element.isHittable) "
+                        + "frame=\(element.frame)"
+                )
+                return false
+            }
             // QA-26: a waiver is only valid with a tracking issue behind it. A cause
             // that is not in the table cannot be suppressed, so adding one without a
             // link fails the audit instead of passing quietly.

@@ -391,6 +391,7 @@ struct HarnessView: View {
                 .accessibilityHidden(true)
             Text("Open Health Exporter is locked")
                 .font(.headline)
+                .fixedSize(horizontal: false, vertical: true)
             Text("Unlocking protects this screen only. Background exports and destination delivery continue without a prompt.")
                 .font(.footnote)
                 .multilineTextAlignment(.center)
@@ -398,6 +399,7 @@ struct HarnessView: View {
             if appPrivacyGate.authenticationFailed {
                 Text("Authentication was not completed.")
                     .font(.footnote)
+                    .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("privacy-gate-failure")
             }
             Button(
@@ -697,7 +699,12 @@ struct HarnessView: View {
             ForEach(Array(httpsTestLines.enumerated()), id: \.offset) { _, line in
                 Text(line)
                     .font(.footnote)
-                    .textSelection(.enabled)
+                    .foregroundStyle(.primary)
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: 44,
+                        alignment: .leading
+                    )
             }
             TextField("MQTT broker URL", text: $mqttURL)
                 .textInputAutocapitalization(.never)
@@ -916,6 +923,7 @@ struct HarnessView: View {
 
             Text("Diagnostics")
                 .font(.headline)
+                .foregroundStyle(.primary)
             Stepper(
                 "Include at least \(diagnosticMinimumRuns) recent runs",
                 value: $diagnosticMinimumRuns,
@@ -1901,10 +1909,24 @@ struct HarnessView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    ForEach(Array(card.lines.enumerated()), id: \.offset) { _, line in
+                    Text("Confirm this server")
+                        .font(.headline)
+                        .frame(
+                            maxWidth: .infinity,
+                            minHeight: 44,
+                            alignment: .leading
+                        )
+                        .accessibilityIdentifier("destination-confirm-title")
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityRespondsToUserInteraction(false)
+                    ForEach(Array(card.lines.dropFirst().enumerated()), id: \.offset) { _, line in
                         Text(line)
                             .font(.footnote)
-                            .textSelection(.enabled)
+                            .frame(
+                                maxWidth: .infinity,
+                                minHeight: 44,
+                                alignment: .leading
+                            )
                     }
                     if card.requiresPublicAddressConfirmation {
                         Text(ConfirmationCopy.publicAddressWarning)
@@ -1928,14 +1950,16 @@ struct HarnessView: View {
                             && publicAddressConfirmation != ConfirmationCopy.publicAddressPhrase
                     )
                     .accessibilityIdentifier("destination-confirm")
+                    .buttonStyle(.borderedProminent)
                     Button("Cancel") {
                         cancelDestinationConfirmation()
                     }
                     .accessibilityIdentifier("destination-confirm-cancel")
+                    .foregroundStyle(.primary)
+                    .frame(minWidth: 44, minHeight: 44)
                 }
                 .padding()
             }
-            .navigationTitle("Confirm this server")
         }
         .interactiveDismissDisabled()
         .presentationDetents([.large])
