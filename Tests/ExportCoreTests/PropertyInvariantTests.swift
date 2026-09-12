@@ -133,65 +133,76 @@ private func propertySample(uuid: String, value: Double, minute: Int) -> SampleR
     )
 }
 
+private func deltaAndFullExportsConverge(seed: Int, sequences: Int) throws -> Bool {
+    var rng = PropertyRNG(seed: UInt64(seed))
+    var model: [String: SampleRecord] = [:]
+    var deltaReceiver = ReferenceReceiver()
+    var retired: Set<String> = []
+
+    for sequence in 1 ... sequences {
+        let slot = Int(rng.next() % 24)
+        let uuid = propertyUUID(slot)
+        if retired.contains(uuid) { continue }
+        let delete = rng.next() % 4 == 0 && model[uuid] != nil
+        let samples: [SampleRecord]
+        let tombstones: [TombstoneRecord]
+        if delete {
+            model.removeValue(forKey: uuid)
+            retired.insert(uuid)
+            samples = []
+            tombstones = [
+                TombstoneRecord(
+                    key: RecordKey(uuid: uuid),
+                    metric: MetricCatalog.heartRate.id
+                ),
+            ]
+        } else {
+            let sample = propertySample(
+                uuid: uuid,
+                value: Double(rng.next() % 10_000) / 10,
+                minute: sequence
+            )
+            model[uuid] = sample
+            samples = [sample]
+            tombstones = []
+        }
+        var envelope = testEnvelope()
+        envelope.seq = sequence
+        let delta = try NativeWire.encode(
+            samples: samples,
+            tombstones: tombstones,
+            metric: MetricCatalog.heartRate.id,
+            batchID: BatchID(rawValue: propertyUUID(seed * 100 + sequence)),
+            envelope: envelope
+        )
+        try deltaReceiver.ingest(ndjson: String(decoding: delta, as: UTF8.self))
+    }
+
+    let full = try NativeWire.encode(
+        samples: Array(model.values),
+        tombstones: [],
+        metric: MetricCatalog.heartRate.id,
+        batchID: BatchID(rawValue: propertyUUID(seed)),
+        envelope: testEnvelope()
+    )
+    var fullReceiver = ReferenceReceiver()
+    try fullReceiver.ingest(ndjson: String(decoding: full, as: UTF8.self))
+    return deltaReceiver.quantities == fullReceiver.quantities
+}
+
 @Test func p6DeltaAndFullExportsConvergeForSeededMutationStreams() throws {
     for seed in 1 ... 50 {
-        var rng = PropertyRNG(seed: UInt64(seed))
-        var model: [String: SampleRecord] = [:]
-        var deltaReceiver = ReferenceReceiver()
-        var retired: Set<String> = []
-
-        for sequence in 1 ... 80 {
-            let slot = Int(rng.next() % 24)
-            let uuid = propertyUUID(slot)
-            if retired.contains(uuid) { continue }
-            let delete = rng.next() % 4 == 0 && model[uuid] != nil
-            let samples: [SampleRecord]
-            let tombstones: [TombstoneRecord]
-            if delete {
-                model.removeValue(forKey: uuid)
-                retired.insert(uuid)
-                samples = []
-                tombstones = [
-                    TombstoneRecord(
-                        key: RecordKey(uuid: uuid),
-                        metric: MetricCatalog.heartRate.id
-                    ),
-                ]
-            } else {
-                let sample = propertySample(
-                    uuid: uuid,
-                    value: Double(rng.next() % 10_000) / 10,
-                    minute: sequence
-                )
-                model[uuid] = sample
-                samples = [sample]
-                tombstones = []
-            }
-            var envelope = testEnvelope()
-            envelope.seq = sequence
-            let delta = try NativeWire.encode(
-                samples: samples,
-                tombstones: tombstones,
-                metric: MetricCatalog.heartRate.id,
-                batchID: BatchID(rawValue: propertyUUID(seed * 100 + sequence)),
-                envelope: envelope
-            )
-            try deltaReceiver.ingest(ndjson: String(decoding: delta, as: UTF8.self))
+        guard try !deltaAndFullExportsConverge(seed: seed, sequences: 80) else {
+            continue
         }
-
-        let full = try NativeWire.encode(
-            samples: Array(model.values),
-            tombstones: [],
-            metric: MetricCatalog.heartRate.id,
-            batchID: BatchID(rawValue: propertyUUID(seed)),
-            envelope: testEnvelope()
-        )
-        var fullReceiver = ReferenceReceiver()
-        try fullReceiver.ingest(ndjson: String(decoding: full, as: UTF8.self))
-        #expect(
-            deltaReceiver.quantities == fullReceiver.quantities,
-            "P6 failed for seed \(seed)"
-        )
+        var shrunk = 80
+        for sequences in 1 ... 80 {
+            if try !deltaAndFullExportsConverge(seed: seed, sequences: sequences) {
+                shrunk = sequences
+                break
+            }
+        }
+        Issue.record("P6 seed \(seed), shrunk command prefix \(shrunk)")
     }
 }
 
@@ -206,35 +217,45 @@ private func propertySample(uuid: String, value: Double, minute: Int) -> SampleR
                 minute: index
             )
         }
-        let cumulative = values.map {
-            SampleRecord(
-                key: $0.key,
+        func conserves(_ candidate: [SampleRecord]) -> Bool {
+            let cumulative = candidate.map {
+                SampleRecord(
+                    key: $0.key,
+                    metric: MetricCatalog.stepCount.id,
+                    start: $0.start,
+                    end: $0.end,
+                    timeZoneOffsetMinutes: $0.timeZoneOffsetMinutes,
+                    timeZoneSource: $0.timeZoneSource,
+                    value: $0.value,
+                    unit: CanonicalUnit(symbol: "count"),
+                    observedAt: $0.observedAt
+                )
+            }
+            let expected = cumulative.map(\.value).reduce(0, +)
+            let sum = AggregateFold.foldDay(
                 metric: MetricCatalog.stepCount.id,
-                start: $0.start,
-                end: $0.end,
-                timeZoneOffsetMinutes: $0.timeZoneOffsetMinutes,
-                timeZoneSource: $0.timeZoneSource,
-                value: $0.value,
-                unit: CanonicalUnit(symbol: "count"),
-                observedAt: $0.observedAt
+                day: "2026-01-01",
+                samples: cumulative
             )
+            let mean = AggregateFold.foldDay(
+                metric: MetricCatalog.heartRate.id,
+                day: "2026-01-01",
+                samples: candidate
+            )
+            return abs((sum.value ?? 0) - expected) < 0.000_001
+                && sum.sampleCount == candidate.count
+                && abs((mean.value ?? 0) * Double(candidate.count) - expected) < 0.000_001
+                && mean.sampleCount == candidate.count
         }
-        let expected = cumulative.map(\.value).reduce(0, +)
-        let sum = AggregateFold.foldDay(
-            metric: MetricCatalog.stepCount.id,
-            day: "2026-01-01",
-            samples: cumulative
-        )
-        #expect(abs((sum.value ?? 0) - expected) < 0.000_001)
-        #expect(sum.sampleCount == count)
-
-        let mean = AggregateFold.foldDay(
-            metric: MetricCatalog.heartRate.id,
-            day: "2026-01-01",
-            samples: values
-        )
-        #expect(abs((mean.value ?? 0) * Double(count) - expected) < 0.000_001)
-        #expect(mean.sampleCount == count)
+        if !conserves(values) {
+            var shrinking = values
+            while shrinking.count > 1 {
+                let candidate = Array(shrinking.dropLast())
+                guard !conserves(candidate) else { break }
+                shrinking = candidate
+            }
+            Issue.record("P10 seed \(seed), shrunk sample count \(shrinking.count)")
+        }
     }
 }
 
@@ -258,6 +279,28 @@ private struct StatefulExportTrace {
     var retired: Set<String>
     var epochs: [UInt32]
     var live: Set<String>
+}
+
+private func cursorIsMonotonic(_ epochs: [UInt32]) -> Bool {
+    zip(epochs, epochs.dropFirst()).allSatisfy { pair in
+        pair.0 <= pair.1
+    }
+}
+
+private func firstFailingStatefulPrefix(
+    seed: Int,
+    maximumSteps: Int,
+    property: (StatefulExportTrace) -> Bool
+) async throws -> (trace: StatefulExportTrace, steps: Int)? {
+    let full = try await statefulExportTrace(seed: seed, steps: maximumSteps)
+    guard !property(full) else { return nil }
+    for steps in 1 ... maximumSteps {
+        let candidate = try await statefulExportTrace(seed: seed, steps: steps)
+        if !property(candidate) {
+            return (candidate, steps)
+        }
+    }
+    return (full, maximumSteps)
 }
 
 private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> StatefulExportTrace {
@@ -443,27 +486,36 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
 
 @Test func p4LiveSetMatchesTheReferenceModelAfterSeededSequences() async throws {
     for seed in 1 ... 8 {
-        let trace = try await statefulExportTrace(seed: seed, steps: 12)
-        #expect(trace.live == Set(trace.model.keys), "P4 seed \(seed)")
+        if let failure = try await firstFailingStatefulPrefix(
+            seed: seed,
+            maximumSteps: 12,
+            property: { $0.live == Set($0.model.keys) }
+        ) {
+            Issue.record("P4 seed \(seed), shrunk command prefix \(failure.steps)")
+        }
     }
 }
 
 @Test func p5PersistedCursorNeverRegresses() async throws {
     for seed in 1 ... 8 {
-        let trace = try await statefulExportTrace(seed: seed, steps: 12)
-        var previous: UInt32 = 0
-        for epoch in trace.epochs {
-            #expect(epoch >= previous, "P5 seed \(seed)")
-            previous = epoch
+        if let failure = try await firstFailingStatefulPrefix(
+            seed: seed,
+            maximumSteps: 12,
+            property: { cursorIsMonotonic($0.epochs) }
+        ) {
+            Issue.record("P5 seed \(seed), shrunk command prefix \(failure.steps)")
         }
     }
 }
 
 @Test func p7TombstonesAreTerminalInTheLiveSet() async throws {
     for seed in 1 ... 8 {
-        let trace = try await statefulExportTrace(seed: seed, steps: 12)
-        for uuid in trace.retired {
-            #expect(!trace.live.contains(uuid), "P7 seed \(seed)")
+        if let failure = try await firstFailingStatefulPrefix(
+            seed: seed,
+            maximumSteps: 12,
+            property: { $0.retired.isDisjoint(with: $0.live) }
+        ) {
+            Issue.record("P7 seed \(seed), shrunk command prefix \(failure.steps)")
         }
     }
     #expect(throws: HAEError.tombstonesNotRepresentable) {
@@ -731,7 +783,25 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
             day: "2026-01-01",
             samples: reversed
         )
-        #expect(forward == backward, "P9 order dependence seed \(seed)")
+        if forward != backward {
+            var shrinking = samples
+            while shrinking.count > 2 {
+                let candidate = Array(shrinking.dropLast())
+                let candidateForward = AggregateFold.foldDay(
+                    metric: MetricCatalog.stepCount.id,
+                    day: "2026-01-01",
+                    samples: candidate
+                )
+                let candidateBackward = AggregateFold.foldDay(
+                    metric: MetricCatalog.stepCount.id,
+                    day: "2026-01-01",
+                    samples: Array(candidate.reversed())
+                )
+                guard candidateForward != candidateBackward else { break }
+                shrinking = candidate
+            }
+            Issue.record("P9 seed \(seed), shrunk sample count \(shrinking.count)")
+        }
     }
 }
 
