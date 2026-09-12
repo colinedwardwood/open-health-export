@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "FIX-M05",
+      "property": 3,
+      "seed": 5,
+      "regressionTest": "restoreFromBackupNewUUIDsAreReemittedWithoutSkipOrDuplicateState",
+      "commands": [
+        "export historical and recent records",
+        "restore an equal-count store whose HealthKit UUIDs changed",
+        "run trailing reconciliation",
+        "run historical reconciliation"
+      ],
+      "sampleIndices": [0, 1],
+      "faultSchedule": [],
+      "expected": "Both restored UUIDs are emitted and both pre-restore UUIDs are retired."
+    },
+    {
+      "id": "FIX-QA19-001",
+      "property": 4,
+      "seed": 83,
+      "regressionTest": "p4NoDuplicationAfterKillResumeAtEveryDeliverySeam",
+      "commands": [
+        "enqueue one stable-key batch",
+        "kill at each R-83 delivery seam",
+        "resume from persisted state"
+      ],
+      "sampleIndices": [0],
+      "faultSchedule": [
+        "afterEnqueueBeforeDestinationWrite",
+        "afterDestinationWriteBeforeAck",
+        "afterAckBeforeRelease"
+      ],
+      "expected": "The destination contains exactly one payload after every kill and resume."
+    }
+  ]
+}

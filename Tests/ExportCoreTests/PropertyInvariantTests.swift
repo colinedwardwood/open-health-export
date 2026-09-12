@@ -799,3 +799,53 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
         }
     }
 }
+
+private struct QA19CounterexampleManifest: Decodable {
+    var version: Int
+    var cases: [QA19Counterexample]
+}
+
+private struct QA19Counterexample: Decodable {
+    var id: String
+    var property: Int
+    var seed: UInt64
+    var regressionTest: String
+    var commands: [String]
+    var sampleIndices: [Int]
+    var faultSchedule: [String]
+    var expected: String
+}
+
+@Test func qa19CommittedCounterexamplesRemainExecutableFixedSeedRegressions() throws {
+    let tests = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repository = tests.deletingLastPathComponent().deletingLastPathComponent()
+    let manifestURL = repository.appendingPathComponent(
+        "spec/v1.0.0/fixtures/qa19-counterexamples.json"
+    )
+    let manifest = try JSONDecoder().decode(
+        QA19CounterexampleManifest.self,
+        from: Data(contentsOf: manifestURL)
+    )
+    #expect(manifest.version == 1)
+    #expect(!manifest.cases.isEmpty)
+    #expect(Set(manifest.cases.map(\.id)).count == manifest.cases.count)
+
+    var testSource = ""
+    let enumerator = FileManager.default.enumerator(at: tests, includingPropertiesForKeys: nil)
+    for case let file as URL in enumerator! where file.pathExtension == "swift" {
+        testSource += try String(contentsOf: file, encoding: .utf8)
+    }
+    for counterexample in manifest.cases {
+        #expect(counterexample.id.hasPrefix("FIX-"), "\(counterexample.id) lacks a FIX-* ID")
+        #expect((1 ... 16).contains(counterexample.property), "\(counterexample.id) has invalid P-number")
+        #expect(!counterexample.commands.isEmpty, "\(counterexample.id) lacks a shrunk command sequence")
+        #expect(!counterexample.sampleIndices.isEmpty, "\(counterexample.id) lacks sample indices")
+        #expect(!counterexample.expected.isEmpty, "\(counterexample.id) lacks an expected invariant")
+        #expect(
+            testSource.contains("func \(counterexample.regressionTest)("),
+            "\(counterexample.id) regression \(counterexample.regressionTest) is missing"
+        )
+        _ = counterexample.seed
+        _ = counterexample.faultSchedule
+    }
+}
