@@ -115,7 +115,7 @@ final class ExporterUITests: XCTestCase {
         let search = scrollToHittable(app.textFields["browser-search"])
         type("no-such-health-type", into: search)
         XCTAssertTrue(app.staticTexts["browser-empty"].waitForExistence(timeout: uiWait))
-        app.keyboards.buttons["return"].tap()
+        dismissKeyboard()
         try performAccessibilityAudit()
         app.terminate()
         app.launch()
@@ -529,7 +529,7 @@ final class ExporterUITests: XCTestCase {
         let field = app.textFields["demo-confirm"]
         XCTAssertTrue(field.waitForExistence(timeout: uiWait))
         type("local-file", into: field)
-        app.keyboards.buttons["return"].tap()
+        dismissKeyboard()
         let export = scrollToHittable(app.buttons["demo-export"])
         XCTAssertTrue(export.isEnabled)
         export.tap()
@@ -799,7 +799,7 @@ final class ExporterUITests: XCTestCase {
         let search = scrollToHittable(app.textFields["browser-search"])
         type("no-such-health-type", into: search)
         XCTAssertTrue(app.staticTexts["browser-empty"].waitForExistence(timeout: uiWait))
-        app.keyboards.buttons["return"].tap()
+        dismissKeyboard()
         try performAccessibilityAudit("\(configuration)-browser-empty")
     }
 
@@ -899,7 +899,7 @@ final class ExporterUITests: XCTestCase {
         let search = app.textFields["browser-search"]
         XCTAssertTrue(search.waitForExistence(timeout: uiWait))
         type("heart", into: search)
-        app.keyboards.buttons["return"].tap()
+        dismissKeyboard()
     }
 
     /// A single tap does not reliably take keyboard focus on CI's simulator, and typing
@@ -914,6 +914,22 @@ final class ExporterUITests: XCTestCase {
         }
         XCTAssertTrue(app.keyboards.element.exists, "keyboard never appeared for \(field.identifier)")
         field.typeText(text)
+    }
+
+    /// Arabic and other software keyboards do not expose identifier `return`.
+    private func dismissKeyboard() {
+        guard app.keyboards.element.exists else { return }
+        let predicate = NSPredicate(
+            format: "identifier CONTAINS[cd] %@ OR label CONTAINS[cd] %@",
+            "return",
+            "return"
+        )
+        let key = app.keyboards.buttons.matching(predicate).firstMatch
+        if key.waitForExistence(timeout: 2), key.isHittable {
+            key.tap()
+            return
+        }
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.04)).tap()
     }
 
     private func visibleIdentifiers() -> [String] {

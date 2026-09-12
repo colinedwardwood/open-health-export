@@ -213,12 +213,15 @@ struct HarnessView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Unacknowledged destination change")
                         .font(.headline)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(destinationChangeBanner)
                         .font(.footnote)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
                 .background(.yellow)
+                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("destination-change-banner")
             }
         }
@@ -581,7 +584,10 @@ struct HarnessView: View {
                 .foregroundStyle(.primary)
             Text("Demo export never reads HealthKit. Type the destination name local-file to confirm you are not sending this into a live archive.")
                 .font(.footnote)
-            TextField("Type local-file to confirm demo export", text: $demoConfirmName)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+            TextField("Type local-file to confirm demo export", text: $demoConfirmName, axis: .vertical)
+                .lineLimit(1...6)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .frame(minHeight: 44)
@@ -871,7 +877,11 @@ struct HarnessView: View {
             ForEach(Array(destinationStatusLines.enumerated()), id: \.offset) { index, line in
                 Text(line)
                     .font(.footnote)
+                    .foregroundStyle(.primary)
                     .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
                     .accessibilityIdentifier(
                         line == "No destination snapshots yet."
                             ? "destination-empty"
@@ -900,6 +910,7 @@ struct HarnessView: View {
             }
             Text("Acknowledgements")
                 .font(.headline)
+                .foregroundStyle(.primary)
                 .accessibilityIdentifier("acknowledgements-title")
             Text(acknowledgementsText)
                 .font(.footnote)
@@ -964,6 +975,9 @@ struct HarnessView: View {
             Button("Build diagnostic bundle") {
                 buildDiagnostic()
             }
+            .buttonStyle(.bordered)
+            .frame(minHeight: 44)
+            .foregroundStyle(.primary)
             .accessibilityIdentifier("diagnostic-build")
             .disabled(phase == .working)
             .accessibilityHint("Assembles a redacted ohe.diagnostic/1 JSON preview. Sharing exists only below the bundle's last line.")
@@ -2054,6 +2068,8 @@ struct HarnessView: View {
                     ForEach(Array(card.lines.dropFirst().enumerated()), id: \.offset) { _, line in
                         Text(line)
                             .font(.footnote)
+                            .foregroundStyle(.primary)
+                            .fixedSize(horizontal: false, vertical: true)
                             .frame(
                                 maxWidth: .infinity,
                                 minHeight: 44,
@@ -2064,6 +2080,7 @@ struct HarnessView: View {
                         Text(ConfirmationCopy.publicAddressWarning)
                             .font(.footnote)
                             .fontWeight(.semibold)
+                            .foregroundStyle(.primary)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("public-destination-warning")
                         TextField(
@@ -2072,6 +2089,7 @@ struct HarnessView: View {
                         )
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .frame(minHeight: 44)
                         .accessibilityIdentifier("public-destination-confirmation")
                     }
                     Button("This is my server") {
