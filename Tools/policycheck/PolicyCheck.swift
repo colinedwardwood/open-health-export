@@ -1396,14 +1396,16 @@ struct PolicyCheck {
         let pinURL = root.appendingPathComponent(
             "spec/v1.0.0/fixtures/host-tzdata-\(platform).txt"
         )
-        let expected = try String(contentsOf: pinURL, encoding: .utf8)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let allowed = try String(contentsOf: pinURL, encoding: .utf8)
+            .split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !$0.hasPrefix("#") }
         let observed = TimeZone.timeZoneDataVersion
-        guard observed == expected else {
+        guard allowed.contains(observed) else {
             FileHandle.standardError.write(
                 Data(
                     (
-                        "host tzdata drift on \(platform): expected \(expected), "
+                        "host tzdata drift on \(platform): allowed \(allowed.joined(separator: ", ")), "
                             + "observed \(observed); review frozen outputs before updating the pin\n"
                     ).utf8
                 )
