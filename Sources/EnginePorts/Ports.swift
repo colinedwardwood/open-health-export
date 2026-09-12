@@ -91,6 +91,11 @@ public struct CursorAdvance: Sendable {
     }
 }
 
+public enum QueueEvictionClass: String, Sendable, Equatable {
+    case normal
+    case pinned
+}
+
 public struct PendingBatch: Sendable, Equatable {
     public var id: BatchID
     public var payloadURL: String
@@ -100,6 +105,7 @@ public struct PendingBatch: Sendable, Equatable {
     public var createdAtEpoch: TimeInterval?
     public var rangeStartDay: String?
     public var rangeEndDay: String?
+    public var evictionClass: QueueEvictionClass
 
     public init(
         id: BatchID,
@@ -109,7 +115,8 @@ public struct PendingBatch: Sendable, Equatable {
         metric: MetricID = MetricID(rawValue: ""),
         createdAtEpoch: TimeInterval? = nil,
         rangeStartDay: String? = nil,
-        rangeEndDay: String? = nil
+        rangeEndDay: String? = nil,
+        evictionClass: QueueEvictionClass = .normal
     ) {
         self.id = id
         self.payloadURL = payloadURL
@@ -119,6 +126,7 @@ public struct PendingBatch: Sendable, Equatable {
         self.createdAtEpoch = createdAtEpoch
         self.rangeStartDay = rangeStartDay
         self.rangeEndDay = rangeEndDay
+        self.evictionClass = evictionClass
     }
 }
 

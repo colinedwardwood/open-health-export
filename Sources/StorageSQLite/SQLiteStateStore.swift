@@ -59,6 +59,7 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
             "ALTER TABLE pending_batches ADD COLUMN created_at_epoch REAL;",
             "ALTER TABLE pending_batches ADD COLUMN range_start_day TEXT;",
             "ALTER TABLE pending_batches ADD COLUMN range_end_day TEXT;",
+            "ALTER TABLE pending_batches ADD COLUMN eviction_class TEXT NOT NULL DEFAULT 'normal';",
             "ALTER TABLE gaps ADD COLUMN metric TEXT NOT NULL DEFAULT '';",
             "ALTER TABLE gaps ADD COLUMN range_start_day TEXT;",
             "ALTER TABLE gaps ADD COLUMN range_end_day TEXT;",
@@ -143,7 +144,8 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 metric TEXT NOT NULL DEFAULT '',
                 created_at_epoch REAL,
                 range_start_day TEXT,
-                range_end_day TEXT
+                range_end_day TEXT,
+                eviction_class TEXT NOT NULL DEFAULT 'normal'
             );
             CREATE INDEX IF NOT EXISTS idx_pending_metric ON pending_batches (metric);
             CREATE TABLE IF NOT EXISTS deliveries (
@@ -208,7 +210,7 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
             );
-            PRAGMA user_version = 16;
+            PRAGMA user_version = 17;
             """)
     }
 
@@ -336,7 +338,7 @@ private final class SQLiteTransaction: StateTransaction {
 
     func enqueuePending(_ batch: PendingBatch) throws {
         let pending = try store.prepare(
-            "INSERT INTO pending_batches (batch_id, payload_url, expected_records, byte_count, metric, created_at_epoch, range_start_day, range_end_day) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(batch_id) DO UPDATE SET payload_url = excluded.payload_url, expected_records = excluded.expected_records, byte_count = excluded.byte_count, metric = excluded.metric, created_at_epoch = COALESCE(pending_batches.created_at_epoch, excluded.created_at_epoch), range_start_day = excluded.range_start_day, range_end_day = excluded.range_end_day;"
+            "INSERT INTO pending_batches (batch_id, payload_url, expected_records, byte_count, metric, created_at_epoch, range_start_day, range_end_day, eviction_class) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(batch_id) DO UPDATE SET payload_url = excluded.payload_url, expected_records = excluded.expected_records, byte_count = excluded.byte_count, metric = excluded.metric, created_at_epoch = COALESCE(pending_batches.created_at_epoch, excluded.created_at_epoch), range_start_day = excluded.range_start_day, range_end_day = excluded.range_end_day, eviction_class = excluded.eviction_class;"
         )
         defer { sqlite3_finalize(pending) }
         bindText(pending, 1, batch.id.rawValue)
@@ -351,6 +353,7 @@ private final class SQLiteTransaction: StateTransaction {
         }
         bindOptionalText(pending, 7, batch.rangeStartDay)
         bindOptionalText(pending, 8, batch.rangeEndDay)
+        bindText(pending, 9, batch.evictionClass.rawValue)
         try stepDone(pending)
     }
 
@@ -375,7 +378,7 @@ private final class SQLiteTransaction: StateTransaction {
 
     func pendingBatches() throws -> [PendingBatch] {
         let stmt = try store.prepare(
-            "SELECT batch_id, payload_url, expected_records, byte_count, metric, created_at_epoch, range_start_day, range_end_day FROM pending_batches ORDER BY rowid;"
+            "SELECT batch_id, payload_url, expected_records, byte_count, metric, created_at_epoch, range_start_day, range_end_day, eviction_class FROM pending_batches ORDER BY rowid;"
         )
         defer { sqlite3_finalize(stmt) }
         var batches: [PendingBatch] = []
@@ -391,7 +394,8 @@ private final class SQLiteTransaction: StateTransaction {
                         ? nil
                         : sqlite3_column_double(stmt, 5),
                     rangeStartDay: optionalText(stmt, 6),
-                    rangeEndDay: optionalText(stmt, 7)
+                    rangeEndDay: optionalText(stmt, 7),
+                    evictionClass: QueueEvictionClass(rawValue: text(stmt, 8)) ?? .normal
                 )
             )
         }

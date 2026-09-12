@@ -2875,6 +2875,97 @@ private func anchorHoldFixture(
     }
 }
 
+@Test func queueAdmissionSkipsPinnedReExportAndBlocksWhenOnlyPinnedRemain() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let page = SamplePage(
+        samples: [heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([1]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let store = MemoryStateStore()
+    let policy = QueuePolicy(cap: 30, lowWatermark: 20)
+    try await store.transact {
+        try $0.commitBatch(
+            PendingBatch(
+                id: BatchID(rawValue: "pinned-reexport"),
+                payloadURL: "/tmp/pinned",
+                expectedRecords: 1,
+                byteCount: 10,
+                metric: metric,
+                rangeStartDay: "2024-01-01",
+                rangeEndDay: "2024-01-02",
+                evictionClass: .pinned
+            ),
+            advancing: CursorAdvance(page: page, epoch: 1)
+        )
+        try $0.enqueuePending(
+            PendingBatch(
+                id: BatchID(rawValue: "live-delta"),
+                payloadURL: "/tmp/live",
+                expectedRecords: 1,
+                byteCount: 18,
+                metric: metric,
+                rangeStartDay: "2024-01-03",
+                rangeEndDay: "2024-01-03"
+            )
+        )
+    }
+    let incoming = PendingBatch(
+        id: BatchID(rawValue: "newer-live"),
+        payloadURL: "/tmp/newer",
+        expectedRecords: 1,
+        byteCount: 8
+    )
+    let victims = try await store.transact { tx in
+        let evicted = try QueueAdmission.makeRoom(for: incoming.byteCount, on: tx, policy: policy)
+        try tx.commitBatch(incoming, advancing: CursorAdvance(page: page, epoch: 2))
+        return evicted
+    }
+    #expect(victims.map(\.id.rawValue) == ["live-delta"])
+    #expect(
+        try store.transaction.pendingBatches().map(\.id.rawValue)
+            == ["pinned-reexport", "newer-live"]
+    )
+    await #expect(throws: QueueAdmissionError.blocked) {
+        try await store.transact { tx in
+            _ = try QueueAdmission.makeRoom(for: 21, on: tx, policy: policy)
+        }
+    }
+    #expect(try store.transaction.pendingBatches().map(\.id.rawValue)
+        == ["pinned-reexport", "newer-live"])
+}
+
+@Test func reExportPinsUntilThePinnedSubBudgetThenJoinsNormalEviction() {
+    let policy = QueuePolicy(cap: 40, lowWatermark: 30)
+    #expect(policy.pinnedBudget == 10)
+    #expect(
+        QueueAdmission.evictionClass(
+            reason: "gap_reexport",
+            pinnedBytes: 0,
+            incomingBytes: 10,
+            policy: policy
+        ) == .pinned
+    )
+    #expect(
+        QueueAdmission.evictionClass(
+            reason: "gap_reexport",
+            pinnedBytes: 10,
+            incomingBytes: 1,
+            policy: policy
+        ) == .normal
+    )
+    #expect(
+        QueueAdmission.evictionClass(
+            reason: "backfill",
+            pinnedBytes: 0,
+            incomingBytes: 1,
+            policy: policy
+        ) == .normal
+    )
+}
+
 @Test func queueExpiryDeletesSevenDayOldPayloadsAndRecordsTamperEvidentEvidence() async throws {
     let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-queue-expiry-\(UUID().uuidString)")
@@ -3824,6 +3915,66 @@ private func anchorHoldFixture(
         .joined()
     #expect(payload.contains("\"reason\":\"gap_reexport\""))
     #expect(payload.contains(sample.key.uuid))
+}
+
+@Test func queueGapReExportEnqueuesAsPinnedUnderTheSubBudget() async throws {
+    let metric = MetricCatalog.heartRate.id
+    var sample = heartSample("dddddddd-dddd-dddd-dddd-dddddddddddd")
+    sample.start = "2024-01-15T10:00:00Z"
+    sample.end = sample.start
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-gap-reexport-pin-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let store = MemoryStateStore()
+    await #expect(throws: DestinationSendError.destinationUnreachable) {
+        try await ReconcileSweep(
+            observations: FixtureDays(byDay: ["2024-01-15": [sample]]),
+            destination: .testing(
+                ThrowingSink(error: .destinationUnreachable)
+            ),
+            store: store,
+            metric: metric,
+            scratchDirectory: root.appendingPathComponent("scratch"),
+            envelope: testEnvelope()
+        ).run(
+            gap: GapRecord(
+                batchID: BatchID(rawValue: "evicted"),
+                rangeDescription: "queue_eviction:2024-01-15:2024-01-15",
+                metric: metric,
+                rangeStartDay: "2024-01-15",
+                rangeEndDay: "2024-01-15"
+            )
+        )
+    }
+    let pending = try store.transaction.pendingBatches()
+    #expect(pending.count == 1)
+    #expect(pending[0].evictionClass == .pinned)
+}
+
+@Test func sqlitePendingBatchesRoundTripPinnedEvictionClass() async throws {
+    let path = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-pinned-\(UUID().uuidString).sqlite")
+        .path
+    defer { try? FileManager.default.removeItem(atPath: path) }
+    let first = try SQLiteStateStore(path: path)
+    try await first.transact {
+        try $0.enqueuePending(
+            PendingBatch(
+                id: BatchID(rawValue: "pinned"),
+                payloadURL: "/tmp/pinned",
+                expectedRecords: 2,
+                byteCount: 9,
+                metric: MetricCatalog.heartRate.id,
+                evictionClass: .pinned
+            )
+        )
+    }
+    let reopened = try SQLiteStateStore(path: path)
+    let loaded = try await reopened.transact { try $0.pendingBatches() }
+    #expect(loaded.count == 1)
+    #expect(loaded[0].evictionClass == .pinned)
+    #expect(loaded[0].byteCount == 9)
 }
 
 @Test func deletionWithoutHealthKitCallbackIsRepairedByReconcile() async throws {

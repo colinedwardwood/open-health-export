@@ -1006,6 +1006,8 @@ enum FixWitness {
         #expect(QueuePolicy.production.redLimit == QueuePolicy.production.cap * 4 / 5)
         #expect(QueuePolicy.production.catchUpLimit < QueuePolicy.production.redLimit)
         #expect(QueuePolicy.production.catchUpLimit < QueuePolicy.production.lowWatermark)
+        #expect(QueuePolicy.production.pinnedBudget == QueuePolicy.production.cap / 4)
+        #expect(QueuePolicy.production.pinnedBudget == 64 * 1024 * 1024)
     }
 
     static func p01() throws {

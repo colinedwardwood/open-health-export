@@ -27,6 +27,8 @@ public struct QueuePolicy: Sendable, Equatable {
     public var catchUpLimit: Int { cap * 3 / 5 }
     /// I6 Red: derived caches purge and the WAL truncates at 80% of cap. Still no eviction.
     public var redLimit: Int { cap * 4 / 5 }
+    /// Re-export may pin up to 25% of cap (64 MB at the production 256 MB cap).
+    public var pinnedBudget: Int { cap / 4 }
 }
 
 /// I6: catch-up work never evicts live delta batches. Amber occupancy parks
@@ -119,6 +121,19 @@ public enum ScheduledReconcile {
 }
 
 public enum QueueAdmission {
+    public static func evictionClass(
+        reason: String,
+        pinnedBytes: Int,
+        incomingBytes: Int,
+        policy: QueuePolicy = .production
+    ) -> QueueEvictionClass {
+        guard reason == "gap_reexport" else { return .normal }
+        if pinnedBytes + incomingBytes <= policy.pinnedBudget {
+            return .pinned
+        }
+        return .normal
+    }
+
     @discardableResult
     public static func makeRoom(
         for incomingBytes: Int,
@@ -133,6 +148,7 @@ public enum QueueAdmission {
         var victims: [PendingBatch] = []
         for batch in try tx.pendingBatches() {
             if remaining + incomingBytes <= policy.lowWatermark { break }
+            if batch.evictionClass == .pinned { continue }
             victims.append(batch)
             remaining -= batch.byteCount
         }

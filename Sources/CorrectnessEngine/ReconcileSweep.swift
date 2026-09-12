@@ -273,6 +273,14 @@ public struct ReconcileSweep: Sendable {
         let payloadURL = scratchDirectory.appendingPathComponent("\(batchID.rawValue).ndjson")
         try FileWriteKit.writeAtomically(payload, to: payloadURL)
         let recordCount = page.samples.count + page.tombstones.count + aggregates.count
+        let (queued, pinnedBytes) = try await store.transact { tx -> (Int, Int) in
+            let batches = try tx.pendingBatches()
+            return (
+                try tx.queuedBytes(),
+                batches.filter { $0.evictionClass == .pinned }
+                    .reduce(0) { $0 + $1.byteCount }
+            )
+        }
         let pending = PendingBatch(
             id: batchID,
             payloadURL: payloadURL.path,
@@ -281,9 +289,13 @@ public struct ReconcileSweep: Sendable {
             metric: metric,
             createdAtEpoch: clock.now().timeIntervalSince1970,
             rangeStartDay: days.first,
-            rangeEndDay: days.last
+            rangeEndDay: days.last,
+            evictionClass: QueueAdmission.evictionClass(
+                reason: reason,
+                pinnedBytes: pinnedBytes,
+                incomingBytes: payload.count
+            )
         )
-        let queued = try await store.transact { try $0.queuedBytes() }
         let breaker = try await store.transact { tx in
             RetryPolicy.age(
                 snapshot: try DestinationBreaker.load(from: tx, destinationID: destinationName),
