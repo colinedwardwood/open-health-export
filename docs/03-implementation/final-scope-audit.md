@@ -32,8 +32,9 @@ https://github.com/colinedwardwood/open-health-export/actions/runs/34697618358
 until that job, or a later `nightly-volume` run on `main`, concludes success.
 
 Weekly mutation (`qa/mutants.json`) and flake-quarantine skip citations are
-wired. Darwin-only mutants skip on Linux. Home Assistant `currentStable` is
-`2026.9.2` after the latest-stable contract passed.
+wired. Linux kills hostless mutants; macOS kills Darwin-hosted mutants.
+Home Assistant `currentStable` is `2026.9.2` after the latest-stable contract
+passed.
 
 T2 remains CI evidence, not physical-device evidence.
 

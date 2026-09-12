@@ -45,9 +45,12 @@ def validate(root: Path, mutants: list[dict]) -> None:
             raise SystemExit(f"{ident}: host must be darwin or linux")
 
 
-def host_matches(mutant: dict, platform: str) -> bool:
+def host_matches(mutant: dict, platform: str, hosted_only: bool = False) -> bool:
     host = mutant.get("host")
-    if not host:
+    if hosted_only:
+        if not host:
+            return False
+    elif not host:
         return True
     if host == "darwin":
         return platform == "darwin"
@@ -98,12 +101,19 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent)
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument(
+        "--hosted-only",
+        action="store_true",
+        help="only mutants that declare a host (used by the Darwin weekly job)",
+    )
     parser.add_argument("--id")
     args = parser.parse_args()
     root = args.root.resolve()
     mutants = load_catalog(root)
     validate(root, mutants)
     if args.self_test:
+        if not any(item.get("host") == "darwin" for item in mutants):
+            raise SystemExit("qa/mutants.json must include at least one darwin-hosted mutant")
         print(f"mutation-check self-test: ok mutants={len(mutants)}")
         return 0
     selected = [item for item in mutants if args.id is None or item["id"] == args.id]
@@ -111,7 +121,7 @@ def main() -> int:
         raise SystemExit(f"no mutant named {args.id}")
     ran = 0
     for mutant in selected:
-        if not host_matches(mutant, sys.platform):
+        if not host_matches(mutant, sys.platform, hosted_only=args.hosted_only):
             print(f"mutant {mutant['id']} skipped on {sys.platform}")
             continue
         run_mutant(root, mutant)

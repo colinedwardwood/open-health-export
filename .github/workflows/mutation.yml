@@ -25,3 +25,11 @@ jobs:
           sudo apt-get install -y zlib1g-dev
       - name: Each committed mutant must fail its named test
         run: python3 scripts/mutation-check.py
+
+  kill-darwin-mutants:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Darwin-hosted mutants must fail their named tests
+        run: python3 scripts/mutation-check.py --hosted-only

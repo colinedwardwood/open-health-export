@@ -1468,6 +1468,18 @@ struct PolicyCheck {
             )
             exit(1)
         }
+        if !workflow.contains("macos-") || !workflow.contains("--hosted-only") {
+            FileHandle.standardError.write(
+                Data("QA-33: mutation workflow must kill Darwin-hosted mutants on macOS\n".utf8)
+            )
+            exit(1)
+        }
+        if !mutants.contains(where: { ($0["host"] as? String) == "darwin" }) {
+            FileHandle.standardError.write(
+                Data("QA-33: qa/mutants.json must include a darwin-hosted mutant\n".utf8)
+            )
+            exit(1)
+        }
         let checker = root.appendingPathComponent(checkerPath)
         guard FileManager.default.isReadableFile(atPath: checker.path) else {
             FileHandle.standardError.write(Data("QA-33: mutation checker is missing\n".utf8))
