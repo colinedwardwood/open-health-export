@@ -20,6 +20,57 @@ public enum DestinationDisplayState: String, Sendable, Equatable, Codable, CaseI
     case limitedByIOS = "limited_by_ios"
     case paused
     case overdue
+
+    /// UX-41: status is a distinct SF Symbol silhouette plus a text label, never hue.
+    public var glyph: String {
+        switch self {
+        case .notSetUp: "circle.dashed"
+        case .noExportsYet: "circle.dotted"
+        case .manualOnly: "hand.tap"
+        case .healthy: "checkmark.circle.fill"
+        case .quiet: "clock"
+        case .sentUnconfirmed: "paperplane.circle"
+        case .partial: "circle.lefthalf.filled"
+        case .stale: "clock.badge.exclamationmark"
+        case .failing: "exclamationmark.triangle.fill"
+        case .blocked: "exclamationmark.octagon.fill"
+        case .waiting: "pause.circle.fill"
+        case .deferred: "lock.circle"
+        case .limitedByIOS: "bolt.slash.fill"
+        case .paused: "pause.fill"
+        case .overdue: "clock.badge.exclamationmark.fill"
+        }
+    }
+
+    public var label: String {
+        switch self {
+        case .notSetUp: "Not set up"
+        case .noExportsYet: "No exports yet"
+        case .manualOnly: "Manual only"
+        case .healthy: "Up to date"
+        case .quiet: "Quiet"
+        case .sentUnconfirmed: "Sent, unconfirmed"
+        case .partial: "Partly delivered"
+        case .stale: "Stale"
+        case .failing: "Failing"
+        case .blocked: "Waiting for you"
+        case .waiting: "Waiting"
+        case .deferred: "Deferred"
+        case .limitedByIOS: "Limited by iOS"
+        case .paused: "Paused"
+        case .overdue: "Overdue"
+        }
+    }
+
+    public var severity: Int {
+        switch self {
+        case .healthy, .manualOnly, .paused: 0
+        case .notSetUp, .noExportsYet, .waiting, .deferred: 1
+        case .quiet, .sentUnconfirmed: 2
+        case .partial, .limitedByIOS, .stale: 3
+        case .failing, .blocked, .overdue: 4
+        }
+    }
 }
 
 /// File the widget, Control Centre, and watchdog read. Never SQLite (observability Q4).

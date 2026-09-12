@@ -1466,6 +1466,17 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     }
 }
 
+@Test func ux41DisplayStatesStayDistinguishableByGlyphAndLabelWithoutHue() {
+    let states = DestinationDisplayState.allCases
+    #expect(states.count == 15)
+    let glyphs = states.map(\.glyph)
+    let labels = states.map(\.label)
+    #expect(Set(glyphs).count == glyphs.count)
+    #expect(Set(labels).count == labels.count)
+    #expect(states.allSatisfy { !$0.glyph.isEmpty && !$0.label.isEmpty })
+    #expect(Set(states.map(\.severity)).isSubset(of: Set(0 ... 4)))
+}
+
 @Test func externalStatusKeepsLastSuccessAcrossFailuresAndAdvancesSequence() {
     let successTally = RunTally(read: 3, committed: 3, acked: 3)
     let success = ExternalStatusRecord.next(
