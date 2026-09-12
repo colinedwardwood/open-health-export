@@ -552,7 +552,15 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
     #expect(workflow.contains(".build/release/exportruncheck"))
     #expect(workflow.contains("exportruncheck --page-size 10000"))
     #expect(checker.contains("private let memoryLimitMiB = 100"))
-    #expect(checker.contains("\"tombstone\""))
+    #expect(checker.contains("NativeWire.volumeStructuralKinds"))
+    #expect(NativeWire.volumeStructuralKinds.contains("tombstone"))
+    #expect(NativeWire.volumeStructuralKinds.contains("sample.ecg"))
+    #expect(NativeWire.volumeStructuralKinds.isSuperset(of: [
+        "series.ecgVoltage",
+        "series.heartbeat",
+        "series.workoutRoute",
+        "series.workoutMetric",
+    ]))
     #expect(checker.contains("submittedRecords == exportableRecords"))
     #expect(checker.contains("peakKiB <= limitKiB"))
 }
