@@ -1687,7 +1687,7 @@ private struct OneExportFault: ExportFaultInjector {
     }
 }
 
-@Test func everyR83FaultLocationIsReachableAndPreservesWriteAheadOrdering() async throws {
+@Test func p4NoDuplicationAfterKillResumeAtEveryDeliverySeam() async throws {
     let beforeCommit: Set<ExportFaultLocation> = [.afterRead, .afterTransform, .duringAnchorPersist]
     for location in ExportFaultLocation.allCases {
         let metric = MetricID(rawValue: "heartRate")
@@ -1741,19 +1741,33 @@ private struct OneExportFault: ExportFaultInjector {
             )
         }
 
-        if location == .afterDestinationWriteBeforeAck || location == .afterAckBeforeRelease {
+        if beforeCommit.contains(location) {
+            let resumed = ExportRun(
+                source: FixtureSource(pages: [page]),
+                destination: .testing(LocalFileSink(directory: destinationURL)),
+                store: store,
+                metric: metric,
+                scratchDirectory: root.appendingPathComponent("scratch-resumed"),
+                envelope: testEnvelope()
+            )
+            let outcome = try await resumed.run()
+            #expect(outcome.kind == .success, "resume failed at \(location.rawValue)")
+        } else {
             let replay = PendingDeliveryRunner(
                 destination: .testing(LocalFileSink(directory: destinationURL)),
                 store: store
             )
             _ = try await replay.runOnce()
             #expect(try await store.transact { try $0.pendingBatches() }.isEmpty)
-            let delivered = try FileManager.default.contentsOfDirectory(
-                at: destinationURL,
-                includingPropertiesForKeys: nil
-            ).filter { $0.pathExtension == "ndjson" }
-            #expect(delivered.count == 1, "idempotent replay duplicated \(location.rawValue)")
         }
+        let delivered = try FileManager.default.contentsOfDirectory(
+            at: destinationURL,
+            includingPropertiesForKeys: nil
+        ).filter { $0.pathExtension == "ndjson" }
+        #expect(
+            delivered.count == 1,
+            "kill/resume delivery multiplicity was \(delivered.count) at \(location.rawValue)"
+        )
     }
 }
 

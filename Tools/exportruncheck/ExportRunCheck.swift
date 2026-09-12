@@ -71,7 +71,7 @@ struct ExportRunCheck {
                 guard let object = try JSONSerialization.jsonObject(with: line) as? [String: Any] else {
                     throw CheckError.invalidRecord(line: inputLines)
                 }
-                declaredRecords = try validateT1Provenance(object)
+                declaredRecords = try validateCorpusProvenance(object)
                 headerRecords = 1
                 continue
             }
@@ -207,10 +207,11 @@ struct ExportRunCheck {
         return size
     }
 
-    private static func validateT1Provenance(_ header: [String: Any]) throws -> Int {
+    private static func validateCorpusProvenance(_ header: [String: Any]) throws -> Int {
         guard header["kind"] as? String == "batch.header",
               header["synthetic"] as? Bool == true,
-              header["tier"] as? String == "T1",
+              let tier = header["tier"] as? String,
+              ["T0", "T1", "T2"].contains(tier),
               let recordCount = (header["recordCount"] as? NSNumber)?.intValue,
               recordCount >= 0
         else {
@@ -408,7 +409,7 @@ private enum CheckError: Error, CustomStringConvertible {
     var description: String {
         switch self {
         case .invalidProvenance:
-            "stdin is not a synthetic T1 corpusgen stream"
+            "stdin is not a synthetic T0/T1/T2 corpusgen stream"
         case .invalidRecord(let line):
             "stdin line \(line) is not a kind-bearing JSON record"
         case .unaccountedKind(let kind, let line):
@@ -422,7 +423,7 @@ private enum CheckError: Error, CustomStringConvertible {
         case .invalidPageSize(let maximum):
             "--page-size must be an integer from 1 through \(maximum)"
         case .noSamples:
-            "T1 corpus stream contained no quantity samples"
+            "corpus stream contained no quantity samples"
         case .outcome(let metric, let outcome):
             "ExportRun for \(metric) closed with \(outcome), expected success"
         case .ackEvidence(let evidence):

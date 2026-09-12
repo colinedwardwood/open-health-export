@@ -775,7 +775,7 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
         1: ["Lossless"],
         2: ["ReExport"],
         3: ["WithoutLoss"],
-        4: ["LiveSet"],
+        4: ["NoDuplication"],
         5: ["Cursor"],
         6: ["DeltaAndFull"],
         7: ["Tombstones"],
