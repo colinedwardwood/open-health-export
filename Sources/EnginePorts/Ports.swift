@@ -561,6 +561,10 @@ public enum SecretStoreError: Error, Equatable {
     case notFound
     case emptyHandle
     case emptySecret
+    /// The Data Protection keychain refused the operation, most often because the
+    /// host is unsigned (`errSecMissingEntitlement`). Callers must not treat this
+    /// as a missing item.
+    case unavailable
 }
 
 /// PSK and similar material. Implementations must not synchronise via iCloud (R-33).

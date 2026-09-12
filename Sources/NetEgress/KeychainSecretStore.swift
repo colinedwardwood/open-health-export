@@ -23,8 +23,12 @@ public struct KeychainSecretStore: SecretStore, Sendable {
         let query = Self.storeQuery(bytes: bytes, handle: handle, service: service)
         let status = SecItemAdd(query as CFDictionary, nil)
         guard status == errSecSuccess else {
-            throw SecretStoreError.notFound
+            throw Self.mapAddStatus(status)
         }
+    }
+
+    static func mapAddStatus(_ status: OSStatus) -> SecretStoreError {
+        status == errSecMissingEntitlement ? .unavailable : .notFound
     }
 
     static func storeQuery(

@@ -27,4 +27,23 @@ import Testing
     #expect(attributes[kSecUseDataProtectionKeychain as String] as? Bool == true)
     #expect(attributes[kSecValueData as String] as? Data == Data([0x33, 0x01]))
 }
+
+@Test func r33KeychainAddMapsMissingEntitlementToUnavailable() {
+    #expect(KeychainSecretStore.mapAddStatus(errSecMissingEntitlement) == .unavailable)
+    #expect(KeychainSecretStore.mapAddStatus(errSecDuplicateItem) == .notFound)
+}
+
+@Test func r33KeychainStoreEitherRoundsTripOrNamesTheEntitlementGap() async throws {
+    let store = KeychainSecretStore(service: "app.openhealthexporter.test.\(UUID().uuidString)")
+    let handle = SecretHandle(rawValue: "r33-live")
+    let bytes: [UInt8] = [0x33, 0x02]
+    do {
+        try await store.store(bytes, handle: handle)
+        let loaded = try await store.load(handle)
+        #expect(loaded == bytes)
+        try await store.delete(handle)
+    } catch SecretStoreError.unavailable {
+        return
+    }
+}
 #endif
