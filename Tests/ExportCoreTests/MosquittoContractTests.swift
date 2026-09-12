@@ -119,6 +119,24 @@ private func mosquittoExecutable() -> String? {
     return nil
 }
 
+private func mosquittoSubExecutable() -> String? {
+    let extras = [
+        "/opt/homebrew/bin/mosquitto_sub",
+        "/usr/local/bin/mosquitto_sub",
+        "/usr/bin/mosquitto_sub",
+    ]
+    if let found = extras.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
+        return found
+    }
+    for dir in (ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":") {
+        let candidate = URL(fileURLWithPath: String(dir)).appendingPathComponent("mosquitto_sub").path
+        if FileManager.default.isExecutableFile(atPath: candidate) {
+            return candidate
+        }
+    }
+    return nil
+}
+
 private func mosquittoPasswdExecutable() -> String? {
     let extras = [
         "/opt/homebrew/bin/mosquitto_passwd",
@@ -199,6 +217,87 @@ func mosquittoQoS1RequiresUsernameAndPassword() async throws {
     let sink = try MQTTSink.overNetwork(destination: destination, pin: nil)
     let receipt = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
     #expect(receipt.accepted == 1)
+}
+
+@Test(
+    .enabled(
+        if: mosquittoExecutable() != nil && mosquittoSubExecutable() != nil
+    )
+)
+func mosquittoBrokerKeepsNoRetainedHealthPayload() async throws {
+    let binary = try #require(mosquittoExecutable())
+    let subscriber = try #require(mosquittoSubExecutable())
+    let port = UInt16(23_830 + (ProcessInfo.processInfo.processIdentifier % 1_000))
+    let work = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-mosq-retain-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: work) }
+    let conf = work.appendingPathComponent("mosquitto.conf")
+    try """
+    listener \(port)
+    protocol mqtt
+    allow_anonymous true
+    persistence false
+    log_type error
+    """.write(to: conf, atomically: true, encoding: .utf8)
+    let broker = try startMosquitto(binary: binary, conf: conf)
+    defer { if broker.isRunning { broker.terminate() } }
+    try await waitForMosquitto(port: port)
+
+    let (file, batchID) = try writeMQTTPayload()
+    let healthTopic = "ohe/health"
+    let destination = try MQTTDestination(
+        urlString: "mqtt://127.0.0.1:\(port)",
+        allowedHosts: ["127.0.0.1"],
+        allowInsecure: true,
+        clientID: "ohe-r90-retain-health",
+        topic: healthTopic
+    )
+    let sink = try MQTTSink.overNetwork(destination: destination, pin: nil)
+    let receipt = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
+    #expect(receipt.accepted == 1)
+    let healthRetained = try mosquittoRetainedPayload(
+        subscriber: subscriber,
+        port: port,
+        topic: healthTopic
+    )
+    #expect(healthRetained.isEmpty)
+
+    let exporterId = "phone-1A7B"
+    let discoveryTopic = try HADiscovery.deviceConfigTopic(exporterId: exporterId)
+    let discoveryPayload = try HADiscovery.encodeDeviceConfig(
+        exporterId: exporterId,
+        metrics: [MetricCatalog.heartRate.id]
+    )
+    let session = MQTTSession(
+        pipe: ByteStreamMQTTPipe(
+            stream: POSIXByteStream(
+                endpoint: try StreamEndpoint(host: "127.0.0.1", port: port, usesTLS: false)
+            )
+        )
+    )
+    try await session.connect(
+        destination: try MQTTDestination(
+            urlString: "mqtt://127.0.0.1:\(port)",
+            allowedHosts: ["127.0.0.1"],
+            allowInsecure: true,
+            clientID: "ohe-r90-retain-discovery",
+            topic: healthTopic
+        )
+    )
+    try await session.publish(
+        topic: discoveryTopic,
+        payload: discoveryPayload,
+        qos: .atMostOnce,
+        retain: true
+    )
+    try await session.disconnect()
+    let discoveryRetained = try mosquittoRetainedPayload(
+        subscriber: subscriber,
+        port: port,
+        topic: discoveryTopic
+    )
+    #expect(discoveryRetained == discoveryPayload)
 }
 
 @Test(.enabled(if: mosquittoExecutable() != nil))
@@ -387,6 +486,30 @@ func mosquittoQoS1RequiresTheCAIssuedClientCertificate() async throws {
 }
 }
 #endif
+
+private func mosquittoRetainedPayload(subscriber: String, port: UInt16, topic: String) throws -> Data {
+    let pipe = Pipe()
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: subscriber)
+    process.arguments = [
+        "-h", "127.0.0.1",
+        "-p", "\(port)",
+        "-t", topic,
+        "-i", "ohe-retain-\(port)-\(abs(topic.hashValue))",
+        "--retained-only",
+        "-C", "1",
+        "-W", "2",
+    ]
+    process.standardOutput = pipe
+    process.standardError = FileHandle.nullDevice
+    try process.run()
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    if data.last == 0x0A {
+        return data.dropLast()
+    }
+    return data
+}
 
 private func startMosquitto(binary: String, conf: URL) throws -> Process {
     let process = Process()
