@@ -208,6 +208,46 @@ private func browserSample(
     }
 }
 
+@Test func ux03HealthPrimingIsASingleContinueWithInvisibleReadGrants() throws {
+    #expect(HealthAuthorizationPriming.continueTitle == "Continue")
+    #expect(HealthAuthorizationPriming.typeCountCopy(1).contains("1 type"))
+    #expect(HealthAuthorizationPriming.typeCountCopy(24).contains("24 types"))
+    #expect(HealthAuthorizationPriming.invisibility.contains("does not tell apps"))
+    #expect(HealthAuthorizationPriming.invisibility.contains("no data"))
+    let joined = [
+        HealthAuthorizationPriming.title,
+        HealthAuthorizationPriming.sheetFollows,
+        HealthAuthorizationPriming.invisibility,
+        HealthAuthorizationPriming.continueTitle,
+        HealthAuthorizationPriming.typeCountCopy(24),
+    ].joined(separator: " ")
+    for banned in ["cancel", "skip", "back", "not now", "later"] {
+        #expect(!joined.lowercased().contains(banned))
+    }
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let view = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
+        encoding: .utf8
+    )
+    #expect(view.contains(".fullScreenCover(isPresented: $showHealthPriming)"))
+    #expect(view.contains(".interactiveDismissDisabled()"))
+    #expect(view.contains("presentHealthPriming()"))
+    #expect(view.contains("health-priming-continue"))
+    #expect(view.contains("Button(HealthAuthorizationPriming.continueTitle)"))
+    guard let priming = view.range(of: "private var healthPriming") else {
+        Issue.record("healthPriming is missing")
+        return
+    }
+    let window = String(view[priming.lowerBound...].prefix(1600))
+    #expect(window.contains("toolbar(.hidden"))
+    #expect(!window.contains("Button(\"Cancel\""))
+    #expect(!window.contains("Button(\"Back\""))
+    #expect(!window.contains("Close"))
+}
+
 @Test func selectionReviewRequiresSensitiveIndividualConfirmation() throws {
     var draft = DataSelectionDraft(baseline: [MetricCatalog.stepCount.id])
     #expect(throws: DataSelectionError.sensitiveConfirmationRequired) {

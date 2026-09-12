@@ -6,7 +6,7 @@ This file separates repository-complete engineering work from evidence that cann
 
 ## Repository-complete controls
 
-- Health destinations default to zero selected types; type and date scopes are canonical state and are checked before enablement and export (SEC-16, R-62).
+- Health read access is preceded by a full-screen priming step with a single Continue control (UX-03, UX-04). The R-63 disclosure remains a separate, navigable screen.
 - HealthKit characteristics are in the selectable catalogue, off in Core Daily and bulk-select, flagged as re-identifying, and read on demand outside the anchored delta pipeline (HK-30).
 - Blood-pressure pairing is emitted as `sample.correlation` beside systolic and diastolic quantity pages. The correlation type stays off the selectable catalogue so it is not a second anchored cursor (ADR-6).
 - The Mac companion keeps a last-received clock, shows a quiet watch after three days of silence, and posts a local notification (Q12). Device-to-device radio evidence remains a later gate.

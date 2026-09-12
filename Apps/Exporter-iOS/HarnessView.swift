@@ -36,7 +36,8 @@ struct HarnessView: View {
 
     @State private var phase: Phase = .disclosure
     @State private var rootTab = AppRootTabs.status
-    @State private var showSettings = false
+    @State private var showHealthPriming = false
+    @State private var primingTypeCount = 0
     @AppStorage("ohe.disclosureAcknowledged")
     private var disclosureAcknowledged = false
     @State private var status = "Waiting for disclosure acknowledgement."
@@ -227,6 +228,10 @@ struct HarnessView: View {
             }
         }
         .tint(.primary)
+        .fullScreenCover(isPresented: $showHealthPriming) {
+            healthPriming
+                .interactiveDismissDisabled()
+        }
         .safeAreaInset(edge: .top) {
             if !isPrivacyLocked, let overdueBanner {
                 VStack(alignment: .leading, spacing: 4) {
@@ -689,10 +694,37 @@ struct HarnessView: View {
         }
     }
 
+    private var healthPriming: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(HealthAuthorizationPriming.title)
+                .font(.title2)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("health-priming-title")
+            Text(HealthAuthorizationPriming.typeCountCopy(primingTypeCount))
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("health-priming-types")
+            Text(HealthAuthorizationPriming.sheetFollows)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(HealthAuthorizationPriming.invisibility)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("health-priming-invisibility")
+            Button(HealthAuthorizationPriming.continueTitle) {
+                showHealthPriming = false
+                Task { await requestAccess() }
+            }
+            .accessibilityIdentifier("health-priming-continue")
+            .accessibilityHint("Opens Apple's Health permission sheet.")
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color(uiColor: .systemBackground))
+        .toolbar(.hidden, for: .navigationBar)
+    }
+
     private var statusOperations: some View {
         VStack(alignment: .leading, spacing: 12) {
             Button("Request Health read access for selected types") {
-                Task { await requestAccess() }
+                Task { await presentHealthPriming() }
             }
             .accessibilityIdentifier("health-request")
             .accessibilityHint("Asks Apple for read permission only for types currently selected in Data.")
@@ -1635,6 +1667,21 @@ struct HarnessView: View {
             status = "Failed: \(error.localizedDescription)"
         }
         phase = .ready
+    }
+
+    @MainActor
+    private func presentHealthPriming() async {
+        do {
+            let metrics = try await HarnessExport.selectedMetrics()
+            guard !metrics.isEmpty else {
+                status = "Configure and enable a destination scope before requesting Health access."
+                return
+            }
+            primingTypeCount = metrics.count
+            showHealthPriming = true
+        } catch {
+            status = "Failed: \(error.localizedDescription)"
+        }
     }
 
     @MainActor

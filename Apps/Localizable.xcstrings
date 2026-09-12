@@ -2257,6 +2257,17 @@
         }
       }
     },
+    "Opens Apple's Health permission sheet.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens Apple's Health permission sheet."
+          }
+        }
+      }
+    },
     "Asks for notification permission and posts one R-40 notice with copy from the registry.": {
       "extractionState": "manual",
       "localizations": {
