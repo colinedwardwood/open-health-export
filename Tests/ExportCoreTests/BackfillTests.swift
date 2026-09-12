@@ -8,6 +8,7 @@ import Foundation
 import StorageSQLite
 import TestSupport
 import Testing
+import WireFormat
 
 private enum BackfillProcessorFailure: Error {
     case interrupted
@@ -235,8 +236,9 @@ private func backfillCheckpoint(
         await log.add(line)
     }
     let lines = await log.snapshot()
-    #expect(lines.contains("Reading day 1 of 3 · type 1 of 1"))
-    #expect(lines.contains("Reading day 3 of 3 · type 1 of 1"))
+    #expect(lines.contains("Archive month 0 of 1 · type 1 of 1"))
+    #expect(NamedWorkProgress.archive(completedMonths: 1, totalMonths: 3, type: 2, types: 4)
+        == "Archive month 1 of 3 · type 2 of 4")
     #expect(NamedWorkProgress.reconcile(current: 2, total: 5) == "Reconciling 2 of 5 types")
     #expect(NamedWorkProgress.types(current: 3, total: 12) == "Reading 3 of 12 types")
 
@@ -248,6 +250,7 @@ private func backfillCheckpoint(
         contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift"),
         encoding: .utf8
     )
+    #expect(harness.contains("archive-manifest.json"))
     for name in ["runHTTPSDestination", "runMQTTDestination", "runCompanion"] {
         guard let range = harness.range(of: "static func \(name)") else {
             Issue.record("\(name) is missing")
@@ -259,6 +262,134 @@ private func backfillCheckpoint(
             "\(name) has no type-total progress callback"
         )
     }
+}
+
+@Test func ux25ArchiveProgressCountsCompletedMonthsAndWritesManifest() async throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-backfill-months-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: url) }
+    let processor = RecordingBackfillProcessor()
+    let job = BackfillJob(
+        checkpointURL: url,
+        processor: processor,
+        clock: FrozenClock(instant: Date(timeIntervalSince1970: 1))
+    )
+    try await job.create(
+        try BackfillCheckpoint(
+            jobID: "01J9F0K2QW8Z4YB7M3T5X7",
+            createdAt: "2026-09-03T08:14:02Z",
+            hostModel: "test-host",
+            plan: BackfillPlan(
+                windowStartDay: "2024-01-31",
+                windowEndDay: "2024-02-01",
+                metrics: [MetricID(rawValue: "heartRate")],
+                destinations: ["local-file"]
+            )
+        )
+    )
+    let log = ProgressLog()
+    let complete = try await job.run { line in
+        await log.add(line)
+    }
+    let lines = await log.snapshot()
+    #expect(lines == [
+        "Archive month 0 of 2 · type 1 of 1",
+        "Archive month 1 of 2 · type 1 of 1",
+    ])
+    let months = try ArchiveMonthProgress.completedCount(
+        from: complete.plan.windowStartDay,
+        through: complete.plan.windowEndDay,
+        metrics: complete.plan.metrics,
+        completed: complete.progress.completed
+    )
+    #expect(months.completed == 2)
+    #expect(months.total == 2)
+
+    let manifestURL = ArchiveCompletionManifest.url(adjacentToCheckpoint: url)
+    let manifest = try JSONDecoder().decode(
+        ArchiveCompletionManifest.self,
+        from: Data(contentsOf: manifestURL)
+    )
+    #expect(manifest.windowStartDay == "2024-01-31")
+    #expect(manifest.windowEndDay == "2024-02-01")
+    #expect(manifest.types.count == 1)
+    #expect(manifest.types[0].metric == "heartRate")
+    #expect(manifest.types[0].recordCount == 20)
+    #expect(manifest.types[0].windowStartDay == "2024-01-31")
+    #expect(manifest.types[0].windowEndDay == "2024-02-01")
+}
+
+@Test func backfillUpgradesV1CheckpointThenResumes() async throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-backfill-v1-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    struct V1Range: Codable {
+        var metric: MetricID
+        var days: [String]
+    }
+    struct V1Progress: Codable {
+        var completed: [V1Range]
+        var cursor: BackfillCursor?
+        var samplesRead: Int
+        var batchesEnqueued: Int
+        var pausedReason: String?
+    }
+    struct V1Checkpoint: Codable {
+        var schemaVersion: Int
+        var jobID: String
+        var jobKind: String
+        var createdAt: String
+        var updatedAt: String
+        var hostModel: String
+        var plan: BackfillPlan
+        var progress: V1Progress
+        var integrity: BackfillIntegrity
+    }
+
+    let plan = BackfillPlan(
+        windowStartDay: "2024-01-01",
+        windowEndDay: "2024-01-02",
+        metrics: [MetricID(rawValue: "heartRate")],
+        destinations: ["local-file"]
+    )
+    var legacy = V1Checkpoint(
+        schemaVersion: 1,
+        jobID: "01J9F0K2QW8Z4YB7M3T5X8",
+        jobKind: "backfill",
+        createdAt: "2026-09-03T08:14:02Z",
+        updatedAt: "2026-09-03T08:14:02Z",
+        hostModel: "test-host",
+        plan: plan,
+        progress: V1Progress(
+            completed: [
+                V1Range(metric: MetricID(rawValue: "heartRate"), days: ["2024-01-02"])
+            ],
+            cursor: BackfillCursor(metricIndex: 0, day: "2024-01-01"),
+            samplesRead: 10,
+            batchesEnqueued: 1,
+            pausedReason: "processor_error"
+        ),
+        integrity: BackfillIntegrity(value: "")
+    )
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    legacy.integrity.value = ContentSHA256.hex(try encoder.encode(legacy))
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+    var data = try encoder.encode(legacy)
+    data.append(0x0A)
+    try data.write(to: url)
+
+    let processor = RecordingBackfillProcessor()
+    let job = BackfillJob(
+        checkpointURL: url,
+        processor: processor,
+        clock: FrozenClock(instant: Date(timeIntervalSince1970: 1))
+    )
+    let complete = try await job.run()
+    #expect(complete.schemaVersion == BackfillCheckpoint.currentSchemaVersion)
+    #expect(complete.progress.completed[0].days == ["2024-01-01", "2024-01-02"])
+    #expect(await processor.recordedDays() == ["2024-01-01"])
 }
 
 private actor ProgressLog {

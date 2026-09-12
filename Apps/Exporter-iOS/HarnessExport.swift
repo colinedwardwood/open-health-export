@@ -896,11 +896,15 @@ enum HarnessExport {
                 "Checkpoint: \(checkpointURL.path)",
             ]
         }
+        let manifest = ArchiveCompletionManifest.make(from: completed)
+        let published = destinationDirectory.appendingPathComponent("archive-manifest.json")
+        try manifest.write(to: published)
         return [
             "\(mode.rawValue) backfill complete",
             "Samples read: \(completed.progress.samplesRead)",
             "Batches enqueued: \(completed.progress.batchesEnqueued)",
             "Checkpoint: \(checkpointURL.path)",
+            "Manifest: \(published.path)",
         ]
     }
 
@@ -2649,6 +2653,8 @@ enum HarnessExport {
             "companion-test.json",
             "backfill-raw.json",
             "backfill-aggregate.json",
+            "backfill-raw-manifest.json",
+            "backfill-aggregate-manifest.json",
             "advisory-request-body",
             "exporter-id",
             "wake-ledger.log",

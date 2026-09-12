@@ -2069,7 +2069,7 @@ struct HarnessView: View {
     @MainActor
     private func runBackfill(mode: BackfillMode) async {
         phase = .working
-        status = NamedWorkProgress.backfill(day: 0, days: 1, type: 0, types: 1)
+        status = NamedWorkProgress.archive(completedMonths: 0, totalMonths: 1, type: 0, types: 1)
         results = []
         do {
             if try ContinuedBackfillCoordinator.submit(mode: mode) {

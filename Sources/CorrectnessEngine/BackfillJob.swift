@@ -47,10 +47,12 @@ public struct BackfillPlan: Codable, Sendable, Equatable {
 public struct BackfillCompletedRange: Codable, Sendable, Equatable {
     public var metric: MetricID
     public var days: [String]
+    public var samplesRead: Int
 
-    public init(metric: MetricID, days: [String] = []) {
+    public init(metric: MetricID, days: [String] = [], samplesRead: Int = 0) {
         self.metric = metric
         self.days = days
+        self.samplesRead = samplesRead
     }
 }
 
@@ -97,7 +99,7 @@ public struct BackfillIntegrity: Codable, Sendable, Equatable {
 }
 
 public struct BackfillCheckpoint: Codable, Sendable, Equatable {
-    public static let currentSchemaVersion = 1
+    public static let currentSchemaVersion = 2
 
     public var schemaVersion: Int
     public var jobID: String
@@ -163,11 +165,24 @@ public struct BackfillCheckpoint: Codable, Sendable, Equatable {
     }
 
     public static func read(from url: URL) throws -> BackfillCheckpoint {
-        let decoded = try JSONDecoder().decode(
-            BackfillCheckpoint.self,
-            from: Data(contentsOf: url)
-        )
-        return try decoded.validated()
+        try decodeValidating(Data(contentsOf: url)).checkpoint
+    }
+
+    public static func decodeValidating(_ data: Data) throws -> (
+        checkpoint: BackfillCheckpoint,
+        upgradedFromV1: Bool
+    ) {
+        let raw = try JSONSerialization.jsonObject(with: data)
+        let version = (raw as? [String: Any])?["schemaVersion"] as? Int
+        if version == 1 {
+            let legacy = try JSONDecoder().decode(BackfillCheckpointV1.self, from: data)
+            try legacy.verifyIntegrity()
+            var upgraded = try legacy.upgraded()
+            try upgraded.reseal()
+            return (upgraded, true)
+        }
+        let decoded = try JSONDecoder().decode(BackfillCheckpoint.self, from: data)
+        return (try decoded.validated(), false)
     }
 
     public func encoded() throws -> Data {
@@ -266,16 +281,20 @@ public struct BackfillJob: Sendable {
             )
             for day in allDays where !completed.contains(day) {
                 try Task.checkCancellation()
-                if let dayIndex = allDays.firstIndex(of: day) {
-                    await onProgress?(
-                        NamedWorkProgress.backfill(
-                            day: dayIndex + 1,
-                            days: allDays.count,
-                            type: metricIndex + 1,
-                            types: typeCount
-                        )
+                let months = try ArchiveMonthProgress.completedCount(
+                    from: checkpoint.plan.windowStartDay,
+                    through: checkpoint.plan.windowEndDay,
+                    metrics: checkpoint.plan.metrics,
+                    completed: checkpoint.progress.completed
+                )
+                await onProgress?(
+                    NamedWorkProgress.archive(
+                        completedMonths: months.completed,
+                        totalMonths: months.total,
+                        type: metricIndex + 1,
+                        types: typeCount
                     )
-                }
+                )
                 if let store {
                     let queued = try await store.transact { try $0.queuedBytes() }
                     if !CatchUpAdmission.allows(queuedBytes: queued) {
@@ -335,9 +354,14 @@ public struct BackfillJob: Sendable {
                 ) {
                     checkpoint.progress.completed[index].days.append(day)
                     checkpoint.progress.completed[index].days.sort()
+                    checkpoint.progress.completed[index].samplesRead += result.samplesRead
                 } else {
                     checkpoint.progress.completed.append(
-                        BackfillCompletedRange(metric: metric, days: [day])
+                        BackfillCompletedRange(
+                            metric: metric,
+                            days: [day],
+                            samplesRead: result.samplesRead
+                        )
                     )
                 }
                 try await persist(&checkpoint)
@@ -346,6 +370,9 @@ public struct BackfillJob: Sendable {
         checkpoint.progress.cursor = nil
         checkpoint.progress.pausedReason = nil
         try await persist(&checkpoint)
+        try ArchiveCompletionManifest.make(from: checkpoint).write(
+            to: ArchiveCompletionManifest.url(adjacentToCheckpoint: checkpointURL)
+        )
         return checkpoint
     }
 
@@ -356,16 +383,20 @@ public struct BackfillJob: Sendable {
     }
 
     private func load() async throws -> BackfillCheckpoint {
-        let file = try BackfillCheckpoint.read(from: checkpointURL)
-        guard let store else { return file }
-        let mirrored = try await store.transact {
-            try $0.loadBackfillCheckpoint(jobID: file.jobID)
+        let onDisk = try Data(contentsOf: checkpointURL)
+        let decoded = try BackfillCheckpoint.decodeValidating(onDisk)
+        if let store {
+            let mirrored = try await store.transact {
+                try $0.loadBackfillCheckpoint(jobID: decoded.checkpoint.jobID)
+            }
+            guard let mirrored, mirrored == onDisk else {
+                throw BackfillError.corruptCheckpoint
+            }
         }
-        let expected = try file.encoded()
-        guard let mirrored, mirrored == expected else {
-            throw BackfillError.corruptCheckpoint
+        if decoded.upgradedFromV1 {
+            try await persist(decoded.checkpoint)
         }
-        return file
+        return decoded.checkpoint
     }
 
     private func persist(_ checkpoint: inout BackfillCheckpoint) async throws {
@@ -382,5 +413,65 @@ public struct BackfillJob: Sendable {
                 try $0.upsertBackfillCheckpoint(jobID: checkpoint.jobID, bytes: bytes)
             }
         }
+    }
+}
+
+/// On-disk schema 1 (no per-type sample counts). Read path upgrades to schema 2.
+private struct BackfillCompletedRangeV1: Codable {
+    var metric: MetricID
+    var days: [String]
+}
+
+private struct BackfillProgressV1: Codable {
+    var completed: [BackfillCompletedRangeV1]
+    var cursor: BackfillCursor?
+    var samplesRead: Int
+    var batchesEnqueued: Int
+    var pausedReason: String?
+}
+
+private struct BackfillCheckpointV1: Codable {
+    var schemaVersion: Int
+    var jobID: String
+    var jobKind: String
+    var createdAt: String
+    var updatedAt: String
+    var hostModel: String
+    var plan: BackfillPlan
+    var progress: BackfillProgressV1
+    var integrity: BackfillIntegrity
+
+    func verifyIntegrity() throws {
+        guard schemaVersion == 1, jobKind == "backfill", integrity.algorithm == "sha256" else {
+            throw BackfillError.corruptCheckpoint
+        }
+        var unsigned = self
+        let expected = unsigned.integrity.value
+        unsigned.integrity.value = ""
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        guard expected == ContentSHA256.hex(try encoder.encode(unsigned)) else {
+            throw BackfillError.corruptCheckpoint
+        }
+    }
+
+    func upgraded() throws -> BackfillCheckpoint {
+        var next = try BackfillCheckpoint(
+            jobID: jobID,
+            createdAt: createdAt,
+            hostModel: hostModel,
+            plan: plan
+        )
+        next.updatedAt = updatedAt
+        next.progress = BackfillProgress(
+            completed: progress.completed.map {
+                BackfillCompletedRange(metric: $0.metric, days: $0.days, samplesRead: 0)
+            },
+            cursor: progress.cursor,
+            samplesRead: progress.samplesRead,
+            batchesEnqueued: progress.batchesEnqueued,
+            pausedReason: progress.pausedReason
+        )
+        return next
     }
 }

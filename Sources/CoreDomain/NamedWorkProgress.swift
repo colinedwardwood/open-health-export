@@ -11,6 +11,15 @@ public enum NamedWorkProgress {
         "Reading day \(day) of \(days) · type \(type) of \(types)"
     }
 
+    public static func archive(
+        completedMonths: Int,
+        totalMonths: Int,
+        type: Int,
+        types: Int
+    ) -> String {
+        "Archive month \(completedMonths) of \(totalMonths) · type \(type) of \(types)"
+    }
+
     public static func reconcile(current: Int, total: Int) -> String {
         "Reconciling \(current) of \(total) types"
     }

@@ -1,0 +1,1 @@
+Historical archive progress is completed months of the window, and a finished backfill writes a manifest of types, record counts, and per-type day bounds. In-progress schema 1 checkpoints upgrade to schema 2 on resume.
