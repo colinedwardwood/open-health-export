@@ -272,6 +272,73 @@ private func browserSample(
     #expect(MetricCatalog.all.allSatisfy { $0.kind == "sample.quantity" })
 }
 
+@Test func ux18PresetUpgradeIsOptInDiffAndLeavesV1UntilAccepted() {
+    let v1 = CoreDailyPreset.current
+    #expect(v1.version == 1)
+    #expect(MetricPresetAdoption.nextAction(
+        shipped: v1,
+        appliedVersion: nil,
+        snapshots: CoreDailyPreset.snapshots
+    ) == .applyNow)
+    #expect(MetricPresetAdoption.nextAction(
+        shipped: v1,
+        appliedVersion: 1,
+        snapshots: CoreDailyPreset.snapshots
+    ) == .applyNow)
+
+    let extra = MetricDeclaration(
+        id: MetricID(rawValue: "ux18FixtureCadence"),
+        wireId: "ux18_fixture_cadence",
+        hkIdentifier: "HKQuantityTypeIdentifierWalkingSpeed",
+        canonicalUnit: CanonicalUnit(symbol: "m/s"),
+        wireUnit: "m/s",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .routine,
+        haUnit: "m/s",
+        haDeviceClass: "speed",
+        haStateClass: "measurement",
+        haRequiresAggregate: false
+    )
+    let v2 = MetricPreset(
+        id: CoreDailyPreset.id,
+        version: 2,
+        metrics: MetricCatalog.coreDaily.filter { $0.id != MetricCatalog.mindfulSession.id } + [extra]
+    )
+    #expect(v2.metrics.allSatisfy { $0.sensitivity == .routine })
+    let action = MetricPresetAdoption.nextAction(
+        shipped: v2,
+        appliedVersion: 1,
+        snapshots: [1: v1]
+    )
+    guard case .offerDiff(let diff) = action else {
+        Issue.record("expected an opt-in diff, not a silent apply")
+        return
+    }
+    #expect(diff.added == [extra.id])
+    #expect(diff.removed == [MetricCatalog.mindfulSession.id])
+    #expect(diff.summary.contains("adds 1 type"))
+    #expect(diff.summary.contains("removes 1 type"))
+
+    var selection = v1.metricIDs
+    #expect(selection.contains(MetricCatalog.mindfulSession.id))
+    #expect(!selection.contains(extra.id))
+    #expect(MetricPresetAdoption.nextAction(
+        shipped: v2,
+        appliedVersion: 1,
+        snapshots: [1: v1]
+    ) != .applyNow)
+
+    selection = v2.metricIDs
+    #expect(selection.contains(extra.id))
+    #expect(!selection.contains(MetricCatalog.mindfulSession.id))
+    #expect(MetricPresetAdoption.nextAction(
+        shipped: v2,
+        appliedVersion: 2,
+        snapshots: [1: v1, 2: v2]
+    ) == .applyNow)
+}
+
 /// R-65's locale matrix. The regions are chosen for the cases a single metric/imperial
 /// switch gets wrong: the United Kingdom reads miles and kilograms at once, and Germany
 /// reads mg/dL despite being metric throughout.

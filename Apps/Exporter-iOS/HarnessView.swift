@@ -129,6 +129,9 @@ struct HarnessView: View {
     @State private var foregroundCatchUpStarted = false
     @AppStorage("ohe.browserOnlyWithData")
     private var browserOnlyWithData = true
+    @AppStorage("ohe.preset.coreDaily.appliedVersion")
+    private var coreDailyAppliedVersion = 0
+    @State private var coreDailyUpgrade: MetricPresetDiff?
     /// SEC-45: one-time, so it persists past the run that acknowledged it.
     @AppStorage("ohe.shareProtectionAcknowledged")
     private var shareProtectionAcknowledged = false
@@ -1450,6 +1453,23 @@ struct HarnessView: View {
         }
     }
 
+    private func applyCoreDailyPreset() {
+        let shipped = CoreDailyPreset.current
+        let applied = coreDailyAppliedVersion == 0 ? nil : coreDailyAppliedVersion
+        switch MetricPresetAdoption.nextAction(
+            shipped: shipped,
+            appliedVersion: applied,
+            snapshots: CoreDailyPreset.snapshots
+        ) {
+        case .applyNow:
+            browserSelection = shipped.metricIDs
+            coreDailyAppliedVersion = shipped.version
+            coreDailyUpgrade = nil
+        case .offerDiff(let diff):
+            coreDailyUpgrade = diff
+        }
+    }
+
     @MainActor
     private func applyBrowserSelection() async {
         phase = .working
@@ -1672,7 +1692,7 @@ struct HarnessView: View {
                 if browserSelecting {
                     HStack {
                         Button("Use Core Daily") {
-                            browserSelection = Set(MetricCatalog.coreDaily.map(\.id))
+                            applyCoreDailyPreset()
                         }
                         .accessibilityIdentifier("browser-core-daily")
                         Button("Invert routine") {
@@ -1683,6 +1703,28 @@ struct HarnessView: View {
                         .accessibilityIdentifier("browser-invert-routine")
                         Button("Clear all") { browserSelection.removeAll() }
                             .accessibilityIdentifier("browser-clear-all")
+                    }
+                    if let upgrade = coreDailyUpgrade {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Review Core Daily update")
+                                .font(.headline)
+                                .accessibilityIdentifier("preset-upgrade-title")
+                            Text(upgrade.summary)
+                                .accessibilityIdentifier("preset-upgrade-summary")
+                            HStack {
+                                Button("Apply Core Daily update") {
+                                    let shipped = CoreDailyPreset.current
+                                    browserSelection = shipped.metricIDs
+                                    coreDailyAppliedVersion = shipped.version
+                                    coreDailyUpgrade = nil
+                                }
+                                .accessibilityIdentifier("preset-upgrade-apply")
+                                Button("Keep current types") {
+                                    coreDailyUpgrade = nil
+                                }
+                                .accessibilityIdentifier("preset-upgrade-keep")
+                            }
+                        }
                     }
                 }
                 if browserReviewVisible {

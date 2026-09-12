@@ -1586,6 +1586,39 @@
         }
       }
     },
+    "Review Core Daily update": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review Core Daily update"
+          }
+        }
+      }
+    },
+    "Apply Core Daily update": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply Core Daily update"
+          }
+        }
+      }
+    },
+    "Keep current types": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep current types"
+          }
+        }
+      }
+    },
     "Run R-70 (one anchored page per type)": {
       "extractionState": "manual",
       "localizations": {
