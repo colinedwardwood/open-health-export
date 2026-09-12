@@ -9,6 +9,7 @@ public actor LoopbackMQTTBroker: MQTTBytePipe {
     private var outbox = Data()
     private var waiters: [CheckedContinuation<Data, Error>] = []
     public private(set) var lastPublishTopic: String?
+    public private(set) var lastConnectFlags: UInt8?
 
     public init() {}
 
@@ -19,6 +20,7 @@ public actor LoopbackMQTTBroker: MQTTBytePipe {
             rest = Data(rest.dropFirst(packet.consumed))
             switch packet.kind {
             case .connect:
+                lastConnectFlags = try MQTTCodec.decodeConnectFlags(packet.body)
                 enqueue(Data([0x20, 0x02, 0x00, 0x00]))
             case .publish:
                 lastPublishTopic = try MQTTCodec.decodePublishTopic(body: packet.body)

@@ -22,11 +22,33 @@ public enum MQTTError: Error, Equatable {
     case unexpectedPacket(UInt8)
     case packetID
     case retainForbidden
+    case qos2Unsupported
+    case unsupportedQoS(Int)
+    case lastWillUnsupported
 }
 
 public enum MQTTQoS: UInt8, Sendable {
     case atMostOnce = 0
     case atLeastOnce = 1
+
+    /// Converts persisted or user-entered configuration without silently treating QoS 2
+    /// as QoS 1. ADR-0003 intentionally limits the publish-only client to QoS 0/1.
+    public init(configurationValue: Int) throws {
+        switch configurationValue {
+        case Int(Self.atMostOnce.rawValue):
+            self = .atMostOnce
+        case Int(Self.atLeastOnce.rawValue):
+            self = .atLeastOnce
+        case 2:
+            throw MQTTError.qos2Unsupported
+        default:
+            throw MQTTError.unsupportedQoS(configurationValue)
+        }
+    }
+
+    public init(configurationValue: UInt8) throws {
+        try self.init(configurationValue: Int(configurationValue))
+    }
 }
 
 public enum MQTTRemainingLength {
@@ -150,6 +172,14 @@ public enum MQTTCodec {
         let bytes = [UInt8](body)
         guard bytes.count >= 2 else { throw MQTTError.truncated }
         return bytes[1]
+    }
+
+    public static func decodeConnectFlags(_ body: Data) throws -> UInt8 {
+        var offset = 0
+        _ = try readMQTTString(body, start: &offset)
+        let bytes = [UInt8](body)
+        guard bytes.count >= offset + 2 else { throw MQTTError.truncated }
+        return bytes[offset + 1]
     }
 
     public static func decodePuback(_ body: Data) throws -> UInt16 {

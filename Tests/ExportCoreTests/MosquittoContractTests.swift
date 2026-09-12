@@ -80,6 +80,25 @@ func mosquittoQoS0IsUnknownAckOnTheEngine() async throws {
     let outcome = try await run.run()
     #expect(outcome.kind == .unknownAck)
 }
+
+@Test(.enabled(if: mosquittoURL() != nil))
+func mosquittoContractRejectsExcludedQoS2AndLastWillBeforeDial() throws {
+    let url = try #require(mosquittoURL())
+    let host = URL(string: url)?.host ?? "127.0.0.1"
+    #expect(throws: MQTTError.qos2Unsupported) {
+        _ = try MQTTQoS(configurationValue: 2)
+    }
+    #expect(throws: MQTTError.lastWillUnsupported) {
+        _ = try MQTTDestination(
+            urlString: url,
+            allowedHosts: [host],
+            allowInsecure: true,
+            clientID: "ohe-r90-no-will",
+            topic: "ohe/health",
+            lastWillEnabled: true
+        )
+    }
+}
 }
 
 private func mosquittoExecutable() -> String? {

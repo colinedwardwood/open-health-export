@@ -38,6 +38,7 @@ public struct MQTTDestination: Sendable {
         clientID: String,
         topic: String,
         qos: MQTTQoS = .atLeastOnce,
+        lastWillEnabled: Bool = false,
         username: String? = nil,
         password: String? = nil,
         clientPKCS12: Data? = nil,
@@ -50,6 +51,11 @@ public struct MQTTDestination: Sendable {
             allowInsecureHTTP: allowInsecure
         )
         try MQTTTopic.validate(topic)
+        if lastWillEnabled {
+            // The app cannot keep an MQTT connection alive under the iOS background
+            // model, so the wire contract deliberately has no meaningful LWT.
+            throw MQTTError.lastWillUnsupported
+        }
         self.clientID = clientID
         self.topic = topic
         self.qos = qos

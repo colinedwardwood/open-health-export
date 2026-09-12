@@ -36,6 +36,44 @@ import WireFormat
     #expect(MQTTPacketKind(rawValue: 8) == nil)
 }
 
+@Test func mqttQoS2ConfigurationIsExplicitlyRejected() throws {
+    #expect(try MQTTQoS(configurationValue: 0) == .atMostOnce)
+    #expect(try MQTTQoS(configurationValue: 1) == .atLeastOnce)
+    #expect(throws: MQTTError.qos2Unsupported) {
+        _ = try MQTTQoS(configurationValue: 2)
+    }
+    #expect(throws: MQTTError.unsupportedQoS(3)) {
+        _ = try MQTTQoS(configurationValue: 3)
+    }
+}
+
+@Test func mqttLastWillIsRejectedAndAbsentFromLoopbackConnect() async throws {
+    #expect(throws: MQTTError.lastWillUnsupported) {
+        _ = try MQTTDestination(
+            urlString: "mqtt://broker.example:1883",
+            allowedHosts: ["broker.example"],
+            allowInsecure: true,
+            clientID: "c1",
+            topic: "ohe/health",
+            lastWillEnabled: true
+        )
+    }
+
+    let broker = LoopbackMQTTBroker()
+    let destination = try MQTTDestination(
+        urlString: "mqtt://broker.example:1883",
+        allowedHosts: ["broker.example"],
+        allowInsecure: true,
+        clientID: "c1",
+        topic: "ohe/health"
+    )
+    let session = MQTTSession(pipe: broker)
+    try await session.connect(destination: destination)
+    let flags = try #require(await broker.lastConnectFlags)
+    #expect(flags & 0b0011_1100 == 0) // Will Flag, Will QoS and Will Retain.
+    #expect(flags & 0b0000_0010 != 0) // CleanSession remains required by ADR-0003.
+}
+
 @Test func mqttDataPublishNeverSetsRetain() throws {
     let off = try MQTTCodec.publish(
         topic: "ohe/health",
