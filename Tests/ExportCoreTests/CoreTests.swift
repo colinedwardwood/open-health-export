@@ -2876,11 +2876,97 @@ private func anchorHoldFixture(
         anchorBlob: Data([1]),
         observedThrough: Date(timeIntervalSince1970: 0)
     )
-    try await store.transact { tx in
+    _ = try await store.transact { tx in
         try Census.apply(page: page, to: tx)
     }
-    #expect(store.transaction.journal.contains { $0.detail == "deletion_undatable" })
+    #expect(store.transaction.journal.contains { event in
+        DeletionUndatable.parse(event.detail)?.uuid
+            == "deadbeef-dead-beef-dead-beefdeadbeef"
+    })
     #expect(try await store.transact { try $0.loadCensus(metric: metric, day: "2024-01-01") } == nil)
+}
+
+@Test func deletionUndatableSweepRebuildsCensusFromObservations() async throws {
+    let metric = MetricCatalog.heartRate.id
+    let kept = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    let lost = "deadbeef-dead-beef-dead-beefdeadbeef"
+    let dest = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-undatable-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: dest) }
+    try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+    let store = MemoryStateStore()
+    let keptSample = heartSample(kept)
+    try await store.transact { tx in
+        try tx.commitBatch(
+            PendingBatch(
+                id: BatchID(rawValue: "prior"),
+                payloadURL: dest.appendingPathComponent("prior.ndjson").path,
+                expectedRecords: 1
+            ),
+            advancing: CursorAdvance(
+                page: SamplePage(
+                    samples: [keptSample],
+                    tombstones: [],
+                    metric: metric,
+                    anchorBlob: Data([0x00]),
+                    observedThrough: Date(timeIntervalSince1970: 0)
+                ),
+                epoch: 1
+            )
+        )
+        try tx.upsertCensus(
+            CensusRow(
+                metric: metric,
+                day: "2024-01-01",
+                sampleCount: 2,
+                digest: Census.digestUUIDs([kept, lost])
+            )
+        )
+        try tx.upsertEmittedIndex(
+            EmittedIndexRow(
+                uuid: kept,
+                metric: metric,
+                day: "2024-01-01",
+                digest: Census.digestUUIDs([kept]),
+                batchID: BatchID(rawValue: "kept")
+            )
+        )
+    }
+    let outcome = try await ExportRun(
+        source: FixtureSource(
+            pages: [
+                SamplePage(
+                    samples: [],
+                    tombstones: [
+                        TombstoneRecord(key: RecordKey(uuid: lost), metric: metric)
+                    ],
+                    metric: metric,
+                    anchorBlob: Data([0xD1]),
+                    observedThrough: Date(timeIntervalSince1970: 0)
+                )
+            ]
+        ),
+        destination: .testing(LocalFileSink(directory: dest)),
+        store: store,
+        metric: metric,
+        scratchDirectory: dest.appendingPathComponent("scratch"),
+        envelope: testEnvelope(),
+        observations: FixtureDays(byDay: ["2024-01-01": [keptSample]])
+    ).run()
+    #expect(outcome.kind == .success)
+    let parsed = store.transaction.journal.compactMap { DeletionUndatable.parse($0.detail) }
+    #expect(parsed.contains { $0.uuid == lost && $0.metric == metric })
+    let row = try await store.transact { try $0.loadCensus(metric: metric, day: "2024-01-01") }
+    #expect(row?.sampleCount == 1)
+    #expect(row?.digest == Census.digestUUIDs([kept]))
+    let payloads = try FileManager.default.contentsOfDirectory(
+        at: dest,
+        includingPropertiesForKeys: nil
+    )
+    .filter { $0.pathExtension == "ndjson" }
+    .map { try String(contentsOf: $0, encoding: .utf8) }
+    .joined()
+    #expect(payloads.contains(DeletionUndatable.token))
 }
 
 @Test func cellCensusFoldIsOrderIndependent() {

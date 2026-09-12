@@ -161,6 +161,13 @@ public final class MemoryTransaction: StateTransaction {
         census["\(metric.rawValue)|\(day)"]
     }
 
+    public func loadCensusDays(metric: MetricID) throws -> [String] {
+        census.values
+            .filter { $0.metric == metric }
+            .map(\.day)
+            .sorted()
+    }
+
     public func markDirty(metric: MetricID, day: String) throws {
         dirty[metric, default: []].insert(day)
     }

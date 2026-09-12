@@ -227,17 +227,18 @@ public struct ExportRun: Sendable {
         }
         rangeDays.append(contentsOf: tombstoneDays)
         let fallbackDay = String(page.observedThrough.ISO8601Format().prefix(10))
+        let applyEpoch = clock.now().timeIntervalSince1970
         let pending = PendingBatch(
             id: batchID,
             payloadURL: payloadURL.path,
             expectedRecords: recordCount,
             byteCount: payload.count,
             metric: metric,
-            createdAtEpoch: clock.now().timeIntervalSince1970,
+            createdAtEpoch: applyEpoch,
             rangeStartDay: rangeDays.min() ?? fallbackDay,
             rangeEndDay: rangeDays.max() ?? fallbackDay
         )
-        let victims = try await store.transact { tx in
+        let enqueue = try await store.transact { tx -> (victims: [PendingBatch], undatable: [String]) in
             let evicted = try QueueAdmission.makeRoom(for: pending.byteCount, on: tx)
             try tx.commitBatch(
                 pending,
@@ -247,7 +248,11 @@ public struct ExportRun: Sendable {
                     tzDatabaseVersion: temporal.tzDatabaseVersion
                 )
             )
-            try Census.apply(page: page, to: tx)
+            let census = try Census.apply(
+                page: page,
+                to: tx,
+                atEpoch: applyEpoch
+            )
             try EmittedIndex.record(page: page, batchID: pending.id, on: tx)
             for plan in aggregates {
                 try tx.upsertAggregateEmitSeq(
@@ -259,9 +264,9 @@ public struct ExportRun: Sendable {
             #if DEBUG
             try faults.hit(.duringAnchorPersist)
             #endif
-            return evicted
+            return (evicted, census.undatableUUIDs)
         }
-        for victim in victims {
+        for victim in enqueue.victims {
             try? FileManager.default.removeItem(atPath: victim.payloadURL)
         }
         #if DEBUG
@@ -299,6 +304,7 @@ public struct ExportRun: Sendable {
             )
             let outcome = RunOutcome.derive(from: tally)
             try await record(outcome: outcome, tally: tally, receipt: nil)
+            try await sweepUndatable(enqueue.undatable)
             return outcome
         }
         #if DEBUG
@@ -321,7 +327,30 @@ public struct ExportRun: Sendable {
             receipt: receipt,
             freshnessTiming: freshnessTiming
         )
+        try await sweepUndatable(enqueue.undatable)
         return outcome
+    }
+
+    private func sweepUndatable(_ uuids: [String]) async throws {
+        guard !uuids.isEmpty, !envelope.demo, let observations else { return }
+        _ = try await ReconcileSweep(
+            observations: observations,
+            destination: destination,
+            store: store,
+            metric: metric,
+            scratchDirectory: scratchDirectory,
+            destinationName: destinationName,
+            envelope: envelope,
+            clock: clock,
+            temporal: temporal,
+            statistics: statistics,
+            trigger: trigger,
+            snapshotURL: snapshotURL,
+            externalStatusURL: externalStatusURL,
+            ledgerHeadSeal: ledgerHeadSeal,
+            ledgerSealURL: ledgerSealURL,
+            scope: scope
+        ).runCensusDays()
     }
 
     private func drainPlans(for page: SamplePage) async throws -> [AggregateDayPlan] {

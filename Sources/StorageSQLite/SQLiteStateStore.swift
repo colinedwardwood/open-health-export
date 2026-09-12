@@ -702,6 +702,19 @@ private final class SQLiteTransaction: StateTransaction {
         return CensusRow(metric: metric, day: day, sampleCount: count, digest: digest)
     }
 
+    func loadCensusDays(metric: MetricID) throws -> [String] {
+        let stmt = try store.prepare(
+            "SELECT day FROM census WHERE metric = ? ORDER BY day;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, metric.rawValue)
+        var days: [String] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            days.append(String(cString: sqlite3_column_text(stmt, 0)))
+        }
+        return days
+    }
+
     func markDirty(metric: MetricID, day: String) throws {
         let stmt = try store.prepare("INSERT OR IGNORE INTO dirty (metric, day) VALUES (?, ?);")
         defer { sqlite3_finalize(stmt) }

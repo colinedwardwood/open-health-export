@@ -99,6 +99,15 @@ public struct ReconcileSweep: Sendable {
         )
     }
 
+    /// O-9: sweep every day this metric still has a census row, so an undatable
+    /// deletion can be rebuilt from live observations instead of waiting for a
+    /// global full reconcile.
+    public func runCensusDays(reason: String = DeletionUndatable.token) async throws -> RunOutcome {
+        let days = try await store.transact { try $0.loadCensusDays(metric: metric) }
+        let throughDay = days.max() ?? String(clock.now().ISO8601Format().prefix(10))
+        return try await run(days: days, throughDay: throughDay, reason: reason)
+    }
+
     public func run(gap: GapRecord) async throws -> RunOutcome {
         guard gap.metric == metric else {
             throw ReconcileSweepError.gapMetricMismatch
@@ -250,7 +259,7 @@ public struct ReconcileSweep: Sendable {
         let victims = try await store.transact { tx in
             let evicted = try QueueAdmission.makeRoom(for: pending.byteCount, on: tx)
             try tx.enqueuePending(pending)
-            try Census.apply(page: censusPage, to: tx)
+            try Census.replaceObserved(page: censusPage, days: permittedDays, to: tx)
             try EmittedIndex.record(page: page, batchID: pending.id, on: tx)
             for plan in aggregates {
                 try tx.upsertAggregateEmitSeq(

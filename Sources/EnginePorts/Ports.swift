@@ -418,6 +418,7 @@ public protocol StateTransaction: AnyObject {
     func loadLedger() throws -> [EgressEntry]
     func upsertCensus(_ row: CensusRow) throws
     func loadCensus(metric: MetricID, day: String) throws -> CensusRow?
+    func loadCensusDays(metric: MetricID) throws -> [String]
     func markDirty(metric: MetricID, day: String) throws
     func dirtyDays(metric: MetricID) throws -> [String]
     func clearDirty(metric: MetricID, day: String) throws
