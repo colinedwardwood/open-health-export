@@ -918,6 +918,12 @@ enum HarnessExport {
             withIntermediateDirectories: true,
             attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
         )
+        // createDirectory does not update attributes when the directory already
+        // exists, so re-apply the SEC-32 floor for upgrades as well as fresh installs.
+        try fm.setAttributes(
+            [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+            ofItemAtPath: root.path
+        )
         // SEC-30: everything the engine keeps — state, journal, queued payloads — lives
         // under here, and none of it may reach a backup.
         try FileWriteKit.excludeFromBackup(root)

@@ -27,6 +27,7 @@ struct CompanionView: View {
     @State private var status = "Choose a folder, then open a receive window."
     @State private var listening = false
     @State private var listener: CompanionListener?
+    @State private var deleteEverythingArmed = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -68,6 +69,19 @@ struct CompanionView: View {
                 Task { await forgetPairing() }
             }
             .disabled(listening)
+            Button(
+                deleteEverythingArmed
+                    ? "Confirm: delete received archives and pairing"
+                    : "Delete everything received"
+            ) {
+                if deleteEverythingArmed {
+                    Task { await deleteEverythingReceived() }
+                } else {
+                    deleteEverythingArmed = true
+                    status = "Confirm to delete this folder's received archives, receipt ledger, and stored pairing."
+                }
+            }
+            .disabled(listening || folder == nil)
             Text("Source offer: this receiver is AGPL-3.0. If you run it for someone else, you must offer them the source.")
                 .font(.footnote)
             Text("Acknowledgements")
@@ -96,6 +110,7 @@ struct CompanionView: View {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
+        deleteEverythingArmed = false
         folder = url
         warning = FolderRisk.iCloudSyncWarning(for: url)
         status = warning == nil
@@ -183,6 +198,23 @@ struct CompanionView: View {
             qrImage = nil
             confirmation = ""
             status = "Pairing forgotten. The next receive window will mint a new PSK."
+        } catch {
+            status = "Failed: \(error.localizedDescription)"
+        }
+    }
+
+    @MainActor
+    private func deleteEverythingReceived() async {
+        guard let folder else { return }
+        do {
+            let deleted = try CompanionArchive(directory: folder).deleteEverythingReceived()
+            try await CompanionPersistence.vault().forget()
+            pairing = nil
+            payloadText = ""
+            qrImage = nil
+            confirmation = ""
+            deleteEverythingArmed = false
+            status = "Deleted \(deleted) received archive(s), the receipt ledger, and the stored pairing."
         } catch {
             status = "Failed: \(error.localizedDescription)"
         }

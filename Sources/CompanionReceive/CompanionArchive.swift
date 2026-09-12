@@ -57,6 +57,23 @@ public struct CompanionArchive: Sendable {
         return directory.appendingPathComponent("\(batchID).ndjson")
     }
 
+    /// Deletes only payloads named by this archive's receipt ledger. It never
+    /// glob-deletes `.ndjson` files from a user-selected folder.
+    @discardableResult
+    public func deleteEverythingReceived() throws -> Int {
+        let receipts = try loadReceipts()
+        for batchID in receipts.keys {
+            let payload = try payloadURL(batchID: batchID)
+            if FileManager.default.fileExists(atPath: payload.path) {
+                try FileManager.default.removeItem(at: payload)
+            }
+        }
+        if FileManager.default.fileExists(atPath: receiptsURL.path) {
+            try FileManager.default.removeItem(at: receiptsURL)
+        }
+        return receipts.count
+    }
+
     private var receiptsURL: URL {
         directory.appendingPathComponent(".ohe-receipts.json")
     }

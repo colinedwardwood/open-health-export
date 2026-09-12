@@ -132,6 +132,7 @@ Secure-development and vulnerability governance: `CYBERSECURITY.md`. The project
 covered-entity stop condition—not a claim of HIPAA status or legal review—is documented in
 `compliance/HIPAA-CONTEXT.md`.
 Monitoring signal and failure taxonomy: `docs/03-implementation/r27-failure-taxonomy.md`.
+Uninstall and complete data-removal steps: `docs/03-implementation/uninstall-and-data-removal.md`.
 Volunteer device runs: `qa/community-device-matrix/CHECKLIST.md`. Energy measurement
 (not a CI gate): `qa/energy-protocol.md`.
 Reference receiver and Grafana lab stack: `receiver/README.md` (`docker compose up` from

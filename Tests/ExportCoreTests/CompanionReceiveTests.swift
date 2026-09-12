@@ -26,6 +26,30 @@ import WireFormat
     }
 }
 
+@Test func companionDeleteEverythingIsScopedAndIdempotent() throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(
+        "ohe-archive-delete-\(UUID().uuidString)"
+    )
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let archive = CompanionArchive(directory: dir)
+    let payload = Data("received".utf8)
+    try archive.store(
+        committed: CompanionCommitted(
+            batchID: "batch-received",
+            digest: ContentSHA256.digest(payload),
+            payload: payload
+        )
+    )
+    let unrelated = dir.appendingPathComponent("notes.ndjson")
+    try Data("not managed by the companion".utf8).write(to: unrelated)
+
+    #expect(try archive.deleteEverythingReceived() == 1)
+    #expect(!FileManager.default.fileExists(atPath: try archive.payloadURL(batchID: "batch-received").path))
+    #expect(FileManager.default.fileExists(atPath: unrelated.path))
+    #expect(try archive.loadReceipts().isEmpty)
+    #expect(try archive.deleteEverythingReceived() == 0)
+}
+
 @Test func iCloudFolderIsAWarningNotARefusal() {
     let icloud = URL(fileURLWithPath: "/Users/colin/Library/Mobile Documents/com~apple~CloudDocs/Health")
     #expect(FolderRisk.iCloudSyncWarning(for: icloud) != nil)

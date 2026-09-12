@@ -53,12 +53,16 @@ struct PolicyCheck {
         // R-34/R-37/R-52: app targets use reviewed NetEgress adapters, never direct sockets.
         let apps = root.appendingPathComponent("Apps")
         var appNetworkBypasses: [String] = []
+        var pasteboardBypasses: [String] = []
         if let appFiles = FileManager.default.enumerator(at: apps, includingPropertiesForKeys: nil) {
             for case let file as URL in appFiles where file.pathExtension == "swift" {
                 let text = try String(contentsOf: file, encoding: .utf8)
                 for token in ["URLSession", "NWConnection", "NWListener", "NWBrowser"]
                     where text.contains(token) {
                     appNetworkBypasses.append("\(file.path): \(token)")
+                }
+                if text.contains("UIPasteboard") {
+                    pasteboardBypasses.append("\(file.path): UIPasteboard")
                 }
             }
         }
@@ -69,6 +73,19 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck app targets use no direct network APIs: ok")
+        if !pasteboardBypasses.isEmpty {
+            FileHandle.standardError.write(
+                Data(
+                    (
+                        "SEC-44: general pasteboard use requires an approved local-only, expiring wrapper:\n"
+                            + pasteboardBypasses.joined(separator: "\n")
+                            + "\n"
+                    ).utf8
+                )
+            )
+            exit(1)
+        }
+        print("policycheck general pasteboard use is prohibited: ok")
 
         let projectText = try String(
             contentsOf: root.appendingPathComponent("project.yml"),
@@ -159,6 +176,29 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck iOS background task identifiers: ok")
+        let harnessExport = try String(
+            contentsOf: apps.appendingPathComponent("Exporter-iOS/HarnessExport.swift"),
+            encoding: .utf8
+        )
+        let sqliteStore = try String(
+            contentsOf: sources.appendingPathComponent("StorageSQLite/SQLiteStateStore.swift"),
+            encoding: .utf8
+        )
+        guard harnessExport.contains(
+            ".protectionKey: FileProtectionType.completeUntilFirstUserAuthentication"
+        ),
+            harnessExport.contains("try fm.setAttributes("),
+            sqliteStore.contains(
+                "SQLITE_OPEN_FILEPROTECTION_COMPLETEUNTILFIRSTUSERAUTHENTICATION"
+            ),
+            !harnessExport.contains(".protectionKey: FileProtectionType.none")
+        else {
+            FileHandle.standardError.write(
+                Data("SEC-32: managed storage lost its Data Protection floor\n".utf8)
+            )
+            exit(1)
+        }
+        print("policycheck managed storage Data Protection floor: ok")
         var healthOnMac: [String] = []
         if let appFiles = FileManager.default.enumerator(at: apps, includingPropertiesForKeys: nil) {
             for case let file as URL in appFiles where file.pathExtension == "swift" {
