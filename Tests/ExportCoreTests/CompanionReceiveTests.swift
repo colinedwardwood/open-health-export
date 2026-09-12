@@ -18,11 +18,18 @@ import WireFormat
     let archive = CompanionArchive(directory: dir)
     let payload = Data("hello-batch".utf8)
     let digest = ContentSHA256.digest(payload)
-    try archive.store(committed: CompanionCommitted(batchID: "batch-safe", digest: digest, payload: payload))
+    try archive.store(
+        committed: CompanionCommitted(batchID: "batch-safe", digest: digest, payload: payload),
+        receivedAtEpoch: 1_704_067_200
+    )
     #expect(try archive.loadReceipts()["batch-safe"] == digest)
+    #expect(try archive.loadWatch().lastReceivedEpoch == 1_704_067_200)
     #expect(try Data(contentsOf: archive.payloadURL(batchID: "batch-safe")) == payload)
     #expect(throws: CompanionArchiveError.unsafeBatchID) {
-        try archive.store(committed: CompanionCommitted(batchID: "../etc", digest: digest, payload: payload))
+        try archive.store(
+            committed: CompanionCommitted(batchID: "../etc", digest: digest, payload: payload),
+            receivedAtEpoch: 1_704_067_200
+        )
     }
 }
 
@@ -38,7 +45,8 @@ import WireFormat
             batchID: "batch-received",
             digest: ContentSHA256.digest(payload),
             payload: payload
-        )
+        ),
+        receivedAtEpoch: 1_704_067_200
     )
     let unrelated = dir.appendingPathComponent("notes.ndjson")
     try Data("not managed by the companion".utf8).write(to: unrelated)
@@ -47,6 +55,7 @@ import WireFormat
     #expect(!FileManager.default.fileExists(atPath: try archive.payloadURL(batchID: "batch-received").path))
     #expect(FileManager.default.fileExists(atPath: unrelated.path))
     #expect(try archive.loadReceipts().isEmpty)
+    #expect(try archive.loadWatch().lastReceivedEpoch == nil)
     #expect(try archive.deleteEverythingReceived() == 0)
 }
 
@@ -65,12 +74,18 @@ import WireFormat
     let pipes = CrossedBytePipes()
     let phone = await pipes.left()
     let mac = await pipes.right()
-    let inbound = try CompanionInbound(stream: mac, archive: archive, installationID: "mac")
+    let inbound = try CompanionInbound(
+        stream: mac,
+        archive: archive,
+        installationID: "mac",
+        nowEpoch: { 1_704_067_200 }
+    )
     let serve = Task { try await inbound.serve() }
     let (file, batchID) = try writeInboundPayload()
     let sink = CompanionSink(pipe: ByteStreamCompanionPipe(stream: phone), installationID: "phone", chunkSize: 8)
     let first = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
     #expect(first.accepted == 1)
+    #expect(try archive.loadWatch().lastReceivedEpoch == 1_704_067_200)
     serve.cancel()
 
     let pipes2 = CrossedBytePipes()
@@ -109,6 +124,55 @@ import WireFormat
     ).send(fileHandle: file.path, idempotencyKey: batchID)
     #expect(seen.get() == "phone-1A7B")
     serve.cancel()
+}
+
+@Test func companionQuietWatchFiresAfterThreeDaysAndResetsOnArrival() throws {
+    let waiting = CompanionQuietWatch.evaluate(lastReceivedEpoch: nil, nowEpoch: 100)
+    #expect(waiting == .waitingForFirstTransfer)
+    #expect(CompanionQuietWatch.statusCopy(waiting) == CompanionQuietWatch.waitingCopy)
+
+    let last: TimeInterval = 1_000
+    let stillFresh = CompanionQuietWatch.evaluate(
+        lastReceivedEpoch: last,
+        nowEpoch: last + CompanionQuietWatch.quietAfterSeconds - 1
+    )
+    #expect(stillFresh == .receiving(lastReceivedEpoch: last))
+
+    let quiet = CompanionQuietWatch.evaluate(
+        lastReceivedEpoch: last,
+        nowEpoch: last + CompanionQuietWatch.quietAfterSeconds
+    )
+    #expect(quiet == .quiet(lastReceivedEpoch: last))
+    #expect(CompanionQuietWatch.statusCopy(quiet).contains(CompanionQuietWatch.quietTitle))
+    #expect(!CompanionQuietWatch.statusCopy(quiet).contains("Tributary"))
+
+    var watch = CompanionReceiveWatch(lastReceivedEpoch: last)
+    #expect(
+        CompanionQuietWatch.claimQuietNotice(kind: quiet, nowEpoch: last + CompanionQuietWatch.quietAfterSeconds, watch: &watch)
+    )
+    #expect(
+        !CompanionQuietWatch.claimQuietNotice(
+            kind: quiet,
+            nowEpoch: last + CompanionQuietWatch.quietAfterSeconds + 60,
+            watch: &watch
+        )
+    )
+    #expect(
+        CompanionQuietWatch.claimQuietNotice(
+            kind: quiet,
+            nowEpoch: last + CompanionQuietWatch.quietAfterSeconds + CompanionQuietWatch.noticeRepeatSeconds,
+            watch: &watch
+        )
+    )
+    watch.lastReceivedEpoch = last + CompanionQuietWatch.quietAfterSeconds + CompanionQuietWatch.noticeRepeatSeconds + 10
+    let afterArrival = CompanionQuietWatch.evaluate(
+        lastReceivedEpoch: watch.lastReceivedEpoch,
+        nowEpoch: watch.lastReceivedEpoch!
+    )
+    #expect(afterArrival == .receiving(lastReceivedEpoch: watch.lastReceivedEpoch!))
+    #expect(
+        !CompanionQuietWatch.claimQuietNotice(kind: afterArrival, nowEpoch: watch.lastReceivedEpoch!, watch: &watch)
+    )
 }
 
 @Test func noticeCopyCoversEveryKindWithoutCallSiteProse() {

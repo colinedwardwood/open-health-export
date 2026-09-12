@@ -7,17 +7,34 @@ import NetEgress
 import SinkCompanion
 import SwiftUI
 import AppKit
+import UserNotifications
+import Combine
 
 @main
 struct CompanionApp: App {
+    @ObservedObject private var chrome = CompanionChrome.shared
+
     var body: some Scene {
         WindowGroup {
-            CompanionView()
+            CompanionView(chrome: chrome)
+        }
+        MenuBarExtra(CompanionQuietWatch.menuBarTitle, systemImage: "laptopcomputer") {
+            Text(chrome.watchLine)
+            Button(CompanionQuietWatch.openWindow) {
+                NSApp.activate(ignoringOtherApps: true)
+            }
         }
     }
 }
 
+@MainActor
+final class CompanionChrome: ObservableObject {
+    static let shared = CompanionChrome()
+    @Published var watchLine = CompanionQuietWatch.waitingCopy
+}
+
 struct CompanionView: View {
+    @ObservedObject var chrome: CompanionChrome
     @State private var folder: URL?
     @State private var warning: String?
     @State private var payloadText = ""
@@ -32,6 +49,8 @@ struct CompanionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(status)
+            Text(chrome.watchLine)
+                .font(.footnote)
             if let warning {
                 Text(warning)
                     .foregroundStyle(.orange)
@@ -93,6 +112,10 @@ struct CompanionView: View {
         }
         .padding()
         .frame(minWidth: 480, minHeight: 320)
+        .onAppear { refreshQuietWatch() }
+        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
+            refreshQuietWatch()
+        }
     }
 
     private var acknowledgementsText: String {
@@ -116,6 +139,7 @@ struct CompanionView: View {
         status = warning == nil
             ? "Folder selected. Open a receive window to pair."
             : "Folder selected with a warning. Export is not refused (O-10)."
+        refreshQuietWatch()
     }
 
     @MainActor
@@ -161,6 +185,7 @@ struct CompanionView: View {
             if confirmation.isEmpty {
                 status = "Listening as \(session.serviceName). Advertise only while this window is open."
             }
+            refreshQuietWatch()
             let archive = CompanionArchive(directory: folder)
             let installation = session.localInstallationID
             Task {
@@ -170,6 +195,7 @@ struct CompanionView: View {
                         stream: stream,
                         archive: archive,
                         installationID: installation,
+                        nowEpoch: { Date().timeIntervalSince1970 },
                         onPeerHello: { peer in
                             Task { @MainActor in
                                 guard var current = pairing else { return }
@@ -181,7 +207,10 @@ struct CompanionView: View {
                             }
                         }
                     )
-                    Task { try await inbound.serve() }
+                    Task {
+                        try await inbound.serve()
+                        await MainActor.run { refreshQuietWatch() }
+                    }
                 }
             }
         } catch {
@@ -215,8 +244,45 @@ struct CompanionView: View {
             confirmation = ""
             deleteEverythingArmed = false
             status = "Deleted \(deleted) received archive(s), the receipt ledger, and the stored pairing."
+            refreshQuietWatch()
         } catch {
             status = "Failed: \(error.localizedDescription)"
         }
+    }
+
+    @MainActor
+    private func refreshQuietWatch() {
+        guard let folder else {
+            chrome.watchLine = CompanionQuietWatch.waitingCopy
+            return
+        }
+        let archive = CompanionArchive(directory: folder)
+        var watch = (try? archive.loadWatch()) ?? CompanionReceiveWatch()
+        let now = Date().timeIntervalSince1970
+        let kind = CompanionQuietWatch.evaluate(
+            lastReceivedEpoch: watch.lastReceivedEpoch,
+            nowEpoch: now
+        )
+        chrome.watchLine = CompanionQuietWatch.statusCopy(kind)
+        if CompanionQuietWatch.claimQuietNotice(kind: kind, nowEpoch: now, watch: &watch) {
+            try? archive.saveWatch(watch)
+            Task { await CompanionQuietNotice.post(body: chrome.watchLine) }
+        }
+    }
+}
+
+enum CompanionQuietNotice {
+    static func post(body: String) async {
+        let center = UNUserNotificationCenter.current()
+        _ = try? await center.requestAuthorization(options: [.alert, .sound])
+        let content = UNMutableNotificationContent()
+        content.title = CompanionQuietWatch.quietTitle
+        content.body = body
+        let request = UNNotificationRequest(
+            identifier: CompanionQuietWatch.notificationIdentifier,
+            content: content,
+            trigger: nil
+        )
+        try? await center.add(request)
     }
 }

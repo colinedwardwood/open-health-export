@@ -41,7 +41,22 @@ public struct CompanionArchive: Sendable {
         return try JSONDecoder().decode([String: String].self, from: data)
     }
 
-    public func store(committed: CompanionCommitted) throws {
+    public func loadWatch() throws -> CompanionReceiveWatch {
+        let url = watchURL
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            return CompanionReceiveWatch()
+        }
+        let data = try Data(contentsOf: url)
+        return try JSONDecoder().decode(CompanionReceiveWatch.self, from: data)
+    }
+
+    public func saveWatch(_ watch: CompanionReceiveWatch) throws {
+        try assertWritable()
+        let encoded = try JSONEncoder().encode(watch)
+        try FileWriteKit.writeAtomically(encoded, to: watchURL)
+    }
+
+    public func store(committed: CompanionCommitted, receivedAtEpoch: TimeInterval) throws {
         try assertWritable()
         try BatchPath.validate(committed.batchID)
         let payloadURL = directory.appendingPathComponent("\(committed.batchID).ndjson")
@@ -50,6 +65,9 @@ public struct CompanionArchive: Sendable {
         receipts[committed.batchID] = committed.digest
         let encoded = try JSONEncoder().encode(receipts)
         try FileWriteKit.writeAtomically(encoded, to: receiptsURL)
+        var watch = try loadWatch()
+        watch.lastReceivedEpoch = receivedAtEpoch
+        try saveWatch(watch)
     }
 
     public func payloadURL(batchID: String) throws -> URL {
@@ -71,11 +89,18 @@ public struct CompanionArchive: Sendable {
         if FileManager.default.fileExists(atPath: receiptsURL.path) {
             try FileManager.default.removeItem(at: receiptsURL)
         }
+        if FileManager.default.fileExists(atPath: watchURL.path) {
+            try FileManager.default.removeItem(at: watchURL)
+        }
         return receipts.count
     }
 
     private var receiptsURL: URL {
         directory.appendingPathComponent(".ohe-receipts.json")
+    }
+
+    private var watchURL: URL {
+        directory.appendingPathComponent(".ohe-receive-watch.json")
     }
 }
 
@@ -113,6 +138,7 @@ public actor CompanionInbound {
     private var receiver: CompanionReceiver
     private let archive: CompanionArchive
     private var inbound = Data()
+    private let nowEpoch: @Sendable () -> TimeInterval
 
     private let onPeerHello: (@Sendable (String) -> Void)?
 
@@ -120,12 +146,14 @@ public actor CompanionInbound {
         stream: any ByteStream,
         archive: CompanionArchive,
         installationID: String,
+        nowEpoch: @escaping @Sendable () -> TimeInterval = { 0 },
         onPeerHello: (@Sendable (String) -> Void)? = nil
     ) throws {
         let receipts = try archive.loadReceipts()
         self.stream = stream
         self.receiver = CompanionReceiver(installationID: installationID, receipts: receipts)
         self.archive = archive
+        self.nowEpoch = nowEpoch
         self.onPeerHello = onPeerHello
     }
 
@@ -140,7 +168,7 @@ public actor CompanionInbound {
                     onPeerHello?(peer)
                 }
                 if let committed = turn.committed {
-                    try archive.store(committed: committed)
+                    try archive.store(committed: committed, receivedAtEpoch: nowEpoch())
                 }
                 for reply in turn.replies {
                     try await stream.send(try reply.encodedFrame())

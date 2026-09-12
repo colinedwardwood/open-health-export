@@ -1,0 +1,1 @@
+The Mac companion records last-received time and raises a quiet watch after three days of silence, with a menu-bar extra and a local notification. It does not wait for someone to reopen the window to notice the phone has gone quiet.
