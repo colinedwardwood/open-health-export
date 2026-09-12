@@ -2,6 +2,39 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
+    "Disabled imported drafts": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disabled imported drafts"
+          }
+        }
+      }
+    },
+    "Disabled — destination test required": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disabled — destination test required"
+          }
+        }
+      }
+    },
+    "Discard draft": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discard draft"
+          }
+        }
+      }
+    },
     "Configuration portability": {
       "extractionState": "manual",
       "localizations": {

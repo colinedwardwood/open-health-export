@@ -7,3 +7,6 @@ enable or re-point an existing destination.
 The iOS app now provides a `.tributary` review and typed-confirmation flow
 that persists imports as protected, backup-excluded disabled drafts with
 fresh local identifiers.
+
+Persisted drafts remain visible after relaunch, can be explicitly discarded,
+and are included in destructive wipe coverage.

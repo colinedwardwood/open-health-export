@@ -2058,6 +2058,7 @@ enum HarnessExport {
             "https-destination.json",
             "mqtt-destination.json",
             "mqtt-client.p12",
+            "imported-destination-drafts.json",
             "otlp-destination.json",
             "local-file-test.json",
             "companion-test.json",

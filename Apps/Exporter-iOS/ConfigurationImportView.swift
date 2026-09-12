@@ -10,6 +10,7 @@ struct ConfigurationImportView: View {
     @State private var review: DestinationConfigurationImportReview?
     @State private var confirmation = ""
     @State private var status = ""
+    @State private var drafts: [ImportedDestinationDraftRecord] = []
 
     private let tributaryType = UTType(filenameExtension: "tributary") ?? .json
 
@@ -60,6 +61,29 @@ struct ConfigurationImportView: View {
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("configuration-import-create-drafts")
             }
+            if !drafts.isEmpty {
+                Text("Disabled imported drafts")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                ForEach(drafts, id: \.localIdentifier) { draft in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(draft.configuration.displayName)
+                        Text(
+                            "\(draft.configuration.kind.rawValue): "
+                                + draft.configuration.endpoint
+                        )
+                        .font(.footnote)
+                        Text("Disabled — destination test required")
+                            .font(.footnote)
+                        Button("Discard draft") {
+                            discard(draft.localIdentifier)
+                        }
+                        .accessibilityIdentifier(
+                            "configuration-import-discard-\(draft.localIdentifier)"
+                        )
+                    }
+                }
+            }
             if !status.isEmpty {
                 Text(status)
                     .font(.footnote)
@@ -74,6 +98,7 @@ struct ConfigurationImportView: View {
         ) { result in
             load(result)
         }
+        .onAppear { reloadDrafts() }
     }
 
     private func load(_ result: Result<[URL], any Error>) {
@@ -98,6 +123,7 @@ struct ConfigurationImportView: View {
         do {
             let confirmed = try review.confirm(typedConfirmation: confirmation)
             let count = try ImportedDestinationDraftStore.append(confirmed)
+            reloadDrafts()
             self.review = nil
             confirmation = ""
             status = "\(confirmed.drafts.count) disabled draft(s) created; \(count) total. Add credentials and pass the destination test before enabling each one."
@@ -105,48 +131,88 @@ struct ConfigurationImportView: View {
             status = "Configuration refused: \(error)"
         }
     }
-}
 
-private enum ImportedDestinationDraftStore {
-    private struct Record: Codable {
-        let localIdentifier: String
-        let configuration: PortableDestinationConfiguration
-        let state: String
+    private func reloadDrafts() {
+        do {
+            drafts = try ImportedDestinationDraftStore.load()
+        } catch {
+            drafts = []
+            status = "Stored drafts could not be read: \(error)"
+        }
     }
 
+    private func discard(_ localIdentifier: String) {
+        do {
+            try ImportedDestinationDraftStore.remove(
+                localIdentifier: localIdentifier
+            )
+            reloadDrafts()
+            status = "Disabled draft discarded."
+        } catch {
+            status = "Draft could not be discarded: \(error)"
+        }
+    }
+}
+
+struct ImportedDestinationDraftRecord: Codable, Equatable {
+    let localIdentifier: String
+    let configuration: PortableDestinationConfiguration
+    let state: String
+}
+
+enum ImportedDestinationDraftStore {
     static func append(_ importValue: ConfirmedDestinationConfigurationImport) throws -> Int {
         let file = try fileURL()
-        let existing: [Record]
-        if FileManager.default.fileExists(atPath: file.path) {
-            existing = try JSONDecoder().decode(
-                [Record].self,
-                from: Data(contentsOf: file)
-            )
-        } else {
-            existing = []
-        }
+        let existing = try load()
         let additions = importValue.drafts.map {
-            Record(
+            ImportedDestinationDraftRecord(
                 localIdentifier: UUID().uuidString,
                 configuration: $0.configuration,
                 state: $0.state.rawValue
             )
         }
+        try write(existing + additions, to: file)
+        return existing.count + additions.count
+    }
+
+    static func load() throws -> [ImportedDestinationDraftRecord] {
+        let file = try fileURL()
+        guard FileManager.default.fileExists(atPath: file.path) else {
+            return []
+        }
+        return try JSONDecoder().decode(
+            [ImportedDestinationDraftRecord].self,
+            from: Data(contentsOf: file)
+        )
+    }
+
+    static func remove(localIdentifier: String) throws {
+        let remaining = try load().filter {
+            $0.localIdentifier != localIdentifier
+        }
+        try write(remaining, to: try fileURL())
+    }
+
+    private static func write(
+        _ records: [ImportedDestinationDraftRecord],
+        to file: URL
+    ) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        let data = try encoder.encode(existing + additions)
-        try data.write(
+        try encoder.encode(records).write(
             to: file,
-            options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication]
+            options: [
+                .atomic,
+                .completeFileProtectionUntilFirstUserAuthentication,
+            ]
         )
         var values = URLResourceValues()
         values.isExcludedFromBackup = true
         var mutable = file
         try mutable.setResourceValues(values)
-        return existing.count + additions.count
     }
 
-    private static func fileURL() throws -> URL {
+    static func fileURL() throws -> URL {
         let support = try FileManager.default.url(
             for: .applicationSupportDirectory,
             in: .userDomainMask,
