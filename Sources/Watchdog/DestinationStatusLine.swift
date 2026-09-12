@@ -46,4 +46,9 @@ public enum DestinationStatusLine {
         }
         return errorClass
     }
+
+    /// Compact widget/intent caption: the reason code, which is what a bug report needs.
+    public static func compactFailure(_ snapshot: DestinationStatusSnapshot) -> String? {
+        reasonCode(snapshot)
+    }
 }

@@ -2560,6 +2560,11 @@ private func anchorHoldFixture(
         )
     )
     #expect(failedLine.contains("last success"))
+    #expect(DestinationStatusLine.compactFailure(base) == nil)
+    #expect(
+        DestinationStatusLine.compactFailure(failed)
+            == ErrorClass.destinationUnreachable.rawValue
+    )
 }
 
 @Test func queueAdmissionEvictsOldestBatchesAndRecordsGaps() async throws {

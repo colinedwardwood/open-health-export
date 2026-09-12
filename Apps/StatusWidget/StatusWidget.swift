@@ -91,6 +91,12 @@ struct ExportStatusWidgetView: View {
                     .font(.title3)
                     .bold()
             }
+            if let worst, let reason = DestinationStatusLine.compactFailure(worst) {
+                Text(reason)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
             Spacer()
             if securityEventCount > 0 {
                 Label("\(securityEventCount) change", systemImage: "exclamationmark.shield.fill")
@@ -122,6 +128,12 @@ struct ExportStatusWidgetView: View {
                         Text(Date(timeIntervalSince1970: success), style: .relative)
                     } else {
                         Text(state.label)
+                    }
+                    if let reason = DestinationStatusLine.compactFailure(snapshot) {
+                        Text(reason)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
                     }
                 }
                 .font(.caption)
@@ -161,6 +173,12 @@ struct ExportStatusWidgetView: View {
                 } else {
                     Text("No exports yet")
                         .font(.caption)
+                }
+                if let worst, let reason = DestinationStatusLine.compactFailure(worst) {
+                    Text(reason)
+                        .font(.caption)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
             }
         }

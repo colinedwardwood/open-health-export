@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import AppIntents
+import CoreDomain
 import Foundation
 import Watchdog
 
@@ -40,6 +41,9 @@ struct DestinationStatusEntity: AppEntity {
     @Property(title: "Error class")
     var errorClass: String?
 
+    @Property(title: "Failure reason")
+    var failureReason: String?
+
     var displayRepresentation: DisplayRepresentation {
         DisplayRepresentation(title: "\(label)", subtitle: "\(state)")
     }
@@ -55,6 +59,7 @@ struct DestinationStatusEntity: AppEntity {
         attribution = status.attribution
         attributionConfidence = status.attributionConfidence
         errorClass = status.errorClass
+        failureReason = ErrorClassManifest.userFacingReason(forRaw: status.errorClass)
     }
 }
 
