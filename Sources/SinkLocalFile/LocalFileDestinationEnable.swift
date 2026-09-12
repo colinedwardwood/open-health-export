@@ -13,7 +13,8 @@ public enum LocalFileDestinationEnable {
         directory: URL,
         exporterId: String,
         emittedAt: String,
-        canaryCode: String = "OHE1-FILE"
+        canaryCode: String = "OHE1-FILE",
+        onProgress: DestinationTestProgress? = nil
     ) throws -> (destination: VerifiedDestination, events: [TrustEvent], report: DestinationTestReport) {
         let preview = try NativeWire.encodeCanary(
             code: canaryCode,
@@ -30,7 +31,7 @@ public enum LocalFileDestinationEnable {
         try setup.markCanarySent(code: canaryCode)
         try setup.confirmCanary(canaryCode)
         try setup.pinWithoutTLS()
-        let report = try LocalFileDestinationTest.run(directory: directory)
+        let report = try LocalFileDestinationTest.run(directory: directory, onProgress: onProgress)
         try setup.recordTest(report)
         let verified = try setup.enable(sink: LocalFileSink(directory: directory))
         return (verified, setup.drainEvents(), report)

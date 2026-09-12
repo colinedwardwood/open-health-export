@@ -11,10 +11,13 @@ public enum MQTTDestinationTest {
     public static func run(
         destination: MQTTDestination,
         pipe: any MQTTBytePipe,
-        canary: Data
+        canary: Data,
+        onProgress: DestinationTestProgress? = nil
     ) async -> DestinationTestReport {
+        let total = destination.confirmsDelivery ? 3 : 2
         var steps: [DestinationTestStepReport] = []
         let session = MQTTSession(pipe: pipe)
+        onProgress?(1, total, .connect)
         do {
             try await session.connect(destination: destination)
         } catch {
@@ -22,6 +25,7 @@ public enum MQTTDestinationTest {
         }
         steps.append(DestinationTestStepReport(name: .connect, outcome: .passed))
 
+        onProgress?(2, total, .publishCanary)
         do {
             try await session.publish(
                 topic: try destination.resolvedTopic(batchID: "canary"),
@@ -35,6 +39,7 @@ public enum MQTTDestinationTest {
 
         if destination.confirmsDelivery {
             steps.append(DestinationTestStepReport(name: .publishCanary, outcome: .passed))
+            onProgress?(3, total, .receiveEcho)
             steps.append(DestinationTestStepReport(name: .receiveEcho, outcome: .passed))
             return DestinationTestReport(verdict: .passed, steps: steps)
         }

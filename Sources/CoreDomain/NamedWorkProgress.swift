@@ -23,4 +23,32 @@ public enum NamedWorkProgress {
     public static func reconcile(current: Int, total: Int) -> String {
         "Reconciling \(current) of \(total) types"
     }
+
+    public static func test(current: Int, total: Int, step: String) -> String {
+        "Testing \(current) of \(total) · \(step)"
+    }
+
+    public static func measure(current: Int, total: Int) -> String {
+        "Measuring \(current) of \(total) types"
+    }
+
+    public static func purge(current: Int, total: Int) -> String {
+        "Purging \(current) of \(total) types"
+    }
+
+    public static func reexport(current: Int, total: Int) -> String {
+        "Re-exporting \(current) of \(total) evicted ranges"
+    }
+
+    public static func wipe(current: Int, total: Int) -> String {
+        "Wiping \(current) of \(total) stores"
+    }
+
+    public static func notify(current: Int, total: Int) -> String {
+        "Sending \(current) of \(total) notifications"
+    }
+
+    public static let requestingHealthAccess = "Requesting Health access"
+    public static let verifyingLedger = "Verifying the egress ledger"
+    public static let enablingDestination = "Saving the destination"
 }

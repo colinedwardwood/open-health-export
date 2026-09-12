@@ -17,7 +17,8 @@ public enum CompanionDestinationEnable {
         canaryCode: String = "OHE1-COMP",
         traceparent: TraceparentEmission? = nil,
         meteredPolicy: MeteredNetworkPolicy = .refuseMetered,
-        pathConditions: NetworkPathConditions = .clear
+        pathConditions: NetworkPathConditions = .clear,
+        onProgress: DestinationTestProgress? = nil
     ) async throws -> (
         destination: VerifiedDestination,
         events: [TrustEvent],
@@ -44,7 +45,8 @@ public enum CompanionDestinationEnable {
             pipe: testPipe,
             installationID: installationID,
             canary: preview,
-            batchID: batchID
+            batchID: batchID,
+            onProgress: onProgress
         )
         try setup.recordTest(report)
         let destination = try setup.enable(

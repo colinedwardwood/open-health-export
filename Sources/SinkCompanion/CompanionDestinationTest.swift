@@ -12,10 +12,13 @@ public enum CompanionDestinationTest {
         pipe: any CompanionBytePipe,
         installationID: String,
         canary: Data,
-        batchID: String = "canary"
+        batchID: String = "canary",
+        onProgress: DestinationTestProgress? = nil
     ) async -> DestinationTestReport {
+        let total = 4
         var steps: [DestinationTestStepReport] = []
         let session = CompanionSession(pipe: pipe)
+        onProgress?(1, total, .connect)
         do {
             try await session.send(.hello(
                 protocolVersion: CompanionReceiver.protocolVersion,
@@ -29,6 +32,7 @@ public enum CompanionDestinationTest {
                 return .failed(at: .connect)
             }
             steps.append(DestinationTestStepReport(name: .connect, outcome: .passed))
+            onProgress?(2, total, .confirmCertificate)
             steps.append(DestinationTestStepReport(name: .confirmCertificate, outcome: .passed))
         } catch {
             return .failed(at: .connect)
@@ -41,11 +45,13 @@ public enum CompanionDestinationTest {
             byteCount: UInt64(canary.count),
             digest: digest
         )
+        onProgress?(3, total, .sendCanary)
         do {
             try await session.send(.offer(offer))
             switch try await session.receive() {
             case .receipt(let id, let acked) where id == batchID && acked == digest:
                 steps.append(DestinationTestStepReport(name: .sendCanary, outcome: .passed))
+                onProgress?(4, total, .readResponse)
                 steps.append(DestinationTestStepReport(name: .readResponse, outcome: .passed))
                 return DestinationTestReport(verdict: .passed, steps: steps)
             case .resume(let fromChunk) where fromChunk == 0:
@@ -60,6 +66,7 @@ public enum CompanionDestinationTest {
                     return .failed(at: .readResponse, prior: steps)
                 }
                 steps.append(DestinationTestStepReport(name: .sendCanary, outcome: .passed))
+                onProgress?(4, total, .readResponse)
                 steps.append(DestinationTestStepReport(name: .readResponse, outcome: .passed))
                 return DestinationTestReport(verdict: .passed, steps: steps)
             default:

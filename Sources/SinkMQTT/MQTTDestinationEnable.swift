@@ -27,7 +27,8 @@ public enum MQTTDestinationEnable {
         pinPolicy: PinPolicy = .leaf,
         canaryCode: String = "OHE1-MQTT",
         meteredPolicy: MeteredNetworkPolicy = .refuseMetered,
-        pathConditions: NetworkPathConditions = .clear
+        pathConditions: NetworkPathConditions = .clear,
+        onProgress: DestinationTestProgress? = nil
     ) async throws -> MQTTDestinationProbe {
         let prepared = try await prepare(
             destination: destination,
@@ -38,7 +39,8 @@ public enum MQTTDestinationEnable {
             pinPolicy: pinPolicy,
             canaryCode: canaryCode,
             meteredPolicy: meteredPolicy,
-            pathConditions: pathConditions
+            pathConditions: pathConditions,
+            onProgress: onProgress
         )
         guard prepared.report.allowsEnablement else {
             throw SetupError.verificationRequired
@@ -128,7 +130,8 @@ public enum MQTTDestinationEnable {
         pinPolicy: PinPolicy,
         canaryCode: String,
         meteredPolicy: MeteredNetworkPolicy,
-        pathConditions: NetworkPathConditions
+        pathConditions: NetworkPathConditions,
+        onProgress: DestinationTestProgress?
     ) async throws -> (
         setup: DestinationSetup,
         identity: TLSIdentity?,
@@ -167,7 +170,8 @@ public enum MQTTDestinationEnable {
         let report = await MQTTDestinationTest.run(
             destination: destination,
             pipe: pipe,
-            canary: canary
+            canary: canary,
+            onProgress: onProgress
         )
         try setup.recordTest(report)
         return (setup, observed, canary, report)

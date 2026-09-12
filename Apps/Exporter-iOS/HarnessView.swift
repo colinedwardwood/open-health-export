@@ -1404,7 +1404,7 @@ struct HarnessView: View {
     @MainActor
     private func loadLedger() async {
         phase = .working
-        status = "Working: verifying egress ledger."
+        status = NamedWorkProgress.verifyingLedger
         do {
             ledgerLines = try await HarnessExport.ledgerLines()
             ledgerWarning = ledgerLines.first ?? ""
@@ -1507,7 +1507,7 @@ struct HarnessView: View {
     @MainActor
     private func requestAccess() async {
         phase = .working
-        status = "Working: Health authorisation."
+        status = NamedWorkProgress.requestingHealthAccess
         do {
             let metrics = try await HarnessExport.selectedMetrics()
             guard !metrics.isEmpty else {
@@ -1532,12 +1532,14 @@ struct HarnessView: View {
     @MainActor
     private func runR70() async {
         phase = .working
-        status = "Working: R-70 measurement."
+        status = NamedWorkProgress.measure(current: 0, total: 2)
         results = []
         let context = TemporalContext.utcHost
         let source = HealthKitSampleSource(context: context, limit: 10_000)
         var lines: [String] = []
-        for metric in [MetricCatalog.heartRate.id, MetricCatalog.stepCount.id] {
+        let metrics = [MetricCatalog.heartRate.id, MetricCatalog.stepCount.id]
+        for (index, metric) in metrics.enumerated() {
+            status = NamedWorkProgress.measure(current: index + 1, total: metrics.count)
             do {
                 let sample = try await HealthKitThroughput.measure(source: source, metric: metric)
                 lines.append(
@@ -2160,7 +2162,7 @@ struct HarnessView: View {
     @MainActor
     private func reExportQueueGap(_ gap: GapRecord) async {
         phase = .working
-        status = "Working: re-exporting an evicted date range."
+        status = NamedWorkProgress.reexport(current: 1, total: 1)
         do {
             let outcome = try await HarnessExport.reExportQueueGap(gap)
             await refreshLedgerIntegrity()
@@ -2174,10 +2176,18 @@ struct HarnessView: View {
     @MainActor
     private func enableLocalFile() async {
         phase = .working
-        status = "Working: local-folder destination test."
+        status = NamedWorkProgress.test(current: 0, total: 4, step: DestinationTestStep.openFolder.progressLabel)
         wipeArmed = false
         do {
-            _ = try await HarnessExport.enableLocalFileDestination()
+            _ = try await HarnessExport.enableLocalFileDestination { current, total, step in
+                Task { @MainActor in
+                    status = NamedWorkProgress.test(
+                        current: current,
+                        total: total,
+                        step: step.progressLabel
+                    )
+                }
+            }
             refreshDestinationSurfaces()
             await startHealthObserversIfEligible()
             await refreshLedgerIntegrity()
@@ -2250,7 +2260,7 @@ struct HarnessView: View {
     @MainActor
     private func testHTTPS() async {
         phase = .working
-        status = "Working: HTTPS destination test and identity pin."
+        status = NamedWorkProgress.test(current: 0, total: 6, step: DestinationTestStep.resolveHost.progressLabel)
         do {
             confirmationKind = .https
             confirmationCard = try await HarnessExport.prepareHTTPSDestination(
@@ -2260,7 +2270,15 @@ struct HarnessView: View {
                 importedLocalIdentifier:
                     importedDestinationDraft?.configuration.kind == .https
                         ? importedDestinationDraft?.localIdentifier : nil
-            )
+            ) { current, total, step in
+                Task { @MainActor in
+                    status = NamedWorkProgress.test(
+                        current: current,
+                        total: total,
+                        step: step.progressLabel
+                    )
+                }
+            }
             httpsTestLines = confirmationCard?.lines ?? []
             userFacingError = nil
             status = "Ready. Confirm this server before any Health data moves."
@@ -2276,7 +2294,7 @@ struct HarnessView: View {
     @MainActor
     private func testMQTT() async {
         phase = .working
-        status = "Working: MQTT destination test."
+        status = NamedWorkProgress.test(current: 0, total: 3, step: DestinationTestStep.connect.progressLabel)
         do {
             confirmationKind = .mqtt
             confirmationCard = try await HarnessExport.prepareMQTTDestination(
@@ -2292,7 +2310,15 @@ struct HarnessView: View {
                 importedLocalIdentifier:
                     importedDestinationDraft?.configuration.kind == .mqtt
                         ? importedDestinationDraft?.localIdentifier : nil
-            )
+            ) { current, total, step in
+                Task { @MainActor in
+                    status = NamedWorkProgress.test(
+                        current: current,
+                        total: total,
+                        step: step.progressLabel
+                    )
+                }
+            }
             mqttTestLines = confirmationCard?.lines ?? []
             if mqttQoS == 0 {
                 let error = UserFacingErrorObject.make(
@@ -2318,7 +2344,7 @@ struct HarnessView: View {
     @MainActor
     private func confirmPendingDestination() async {
         phase = .working
-        status = "Working: enabling destination."
+        status = NamedWorkProgress.enablingDestination
         do {
             let activatingDraft = importedDestinationDraft.flatMap { draft in
                 let kind = draft.configuration.kind
@@ -2591,7 +2617,7 @@ struct HarnessView: View {
     @MainActor
     private func stopHeartRate() async {
         phase = .working
-        status = "Working: type purge."
+        status = NamedWorkProgress.purge(current: 1, total: 1)
         do {
             try await HarnessExport.stopExportingHeartRate()
             stopHeartRateArmed = false
@@ -2606,7 +2632,7 @@ struct HarnessView: View {
     @MainActor
     private func wipeDevice() async {
         phase = .working
-        status = "Working: destructive wipe."
+        status = NamedWorkProgress.wipe(current: 1, total: 1)
         do {
             try await HarnessExport.wipeEverything()
             wipeArmed = false
@@ -2642,7 +2668,7 @@ struct HarnessView: View {
     @MainActor
     private func sendSampleNotice() async {
         phase = .working
-        status = "Working: local notification."
+        status = NamedWorkProgress.notify(current: 1, total: 1)
         do {
             let delivery = try await LocalUserNotifier().notify(
                 UserNotice(kind: .destinationEnabled, destination: "local-file")

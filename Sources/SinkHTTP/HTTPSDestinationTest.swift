@@ -17,14 +17,18 @@ public enum HTTPSDestinationTest {
         canary: Data,
         observedAt: String = "1970-01-01T00:00:00Z",
         entityURL: URL? = nil,
-        expected: MetricDeclaration? = nil
+        expected: MetricDeclaration? = nil,
+        onProgress: DestinationTestProgress? = nil
     ) async -> DestinationTestReport {
+        let total = pin == nil ? 5 : 6
         var steps: [DestinationTestStepReport] = []
+        onProgress?(1, total, .resolveHost)
         guard let host = destination.url.host, !host.isEmpty else {
             return .failed(at: .resolveHost)
         }
         steps.append(DestinationTestStepReport(name: .resolveHost, outcome: .passed, detail: host))
 
+        onProgress?(2, total, .tlsHandshake)
         let identity: TLSIdentity?
         do {
             identity = try await transport.identityProbe()
@@ -37,6 +41,7 @@ public enum HTTPSDestinationTest {
         steps.append(DestinationTestStepReport(name: .tlsHandshake, outcome: .passed))
 
         if let pin {
+            onProgress?(3, total, .confirmCertificate)
             switch PinGate.evaluate(observed: identity, stored: pin, policy: pin.policy, observedAt: observedAt) {
             case .matched, .noTLS:
                 steps.append(DestinationTestStepReport(name: .confirmCertificate, outcome: .passed))
@@ -63,6 +68,8 @@ public enum HTTPSDestinationTest {
             body: Data()
         )
         let previewText = String(decoding: preview, as: UTF8.self)
+        let authenticateIndex = pin == nil ? 3 : 4
+        onProgress?(authenticateIndex, total, .authenticate)
         guard !previewText.contains(destination.authorizationBearer ?? "\u{0}") || destination.authorizationBearer == nil else {
             return .failed(at: .authenticate, prior: steps)
         }
@@ -84,10 +91,12 @@ public enum HTTPSDestinationTest {
             return .failed(at: .authenticate, prior: steps)
         }
         steps.append(DestinationTestStepReport(name: .authenticate, outcome: .passed))
+        onProgress?(authenticateIndex + 1, total, .sendCanary)
         guard (200..<300).contains(post.status) else {
             return .failed(at: .sendCanary, prior: steps)
         }
         steps.append(DestinationTestStepReport(name: .sendCanary, outcome: .passed))
+        onProgress?(authenticateIndex + 2, total, .readResponse)
         steps.append(DestinationTestStepReport(name: .readResponse, outcome: .passed))
 
         if let entityURL, let expected {

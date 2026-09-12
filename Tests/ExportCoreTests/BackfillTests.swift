@@ -4,6 +4,7 @@
 import CoreDomain
 import CoreTemporal
 import CorrectnessEngine
+import DestinationTrust
 import Foundation
 import StorageSQLite
 import TestSupport
@@ -241,11 +242,23 @@ private func backfillCheckpoint(
         == "Archive month 1 of 3 · type 2 of 4")
     #expect(NamedWorkProgress.reconcile(current: 2, total: 5) == "Reconciling 2 of 5 types")
     #expect(NamedWorkProgress.types(current: 3, total: 12) == "Reading 3 of 12 types")
+    #expect(NamedWorkProgress.test(current: 2, total: 4, step: "TLS") == "Testing 2 of 4 · TLS")
+    #expect(NamedWorkProgress.measure(current: 1, total: 2) == "Measuring 1 of 2 types")
+    #expect(DestinationTestStep.resolveHost.progressLabel == "Resolve")
+    #expect(DestinationTestStep.sendCanary.progressLabel == "Send")
 
     let root = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
+    let view = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
+        encoding: .utf8
+    )
+    #expect(!view.contains("Working:"))
+    #expect(view.contains("NamedWorkProgress.test("))
+    #expect(view.contains("NamedWorkProgress.measure("))
+
     let harness = try String(
         contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift"),
         encoding: .utf8

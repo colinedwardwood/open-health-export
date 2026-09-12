@@ -45,6 +45,24 @@ public struct DestinationTestStepReport: Sendable, Equatable, Codable {
     }
 }
 
+extension DestinationTestStep {
+    /// UX-09 named steps: Resolve / TLS / Authenticate / Send / Confirm, plus folder/connect.
+    public var progressLabel: String {
+        switch self {
+        case .resolveHost: "Resolve"
+        case .tlsHandshake, .confirmCertificate: "TLS"
+        case .authenticate: "Authenticate"
+        case .sendCanary, .writeCanary, .publishCanary: "Send"
+        case .readResponse, .readBack, .confirmBytes, .receiveEcho: "Confirm"
+        case .openFolder: "Open folder"
+        case .connect: "Connect"
+        case .subscribe: "Subscribe"
+        }
+    }
+}
+
+public typealias DestinationTestProgress = @Sendable (Int, Int, DestinationTestStep) -> Void
+
 public struct DestinationTestReport: Sendable, Equatable, Codable {
     public var verdict: DestinationTestVerdict
     public var steps: [DestinationTestStepReport]

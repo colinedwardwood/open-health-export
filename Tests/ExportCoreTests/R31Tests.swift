@@ -90,8 +90,20 @@ func sampleIdentity(leaf: String, issuer: String = "issuer00") -> TLSIdentity {
     let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-dest-test-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    let report = try LocalFileDestinationTest.run(directory: directory, canary: Data("canary-bytes\n".utf8))
+    final class Recorded: @unchecked Sendable {
+        var steps: [(Int, Int, DestinationTestStep)] = []
+    }
+    let recorded = Recorded()
+    let report = try LocalFileDestinationTest.run(
+        directory: directory,
+        canary: Data("canary-bytes\n".utf8)
+    ) { current, total, step in
+        recorded.steps.append((current, total, step))
+    }
     #expect(report.verdict == .passed)
+    #expect(recorded.steps.map(\.2) == [.openFolder, .writeCanary, .readBack, .confirmBytes])
+    #expect(recorded.steps.map(\.0) == [1, 2, 3, 4])
+    #expect(Set(recorded.steps.map(\.1)) == [4])
     #expect(report.failingStep == nil)
     #expect(try Data(contentsOf: directory.appendingPathComponent("ohe-canary.ndjson")) == Data("canary-bytes\n".utf8))
     let missing = try LocalFileDestinationTest.run(

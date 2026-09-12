@@ -25,7 +25,8 @@ public enum HTTPSDestinationEnable {
         pinPolicy: PinPolicy = .leaf,
         canaryCode: String = "OHE1-HTTPS",
         meteredPolicy: MeteredNetworkPolicy = .refuseMetered,
-        pathConditions: NetworkPathConditions = .clear
+        pathConditions: NetworkPathConditions = .clear,
+        onProgress: DestinationTestProgress? = nil
     ) async throws -> HTTPSDestinationProbe {
         let prepared = try await prepare(
             destination: destination,
@@ -35,7 +36,8 @@ public enum HTTPSDestinationEnable {
             pinPolicy: pinPolicy,
             canaryCode: canaryCode,
             meteredPolicy: meteredPolicy,
-            pathConditions: pathConditions
+            pathConditions: pathConditions,
+            onProgress: onProgress
         )
         guard prepared.report.allowsEnablement else {
             throw SetupError.verificationRequired
@@ -118,7 +120,8 @@ public enum HTTPSDestinationEnable {
         pinPolicy: PinPolicy,
         canaryCode: String,
         meteredPolicy: MeteredNetworkPolicy,
-        pathConditions: NetworkPathConditions
+        pathConditions: NetworkPathConditions,
+        onProgress: DestinationTestProgress?
     ) async throws -> (
         setup: DestinationSetup,
         identity: TLSIdentity?,
@@ -166,7 +169,8 @@ public enum HTTPSDestinationEnable {
             transport: delivery,
             pin: setup.pin,
             canary: canary,
-            observedAt: emittedAt
+            observedAt: emittedAt,
+            onProgress: onProgress
         )
         try setup.recordTest(report)
         return (setup, identity, canary, report)

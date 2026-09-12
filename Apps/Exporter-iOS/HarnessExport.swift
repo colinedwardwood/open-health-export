@@ -1610,7 +1610,8 @@ enum HarnessExport {
         urlString: String,
         allowInsecureHTTP: Bool,
         bearer: String?,
-        importedLocalIdentifier: String? = nil
+        importedLocalIdentifier: String? = nil,
+        onProgress: DestinationTestProgress? = nil
     ) async throws -> DestinationConfirmationCard {
         guard let host = URL(string: urlString)?.host?.lowercased(), !host.isEmpty else {
             throw EgressError.invalidURL
@@ -1635,7 +1636,8 @@ enum HarnessExport {
                 exporterID: try installationID(),
                 emittedAt: now,
                 meteredPolicy: .fromAllowsMetered(allowsMeteredNetwork(destinationID: "https")),
-                pathConditions: networkPathConditions()
+                pathConditions: networkPathConditions(),
+                onProgress: onProgress
             )
         }
         await PendingDestination.shared.setHTTPS(PendingHTTPS(
@@ -1738,7 +1740,8 @@ enum HarnessExport {
         username: String? = nil,
         password: String? = nil,
         qos: UInt8 = 1,
-        importedLocalIdentifier: String? = nil
+        importedLocalIdentifier: String? = nil,
+        onProgress: DestinationTestProgress? = nil
     ) async throws -> DestinationConfirmationCard {
         guard let host = URL(string: urlString)?.host?.lowercased(), !host.isEmpty else {
             throw EgressError.invalidURL
@@ -1766,7 +1769,8 @@ enum HarnessExport {
             exporterID: try installationID(),
             emittedAt: now,
             meteredPolicy: .fromAllowsMetered(allowsMeteredNetwork(destinationID: "mqtt")),
-            pathConditions: networkPathConditions()
+            pathConditions: networkPathConditions(),
+            onProgress: onProgress
         )
         await PendingDestination.shared.setMQTT(PendingMQTT(
             probe: probe,
@@ -2162,12 +2166,18 @@ enum HarnessExport {
         return lines
     }
 
-    static func enableLocalFileDestination() async throws -> [String] {
+    static func enableLocalFileDestination(
+        onProgress: DestinationTestProgress? = nil
+    ) async throws -> [String] {
         try ExportScopeGate.requireConfigured(try await destinationScope("local-file"))
         let root = try applicationSupportRoot()
         let dest = try protectedPayloadDirectory(named: "exports", under: root)
         try? FileManager.default.removeItem(at: localFileTestReportURL(root: root))
-        let (_, events) = try verifiedLocalFile(root: root, destinationDirectory: dest)
+        let (_, events) = try verifiedLocalFile(
+            root: root,
+            destinationDirectory: dest,
+            onProgress: onProgress
+        )
         try await emitTrustNotices(events)
         try await requestScopeAuthorizationIfConfigured("local-file")
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
@@ -2699,7 +2709,8 @@ enum HarnessExport {
 
     private static func verifiedLocalFile(
         root: URL,
-        destinationDirectory: URL
+        destinationDirectory: URL,
+        onProgress: DestinationTestProgress? = nil
     ) throws -> (VerifiedDestination, [TrustEvent]) {
         let reportURL = localFileTestReportURL(root: root)
         if let saved = try? Data(contentsOf: reportURL),
@@ -2716,7 +2727,8 @@ enum HarnessExport {
         let completed = try LocalFileDestinationEnable.complete(
             directory: destinationDirectory,
             exporterId: try installationID(),
-            emittedAt: Date().ISO8601Format()
+            emittedAt: Date().ISO8601Format(),
+            onProgress: onProgress
         )
         try JSONEncoder().encode(completed.report).write(to: reportURL, options: .atomic)
         if let snapshotURL = StatusSnapshotLocation.url(destinationID: "local-file") {
