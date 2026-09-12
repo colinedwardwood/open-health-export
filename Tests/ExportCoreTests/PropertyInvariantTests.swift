@@ -898,7 +898,16 @@ private struct QA19Counterexample: Decodable {
     var expected: String
 }
 
-@Test func qa19CommittedCounterexamplesRemainExecutableFixedSeedRegressions() throws {
+private func qa19TestSource(at tests: URL) throws -> String {
+    var source = ""
+    let enumerator = FileManager.default.enumerator(at: tests, includingPropertiesForKeys: nil)
+    for case let file as URL in enumerator! where file.pathExtension == "swift" {
+        source += try String(contentsOf: file, encoding: .utf8)
+    }
+    return source
+}
+
+@Test func qa19CommittedCounterexamplesRemainExecutableFixedSeedRegressions() async throws {
     let tests = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repository = tests.deletingLastPathComponent().deletingLastPathComponent()
     let manifestURL = repository.appendingPathComponent(
@@ -912,11 +921,7 @@ private struct QA19Counterexample: Decodable {
     #expect(!manifest.cases.isEmpty)
     #expect(Set(manifest.cases.map(\.id)).count == manifest.cases.count)
 
-    var testSource = ""
-    let enumerator = FileManager.default.enumerator(at: tests, includingPropertiesForKeys: nil)
-    for case let file as URL in enumerator! where file.pathExtension == "swift" {
-        testSource += try String(contentsOf: file, encoding: .utf8)
-    }
+    let testSource = try qa19TestSource(at: tests)
     for counterexample in manifest.cases {
         #expect(counterexample.id.hasPrefix("FIX-"), "\(counterexample.id) lacks a FIX-* ID")
         #expect((1 ... 16).contains(counterexample.property), "\(counterexample.id) has invalid P-number")
@@ -927,7 +932,21 @@ private struct QA19Counterexample: Decodable {
             testSource.contains("func \(counterexample.regressionTest)("),
             "\(counterexample.id) regression \(counterexample.regressionTest) is missing"
         )
-        _ = counterexample.seed
-        _ = counterexample.faultSchedule
+#if DEBUG
+        switch counterexample.id {
+        case "FIX-QA19-001":
+            let schedule = counterexample.faultSchedule.compactMap(ExportFaultLocation.init(rawValue:))
+            #expect(
+                schedule.count == counterexample.faultSchedule.count,
+                "\(counterexample.id) contains an unknown fault seam"
+            )
+            try await replayP4KillResumeCounterexample(
+                seed: counterexample.seed,
+                faultSchedule: schedule
+            )
+        default:
+            Issue.record("\(counterexample.id) has no executable counterexample replay")
+        }
+#endif
     }
 }

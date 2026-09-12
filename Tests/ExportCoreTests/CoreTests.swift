@@ -1725,11 +1725,22 @@ private struct OneExportFault: ExportFaultInjector {
 }
 
 @Test func p4NoDuplicationAfterKillResumeAtEveryDeliverySeam() async throws {
+    try await replayP4KillResumeCounterexample(
+        seed: 83,
+        faultSchedule: ExportFaultLocation.allCases
+    )
+}
+
+func replayP4KillResumeCounterexample(
+    seed: UInt64,
+    faultSchedule: [ExportFaultLocation]
+) async throws {
     let beforeCommit: Set<ExportFaultLocation> = [.afterRead, .afterTransform, .duringAnchorPersist]
-    for location in ExportFaultLocation.allCases {
+    let uuid = String(format: "f0000000-0000-4000-8000-%012llx", seed)
+    for location in faultSchedule {
         let metric = MetricID(rawValue: "heartRate")
         let page = SamplePage(
-            samples: [heartSample("f0000000-0000-0000-0000-000000000001")],
+            samples: [heartSample(uuid)],
             tombstones: [],
             metric: metric,
             anchorBlob: Data([0xF0]),
@@ -1763,7 +1774,7 @@ private struct OneExportFault: ExportFaultInjector {
             #expect(pending.isEmpty, "batch survived rollback at \(location.rawValue)")
             #expect(
                 try await store.transact {
-                    try $0.loadEmittedIndex(uuid: "f0000000-0000-0000-0000-000000000001")
+                    try $0.loadEmittedIndex(uuid: uuid)
                 } == nil,
                 "emitted_index survived rollback at \(location.rawValue)"
             )
@@ -1772,7 +1783,7 @@ private struct OneExportFault: ExportFaultInjector {
             #expect(pending.count == 1, "batch was not replayable at \(location.rawValue)")
             #expect(
                 try await store.transact {
-                    try $0.loadEmittedIndex(uuid: "f0000000-0000-0000-0000-000000000001")
+                    try $0.loadEmittedIndex(uuid: uuid)
                 } != nil,
                 "emitted_index missing after commit at \(location.rawValue)"
             )
