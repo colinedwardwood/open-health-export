@@ -54,9 +54,18 @@ public struct DemoSampleSource: SampleSource, Sendable {
     }
 }
 
-public enum DemoExportError: Error, Equatable {
+public enum DemoExportError: Error, Equatable, LocalizedError {
     case confirmationRequired
     case confirmationMismatch
+
+    public var errorDescription: String? {
+        switch self {
+        case .confirmationRequired:
+            "Type the destination name to send demo data."
+        case .confirmationMismatch:
+            "The typed destination name did not match."
+        }
+    }
 }
 
 public enum DemoExportGate {

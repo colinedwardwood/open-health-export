@@ -3,8 +3,12 @@
 
 import Foundation
 
-public enum DestinationScopeError: Error, Equatable {
+public enum DestinationScopeError: Error, Equatable, LocalizedError {
     case invalidDateRange
+
+    public var errorDescription: String? {
+        "The export date range is invalid."
+    }
 }
 
 /// SEC-16: the complete health-data grant for one destination. Absence is deny, not

@@ -475,7 +475,7 @@ public protocol BoundedDayObservationSource: DayObservationSource {
 }
 
 /// Classified destination failure. Call sites must not invent a `RunOutcome`.
-public enum DestinationSendError: Error, Sendable, Equatable {
+public enum DestinationSendError: Error, Sendable, Equatable, LocalizedError {
     case localNetworkDenied
     case destinationUnreachable
     case cancelledBySystem
@@ -492,6 +492,11 @@ public enum DestinationSendError: Error, Sendable, Equatable {
         case .deviceLocked: .deviceLocked
         case .internalFault: .internalFault
         }
+    }
+
+    public var errorDescription: String? {
+        let copy = ErrorClassManifest.record(for: errorClass).userFacingCopy
+        return copy.isEmpty ? nil : copy
     }
 }
 
@@ -557,7 +562,7 @@ public struct SecretHandle: Hashable, Sendable, Codable {
     public init(rawValue: String) { self.rawValue = rawValue }
 }
 
-public enum SecretStoreError: Error, Equatable {
+public enum SecretStoreError: Error, Equatable, LocalizedError {
     case notFound
     case emptyHandle
     case emptySecret
@@ -565,6 +570,15 @@ public enum SecretStoreError: Error, Equatable {
     /// host is unsigned (`errSecMissingEntitlement`). Callers must not treat this
     /// as a missing item.
     case unavailable
+
+    public var errorDescription: String? {
+        switch self {
+        case .notFound, .emptyHandle, .emptySecret:
+            "The saved credential was not found."
+        case .unavailable:
+            "Saved credentials are unavailable on this device."
+        }
+    }
 }
 
 /// PSK and similar material. Implementations must not synchronise via iCloud (R-33).

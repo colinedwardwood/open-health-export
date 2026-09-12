@@ -17,7 +17,7 @@ public enum PortableCredentialDisposition: String, Sendable, Codable {
     case omitted
 }
 
-public enum DestinationConfigurationPortabilityError: Error, Sendable, Equatable {
+public enum DestinationConfigurationPortabilityError: Error, Sendable, Equatable, LocalizedError {
     case emptyIdentifier
     case emptyDisplayName
     case emptyEndpoint
@@ -29,6 +29,31 @@ public enum DestinationConfigurationPortabilityError: Error, Sendable, Equatable
     case confirmationMismatch
     case invalidScopeDateRange
     case unsupportedDestinationKind(PortableDestinationKind)
+
+    public var errorDescription: String? {
+        switch self {
+        case .emptyIdentifier:
+            "The destination identifier is empty."
+        case .emptyDisplayName:
+            "The destination name is empty."
+        case .emptyEndpoint:
+            "The destination address is empty."
+        case .unsupportedSchemaVersion:
+            "This configuration file uses a schema version this app does not support."
+        case .duplicateIdentifier:
+            "The configuration file lists the same destination twice."
+        case .unsupportedField, .unsupportedSetting:
+            "The configuration file contains a field or setting this app does not import."
+        case .credentialsInEndpoint:
+            "The destination address includes credentials. Remove them and add credentials in the app."
+        case .confirmationMismatch:
+            "The import confirmation phrase did not match."
+        case .invalidScopeDateRange:
+            "The export date range is invalid."
+        case .unsupportedDestinationKind:
+            "This destination kind does not have a setup path."
+        }
+    }
 }
 
 public struct PortableDestinationExportScope: Sendable, Codable, Equatable {

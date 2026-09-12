@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import Foundation
+
 public enum PinPolicy: String, Sendable, Equatable {
     case leaf
     case issuer
@@ -27,9 +29,18 @@ public enum PinOutcome: Sendable, Equatable {
     case noTLS
 }
 
-public enum PinError: Error, Equatable {
+public enum PinError: Error, Equatable, LocalizedError {
     case mismatch
     case notPinned
+
+    public var errorDescription: String? {
+        switch self {
+        case .mismatch:
+            "The destination identity changed. Export stopped before sending data."
+        case .notPinned:
+            "The destination is not pinned yet."
+        }
+    }
 }
 
 public enum PinGate {

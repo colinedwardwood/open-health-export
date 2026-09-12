@@ -46,7 +46,7 @@ public extension HTTPTransport {
     func applyingPin(_ pin: PinRecord) -> any HTTPTransport { self }
 }
 
-public enum EgressError: Error, Equatable {
+public enum EgressError: Error, Equatable, LocalizedError {
     case invalidURL
     case credentialsInURL
     case forbiddenScheme(String)
@@ -57,6 +57,29 @@ public enum EgressError: Error, Equatable {
     case httpRetryAfter(status: Int, seconds: TimeInterval)
     case transport(String)
     case pinMismatch
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidURL:
+            "The destination address is not a valid URL."
+        case .credentialsInURL:
+            "The destination address includes credentials. Remove them and add credentials in the app."
+        case .forbiddenScheme:
+            "That destination URL scheme is not supported."
+        case .insecureHTTP:
+            "Plain HTTP is off for this destination."
+        case .notAllowlisted:
+            "That destination host is not on the allowlist."
+        case .notHTTP:
+            "That destination is not an HTTP endpoint."
+        case .httpStatus, .httpRetryAfter:
+            "The destination returned an HTTP error."
+        case .transport:
+            "The destination transport failed."
+        case .pinMismatch:
+            "The destination identity changed. Export stopped before sending data."
+        }
+    }
 }
 
 /// RFC 9110 `Retry-After`: delta-seconds or HTTP-date, capped at 24 hours.

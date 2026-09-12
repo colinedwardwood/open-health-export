@@ -139,7 +139,7 @@ struct ConfigurationImportView: View {
             status = "Review every endpoint and metric grant before importing."
         } catch {
             review = nil
-            status = "Configuration refused: \(error)"
+            status = "Configuration refused: \(error.localizedDescription)"
         }
     }
 
@@ -152,7 +152,7 @@ struct ConfigurationImportView: View {
             confirmation = ""
             status = "\(confirmed.drafts.count) disabled draft(s) created; \(count) total. Add credentials and pass the destination test before enabling each one."
         } catch {
-            status = "Configuration refused: \(error)"
+            status = "Configuration refused: \(error.localizedDescription)"
         }
     }
 
@@ -161,7 +161,7 @@ struct ConfigurationImportView: View {
             drafts = try ImportedDestinationDraftStore.load()
         } catch {
             drafts = []
-            status = "Stored drafts could not be read: \(error)"
+            status = "Stored drafts could not be read: \(error.localizedDescription)"
         }
     }
 
@@ -173,7 +173,7 @@ struct ConfigurationImportView: View {
             reloadDrafts()
             status = "Disabled draft discarded."
         } catch {
-            status = "Draft could not be discarded: \(error)"
+            status = "Draft could not be discarded: \(error.localizedDescription)"
         }
     }
 }

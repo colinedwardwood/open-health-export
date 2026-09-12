@@ -1871,7 +1871,7 @@ struct HarnessView: View {
                 draft.configuration
             )
         } catch {
-            status = "Import refused: \(error)."
+            status = "Import refused: \(error.localizedDescription)"
             return
         }
         let slot = inputs.slotIdentifier

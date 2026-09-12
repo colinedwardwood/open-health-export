@@ -15,11 +15,24 @@ public enum DestinationState: String, Sendable, Equatable {
     case halted
 }
 
-public enum SetupError: Error, Equatable {
+public enum SetupError: Error, Equatable, LocalizedError {
     case illegalTransition(from: DestinationState, to: DestinationState)
     case canaryMismatch
     case notEnabled
     case verificationRequired
+
+    public var errorDescription: String? {
+        switch self {
+        case .illegalTransition:
+            "That destination setup step is not valid from the current state."
+        case .canaryMismatch:
+            "The confirmation code did not match."
+        case .notEnabled:
+            "The destination is not enabled."
+        case .verificationRequired:
+            "The destination test must pass before enablement."
+        }
+    }
 }
 
 /// R-40: trust changes the user must be told about. Accumulated by the transitions

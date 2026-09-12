@@ -4,13 +4,20 @@
 import Foundation
 import WireFormat
 
-public enum PairingError: Error, Equatable {
+public enum PairingError: Error, Equatable, LocalizedError {
     case secretLength
     case payloadVersion
     case payloadShape
     case emptyField
     case fieldTooLong
     case base64
+
+    public var errorDescription: String? {
+        switch self {
+        case .secretLength, .payloadVersion, .payloadShape, .emptyField, .fieldTooLong, .base64:
+            "This pairing code is not valid."
+        }
+    }
 }
 
 /// Pre-shared 32-byte key material for the companion TLS-PSK handshake.
