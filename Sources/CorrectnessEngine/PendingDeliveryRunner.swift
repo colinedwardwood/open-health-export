@@ -36,6 +36,12 @@ public struct PendingDeliveryRunner: Sendable {
     public func runOnce() async throws -> [DeliveryReceipt] {
         let batches = try await store.transact { try $0.pendingBatches() }
         guard let batch = batches.first else { return [] }
+        return try await HTTPTransferSchedule.$current.withValue(.discretionaryRetry) {
+            try await sendOnce(batch: batch)
+        }
+    }
+
+    private func sendOnce(batch: PendingBatch) async throws -> [DeliveryReceipt] {
         #if DEBUG
         let receipt = try await DeliveryExecutor.send(
             batch: batch,

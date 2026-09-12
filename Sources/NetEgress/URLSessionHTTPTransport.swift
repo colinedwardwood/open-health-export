@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import EnginePorts
 import Foundation
 #if canImport(FoundationNetworking)
 import FoundationNetworking
@@ -11,20 +12,31 @@ import Security
 
 /// The only type in ExportCore allowed to talk to `URLSession` (R-32).
 public final class URLSessionHTTPTransport: HTTPTransport, @unchecked Sendable {
+    public enum Role: Sendable {
+        /// Health export payloads (HK-18).
+        case exportPayload
+        /// OTLP, probes, and tests that must not join the payload background session.
+        case auxiliary
+    }
+
     private let session: URLSession
     private let delegate: HTTPSessionDelegate
     private let resolver: any AddressResolver
+    private let pin: PinRecord?
+    private let role: Role
 
     public init(
         pin: PinRecord? = nil,
-        resolver: any AddressResolver = SystemAddressResolver()
+        resolver: any AddressResolver = SystemAddressResolver(),
+        role: Role = .auxiliary
     ) {
         let delegate = HTTPSessionDelegate(pin: pin, resolver: resolver)
         self.delegate = delegate
         self.resolver = resolver
-        let configuration = URLSessionConfiguration.ephemeral
+        self.pin = pin
+        self.role = role
         session = URLSession(
-            configuration: configuration,
+            configuration: .ephemeral,
             delegate: delegate,
             delegateQueue: nil
         )
@@ -40,6 +52,12 @@ public final class URLSessionHTTPTransport: HTTPTransport, @unchecked Sendable {
             bytes: bodyBytes
         )
         let connectionURL = try await connectTimeURL(for: request.url)
+        guard FileManager.default.isReadableFile(atPath: request.bodyFile.path) else {
+            throw CocoaError(.fileReadNoSuchFile)
+        }
+        if let pin, let host = request.url.host {
+            HTTPBackgroundSession.storePin(pin, host: host)
+        }
         var urlRequest = URLRequest(url: connectionURL)
         urlRequest.timeoutInterval = 30
         urlRequest.httpMethod = request.method
@@ -53,8 +71,8 @@ public final class URLSessionHTTPTransport: HTTPTransport, @unchecked Sendable {
                 forHTTPHeaderField: "Host"
             )
         }
-        urlRequest.httpBody = try Data(contentsOf: request.bodyFile)
-        let (data, response) = try await session.data(for: urlRequest)
+        let session = payloadSessionIfNeeded()
+        let (data, response) = try await session.upload(for: urlRequest, fromFile: request.bodyFile)
         guard let http = response as? HTTPURLResponse else {
             throw EgressError.notHTTP
         }
@@ -68,7 +86,20 @@ public final class URLSessionHTTPTransport: HTTPTransport, @unchecked Sendable {
     }
 
     public func applyingPin(_ pin: PinRecord) -> any HTTPTransport {
-        URLSessionHTTPTransport(pin: pin, resolver: resolver)
+        URLSessionHTTPTransport(pin: pin, resolver: resolver, role: role)
+    }
+
+    private func payloadSessionIfNeeded() -> URLSession {
+        guard role == .exportPayload else { return session }
+        #if os(iOS)
+        return HTTPBackgroundSession.payloadSession(
+            schedule: HTTPTransferSchedule.current,
+            pin: pin,
+            resolver: resolver
+        )
+        #else
+        return session
+        #endif
     }
 
     /// Plain HTTP is a local-network-only opt-in. Resolve and pin its numeric address before
@@ -158,7 +189,7 @@ final class HTTPSessionDelegate: NSObject, URLSessionDelegate, URLSessionTaskDel
             completionHandler(.performDefaultHandling, nil)
             return
         }
-        if let pin {
+        if let pin = HTTPBackgroundSession.pin(for: host) ?? pin {
             do {
                 try PinGate.requireMatch(observed: identity, stored: pin)
                 completionHandler(.useCredential, URLCredential(trust: trust))
@@ -172,11 +203,17 @@ final class HTTPSessionDelegate: NSObject, URLSessionDelegate, URLSessionTaskDel
         completionHandler(.performDefaultHandling, nil)
         #endif
     }
+
+    #if os(iOS)
+    func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
+        HTTPBackgroundSession.completeEvents(for: session)
+    }
+    #endif
 }
 
 public enum SystemHTTPTransport {
     public static func make() -> any HTTPTransport {
-        URLSessionHTTPTransport()
+        URLSessionHTTPTransport(role: .exportPayload)
     }
 
     public static func make(
@@ -192,7 +229,7 @@ public enum SystemHTTPTransport {
             allowInsecure: allowInsecureHTTP
         )
         return IdentityProbingHTTPTransport(
-            http: URLSessionHTTPTransport(pin: pin),
+            http: URLSessionHTTPTransport(pin: pin, role: .exportPayload),
             endpoint: endpoint
         )
         #else
@@ -201,7 +238,7 @@ public enum SystemHTTPTransport {
             allowedHosts: allowedHosts,
             allowInsecureHTTP: allowInsecureHTTP
         )
-        return URLSessionHTTPTransport(pin: pin)
+        return URLSessionHTTPTransport(pin: pin, role: .exportPayload)
         #endif
     }
 }
@@ -216,7 +253,7 @@ private struct IdentityProbingHTTPTransport: HTTPTransport {
     }
 
     func applyingPin(_ pin: PinRecord) -> any HTTPTransport {
-        IdentityProbingHTTPTransport(http: URLSessionHTTPTransport(pin: pin), endpoint: endpoint)
+        IdentityProbingHTTPTransport(http: URLSessionHTTPTransport(pin: pin, role: .exportPayload), endpoint: endpoint)
     }
 
     func identityProbe() async throws -> TLSIdentity? {

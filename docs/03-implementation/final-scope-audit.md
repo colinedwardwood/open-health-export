@@ -9,6 +9,7 @@ This file separates repository-complete engineering work from evidence that cann
 - Health destinations default to zero selected types; type and date scopes are canonical state and are checked before enablement and export (SEC-16, R-62).
 - HealthKit characteristics are in the selectable catalogue, off in Core Daily and bulk-select, flagged as re-identifying, and read on demand outside the anchored delta pipeline (HK-30).
 - Destination tests, pinning, connect-time address-class checks, typed public-address confirmation, and explicit MQTT QoS/LWT exclusions are enforced on real transport paths (R-25, R-31, R-32, SEC-09–SEC-15).
+- HTTPS export payloads upload from a file handle. On iOS they use a background URLSession so the transfer can outlive suspension; later-wake retries are discretionary (HK-18, ADR-R5). Device terminate-and-relaunch evidence remains a later gate.
 - The optional foreground privacy gate fails closed without entering background export or delivery paths; stored credentials have no reveal path (SEC-29, SEC-65).
 - Managed state uses the Class C Data Protection floor, payload directories use Class B, SQLite opens with its explicit protection flag, and managed storage is excluded from backup (SEC-30, SEC-32, ADR-0002).
 - Destructive wipe covers every app credential service, pairing and signing identities, queued/delivered managed payloads, destination sidecars, logs, snapshots, and preferences. The Mac companion deletes only receipt-ledger-owned archives and documents manual login-keychain cleanup (R-43, SEC-69).

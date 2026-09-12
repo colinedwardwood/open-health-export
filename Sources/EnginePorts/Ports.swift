@@ -673,6 +673,15 @@ public enum DestinationSendError: Error, Sendable, Equatable, LocalizedError {
     }
 }
 
+public enum HTTPTransferSchedule: String, Sendable, Equatable {
+    /// HK-18 / ADR-R5: first delivery attempt. Freshness matters.
+    case immediate
+    /// ADR-R5: later-wake retries. The OS may delay the transfer.
+    case discretionaryRetry
+
+    @TaskLocal public static var current: HTTPTransferSchedule = .immediate
+}
+
 public protocol DestinationSink: Sendable {
     func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt
 }

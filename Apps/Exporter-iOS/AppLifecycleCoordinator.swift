@@ -6,6 +6,7 @@ import CorrectnessEngine
 import EnginePorts
 import Foundation
 import HealthKitSource
+import NetEgress
 import RunJournal
 import UIKit
 import UserNotifications
@@ -77,6 +78,17 @@ final class ExporterAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
             _ = try? await HarnessExport.recoverInterruptedExports()
         }
         return true
+    }
+
+    func application(
+        _ application: UIApplication,
+        handleEventsForBackgroundURLSession identifier: String,
+        completionHandler: @escaping () -> Void
+    ) {
+        HTTPBackgroundSession.finishEvents(
+            for: identifier,
+            completionHandler: completionHandler
+        )
     }
 
     func userNotificationCenter(

@@ -69,8 +69,12 @@ struct PolicyCheck {
         if let appFiles = FileManager.default.enumerator(at: apps, includingPropertiesForKeys: nil) {
             for case let file as URL in appFiles where file.pathExtension == "swift" {
                 let text = try String(contentsOf: file, encoding: .utf8)
+                let sanitized = text.replacingOccurrences(
+                    of: "handleEventsForBackgroundURLSession",
+                    with: ""
+                )
                 for token in ["URLSession", "NWConnection", "NWListener", "NWBrowser"]
-                    where text.contains(token) {
+                    where sanitized.contains(token) {
                     appNetworkBypasses.append("\(file.path): \(token)")
                 }
                 for token in ["UIPasteboard", "NSPasteboard"] where text.contains(token) {
