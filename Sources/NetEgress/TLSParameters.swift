@@ -7,10 +7,14 @@ import Network
 import Security
 
 enum TLSParameters {
+    /// Companion PSK on Darwin `NWConnection`. Network.framework's PSK API is TLS 1.2 only
+    /// (Apple TN3213); TLS 1.3 PSK is not available, so the handshake uses
+    /// `TLS_PSK_WITH_AES_128_GCM_SHA256`.
     static func preSharedKey(_ psk: PreSharedKey) -> NWParameters {
         let tls = NWProtocolTLS.Options()
         let security = tls.securityProtocolOptions
-        sec_protocol_options_set_min_tls_protocol_version(security, .TLSv13)
+        sec_protocol_options_set_min_tls_protocol_version(security, .TLSv12)
+        sec_protocol_options_set_max_tls_protocol_version(security, .TLSv12)
         let key = psk.key.withUnsafeBytes { DispatchData(bytes: $0) }
         let identity = psk.identity.withUnsafeBytes { DispatchData(bytes: $0) }
         sec_protocol_options_add_pre_shared_key(
@@ -18,9 +22,20 @@ enum TLSParameters {
             key as __DispatchData,
             identity as __DispatchData
         )
+        sec_protocol_options_set_tls_pre_shared_key_identity_hint(
+            security,
+            identity as __DispatchData
+        )
+        sec_protocol_options_set_pre_shared_key_selection_block(
+            security,
+            { _, _, complete in
+                complete(identity as __DispatchData)
+            },
+            DispatchQueue.global()
+        )
         sec_protocol_options_append_tls_ciphersuite(
             security,
-            tls_ciphersuite_t.AES_128_GCM_SHA256
+            tls_ciphersuite_t(rawValue: UInt16(TLS_PSK_WITH_AES_128_GCM_SHA256))!
         )
         return NWParameters(tls: tls)
     }

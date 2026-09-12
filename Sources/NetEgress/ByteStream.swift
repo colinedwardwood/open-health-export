@@ -85,7 +85,7 @@ public struct BonjourService: Sendable, Equatable {
     }
 }
 
-/// TLS 1.3 pre-shared key material, established at pairing (R-33) and held by the caller.
+/// Pre-shared key material, established at pairing (R-33) and held by the caller.
 public struct PreSharedKey: Sendable, Equatable, CustomStringConvertible, CustomDebugStringConvertible {
     public var key: [UInt8]
     public var identity: [UInt8]

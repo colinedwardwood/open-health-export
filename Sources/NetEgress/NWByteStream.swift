@@ -37,7 +37,7 @@ public actor NWByteStream: ByteStream {
         /// A refused or unroutable destination sits in `.waiting` and retries rather than
         /// failing. Set this for the R-31 destination test, where the user holds a spinner.
         public var failFastOnWaiting: Bool
-        /// Set for the Mac companion: TLS 1.3 PSK from pairing, no certificates involved.
+        /// Set for the Mac companion: pairing PSK, no certificates involved.
         public var preSharedKey: PreSharedKey?
         /// Optional PKCS#12 client certificate for brokers that require mTLS. Not SE-backed.
         public var clientIdentity: TLSClientIdentity?
