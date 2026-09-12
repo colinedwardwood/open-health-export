@@ -29,7 +29,7 @@ private let r32ExcludedOSInitiatedTraffic = [
 /// removes that same host from the current allowlist and enters through the same
 /// app-style cycle assembly function. Production rejects the saved URL while
 /// rebuilding `HTTPSDestination`, before source reads, DNS, or transport execution.
-@Test func removedHTTPSHostReceivesZeroAppInitiatedEgressAcrossExportCycle() async throws {
+@Test func p16R32RemovedHTTPSHostReceivesZeroAppInitiatedEgressAcrossExportCycle() async throws {
     let receiver = ScriptableHTTPServer()
     try receiver.start()
     defer { receiver.stop() }

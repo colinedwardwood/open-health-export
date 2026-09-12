@@ -40,7 +40,7 @@ private enum R84DeterminismFixture {
     #expect(out.contains("r84-determinism self-test: ok"))
 }
 
-@Test func r84G1UtcFixtureIsByteStableAcrossOneHundredEncodes() throws {
+@Test func p8R84G1UtcFixtureIsByteStableAcrossOneHundredEncodes() throws {
     let input = try R84DeterminismFixture.data(
         "spec/v1.0.0/fixtures/g1/logical-input.json"
     )

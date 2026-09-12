@@ -414,6 +414,19 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
             #expect(!trace.live.contains(uuid), "P7 seed \(seed)")
         }
     }
+    #expect(throws: HAEError.tombstonesNotRepresentable) {
+        _ = try HAEWire.encode(
+            samples: [],
+            tombstones: [
+                TombstoneRecord(
+                    key: RecordKey(uuid: propertyUUID(7)),
+                    metric: MetricCatalog.heartRate.id
+                ),
+            ],
+            metric: MetricCatalog.heartRate.id,
+            acknowledgingLoss: HAELossAccepted()
+        )
+    }
 }
 
 @Test func p12BoundedResourceGateStreamsEveryT1AndT2RecordUnderTheRSSCeiling() throws {
@@ -537,7 +550,7 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
     }
 }
 
-@Test func p2ReExportOfTheSameScopeIsByteIdentical() throws {
+@Test func p2ReExportOfTheSameScopeIsByteIdenticalAndDestinationIdempotent() async throws {
     for seed in 1 ... 40 {
         var rng = PropertyRNG(seed: UInt64(seed))
         let samples = [
@@ -562,6 +575,23 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
             envelope: testEnvelope()
         )
         #expect(first == second, "P2 re-export drifted for seed \(seed)")
+
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ohe-p2-\(seed)-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let payload = directory.appendingPathComponent("source.ndjson")
+        try first.write(to: payload)
+        let sink = LocalFileSink(directory: directory)
+        let key = BatchID(rawValue: propertyUUID(seed))
+        _ = try await sink.send(fileHandle: payload.path, idempotencyKey: key)
+        _ = try await sink.send(fileHandle: payload.path, idempotencyKey: key)
+        let delivered = try FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: nil
+        ).filter { $0.pathExtension == "ndjson" && $0.lastPathComponent != "source.ndjson" }
+        #expect(delivered.count == 1, "P2 duplicate destination object for seed \(seed)")
+        #expect(try Data(contentsOf: delivered[0]) == first)
     }
 }
 
@@ -779,7 +809,7 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
         5: ["Cursor"],
         6: ["DeltaAndFull"],
         7: ["Tombstones"],
-        8: ["Determinism"],
+        8: ["Determinism", "R84"],
         9: ["Aggregation"],
         10: ["Conserve"],
         11: ["Redaction"],
@@ -787,7 +817,7 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
         13: ["Migrates", "CorruptCheckpoint"],
         14: ["AtomicWrite"],
         15: ["InstantInvariance"],
-        16: ["NetworkDials"],
+        16: ["NetworkDials", "R32"],
     ]
     for property in 1 ... 16 {
         let witnesses = names[property] ?? []
