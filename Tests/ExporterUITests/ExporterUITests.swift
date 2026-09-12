@@ -535,7 +535,7 @@ final class ExporterUITests: XCTestCase {
 
     func testDataBrowserSelectAndEmptyMeasurementsAreVisibleAfterDisclosure() throws {
         enterControls()
-        XCTAssertTrue(app.staticTexts["browser-title"].waitForExistence(timeout: uiWait))
+        XCTAssertTrue(scrollToHittable(app.staticTexts["browser-title"]).exists)
         XCTAssertEqual(app.staticTexts["browser-title"].label, "Data")
         XCTAssertTrue(app.buttons["browser-select"].exists)
         XCTAssertFalse(app.buttons["browser-review"].exists)
@@ -727,9 +727,9 @@ final class ExporterUITests: XCTestCase {
         enterControls()
         let title = scrollToHittable(app.staticTexts["destination-title"])
         XCTAssertEqual(title.label, "Where your data goes")
-        XCTAssertTrue(app.buttons["destination-refresh"].exists)
+        XCTAssertTrue(scrollToHittable(app.buttons["destination-refresh"]).exists)
         XCTAssertEqual(
-            app.staticTexts["destination-empty"].label,
+            scrollToHittable(app.staticTexts["destination-empty"]).label,
             "No destination snapshots yet."
         )
         let hae = scrollToHittable(app.staticTexts["hae-compatibility-label"])
@@ -759,12 +759,7 @@ final class ExporterUITests: XCTestCase {
         ]
         app.launch()
         enterControls()
-        let row = app.descendants(matching: .any)["browser-row-heartRate"]
-        XCTAssertTrue(
-            row.waitForExistence(timeout: uiWait),
-            "available identifiers: \(visibleIdentifiers())"
-        )
-        scrollToHittable(row)
+        let row = scrollToHittable(app.descendants(matching: .any)["browser-row-heartRate"])
         try performAccessibilityAudit("browser-permission-limited")
 
         row.tap()
@@ -911,6 +906,7 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(app.buttons["disclosure-continue"].waitForExistence(timeout: uiWait))
         try performAccessibilityAudit("\(configuration)-disclosure")
         enterControls()
+        selectRootTab(1)
         XCTAssertTrue(app.staticTexts["browser-title"].waitForExistence(timeout: uiWait))
         try performAccessibilityAudit("\(configuration)-controls")
     }
@@ -934,9 +930,10 @@ final class ExporterUITests: XCTestCase {
     ) throws {
         launchLocalized(arguments)
         enterControls()
+        selectRootTab(2)
         XCTAssertTrue(scrollToHittable(app.staticTexts["destination-title"]).exists)
-        XCTAssertTrue(app.buttons["destination-refresh"].exists)
         try performAccessibilityAudit("\(configuration)-destinations")
+        selectRootTab(3)
         XCTAssertTrue(scrollToHittable(app.buttons["history-load"]).exists)
         app.buttons["history-load"].tap()
         try performAccessibilityAudit("\(configuration)-history")
@@ -1021,8 +1018,7 @@ final class ExporterUITests: XCTestCase {
     ]
 
     private func filterBrowserToHeartRate() {
-        let search = app.textFields["browser-search"]
-        XCTAssertTrue(search.waitForExistence(timeout: uiWait))
+        let search = scrollToHittable(app.textFields["browser-search"])
         type("heart", into: search)
         dismissKeyboard()
     }
@@ -1063,18 +1059,41 @@ final class ExporterUITests: XCTestCase {
             .filter { !$0.isEmpty }
     }
 
+    private func selectRootTab(_ index: Int) {
+        let bar = app.tabBars.firstMatch
+        guard bar.waitForExistence(timeout: uiWait) else { return }
+        let button = bar.buttons.element(boundBy: index)
+        if button.exists {
+            button.tap()
+        }
+    }
+
     @discardableResult
     private func scrollToHittable(_ element: XCUIElement) -> XCUIElement {
+        if becomeHittable(element) {
+            return element
+        }
+        for index in 0 ..< 4 {
+            selectRootTab(index)
+            if becomeHittable(element) {
+                return element
+            }
+        }
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "Element did not become hittable"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        XCTAssertTrue(element.isHittable)
+        return element
+    }
+
+    private func becomeHittable(_ element: XCUIElement) -> Bool {
+        if element.waitForExistence(timeout: 1), element.isHittable {
+            return true
+        }
         for _ in 0 ..< 40 where !element.isHittable {
             app.swipeUp()
         }
-        if !element.isHittable {
-            let attachment = XCTAttachment(screenshot: app.screenshot())
-            attachment.name = "Element did not become hittable"
-            attachment.lifetime = .keepAlways
-            add(attachment)
-        }
-        XCTAssertTrue(element.isHittable)
-        return element
+        return element.isHittable
     }
 }

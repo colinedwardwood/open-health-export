@@ -981,6 +981,17 @@
         }
       }
     },
+    "History": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "History"
+          }
+        }
+      }
+    },
     "HealthKit provides no deletion callback. Tombstones are best-effort when iOS next reports a deletion; a full reconcile repairs deletions that were not reported.": {
       "extractionState": "manual",
       "localizations": {
@@ -1879,6 +1890,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Stale"
+          }
+        }
+      }
+    },
+    "Status": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Status"
           }
         }
       }

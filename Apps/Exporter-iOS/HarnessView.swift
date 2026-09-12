@@ -35,6 +35,7 @@ struct HarnessView: View {
     }
 
     @State private var phase: Phase = .disclosure
+    @State private var rootTab = AppRootTabs.status
     @AppStorage("ohe.disclosureAcknowledged")
     private var disclosureAcknowledged = false
     @State private var status = "Waiting for disclosure acknowledgement."
@@ -185,68 +186,27 @@ struct HarnessView: View {
                 healthKitUnavailable
             } else if isPrivacyLocked {
                 privacyLock
-            } else {
+            } else if phase == .disclosure {
                 NavigationStack {
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 16) {
-                                Text(status)
-                                    .font(.body)
-                                    .multilineTextAlignment(.leading)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .accessibilityLabel("Status: \(status)")
-                                    .accessibilityIdentifier("status-line")
-                                    .id("status-line")
-
-                                if let userFacingError {
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        ForEach(Array(userFacingError.lines.enumerated()), id: \.offset) { index, line in
-                                            Text(line)
-                                                .font(.system(.footnote, design: .monospaced))
-                                                .textSelection(.enabled)
-                                                .fixedSize(horizontal: false, vertical: true)
-                                                .accessibilityIdentifier("error-part-\(index)")
-                                        }
-                                        ForEach(userFacingError.actions, id: \.rawValue) { action in
-                                            Button(action.label) {
-                                                applyUserFacingFix(action)
-                                            }
-                                            .disabled(phase == .working)
-                                            .accessibilityIdentifier("error-fix-\(action.rawValue)")
-                                        }
-                                    }
-                                    .id("user-facing-error")
-                                }
-
-                                Text("Time to first screen: \(timeToFirstFrameMS, specifier: "%.0f") ms (foreground; R-73 is a background-launch budget).")
-                                    .font(.footnote)
-                                    .fixedSize(horizontal: false, vertical: true)
-
-                                if phase == .disclosure {
-                                    disclosure
-                                } else {
-                                    dataBrowser
-                                    controls
-                                }
-
-                                if !results.isEmpty {
-                                    Text("Measurements")
-                                        .font(.headline)
-                                    ForEach(Array(results.enumerated()), id: \.offset) { _, line in
-                                        Text(line)
-                                            .font(.body)
-                                            .textSelection(.enabled)
-                                    }
-                                }
-                            }
-                            .padding()
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 16) {
+                            statusAttention
+                            disclosure
                         }
-                        .navigationTitle("M0 harness")
-                        .onChange(of: userFacingError) { _, error in
-                            guard error != nil else { return }
-                            proxy.scrollTo("user-facing-error", anchor: .top)
-                        }
+                        .padding()
                     }
+                    .navigationTitle("M0 harness")
+                }
+            } else {
+                TabView(selection: $rootTab) {
+                    ForEach(AppRootTabs.allCases, id: \.self) { tab in
+                        rootTabPage(tab)
+                    }
+                }
+                .tabViewStyle(.sidebarAdaptable)
+                .onChange(of: userFacingError) { _, error in
+                    guard error != nil else { return }
+                    rootTab = .status
                 }
             }
         }
@@ -574,6 +534,115 @@ struct HarnessView: View {
         ["p12", "pfx"].compactMap { UTType(filenameExtension: $0) } + [.data]
     }
 
+    private var statusAttention: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(status)
+                .font(.body)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityLabel("Status: \(status)")
+                .accessibilityIdentifier("status-line")
+                .id("status-line")
+
+            if let userFacingError {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(Array(userFacingError.lines.enumerated()), id: \.offset) { index, line in
+                        Text(line)
+                            .font(.system(.footnote, design: .monospaced))
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("error-part-\(index)")
+                    }
+                    ForEach(userFacingError.actions, id: \.rawValue) { action in
+                        Button(action.label) {
+                            applyUserFacingFix(action)
+                        }
+                        .disabled(phase == .working)
+                        .accessibilityIdentifier("error-fix-\(action.rawValue)")
+                    }
+                }
+                .id("user-facing-error")
+            }
+
+            Text("Time to first screen: \(timeToFirstFrameMS, specifier: "%.0f") ms (foreground; R-73 is a background-launch budget).")
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var measurements: some View {
+        Group {
+            if !results.isEmpty {
+                Text("Measurements")
+                    .font(.headline)
+                ForEach(Array(results.enumerated()), id: \.offset) { _, line in
+                    Text(line)
+                        .font(.body)
+                        .textSelection(.enabled)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func rootTabPage(_ tab: AppRootTabs) -> some View {
+        NavigationStack {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        switch tab {
+                        case .status:
+                            statusAttention
+                            destinationStatusCards
+                            Button("Where your data goes") {
+                                rootTab = .destinations
+                            }
+                            .accessibilityIdentifier("status-open-destinations")
+                            statusOperations
+                            statusSettings
+                            measurements
+                        case .data:
+                            dataBrowser
+                        case .destinations:
+                            destinationsPane
+                        case .history:
+                            historyPane
+                        }
+                    }
+                    .padding()
+                }
+                .navigationTitle(rootTabTitle(tab))
+                .onChange(of: userFacingError) { _, error in
+                    guard tab == .status, error != nil else { return }
+                    proxy.scrollTo("user-facing-error", anchor: .top)
+                }
+            }
+        }
+        .tabItem {
+            switch tab {
+            case .status:
+                Label("Status", systemImage: tab.systemImage)
+            case .data:
+                Label("Data", systemImage: tab.systemImage)
+            case .destinations:
+                Label("Destinations", systemImage: tab.systemImage)
+            case .history:
+                Label("History", systemImage: tab.systemImage)
+            }
+        }
+        .tag(tab)
+        .accessibilityIdentifier(tab.accessibilityIdentifier)
+    }
+
+    private func rootTabTitle(_ tab: AppRootTabs) -> String {
+        switch tab {
+        case .status: "Status"
+        case .data: "Data"
+        case .destinations: "Destinations"
+        case .history: "History"
+        }
+    }
+
     private var disclosure: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Before Health access")
@@ -595,7 +664,7 @@ struct HarnessView: View {
         }
     }
 
-    private var controls: some View {
+    private var statusOperations: some View {
         VStack(alignment: .leading, spacing: 12) {
             Button("Request Health read access for selected types") {
                 Task { await requestAccess() }
@@ -773,6 +842,52 @@ struct HarnessView: View {
                 .accessibilityIdentifier("advisory-\(item.id)")
             }
 
+        }
+        .buttonStyle(HarnessButtonStyle())
+        .controlSize(.large)
+    }
+
+    private var destinationStatusCards: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button("Refresh destination status") {
+                refreshDestinationSurfaces()
+            }
+            .accessibilityIdentifier("destination-refresh")
+            if destinationSnapshots.isEmpty {
+                Text(destinationStatusLines.first ?? DestinationStatusLine.emptyCopy)
+                    .font(.footnote)
+                    .foregroundStyle(.primary)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .accessibilityIdentifier("destination-empty")
+            } else {
+                ForEach(Array(destinationSnapshots.enumerated()), id: \.element.destinationID) { index, snapshot in
+                    let line = destinationStatusLines[index]
+                    Button {
+                        presentErrorFromStatus(snapshot)
+                    } label: {
+                        Text(line)
+                            .font(.footnote)
+                            .foregroundStyle(.primary)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("destination-status-\(index)")
+                    .accessibilityHint("Shows the error cause and fix when this destination needs attention.")
+                }
+            }
+        }
+        .buttonStyle(HarnessButtonStyle())
+        .controlSize(.large)
+    }
+
+    private var destinationsPane: some View {
+        VStack(alignment: .leading, spacing: 12) {
             Text("Where your data goes")
                 .font(.headline)
                 .accessibilityIdentifier("destination-title")
@@ -1029,38 +1144,6 @@ struct HarnessView: View {
                     .textSelection(.enabled)
             }
             #endif
-            Button("Refresh destination status") {
-                refreshDestinationSurfaces()
-            }
-            .accessibilityIdentifier("destination-refresh")
-            if destinationSnapshots.isEmpty {
-                Text(destinationStatusLines.first ?? DestinationStatusLine.emptyCopy)
-                    .font(.footnote)
-                    .foregroundStyle(.primary)
-                    .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .contentShape(Rectangle())
-                    .accessibilityIdentifier("destination-empty")
-            } else {
-                ForEach(Array(destinationSnapshots.enumerated()), id: \.element.destinationID) { index, snapshot in
-                    let line = destinationStatusLines[index]
-                    Button {
-                        presentErrorFromStatus(snapshot)
-                    } label: {
-                        Text(line)
-                            .font(.footnote)
-                            .foregroundStyle(.primary)
-                            .multilineTextAlignment(.leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("destination-status-\(index)")
-                    .accessibilityHint("Shows the error cause and fix when this destination needs attention.")
-                }
-            }
             Button("Acknowledge destination changes") {
                 do {
                     try HarnessExport.acknowledgeDestinationChanges()
@@ -1105,6 +1188,13 @@ struct HarnessView: View {
                 .font(.footnote)
                 .textSelection(.enabled)
                 .accessibilityIdentifier("acknowledgements-body")
+        }
+        .buttonStyle(HarnessButtonStyle())
+        .controlSize(.large)
+    }
+
+    private var historyPane: some View {
+        VStack(alignment: .leading, spacing: 12) {
             Button("Show export history (problems first)") {
                 Task { await loadHistory() }
             }
@@ -1116,7 +1206,13 @@ struct HarnessView: View {
                     .textSelection(.enabled)
                     .accessibilityIdentifier("history-row-\(index)")
             }
+        }
+        .buttonStyle(HarnessButtonStyle())
+        .controlSize(.large)
+    }
 
+    private var statusSettings: some View {
+        VStack(alignment: .leading, spacing: 12) {
             Text("If someone else set this up")
                 .font(.headline)
             Text("iOS can hide this app. We cannot prevent that, and we do not offer stealth mode, alternate icons, or a second name. Check Settings → Apps → Hidden Apps, Screen Time, Battery, and App Store purchase history. Apple's Personal Safety guide: https://support.apple.com/guide/personal-safety/lock-or-hide-apps-on-your-iphone-ipsd0be4c185/web")
@@ -2445,6 +2541,7 @@ struct HarnessView: View {
         results = object.lines
         if disclosureAcknowledged {
             phase = .ready
+            rootTab = .status
             status = object.title
         } else {
             status = "Review the disclosure before opening destination status."
@@ -2470,6 +2567,7 @@ struct HarnessView: View {
                 : "Review the disclosure before exporting from Control Centre."
             return
         }
+        rootTab = .status
         Task { await runLocalExport(trigger: .widgetControl) }
     }
 
@@ -2478,6 +2576,7 @@ struct HarnessView: View {
         refreshDestinationSurfaces()
         if disclosureAcknowledged {
             phase = .ready
+            rootTab = .status
             status = route.destinationID.map {
                 "Ready. Opened destination status for \($0) from the widget."
             } ?? "Ready. Opened destination status from the widget."
