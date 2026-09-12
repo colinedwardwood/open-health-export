@@ -78,7 +78,7 @@ body:
           required: true
         - label: No feature, update, artifact, or beta seat is sponsor-gated; any TestFlight public link was checked manually.
           required: true
-        - label: A different maintainer completed the clean build-from-source stranger test.
+        - label: A person unaffiliated with implementation completed the clean build-from-source stranger test without repository, Apple, or signing access.
           required: true
         - label: Roll-forward instructions and the last-good tag are recorded.
           required: true

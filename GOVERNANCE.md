@@ -1,14 +1,17 @@
 # Governance
 
-Decisions are made by the people listed in `MAINTAINERS.md`. Today that is one person.
-There is no voting body and no company behind the project.
+Product and repository decisions are made by the owner listed in
+`MAINTAINERS.md`. There is no voting body, community governance process, or open
+path to a maintainer role.
 
-## Adding or removing a maintainer
+## Exceptional succession
 
-A new maintainer is added by a reviewed change to `MAINTAINERS.md` that names GitHub
-handle, scope, and a contactable address, then by granting the least GitHub and Apple
-roles needed. Removal is the reverse, including revoking those roles. Private keys are
-never transferred through this repository. See `CONTINUITY.md`.
+The owner may appoint a successor or contractor only as an explicit continuity
+decision. That person is recorded by a reviewed change to `MAINTAINERS.md` that
+names GitHub handle, scope, and a contactable address, then receives only the
+GitHub and Apple roles needed. Removal is the reverse, including revoking those
+roles. Private keys are never transferred through this repository. See
+`CONTINUITY.md`.
 
 ## Licence change
 
@@ -18,7 +21,7 @@ are under the same licence (`CONTRIBUTING.md`).
 
 ## Dormancy
 
-If no maintainer has responded to issues, security reports, or pull requests for **90
-days**, regard the project as unmaintained: the README status line should read `archived`
-or `seeking-maintainers`, and a fork is the continuity path. Source remains usable under
-the licence without anyone's permission.
+If the owner has not responded to issues or security reports for **90 days**,
+regard the project as unmaintained: the README status line should read
+`archived`, and a fork is the continuity path. Source remains usable under the
+licence without anyone's permission.

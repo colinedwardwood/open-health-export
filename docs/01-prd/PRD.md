@@ -189,7 +189,7 @@ and contribution intake must be decided together (D-01, D-02).
 | G-2 | A user can always answer "what left my device, when, to where, and did it arrive?" without developer tools | Unaided task success in usability testing, for the last 30 runs |
 | G-3 | The app detects and surfaces its own silent failure | R-23's escalation fires within the freshness window in the R-88 soak, including with notifications denied |
 | G-4 | A self-hoster goes from install to data-on-a-Grafana-panel in under 10 minutes | Timed, by a non-maintainer, on a clean machine |
-| G-5 | The project survives its founder, to the extent Apple's account model permits | R-105a unconditionally; R-105b if D-03 resolves to organisation enrolment |
+| G-5 | The source and build path survive the owner, while the existing Apple identity may not | R-106 continuity and R-108 stranger build; a fork can continue under a different identity |
 
 G-5 is deliberately hedged. The unhedged version is not achievable under individual Apple
 enrolment (C-10), and claiming it would violate the document's own standard.
@@ -414,8 +414,8 @@ product built to eliminate silent failure, is the most embarrassing bug availabl
 |---|---|---|---|---|
 | R-100 | Licence committed in the first commit (D-01) | Must | `LICENSE` present at commit 1 | OSS-01 |
 | R-101 | DCO sign-off enforced on every commit, plus a written inbound=outbound statement and a licence-change rule | Must | CI rejects an unsigned commit | OSS-04/05 |
-| R-105a | Two people hold commit rights, and both have independently cut a **source** release | Must | Both named in `MAINTAINERS.md`; both have tagged a release | MKT-15, OSS-12/13, AR-F-02 |
-| R-105b | Both maintainers have shipped an **App Store** release | Must **if D-03 = organisation** | Both appear in App Store Connect release history | AR-F-02 |
+| R-105a | A second maintainer and shared commit rights | **Not pursued — owner decision (D-10)** | The commercial product remains owner-directed; continuity is the forkable source/build path in R-106 and R-108, not shared control | MKT-15, OSS-12/13, AR-F-02 |
+| R-105b | Multiple maintainers shipping an **App Store** release | **Not applicable** | No additional maintainer role exists; the existing Apple distribution identity remains owner-controlled | AR-F-02 |
 | R-106 | `CONTINUITY.md` states what happens if maintenance stops, including signing-identity handover, and — under individual enrolment — states plainly that the App Store channel has a bus factor of one, mitigated by R-108 and by the licence permitting a rebranded fork | Must | Present before v1.0; reviewed by someone outside the project | MKT-15, AR-F-02 |
 | R-107 | README carries a machine-readable maintenance status (`maintained` / `seeking-maintainers` / `archived`) and a supported-OS matrix, updated every release | Should | Release cannot be tagged without them | MKT-17 |
 | R-108 | Build-from-source is reproducible by a stranger on a clean machine, verified each release | Must | A non-maintainer builds from a tag using only the README | OSS-11 |
@@ -540,7 +540,7 @@ it removes the usual retention metrics.
 | 6 months | HACS listing accepted | Yes |
 | 12 months | App Store units | 2,000 |
 | 12 months | Independent receivers or dashboards built on our wire spec | 3 |
-| 12 months | Second maintainer active with source-release rights (R-105a) | Yes |
+| 12 months | Independent clean build-from-source checks completed | 2 |
 | Ongoing | Median time-to-first-successful-export, self-reported | < 20 min |
 
 Deliberately not used: GitHub stars.
@@ -585,7 +585,7 @@ so Stage 2 knows what was traded away.
 | D-07 | **Ratified** — R-66's sensitive-type exclusion list stands | |
 | D-08 | **Free binary, donations and actively-sought named sponsorship, all collected outside the app** | Conditional on R-110: no functionality, update or build access may ever be gated on sponsoring. Visible funding is the strongest available answer to RK-1 |
 | D-09 | **Accepted** — permanent blindness to outbound fleet telemetry | Scoped to outbound only; R-38 preserves the ability to warn users. To be recorded as an ADR |
-| D-10 | **Open** — no second maintainer identified yet | R-107's status must read `seeking-maintainers` until R-105a is satisfied. Organisation enrolment (D-03) means the seat is now fillable, which it would not have been |
+| D-10 | **Resolved — owner-directed, no maintainer recruitment** | R-105a and R-105b are not pursued. R-106 and R-108 preserve the honest continuity path: public source, reproducible builds, and separately identified forks |
 | D-11 | **R-09 defaults adopted**: 256 MB queue cap, oldest-first eviction, persisted user-visible gap record, one-tap re-export | The one place the product deliberately loses health data now has an owner |
 | D-12 | **Legal budget available**; R-112 stands | Required before charging, and now also for the D-03 CRA steward-vs-manufacturer analysis |
 | D-13 | **Trader status declared against the legal entity's address** | Follows from D-03; removes the personal-safety concern that made this a decision |
@@ -606,7 +606,7 @@ Retained because it records what each decision cost and how reversible it is.
 | **D-07** | **Sensitive-type class** | Ratify R-66's exclusion list | Easy |
 | **D-08** | **Funding model.** *Reopened.* | v0.1 dismissed MKT-18 using a CRA argument that defeats only half of it. MKT-18 recommended "a price **or** explicit named sponsorship", and the same Commission guidance says third-party sponsorship does not create scope provided results are openly published. So: free binary, donations and named sponsorship outside the app (C-12), conditional on R-110. **Sponsorship is now recommended rather than merely permitted**, because visible funding is the strongest available answer to RK-1 | Charging later triggers CRA manufacturer obligations and requires R-112 |
 | **D-09** | **Accept permanent fleet blindness?** | Yes, as an ADR. Note this is now blindness to *outbound* telemetry only; R-38 preserves the ability to warn users | Reversing collapses the positioning |
-| **D-10** | **Is there a second maintainer?** | If no, R-105a fails and R-107's status must say `seeking-maintainers` from day one rather than implying durability we do not have | — |
+| **D-10** | **Is there a second maintainer?** | No. The product remains owner-directed and does not recruit maintainers. Maintenance status reports whether the owner is actively maintaining it; continuity is via source and independently reproducible builds | Owner decision recorded during Stage 3 |
 | **D-11** | **Queue bound, drop policy and TTL** | R-09's defaults: 256 MB, oldest-first eviction, persisted gap record, one-tap re-export. This is the one place the product deliberately loses health data and it needs an owner, not an implementer's default | Easy to tune, hard to retrofit the gap record |
 | **D-12** | **Is there a legal budget?** | Two specialists asked independently. If no, the recommended path (MPL-2.0, DCO, free, donations outside the app) is specifically chosen to be defensible without one — which is a better argument for D-08 than the CRA one | — |
 | **D-13** | **DSA trader declaration: trader status and published address** | Apple publishes the address across 27 EU territories. Investigate P.O. Box eligibility before declaring. This is a personal-safety decision, not paperwork | Hard to unpublish |
@@ -710,8 +710,10 @@ non-negotiable design inputs, the §6.6 testability constraints, the two sequenc
 in §7.1, the R-70 and R-71 measurement spikes as the first work items, and the ~230 specialist
 requirements not promoted here as design-level inputs.
 
-Open items tracked into Stage 2 rather than blocking closure: D-06 (name clearance), D-10
-(second maintainer), and R-112's legal opinion on the D-03 CRA analysis.
+Open items tracked into Stage 2 rather than blocking closure: D-06 (name
+clearance) and R-112's legal opinion on the D-03 CRA analysis. D-10 was later
+resolved during Stage 3 in favour of an owner-directed model with no maintainer
+recruitment.
 
 ---
 

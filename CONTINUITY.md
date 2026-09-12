@@ -1,8 +1,9 @@
 # Project continuity
 
-Open Health Exporter currently has one maintainer and is seeking additional
-maintainers. This document describes what remains possible if that maintainer
-is unavailable; it does not imply that a deputy or credential escrow exists.
+Open Health Exporter is an owner-directed commercial open-source project. It is
+not recruiting maintainers. This document describes what remains possible if
+the owner is unavailable; it does not imply that a deputy or credential escrow
+exists.
 
 ## What anyone can continue
 
@@ -31,9 +32,8 @@ Apple team or advisory identity merely by obtaining the source.
 ## Release continuity
 
 Source releases remain forkable. Releases under the existing project identity
-require the owner until a second maintainer is appointed, receives the required
-service roles, completes the stranger-test release checklist, and is recorded
-in `MAINTAINERS.md`.
+require the owner. An independent person may perform the documented stranger
+test without receiving repository, Apple, or signing credentials.
 
 If Apple distribution becomes unavailable, the last published binary remains
 independent of the repository. Under individual enrolment the App Store channel
@@ -58,13 +58,15 @@ If the advisory key is unavailable or suspect, use the GitHub security advisory
 and release channels and state explicitly that the in-app feed could not be
 updated.
 
-## Succession checklist
+## Exceptional succession checklist
 
-1. Add the maintainer through a reviewed `MAINTAINERS.md` change.
+This is a continuity procedure, not an open maintainer path.
+
+1. Record the successor through a reviewed `MAINTAINERS.md` change.
 2. Grant least-privilege repository and protected-environment roles.
 3. Complete Apple role onboarding separately; never transfer private keys in
    the repository.
 4. Rehearse source release, clean build, advisory rotation, rollback, and
    incident communication.
-5. Record which maintainer completed each release in release history.
-6. Revoke access promptly when a maintainer leaves.
+5. Record who completed each release in release history.
+6. Revoke access promptly when a successor or contractor leaves.

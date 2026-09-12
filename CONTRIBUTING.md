@@ -1,5 +1,10 @@
 # Contributing
 
+This owner-directed project does not recruit maintainers or solicit roadmap
+work. The owner may choose to review a narrowly scoped external patch, but
+submitting one does not create an expectation of review, support, or a project
+role.
+
 Inbound licence equals outbound: AGPL-3.0 plus the additional permission in `COPYING`.
 
 ## Developer Certificate of Origin
@@ -53,8 +58,8 @@ git commit -s
 
 ## Review
 
-Open a pull request against `main`. Expected review latency is best-effort; with one
-maintainer it may be days. The PR template is the checklist. Licence and governance
+If the owner has agreed to review a patch, open a pull request against `main`.
+Review is best-effort. The PR template is the checklist. Licence and ownership
 rules are in `GOVERNANCE.md`.
 
 The **public API** for versioning is the export wire (`spec/`, `ohe.wire/1`) and the

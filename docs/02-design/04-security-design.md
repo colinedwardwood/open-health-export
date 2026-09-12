@@ -1062,10 +1062,11 @@ re-run. Automated vulnerability scanning per PR and weekly, with a named triage 
   SBOM obligation** — Article 13(6) is a manufacturer duty. We generate one anyway because it is
   cheap and because it becomes mandatory the moment D-08 changes. Nobody should read our SBOM as
   evidence that we have concluded we are a manufacturer.
-- **Two-maintainer release** (SEC-57) is currently unsatisfiable: D-10 records no second
-  maintainer. R-107 must read `seeking-maintainers`, and the release process must state that the
-  two-person rule is aspirational until R-105a is met. Saying it is in force when it is not is
-  worse than not having it.
+- **Two-maintainer release** (SEC-57) is not pursued: D-10 records an
+  owner-directed model with no maintainer recruitment. R-107 reports
+  `maintained` while the owner actively maintains the product. R-106 and R-108
+  preserve the fork and independent-build continuity path without pretending
+  shared signing authority exists.
 
 ---
 

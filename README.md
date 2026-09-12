@@ -46,7 +46,7 @@ is about honest delivery.
 version **0.1.0** currently emits wire profile `ohe.wire/1` from `spec/v1.0.0`
 (in progress until freeze). See `spec/compatibility.json` and `VERSIONING.md`.
 
-<!-- maintenance-status: active -->
+<!-- maintenance-status: maintained -->
 
 | Platform | Minimum / toolchain | Release support |
 |---|---|---|

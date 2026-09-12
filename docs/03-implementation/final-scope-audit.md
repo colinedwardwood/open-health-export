@@ -30,7 +30,8 @@ The manually dispatched `nightly-volume` run is the first remote execution of th
 - R-77–R-79, QA-23–QA-25, OBS-20 and OBS-32: on-device energy, memory, launch, and overhead measurements.
 - Manual VoiceOver, locked-device notification/widget, app-switcher snapshot, Hide-and-Require-Face-ID, and other SPIKE-COERCE observations.
 - App Store Connect/TestFlight declarations, DSA trader status, review notes, beta cadence, phased release, and notarized distribution.
-- A second maintainer, independent clean release build, continuity review, and source/App Store release history.
+- Independent clean release build and continuity review. D-10 explicitly rejects
+  maintainer recruitment; R-105a/R-105b are not pursued.
 - Legal opinions, HIPAA/CRA role determinations, and trademark/name clearance.
 - HACS default-list acceptance, Grafana community publication, and real community-device/store-characterisation rows.
 - Live advisory-host logging/retention verification and a physical-device release-rehearsal advisory.
