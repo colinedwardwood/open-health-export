@@ -50,7 +50,11 @@ private let r32ExcludedOSInitiatedTraffic = [
         )
     }
     #expect(control.kind == .success)
-    #expect(controlRecorder.snapshot() == [.init(kind: .http, host: host)])
+    let controlAttempts = controlRecorder.snapshot()
+    #expect(controlAttempts.count == 1)
+    #expect(controlAttempts[0].kind == .http)
+    #expect(controlAttempts[0].host == host)
+    #expect(controlAttempts[0].bytes > 0)
     #expect(receiver.requests().count == 1, "control did not reach the loopback receiver")
 
     let removedHostRecorder = EgressAttemptLog.Recorder()
