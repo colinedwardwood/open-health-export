@@ -23,6 +23,8 @@ public struct DiagnosticHeader: Sendable, Equatable {
     public var utcOffsetMinutes: Int
     public var generatedAt: String
     public var degraded: [String]
+    public var sourceCommit: String
+    public var buildHash: String
 
     public init(
         appVersion: String,
@@ -31,7 +33,9 @@ public struct DiagnosticHeader: Sendable, Equatable {
         localeIdentifier: String,
         utcOffsetMinutes: Int,
         generatedAt: String,
-        degraded: [String] = []
+        degraded: [String] = [],
+        sourceCommit: String = "",
+        buildHash: String = ""
     ) {
         self.appVersion = appVersion
         self.osVersion = osVersion
@@ -40,6 +44,8 @@ public struct DiagnosticHeader: Sendable, Equatable {
         self.utcOffsetMinutes = utcOffsetMinutes
         self.generatedAt = generatedAt
         self.degraded = degraded
+        self.sourceCommit = sourceCommit
+        self.buildHash = buildHash
     }
 }
 
@@ -106,6 +112,8 @@ public struct BundleAssembler: Sendable {
                 "utcOffsetMinutes": header.utcOffsetMinutes,
                 "generatedAt": header.generatedAt,
                 "degraded": header.degraded.sorted(),
+                "sourceCommit": header.sourceCommit,
+                "buildHash": header.buildHash,
             ],
             "runs": runs,
         ]

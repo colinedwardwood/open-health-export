@@ -32,6 +32,9 @@ import Testing
         #expect(error.lines[3].hasPrefix("④"))
         #expect(error.lines[4].hasPrefix("⑤"))
         #expect(error.copyDiagnostics.contains("Copy diagnostics"))
+        #expect(error.copyDiagnostics.contains("trace:"))
+        #expect(error.copyDiagnostics.contains("build:"))
+        #expect(error.copyDiagnostics.contains("commit:"))
         #expect(!error.title.contains("401") || archetype == .http401)
         #expect(!error.title.hasPrefix("Error"))
         let blob = ([error.title, error.cause, error.fix, error.copyDiagnostics] + error.actions.map(\.label))
@@ -102,4 +105,25 @@ import Testing
         let copy = ErrorClassManifest.record(for: errorClass).userFacingCopy
         #expect(UserFacingErrorCopy.violations(in: copy).isEmpty)
     }
+}
+
+@Test func copyDiagnosticsCarriesTraceBuildAndCommitWithoutSecrets() {
+    let identity = BuildIdentity(sourceCommit: "c0ffee1234567890", buildHash: "b1d0c0deabc123")
+    let error = UserFacingErrorObject.make(
+        archetype: .http401,
+        destinationLabel: "https://user:s3cret@clinic.example/api?token=s3cret",
+        evidence: UserFacingErrorEvidence(
+            statusCode: 401,
+            path: "/api/webhook/abcdef0123456789"
+        ),
+        identity: identity
+    )
+    #expect(error.destinationLabel == "clinic.example")
+    #expect(!error.title.contains("s3cret"))
+    #expect(error.copyDiagnostics.contains("commit: c0ffee1234567890"))
+    #expect(error.copyDiagnostics.contains("build: b1d0c0deabc123"))
+    #expect(error.copyDiagnostics.contains("trace:"))
+    #expect(!error.copyDiagnostics.contains("s3cret"))
+    #expect(!error.copyDiagnostics.contains("user:"))
+    #expect(error.copyDiagnostics.contains("Copy diagnostics"))
 }

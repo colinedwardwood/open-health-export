@@ -1158,7 +1158,9 @@ enum HarnessExport {
                 localeIdentifier: Locale.current.identifier,
                 utcOffsetMinutes: TimeZone.current.secondsFromGMT() / 60,
                 generatedAt: Date().ISO8601Format(),
-                degraded: journal.degraded
+                degraded: journal.degraded,
+                sourceCommit: BuildIdentity.current.sourceCommit,
+                buildHash: BuildIdentity.current.buildHash
             ),
             events: journal.events
         )

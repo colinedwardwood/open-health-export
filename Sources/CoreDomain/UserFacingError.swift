@@ -114,9 +114,17 @@ public struct UserFacingErrorObject: Sendable, Equatable {
     public static func make(
         archetype: UserFacingErrorArchetype,
         destinationLabel: String,
-        evidence: UserFacingErrorEvidence = UserFacingErrorEvidence()
+        evidence: UserFacingErrorEvidence = UserFacingErrorEvidence(),
+        identity: BuildIdentity = .current
     ) -> UserFacingErrorObject {
-        let label = destinationLabel.isEmpty ? "this destination" : destinationLabel
+        let label = BuildIdentity.publicDestinationLabel(destinationLabel)
+        var evidence = evidence
+        if evidence.traceID == nil {
+            evidence.traceID = BuildIdentity.traceID(seed: "\(archetype.rawValue)|\(label)|\(identity.sourceCommit)")
+        }
+        if evidence.buildHash == nil {
+            evidence.buildHash = identity.buildHash
+        }
         let parts = copy(archetype: archetype, label: label, evidence: evidence)
         return UserFacingErrorObject(
             archetype: archetype,
@@ -126,7 +134,12 @@ public struct UserFacingErrorObject: Sendable, Equatable {
             fix: parts.fix,
             actions: parts.actions,
             evidence: evidence,
-            copyDiagnostics: diagnostics(archetype: archetype, label: label, evidence: evidence),
+            copyDiagnostics: diagnostics(
+                archetype: archetype,
+                label: label,
+                evidence: evidence,
+                identity: identity
+            ),
             nonActionable: archetype == .healthLocked
         )
     }
@@ -261,7 +274,8 @@ public struct UserFacingErrorObject: Sendable, Equatable {
     private static func diagnostics(
         archetype: UserFacingErrorArchetype,
         label: String,
-        evidence: UserFacingErrorEvidence
+        evidence: UserFacingErrorEvidence,
+        identity: BuildIdentity
     ) -> String {
         var lines = [
             "Copy diagnostics",
@@ -286,12 +300,9 @@ public struct UserFacingErrorObject: Sendable, Equatable {
         if let retry = evidence.retryAfterSeconds {
             lines.append("retryAfterSeconds: \(retry)")
         }
-        if let trace = evidence.traceID {
-            lines.append("trace: \(trace)")
-        }
-        if let build = evidence.buildHash {
-            lines.append("build: \(build)")
-        }
+        lines.append("trace: \(evidence.traceID ?? "none")")
+        lines.append("build: \(evidence.buildHash ?? identity.buildHash)")
+        lines.append("commit: \(identity.sourceCommit)")
         return lines.joined(separator: "\n")
     }
 

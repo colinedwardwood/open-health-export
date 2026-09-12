@@ -48,6 +48,7 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         CURRENT_PROJECT_VERSION: 1
         MARKETING_VERSION: 0.1.0
+        OHE_SOURCE_COMMIT: unspecified
     dependencies:
       - package: open-health-exporter
         product: ExportCore
