@@ -146,6 +146,25 @@ private func isLowercaseHex(_ text: String) -> Bool {
     #expect(try SPKIDigest.sha256Hex(certificateDER: original) == SPKIDigest.sha256Hex(certificateDER: renewed))
 }
 
+@Test func certificateValidityParsesUTCTimeAndGeneralizedTime() throws {
+    let utc = SPKIFixture.certificate(
+        validity: SPKIFixture.validity(notBefore: "240101000000Z", notAfter: "250101000000Z")
+    )
+    let utcDates = try SPKIDigest.validity(certificateDER: utc)
+    #expect(utcDates.notBefore == "2024-01-01T00:00:00Z")
+    #expect(utcDates.notAfter == "2025-01-01T00:00:00Z")
+
+    let generalized = SPKIFixture.certificate(
+        validity: SPKIFixture.sequence([
+            SPKIFixture.element(0x18, Data("20240101000000Z".utf8)),
+            SPKIFixture.element(0x18, Data("20250101000000Z".utf8)),
+        ])
+    )
+    let generalizedDates = try SPKIDigest.validity(certificateDER: generalized)
+    #expect(generalizedDates.notBefore == "2024-01-01T00:00:00Z")
+    #expect(generalizedDates.notAfter == "2025-01-01T00:00:00Z")
+}
+
 @Test func trailingBytesAfterCertificateAreIgnored() throws {
     let spki = SPKIFixture.spki()
     var certificate = SPKIFixture.certificate(spki: spki)

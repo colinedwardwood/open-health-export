@@ -17,6 +17,8 @@ extension TLSIdentity {
         let issuer = chain.dropFirst().first
         let issuerSPKI = issuer
             .flatMap { try? SPKIDigest.sha256Hex(certificateDER: SecCertificateCopyData($0) as Data) }
+        let leafDER = SecCertificateCopyData(leaf) as Data
+        let dates = try? SPKIDigest.validity(certificateDER: leafDER)
         return TLSIdentity(
             leafSPKISha256: leafSPKI,
             issuerSPKISha256: issuerSPKI ?? "",
@@ -24,8 +26,8 @@ extension TLSIdentity {
             cipherSuite: "",
             leafSubject: SecCertificateCopySubjectSummary(leaf) as String? ?? host,
             leafIssuer: issuer.flatMap { SecCertificateCopySubjectSummary($0) as String? } ?? "",
-            notBefore: "",
-            notAfter: "",
+            notBefore: dates?.notBefore ?? "",
+            notAfter: dates?.notAfter ?? "",
             resolvedAddress: "",
             addressClass: .unknown,
             trustAnchorKind: "pin"

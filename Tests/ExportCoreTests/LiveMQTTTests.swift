@@ -105,6 +105,10 @@ struct LiveMQTTTests {
         emittedAt: "2026-01-01T00:00:00Z"
     )
     #expect(completed.identity?.leafSPKISha256 == material.pin.leafSPKISha256)
+    #expect(completed.identity?.notBefore.hasSuffix("Z") == true)
+    #expect(completed.identity?.notAfter.hasSuffix("Z") == true)
+    #expect(completed.identity?.notBefore.isEmpty == false)
+    #expect(completed.identity?.notAfter.isEmpty == false)
     #expect(completed.report.allowsEnablement)
     #expect(
         completed.events.contains {

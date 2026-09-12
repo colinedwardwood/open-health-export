@@ -17,6 +17,39 @@ public enum SPKIDigestError: Error, Equatable {
 public enum SPKIDigest {
     /// The full DER encoding (tag + length + content) of the certificate's SubjectPublicKeyInfo.
     public static func subjectPublicKeyInfo(certificateDER: Data) throws -> Data {
+        Data(try tbsFields(certificateDER: certificateDER).spkiBytes)
+    }
+
+    /// Leaf certificate validity as UTC instants (`YYYY-MM-DDTHH:MM:SSZ`).
+    public static func validity(certificateDER: Data) throws -> (notBefore: String, notAfter: String) {
+        let fields = try tbsFields(certificateDER: certificateDER)
+        var cursor = DERCursor(
+            bytes: fields.bytes,
+            index: fields.validity.contentRange.lowerBound,
+            end: fields.validity.contentRange.upperBound,
+            depth: fields.depth + 1
+        )
+        let notBefore = try cursor.readElement()
+        let notAfter = try cursor.readElement()
+        return (
+            try formatTime(tag: notBefore.tag, content: fields.bytes[notBefore.contentRange]),
+            try formatTime(tag: notAfter.tag, content: fields.bytes[notAfter.contentRange])
+        )
+    }
+
+    /// Lowercase hex SHA-256 of `subjectPublicKeyInfo`, with no "sha256:" prefix.
+    public static func sha256Hex(certificateDER: Data) throws -> String {
+        ContentSHA256.hex(try subjectPublicKeyInfo(certificateDER: certificateDER))
+    }
+
+    private struct TBSFields {
+        var bytes: [UInt8]
+        var validity: DERElement
+        var spkiBytes: ArraySlice<UInt8>
+        var depth: Int
+    }
+
+    private static func tbsFields(certificateDER: Data) throws -> TBSFields {
         let bytes = [UInt8](certificateDER)
         var top = DERCursor(bytes: bytes, index: 0, end: bytes.count, depth: 0)
         let certificate = try top.readElement(expecting: DERTag.sequence)
@@ -31,16 +64,56 @@ public enum SPKIDigest {
         _ = try fields.readElement(expecting: DERTag.integer)   // serialNumber
         _ = try fields.readElement(expecting: DERTag.sequence)  // signature
         _ = try fields.readElement(expecting: DERTag.sequence)  // issuer
-        _ = try fields.readElement(expecting: DERTag.sequence)  // validity
+        let validity = try fields.readElement(expecting: DERTag.sequence)
         _ = try fields.readElement(expecting: DERTag.sequence)  // subject
         let spki = try fields.readElement(expecting: DERTag.sequence)
-
-        return Data(bytes[spki.range])
+        return TBSFields(
+            bytes: bytes,
+            validity: validity,
+            spkiBytes: bytes[spki.range],
+            depth: fields.depth
+        )
     }
 
-    /// Lowercase hex SHA-256 of `subjectPublicKeyInfo`, with no "sha256:" prefix.
-    public static func sha256Hex(certificateDER: Data) throws -> String {
-        ContentSHA256.hex(try subjectPublicKeyInfo(certificateDER: certificateDER))
+    private static func formatTime(tag: UInt8, content: ArraySlice<UInt8>) throws -> String {
+        guard let text = String(bytes: content, encoding: .ascii), text.hasSuffix("Z") else {
+            throw SPKIDigestError.malformedDER
+        }
+        let body = String(text.dropLast())
+        let year: Int
+        let rest: Substring
+        switch tag {
+        case DERTag.utcTime:
+            guard body.count == 12, let yy = Int(body.prefix(2)) else {
+                throw SPKIDigestError.malformedDER
+            }
+            year = yy >= 50 ? 1900 + yy : 2000 + yy
+            rest = body.dropFirst(2)
+        case DERTag.generalizedTime:
+            guard body.count == 14, let yyyy = Int(body.prefix(4)) else {
+                throw SPKIDigestError.malformedDER
+            }
+            year = yyyy
+            rest = body.dropFirst(4)
+        default:
+            throw SPKIDigestError.unexpectedTag(tag)
+        }
+        let parts = rest.compactMap { $0.wholeNumberValue }
+        guard parts.count == 10 else { throw SPKIDigestError.malformedDER }
+        let month = parts[0] * 10 + parts[1]
+        let day = parts[2] * 10 + parts[3]
+        let hour = parts[4] * 10 + parts[5]
+        let minute = parts[6] * 10 + parts[7]
+        let second = parts[8] * 10 + parts[9]
+        guard (1...12).contains(month), (1...31).contains(day),
+              (0...23).contains(hour), (0...59).contains(minute), (0...60).contains(second)
+        else {
+            throw SPKIDigestError.malformedDER
+        }
+        return String(
+            format: "%04d-%02d-%02dT%02d:%02d:%02dZ",
+            year, month, day, hour, minute, second
+        )
     }
 }
 
@@ -48,6 +121,8 @@ extension SPKIDigest: Sendable {}
 
 private enum DERTag {
     static let integer: UInt8 = 0x02
+    static let utcTime: UInt8 = 0x17
+    static let generalizedTime: UInt8 = 0x18
     static let sequence: UInt8 = 0x30
     static let contextExplicitZero: UInt8 = 0xa0
 }
