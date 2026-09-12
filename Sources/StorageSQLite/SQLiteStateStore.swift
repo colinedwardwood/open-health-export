@@ -269,6 +269,14 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
             )
         }
     }
+
+    #if DEBUG
+    public func tamperLedgerSampleCountForTesting(sequence: Int, sampleCount: Int) throws {
+        try exec(
+            "UPDATE ledger SET sample_count = \(sampleCount) WHERE sequence = \(sequence);"
+        )
+    }
+    #endif
 }
 
 private final class SQLiteTransaction: StateTransaction {

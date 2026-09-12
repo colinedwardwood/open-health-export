@@ -5,6 +5,7 @@ import EnginePorts
 import Foundation
 import NetEgress
 import RunJournal
+import StorageSQLite
 import TestSupport
 import Testing
 
@@ -52,6 +53,51 @@ import Testing
     rewritten.sampleCount = 99
     #expect(
         await LedgerHeadSealRecordFile.verify(entries: [rewritten], seal: seal, url: url)
+            == .chainInvalid(sequence: 1)
+    )
+}
+
+@Test func r30PersistedLedgerTamperIsDetectedAfterStoreRelaunch() async throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-r30-relaunch-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let database = root.appendingPathComponent("state.sqlite").path
+    let sealURL = root.appendingPathComponent("ledger-head-seal.json")
+    let seal = HashLedgerSeal(secret: "r30-device")
+
+    let initial = try SQLiteStateStore(path: database)
+    try await initial.transact { tx in
+        try tx.appendLedger(
+            EgressEntry(
+                destination: "https",
+                sampleCount: 7,
+                outcomeKind: "success",
+                wallTimeEpoch: 1
+            )
+        )
+        try tx.appendLedger(
+            EgressEntry(
+                destination: "mqtt",
+                sampleCount: 3,
+                outcomeKind: "success",
+                wallTimeEpoch: 2
+            )
+        )
+    }
+    let original = try await initial.transact { try $0.loadLedger() }
+    try await LedgerHeadSealRecordFile.update(
+        entries: original,
+        seal: seal,
+        sealedAtEpoch: 3,
+        url: sealURL
+    )
+    try initial.tamperLedgerSampleCountForTesting(sequence: 1, sampleCount: 700)
+
+    let relaunched = try SQLiteStateStore(path: database)
+    let reloaded = try await relaunched.transact { try $0.loadLedger() }
+    #expect(
+        await LedgerHeadSealRecordFile.verify(entries: reloaded, seal: seal, url: sealURL)
             == .chainInvalid(sequence: 1)
     )
 }
