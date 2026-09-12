@@ -1206,6 +1206,43 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     #expect(status.attribution == "execution")
 }
 
+@Test func ux34EveryDestinationStateAgreesAcrossStatusWidgetIntentAndEscalation() throws {
+    let now: TimeInterval = 2_000
+    for state in DestinationDisplayState.allCases {
+        let snapshot = DestinationStatusSnapshot(
+            destinationID: "destination",
+            destinationLabel: "Archive folder",
+            enabled: true,
+            state: state,
+            writtenAtEpoch: 1_000
+        )
+        let effective = snapshot.state(at: now)
+        let status = DestinationMonitoringStatus(snapshot: snapshot, nowEpoch: now)
+        let line = DestinationStatusLine.render(snapshot, nowEpoch: now) { _ in "earlier" }
+        let timeline = DestinationTimelinePlanner.entries(
+            snapshots: [snapshot],
+            nowEpoch: now
+        )
+        let widgetSnapshot = try #require(timeline.first?.snapshots.first)
+        let escalation = Escalation.plan(
+            snapshot: snapshot,
+            now: Date(timeIntervalSince1970: now),
+            notificationsAuthorized: true
+        )
+
+        #expect(status.state == effective.rawValue, "intent disagreed for \(state.rawValue)")
+        #expect(line.contains(effective.rawValue), "status line disagreed for \(state.rawValue)")
+        #expect(
+            widgetSnapshot.state(at: now) == effective,
+            "widget disagreed for \(state.rawValue)"
+        )
+        #expect(
+            escalation.overdue == (effective == .overdue),
+            "notification escalation disagreed for \(state.rawValue)"
+        )
+    }
+}
+
 @Test func externalStatusKeepsLastSuccessAcrossFailuresAndAdvancesSequence() {
     let successTally = RunTally(read: 3, committed: 3, acked: 3)
     let success = ExternalStatusRecord.next(
