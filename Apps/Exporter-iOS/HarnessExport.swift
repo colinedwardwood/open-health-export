@@ -13,7 +13,9 @@ import Foundation
 import HealthKitSource
 import MetricCatalog
 import NetEgress
+#if !OHE_OBS25_SIZE_BASELINE
 import OTLPExport
+#endif
 import RunJournal
 import SinkCompanion
 import SinkHTTP
@@ -44,12 +46,14 @@ private struct HTTPSVerificationRecord: Codable {
     var propagateTraceparent: Bool?
 }
 
+#if !OHE_OBS25_SIZE_BASELINE
 private struct OTLPDestinationRecord: Codable {
     var urlString: String
     var allowedHosts: [String]
     var allowInsecureHTTP: Bool
     var previewDigest: String
 }
+#endif
 
 private struct PendingHTTPS {
     var probe: HTTPSDestinationProbe
@@ -1764,6 +1768,7 @@ enum HarnessExport {
         try JSONEncoder().encode(record).write(to: url, options: .atomic)
     }
 
+    #if !OHE_OBS25_SIZE_BASELINE
     static func storedOTLPURL() -> String {
         guard let root = try? applicationSupportRoot(),
               let data = try? Data(contentsOf: root.appendingPathComponent("otlp-destination.json")),
@@ -2042,6 +2047,7 @@ enum HarnessExport {
             throw error
         }
     }
+    #endif
 
     static func wipeEverything() async throws {
         let root = try applicationSupportRoot()

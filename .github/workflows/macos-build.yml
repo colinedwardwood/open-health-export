@@ -192,3 +192,5 @@ jobs:
           scripts/scan-release-artifacts.sh \
             "$RUNNER_TEMP/ohe-release-ios/Release-iphoneos" \
             "$RUNNER_TEMP/ohe-release-mac/Release"
+      - name: Telemetry stays within its uncompressed app-size budget
+        run: scripts/check-obs25-telemetry-size.sh

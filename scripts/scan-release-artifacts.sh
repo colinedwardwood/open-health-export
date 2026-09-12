@@ -129,6 +129,14 @@ cat "$scratch/fault-seams" "$scratch/canaries" > "$scratch/forbidden"
 found=0
 for binary in "${binaries[@]}"; do
   echo "Scanning release binary: $binary"
+  if otool -L "$binary" | grep -Ei 'grpc|swift[_-]?nio|NIOPosix|SwiftProtobuf|OpenTelemetry'; then
+    echo "OBS-25: release binary links a forbidden telemetry transport dependency: $binary" >&2
+    found=1
+  fi
+  if nm -u "$binary" | grep -Ei 'grpc|swift[_-]?nio|NIOPosix|SwiftProtobuf|OpenTelemetry'; then
+    echo "OBS-25: release binary imports a forbidden telemetry transport symbol: $binary" >&2
+    found=1
+  fi
   if otool -L "$binary" | grep -F "StoreKit.framework"; then
     echo "R-110: release binary links StoreKit: $binary" >&2
     found=1

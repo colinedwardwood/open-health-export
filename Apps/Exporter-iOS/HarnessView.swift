@@ -61,12 +61,14 @@ struct HarnessView: View {
     @State private var mqttPKCS12Password = ""
     @State private var pickingMQTTPKCS12 = false
     @State private var mqttTestLines: [String] = []
+    #if !OHE_OBS25_SIZE_BASELINE
     @State private var otlpURL = ""
     @State private var allowInsecureOTLP = false
     @State private var otlpPreview = ""
     @State private var otlpPayload: Data?
     @State private var otlpGate = DiagnosticPreviewGate()
     @State private var otlpLines: [String] = []
+    #endif
     @State private var showScanner = false
     @State private var diagnosticPreview = ""
     @State private var diagnosticPayload: Data?
@@ -247,9 +249,11 @@ struct HarnessView: View {
             appPrivacyGate.prepare(enabled: appPrivacyGateEnabled)
             timeToFirstFrameMS = LaunchMark.millisecondsToNow()
             refreshDestinationSurfaces()
+            #if !OHE_OBS25_SIZE_BASELINE
             if otlpURL.isEmpty {
                 otlpURL = HarnessExport.storedOTLPURL()
             }
+            #endif
             propagateTraceparent = HarnessExport.storedHTTPSTraceparent()
             companionTraceparent = HarnessExport.storedCompanionTraceparent()
             if disclosureAcknowledged {
@@ -787,6 +791,7 @@ struct HarnessView: View {
                     .font(.footnote)
                     .textSelection(.enabled)
             }
+            #if !OHE_OBS25_SIZE_BASELINE
             TextField("OTLP collector URL", text: $otlpURL)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -841,6 +846,7 @@ struct HarnessView: View {
                     .font(.footnote)
                     .textSelection(.enabled)
             }
+            #endif
             Button("Refresh destination status") {
                 refreshDestinationSurfaces()
             }
@@ -1063,6 +1069,7 @@ struct HarnessView: View {
         }
     }
 
+    #if !OHE_OBS25_SIZE_BASELINE
     private func revealOTLPEnable() {
         guard let otlpPayload else { return }
         otlpGate.reachedEnd(of: otlpPayload)
@@ -1135,6 +1142,7 @@ struct HarnessView: View {
             status = "Failed: \(error.localizedDescription)"
         }
     }
+    #endif
 
     @MainActor
     private func loadLedger() async {
