@@ -867,7 +867,7 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
         11: ["Redaction", "Notification", "OTLP"],
         12: ["BoundedResource"],
         13: ["Migrates", "CorruptCheckpoint"],
-        14: ["AtomicWrite"],
+        14: ["AtomicWrite", "ProcessExitDuringAnchorPersist"],
         15: ["InstantInvariance"],
         16: ["NetworkDials", "R32"],
     ]

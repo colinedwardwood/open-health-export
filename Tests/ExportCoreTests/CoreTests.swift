@@ -1932,6 +1932,42 @@ private func runUntilProcessExitSeam() async throws {
         }
     }
 }
+
+@Test func p14ProcessExitDuringAnchorPersistLeavesThePriorCheckpointComplete() async throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-p14-process-exit-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let metric = MetricCatalog.heartRate.id
+    let checkpoint = CheckpointEnvelope(
+        tzDatabaseVersion: "2024a",
+        epoch: 7,
+        adapterAnchor: Data([0x14])
+    )
+    let statePath = root.appendingPathComponent("state.sqlite").path
+    try SQLiteV1Fixture.write(
+        path: statePath,
+        metric: metric,
+        checkpoint: checkpoint,
+        runID: "p14-prior"
+    )
+
+    setenv("OHE_PROCESS_EXIT_ROOT", root.path, 1)
+    setenv("OHE_PROCESS_EXIT_SEAM", ExportFaultLocation.duringAnchorPersist.rawValue, 1)
+    setenv("OHE_PROCESS_EXIT_SEED", "14", 1)
+    await #expect(processExitsWith: .exitCode(9)) {
+        try await runUntilProcessExitSeam()
+    }
+    unsetenv("OHE_PROCESS_EXIT_ROOT")
+    unsetenv("OHE_PROCESS_EXIT_SEAM")
+    unsetenv("OHE_PROCESS_EXIT_SEED")
+
+    let reopened = try SQLiteStateStore(path: statePath)
+    let cursor = try await reopened.transact { try $0.loadCursor(metric: metric) }
+    #expect(cursor?.epoch == 7)
+    #expect(cursor?.anchorBlob == Data([0x14]))
+    #expect(try await reopened.transact { try $0.pendingBatches() }.isEmpty)
+}
 #endif
 
 @Test func pendingDeliveryRunnerReplaysACommittedBatchAfterRestart() async throws {
