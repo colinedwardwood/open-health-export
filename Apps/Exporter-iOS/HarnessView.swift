@@ -2411,9 +2411,13 @@ struct HarnessView: View {
     @MainActor
     private func runMQTTExport() async {
         phase = .working
-        status = "Working: MQTT export."
+        status = NamedWorkProgress.types(current: 0, total: 1)
         do {
-            results = try await HarnessExport.runMQTTDestination()
+            results = try await HarnessExport.runMQTTDestination { current, total in
+                await MainActor.run {
+                    status = NamedWorkProgress.types(current: current, total: total)
+                }
+            }
             refreshDestinationSurfaces()
             await refreshLedgerIntegrity()
             await refreshWakeAttribution()
@@ -2431,9 +2435,13 @@ struct HarnessView: View {
     @MainActor
     private func runHTTPSExport() async {
         phase = .working
-        status = "Working: HTTPS export."
+        status = NamedWorkProgress.types(current: 0, total: 1)
         do {
-            results = try await HarnessExport.runHTTPSDestination()
+            results = try await HarnessExport.runHTTPSDestination { current, total in
+                await MainActor.run {
+                    status = NamedWorkProgress.types(current: current, total: total)
+                }
+            }
             refreshDestinationSurfaces()
             await refreshLedgerIntegrity()
             await refreshWakeAttribution()
@@ -2553,10 +2561,14 @@ struct HarnessView: View {
     private func runCompanionExport() async {
         guard let pairing else { return }
         phase = .working
-        status = "Working: companion export."
+        status = NamedWorkProgress.types(current: 0, total: 1)
         results = []
         do {
-            results = try await HarnessExport.runCompanion(session: pairing)
+            results = try await HarnessExport.runCompanion(session: pairing) { current, total in
+                await MainActor.run {
+                    status = NamedWorkProgress.types(current: current, total: total)
+                }
+            }
             refreshDestinationSurfaces()
             status = "Ready. Companion export finished. Compare confirmation \(sas) with the Mac."
         } catch {

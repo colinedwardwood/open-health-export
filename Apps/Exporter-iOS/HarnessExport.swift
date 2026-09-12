@@ -980,7 +980,10 @@ enum HarnessExport {
         return lines
     }
 
-    static func runCompanion(session: PairingSession) async throws -> [String] {
+    static func runCompanion(
+        session: PairingSession,
+        onProgress: (@Sendable (Int, Int) async -> Void)? = nil
+    ) async throws -> [String] {
         let scope = try await destinationScope("companion")
         try ExportScopeGate.requireConfigured(scope)
         let root = try applicationSupportRoot()
@@ -1054,7 +1057,9 @@ enum HarnessExport {
         let ledgerSeal = ledgerHeadSeal()
         let ledgerSealURL = root.appendingPathComponent("ledger-head-seal.json")
         var lines: [String] = []
-        for metric in scope.metrics.sorted(by: { $0.rawValue < $1.rawValue }) {
+        let metrics = scope.metrics.sorted { $0.rawValue < $1.rawValue }
+        for (index, metric) in metrics.enumerated() {
+            await onProgress?(index + 1, metrics.count)
             let run = ExportRun(
                 source: source,
                 destination: verified,
@@ -1771,7 +1776,9 @@ enum HarnessExport {
         Task { await PendingDestination.shared.setMQTT(nil) }
     }
 
-    static func runMQTTDestination() async throws -> [String] {
+    static func runMQTTDestination(
+        onProgress: (@Sendable (Int, Int) async -> Void)? = nil
+    ) async throws -> [String] {
         let root = try applicationSupportRoot()
         let data = try Data(
             contentsOf: root.appendingPathComponent("mqtt-destination.json")
@@ -1839,7 +1846,9 @@ enum HarnessExport {
         let snapshotURL = StatusSnapshotLocation.url(destinationID: "mqtt")
         let ledgerSeal = ledgerHeadSeal()
         let ledgerSealURL = root.appendingPathComponent("ledger-head-seal.json")
-        for metric in scope.metrics.sorted(by: { $0.rawValue < $1.rawValue }) {
+        let metrics = scope.metrics.sorted { $0.rawValue < $1.rawValue }
+        for (index, metric) in metrics.enumerated() {
+            await onProgress?(index + 1, metrics.count)
             let envelope = WireEnvelope(
                 exporterId: exporterID,
                 seq: 1,
@@ -1900,7 +1909,9 @@ enum HarnessExport {
         return lines
     }
 
-    static func runHTTPSDestination() async throws -> [String] {
+    static func runHTTPSDestination(
+        onProgress: (@Sendable (Int, Int) async -> Void)? = nil
+    ) async throws -> [String] {
         let root = try applicationSupportRoot()
         let data = try Data(
             contentsOf: root.appendingPathComponent("https-destination.json")
@@ -1973,7 +1984,9 @@ enum HarnessExport {
         let snapshotURL = StatusSnapshotLocation.url(destinationID: "https")
         let ledgerSeal = ledgerHeadSeal()
         let ledgerSealURL = root.appendingPathComponent("ledger-head-seal.json")
-        for metric in scope.metrics.sorted(by: { $0.rawValue < $1.rawValue }) {
+        let metrics = scope.metrics.sorted { $0.rawValue < $1.rawValue }
+        for (index, metric) in metrics.enumerated() {
+            await onProgress?(index + 1, metrics.count)
             let envelope = WireEnvelope(
                 exporterId: exporterID,
                 seq: 1,

@@ -205,6 +205,27 @@ private func backfillCheckpoint(
     #expect(lines.contains("Reading day 1 of 3 · type 1 of 1"))
     #expect(lines.contains("Reading day 3 of 3 · type 1 of 1"))
     #expect(NamedWorkProgress.reconcile(current: 2, total: 5) == "Reconciling 2 of 5 types")
+    #expect(NamedWorkProgress.types(current: 3, total: 12) == "Reading 3 of 12 types")
+
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let harness = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift"),
+        encoding: .utf8
+    )
+    for name in ["runHTTPSDestination", "runMQTTDestination", "runCompanion"] {
+        guard let range = harness.range(of: "static func \(name)") else {
+            Issue.record("\(name) is missing")
+            continue
+        }
+        let window = String(harness[range.lowerBound...].prefix(500))
+        #expect(
+            window.contains("onProgress:"),
+            "\(name) has no type-total progress callback"
+        )
+    }
 }
 
 private actor ProgressLog {
