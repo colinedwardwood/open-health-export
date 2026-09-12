@@ -1,0 +1,2 @@
+{"batchID":"queue-1","expectedRecords":2,"metric":"heartRate","rangeDescription":"queue_eviction:2026-01-01:2026-01-01","rangeEndDay":"2026-01-01","rangeStartDay":"2026-01-01"}
+{"batchID":"queue-2","expectedRecords":3,"metric":"heartRate","rangeDescription":"queue_eviction:2026-01-02:2026-01-03","rangeEndDay":"2026-01-03","rangeStartDay":"2026-01-02"}
