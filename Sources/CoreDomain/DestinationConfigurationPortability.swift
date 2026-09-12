@@ -28,6 +28,7 @@ public enum DestinationConfigurationPortabilityError: Error, Sendable, Equatable
     case credentialsInEndpoint
     case confirmationMismatch
     case invalidScopeDateRange
+    case unsupportedDestinationKind(PortableDestinationKind)
 }
 
 public struct PortableDestinationExportScope: Sendable, Codable, Equatable {
@@ -276,5 +277,88 @@ public struct ConfirmedDestinationConfigurationImport: Sendable, Equatable {
 
     fileprivate init(drafts: [DestinationConfigurationDraft]) {
         self.drafts = drafts
+    }
+}
+
+public struct PortableDestinationSetupInputs: Sendable, Equatable {
+    public let slotIdentifier: String
+    public let endpoint: String
+    public let allowInsecure: Bool
+    public let clientID: String?
+    public let topic: String?
+    public let qos: UInt8?
+}
+
+public enum PortableDestinationMaterializer {
+    public static func materialize(
+        _ configuration: PortableDestinationConfiguration
+    ) throws -> PortableDestinationSetupInputs {
+        let supported: Set<String>
+        switch configuration.kind {
+        case .https:
+            supported = ["allowInsecureHTTP", "method"]
+            if let method = configuration.settings["method"],
+               method.uppercased() != "POST" {
+                throw DestinationConfigurationPortabilityError.unsupportedSetting(
+                    kind: .https,
+                    key: "method"
+                )
+            }
+            try rejectUnsupported(
+                configuration.settings,
+                supported: supported,
+                kind: .https
+            )
+            return PortableDestinationSetupInputs(
+                slotIdentifier: "https",
+                endpoint: configuration.endpoint,
+                allowInsecure:
+                    configuration.settings["allowInsecureHTTP"] == "true",
+                clientID: nil,
+                topic: nil,
+                qos: nil
+            )
+        case .mqtt:
+            supported = ["allowInsecure", "clientID", "qos", "topic"]
+            try rejectUnsupported(
+                configuration.settings,
+                supported: supported,
+                kind: .mqtt
+            )
+            let qos = UInt8(configuration.settings["qos"] ?? "") ?? 1
+            guard qos <= 1 else {
+                throw DestinationConfigurationPortabilityError.unsupportedSetting(
+                    kind: .mqtt,
+                    key: "qos"
+                )
+            }
+            return PortableDestinationSetupInputs(
+                slotIdentifier: "mqtt",
+                endpoint: configuration.endpoint,
+                allowInsecure:
+                    configuration.settings["allowInsecure"] == "true",
+                clientID: configuration.settings["clientID"],
+                topic: configuration.settings["topic"],
+                qos: qos
+            )
+        case .localFile, .homeAssistant, .companion:
+            throw DestinationConfigurationPortabilityError
+                .unsupportedDestinationKind(configuration.kind)
+        }
+    }
+
+    private static func rejectUnsupported(
+        _ settings: [String: String],
+        supported: Set<String>,
+        kind: PortableDestinationKind
+    ) throws {
+        if let key = settings.keys.sorted().first(
+            where: { !supported.contains($0) }
+        ) {
+            throw DestinationConfigurationPortabilityError.unsupportedSetting(
+                kind: kind,
+                key: key
+            )
+        }
     }
 }

@@ -428,6 +428,30 @@ final class ExporterUITests: XCTestCase {
         )
     }
 
+    func testImportedHTTPSDraftLoadsOnlyAfterExplicitSetupAction() throws {
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_IMPORTED_DRAFT"] = "https"
+        app.launch()
+        enterControls()
+        let configure = scrollToHittable(
+            app.buttons["Add credentials and test"]
+        )
+        XCTAssertTrue(configure.exists)
+        try performAccessibilityAudit("configuration-import-disabled-draft")
+        configure.tap()
+
+        let endpoint = scrollToHittable(app.textFields["https-url"])
+        XCTAssertEqual(
+            endpoint.value as? String,
+            "https://collector.example/upload"
+        )
+        XCTAssertTrue(app.secureTextFields["https-bearer"].exists)
+        XCTAssertFalse(
+            app.buttons["destination-confirm"].exists,
+            "loading a draft must not run its destination test or enable it"
+        )
+    }
+
     func testDataBrowserShowsAnExplicitEmptySearchState() {
         enterControls()
         let search = scrollToHittable(app.textFields["browser-search"])

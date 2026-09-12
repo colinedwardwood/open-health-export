@@ -163,3 +163,64 @@ private func portableMQTT(
         )
     }
 }
+
+@Test func importedNetworkDraftsMaterializeOnlySettingsRuntimeCanPreserve() throws {
+    let mqtt = try PortableDestinationConfiguration(
+        sourceIdentifier: "mqtt",
+        displayName: "MQTT",
+        kind: .mqtt,
+        endpoint: "mqtts://nas.example:8883",
+        settings: [
+            "allowInsecure": "false",
+            "clientID": "phone",
+            "qos": "1",
+            "topic": "health/export",
+        ]
+    )
+    let inputs = try PortableDestinationMaterializer.materialize(mqtt)
+    #expect(inputs.slotIdentifier == "mqtt")
+    #expect(inputs.endpoint == "mqtts://nas.example:8883")
+    #expect(inputs.clientID == "phone")
+    #expect(inputs.topic == "health/export")
+    #expect(inputs.qos == 1)
+    #expect(!inputs.allowInsecure)
+
+    #expect(
+        throws: DestinationConfigurationPortabilityError.unsupportedSetting(
+            kind: .mqtt,
+            key: "retain"
+        )
+    ) {
+        try PortableDestinationMaterializer.materialize(portableMQTT())
+    }
+}
+
+@Test func importedDraftMaterializationRejectsUnsupportedKindsAndMethods() throws {
+    let local = try PortableDestinationConfiguration(
+        sourceIdentifier: "local",
+        displayName: "Local",
+        kind: .localFile,
+        endpoint: "archive"
+    )
+    #expect(
+        throws: DestinationConfigurationPortabilityError
+            .unsupportedDestinationKind(.localFile)
+    ) {
+        try PortableDestinationMaterializer.materialize(local)
+    }
+    let https = try PortableDestinationConfiguration(
+        sourceIdentifier: "https",
+        displayName: "HTTPS",
+        kind: .https,
+        endpoint: "https://example.test/upload",
+        settings: ["method": "PUT"]
+    )
+    #expect(
+        throws: DestinationConfigurationPortabilityError.unsupportedSetting(
+            kind: .https,
+            key: "method"
+        )
+    ) {
+        try PortableDestinationMaterializer.materialize(https)
+    }
+}

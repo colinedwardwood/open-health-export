@@ -44,6 +44,7 @@ private struct HTTPSVerificationRecord: Codable {
     var firstSeen: String
     var hasBearer: Bool
     var propagateTraceparent: Bool?
+    var importedLocalIdentifier: String?
 }
 
 #if !OHE_OBS25_SIZE_BASELINE
@@ -62,6 +63,7 @@ private struct PendingHTTPS {
     var allowInsecureHTTP: Bool
     var bearer: String?
     var firstSeen: String
+    var importedLocalIdentifier: String?
 }
 
 private struct PendingMQTT {
@@ -77,6 +79,7 @@ private struct PendingMQTT {
     var username: String?
     var password: String?
     var firstSeen: String
+    var importedLocalIdentifier: String?
 }
 
 @MainActor
@@ -121,6 +124,7 @@ private struct MQTTVerificationRecord: Codable {
     var leafSPKISha256: String?
     var issuerSPKISha256: String?
     var firstSeen: String?
+    var importedLocalIdentifier: String?
 }
 
 private actor CountingBackfillObservations: DayObservationSource {
@@ -263,6 +267,22 @@ enum HarnessExport {
         default:
             return false
         }
+    }
+
+    static func hasDestinationConfiguration(_ destinationID: String) -> Bool {
+        guard let root = try? applicationSupportRoot() else { return false }
+        let filename: String
+        switch destinationID {
+        case "https":
+            filename = "https-destination.json"
+        case "mqtt":
+            filename = "mqtt-destination.json"
+        default:
+            return false
+        }
+        return FileManager.default.fileExists(
+            atPath: root.appendingPathComponent(filename).path
+        )
     }
 
     private static func requestScopeAuthorizationIfConfigured(
@@ -1237,7 +1257,8 @@ enum HarnessExport {
     static func prepareHTTPSDestination(
         urlString: String,
         allowInsecureHTTP: Bool,
-        bearer: String?
+        bearer: String?,
+        importedLocalIdentifier: String? = nil
     ) async throws -> DestinationConfirmationCard {
         guard let host = URL(string: urlString)?.host?.lowercased(), !host.isEmpty else {
             throw EgressError.invalidURL
@@ -1267,7 +1288,8 @@ enum HarnessExport {
             allowedHosts: allowedHosts.sorted(),
             allowInsecureHTTP: allowInsecureHTTP,
             bearer: bearer,
-            firstSeen: now
+            firstSeen: now,
+            importedLocalIdentifier: importedLocalIdentifier
         ))
         return DestinationConfirmationCard(
             host: host,
@@ -1293,7 +1315,8 @@ enum HarnessExport {
             issuerSPKISha256: probe.identity?.issuerSPKISha256,
             firstSeen: pending.firstSeen,
             hasBearer: pending.bearer != nil,
-            propagateTraceparent: propagateTraceparent
+            propagateTraceparent: propagateTraceparent,
+            importedLocalIdentifier: pending.importedLocalIdentifier
         )
         let root = try applicationSupportRoot()
         let bearerStore = KeychainSecretStore(
@@ -1358,7 +1381,8 @@ enum HarnessExport {
         clientPKCS12Password: String? = nil,
         username: String? = nil,
         password: String? = nil,
-        qos: UInt8 = 1
+        qos: UInt8 = 1,
+        importedLocalIdentifier: String? = nil
     ) async throws -> DestinationConfirmationCard {
         guard let host = URL(string: urlString)?.host?.lowercased(), !host.isEmpty else {
             throw EgressError.invalidURL
@@ -1398,7 +1422,8 @@ enum HarnessExport {
             clientPKCS12Password: clientPKCS12Password,
             username: username,
             password: password,
-            firstSeen: now
+            firstSeen: now,
+            importedLocalIdentifier: importedLocalIdentifier
         ))
         return DestinationConfirmationCard(
             host: host,
@@ -1429,7 +1454,8 @@ enum HarnessExport {
             hasPassword: pending.password != nil,
             leafSPKISha256: probe.identity?.leafSPKISha256,
             issuerSPKISha256: probe.identity?.issuerSPKISha256,
-            firstSeen: pending.firstSeen
+            firstSeen: pending.firstSeen,
+            importedLocalIdentifier: pending.importedLocalIdentifier
         )
         let root = try applicationSupportRoot()
         let pkcs12URL = root.appendingPathComponent("mqtt-client.p12")

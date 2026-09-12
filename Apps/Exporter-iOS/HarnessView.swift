@@ -61,6 +61,8 @@ struct HarnessView: View {
     @State private var mqttPKCS12Password = ""
     @State private var pickingMQTTPKCS12 = false
     @State private var mqttTestLines: [String] = []
+    @State private var importedDestinationDraft: ImportedDestinationDraftRecord?
+    @State private var importedDraftRefreshToken = 0
     #if !OHE_OBS25_SIZE_BASELINE
     @State private var otlpURL = ""
     @State private var allowInsecureOTLP = false
@@ -648,7 +650,9 @@ struct HarnessView: View {
             }
             Text("Your health data is sent only to destinations listed here. This is what the app records about its own use, not independent proof.")
                 .font(.footnote)
-            ConfigurationImportView()
+            ConfigurationImportView(
+                refreshToken: importedDraftRefreshToken
+            ) { loadImportedDestinationDraft($0) }
             Button("Enable local archive folder (R-25 test)") {
                 Task { await enableLocalFile() }
             }
@@ -1807,6 +1811,53 @@ struct HarnessView: View {
     }
 
     @MainActor
+    private func loadImportedDestinationDraft(
+        _ draft: ImportedDestinationDraftRecord
+    ) {
+        let inputs: PortableDestinationSetupInputs
+        do {
+            inputs = try PortableDestinationMaterializer.materialize(
+                draft.configuration
+            )
+        } catch {
+            status = "Import refused: \(error)."
+            return
+        }
+        let slot = inputs.slotIdentifier
+        guard !HarnessExport.hasDestinationConfiguration(slot) else {
+            status = "Import refused: the \(slot) destination slot already has a configuration. Disable and remove it before importing another."
+            return
+        }
+        importedDestinationDraft = draft
+        scopeDestinationID = slot
+        browserBaseline = []
+        browserSelection = Set(draft.configuration.exportScope.metrics)
+        scopeStartDate =
+            draft.configuration.exportScope.startInclusive ?? Date()
+        scopeEndEnabled =
+            draft.configuration.exportScope.endExclusive != nil
+        scopeEndDate =
+            draft.configuration.exportScope.endExclusive
+                ?? scopeStartDate.addingTimeInterval(365 * 24 * 60 * 60)
+        switch draft.configuration.kind {
+        case .https:
+            httpsURL = inputs.endpoint
+            allowInsecureHTTP = inputs.allowInsecure
+            status = "Ready. HTTPS fields loaded from the disabled draft. Add the omitted credential, then run the destination test."
+        case .mqtt:
+            mqttURL = inputs.endpoint
+            mqttClientID = inputs.clientID ?? mqttClientID
+            mqttTopic = inputs.topic ?? mqttTopic
+            mqttQoS = inputs.qos ?? 1
+            allowInsecureMQTT = inputs.allowInsecure
+            status = "Ready. MQTT fields loaded from the disabled draft. Add omitted credentials, then run the destination test."
+        default:
+            importedDestinationDraft = nil
+            status = "Import refused: this destination kind does not have a setup path."
+        }
+    }
+
+    @MainActor
     private func testHTTPS() async {
         phase = .working
         status = "Working: HTTPS destination test and identity pin."
@@ -1815,7 +1866,10 @@ struct HarnessView: View {
             confirmationCard = try await HarnessExport.prepareHTTPSDestination(
                 urlString: httpsURL,
                 allowInsecureHTTP: allowInsecureHTTP,
-                bearer: httpsBearer.isEmpty ? nil : httpsBearer
+                bearer: httpsBearer.isEmpty ? nil : httpsBearer,
+                importedLocalIdentifier:
+                    importedDestinationDraft?.configuration.kind == .https
+                        ? importedDestinationDraft?.localIdentifier : nil
             )
             httpsTestLines = confirmationCard?.lines ?? []
             status = "Ready. Confirm this server before any Health data moves."
@@ -1843,7 +1897,10 @@ struct HarnessView: View {
                 clientPKCS12Password: mqttPKCS12Password.isEmpty ? nil : mqttPKCS12Password,
                 username: mqttUsername.isEmpty ? nil : mqttUsername,
                 password: mqttPassword.isEmpty ? nil : mqttPassword,
-                qos: mqttQoS
+                qos: mqttQoS,
+                importedLocalIdentifier:
+                    importedDestinationDraft?.configuration.kind == .mqtt
+                        ? importedDestinationDraft?.localIdentifier : nil
             )
             mqttTestLines = confirmationCard?.lines ?? []
             status = "Ready. Confirm this server before any Health data moves."
@@ -1861,6 +1918,24 @@ struct HarnessView: View {
         phase = .working
         status = "Working: enabling destination."
         do {
+            let activatingDraft = importedDestinationDraft.flatMap { draft in
+                let kind = draft.configuration.kind
+                return (confirmationKind == .https && kind == .https)
+                    || (confirmationKind == .mqtt && kind == .mqtt)
+                    ? draft : nil
+            }
+            if let draft = activatingDraft {
+                let destinationID =
+                    draft.configuration.kind == .https ? "https" : "mqtt"
+                try await HarnessExport.saveDestinationScope(
+                    try DestinationExportScope(
+                        destinationID: destinationID,
+                        metrics: browserSelection,
+                        startInclusive: scopeStartDate,
+                        endExclusive: scopeEndEnabled ? scopeEndDate : nil
+                    )
+                )
+            }
             switch confirmationKind {
             case .https:
                 httpsTestLines = try await HarnessExport.confirmPendingHTTPSDestination(
@@ -1873,6 +1948,18 @@ struct HarnessView: View {
                 status = "Ready. MQTT destination passed its real-path test and is enabled."
             case nil:
                 status = "Failed: nothing to confirm."
+            }
+            if let draft = activatingDraft {
+                do {
+                    try ImportedDestinationDraftStore.remove(
+                        localIdentifier: draft.localIdentifier
+                    )
+                    importedDestinationDraft = nil
+                    importedDraftRefreshToken += 1
+                    status += " Imported scope applied and the disabled draft was consumed."
+                } catch {
+                    status += " The destination is enabled, but its inert draft could not be removed; discard that draft manually."
+                }
             }
             confirmationCard = nil
             confirmationKind = nil

@@ -6,6 +6,8 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ConfigurationImportView: View {
+    let refreshToken: Int
+    let onConfigure: (ImportedDestinationDraftRecord) -> Void
     @State private var showingImporter = false
     @State private var review: DestinationConfigurationImportReview?
     @State private var confirmation = ""
@@ -75,6 +77,18 @@ struct ConfigurationImportView: View {
                         .font(.footnote)
                         Text("Disabled — destination test required")
                             .font(.footnote)
+                        if draft.configuration.kind == .https
+                            || draft.configuration.kind == .mqtt {
+                            Button("Add credentials and test") {
+                                onConfigure(draft)
+                            }
+                            .accessibilityIdentifier(
+                                "configuration-import-configure-\(draft.localIdentifier)"
+                            )
+                        } else {
+                            Text("This destination kind does not yet have an import setup path.")
+                                .font(.footnote)
+                        }
                         Button("Discard draft") {
                             discard(draft.localIdentifier)
                         }
@@ -98,7 +112,17 @@ struct ConfigurationImportView: View {
         ) { result in
             load(result)
         }
-        .onAppear { reloadDrafts() }
+        .onAppear {
+            #if DEBUG
+            if ProcessInfo.processInfo.environment[
+                "OHE_SEED_IMPORTED_DRAFT"
+            ] == "https" {
+                try? ImportedDestinationDraftStore.seedHTTPSForUITests()
+            }
+            #endif
+            reloadDrafts()
+        }
+        .onChange(of: refreshToken) { _, _ in reloadDrafts() }
     }
 
     private func load(_ result: Result<[URL], any Error>) {
@@ -161,6 +185,34 @@ struct ImportedDestinationDraftRecord: Codable, Equatable {
 }
 
 enum ImportedDestinationDraftStore {
+    #if DEBUG
+    static func seedHTTPSForUITests() throws {
+        guard try load().isEmpty else { return }
+        let configuration = try PortableDestinationConfiguration(
+            sourceIdentifier: "seed-https",
+            displayName: "Imported HTTPS",
+            kind: .https,
+            endpoint: "https://collector.example/upload",
+            settings: ["method": "POST"],
+            exportScope: PortableDestinationExportScope(
+                metrics: [MetricID(rawValue: "heart_rate")],
+                startInclusive: Date(timeIntervalSince1970: 1)
+            )
+        )
+        let review = try DestinationConfigurationDocument(
+            destinations: [configuration]
+        )
+        .encoded()
+        let confirmed = try DestinationConfigurationDocument
+            .reviewImport(review)
+            .confirm(
+                typedConfirmation:
+                    DestinationConfigurationImportReview.confirmationPhrase
+            )
+        _ = try append(confirmed)
+    }
+    #endif
+
     static func append(_ importValue: ConfirmedDestinationConfigurationImport) throws -> Int {
         let file = try fileURL()
         let existing = try load()

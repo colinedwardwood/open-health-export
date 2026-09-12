@@ -10,3 +10,8 @@ fresh local identifiers.
 
 Persisted drafts remain visible after relaunch, can be explicitly discarded,
 and are included in destructive wipe coverage.
+
+HTTPS and MQTT drafts can now prefill the existing credential editors, preserve
+their metric/date scope and fresh imported identity, and are consumed only
+after the real destination probe and explicit server confirmation succeed.
+Imports refuse occupied slots or settings the runtime path cannot preserve.

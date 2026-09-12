@@ -2,6 +2,28 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
+    "Add credentials and test": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add credentials and test"
+          }
+        }
+      }
+    },
+    "This destination kind does not yet have an import setup path.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This destination kind does not yet have an import setup path."
+          }
+        }
+      }
+    },
     "Disabled imported drafts": {
       "extractionState": "manual",
       "localizations": {

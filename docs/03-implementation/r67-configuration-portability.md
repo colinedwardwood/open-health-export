@@ -13,9 +13,14 @@ destination configuration. The representation is credential-free by construction
 
 File import is a two-step API. Parsing produces inert review data. Exact typed
 confirmation produces only new `disabledRequiresTest` drafts, with no operation that
-can update an existing local destination or enable a draft. The app integration must
-still show the full review UI, allocate new local identifiers, collect omitted
-credentials, and run the existing real-path destination test before enablement.
+can update an existing local destination or enable a draft. The app allocates fresh
+local identifiers and persists the disabled drafts. HTTPS and MQTT drafts can be
+loaded into their existing setup editors only when that kind's local slot is empty;
+unsupported settings are refused rather than dropped. The user must supply omitted
+credentials and pass the existing probe, identity-confirmation, scope, and enablement
+path before the draft is consumed. Local-file, Home Assistant, and companion imports
+remain disabled drafts because their runtime setup paths cannot yet preserve the
+portable endpoint/settings contract.
 
 Signed QR import remains a **Should** and is intentionally deferred. The product has
 not selected a signing authority, trust bootstrap, key rotation/revocation policy, or
