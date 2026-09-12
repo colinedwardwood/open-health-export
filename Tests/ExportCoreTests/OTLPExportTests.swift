@@ -339,7 +339,7 @@ import Testing
     #expect(dropped.metricPoint.count == 1)
 }
 
-@Test func otlpCreatesNoDedicatedBackgroundSchedule() throws {
+@Test func obs20TelemetryIsLazyAfterObserverRegistrationAndHasNoDedicatedSchedule() throws {
     let root = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
         .deletingLastPathComponent()
@@ -353,8 +353,25 @@ import Testing
         contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/AppLifecycleCoordinator.swift"),
         encoding: .utf8
     )
-    #expect(!source.contains("OTLPBackgroundCoordinator"))
-    #expect(!source.contains("projectOTLP"))
+    #expect(source.contains("try? await AppLifecycleCoordinator.shared.startObserversIfEligible()"))
+    for forbidden in [
+        "import OTLPExport",
+        "OTLPBackgroundCoordinator",
+        "OTLPExporter(",
+        "storedOTLPURL",
+        "projectOTLP",
+    ] {
+        #expect(
+            !source.contains(forbidden),
+            "launch lifecycle must register HealthKit observers without telemetry: \(forbidden)"
+        )
+    }
+    let harness = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift"),
+        encoding: .utf8
+    )
+    #expect(harness.contains("static func projectOTLP() async throws"))
+    #expect(harness.contains("static func enableOTLPCollector("))
 }
 
 @Test func otlpDependencyGraphUsesHTTPProtobufWithoutGRPCOrNIO() throws {
