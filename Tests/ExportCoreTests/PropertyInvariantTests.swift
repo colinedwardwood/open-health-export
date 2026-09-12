@@ -31,6 +31,25 @@ private enum StatefulSinkError: Error {
     case injected
 }
 
+#if DEBUG
+private final class TransitionCoverageRecorder: ExportFaultInjector, @unchecked Sendable {
+    private let lock = NSLock()
+    private var locations: Set<ExportFaultLocation> = []
+
+    func hit(_ location: ExportFaultLocation) {
+        lock.lock()
+        locations.insert(location)
+        lock.unlock()
+    }
+
+    func snapshot() -> Set<ExportFaultLocation> {
+        lock.lock()
+        defer { lock.unlock() }
+        return locations
+    }
+}
+#endif
+
 private actor StatefulPropertySink: DestinationSink {
     private var failuresRemaining: Int
     private var receiver = ReferenceReceiver()
@@ -61,6 +80,39 @@ private actor StatefulPropertySink: DestinationSink {
         Set(receiver.quantities.keys)
     }
 }
+
+#if DEBUG
+@Test func anchorCheckpointTransitionGraphIsFullyCovered() async throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-transition-coverage-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let destination = root.appendingPathComponent("destination")
+    try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+    let metric = MetricCatalog.heartRate.id
+    let page = SamplePage(
+        samples: [propertySample(uuid: propertyUUID(33), value: 72, minute: 1)],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0x33]),
+        observedThrough: Date(timeIntervalSince1970: 1)
+    )
+    let recorder = TransitionCoverageRecorder()
+    var run = ExportRun(
+        source: FixtureSource(pages: [page]),
+        destination: .testing(LocalFileSink(directory: destination)),
+        store: MemoryStateStore(),
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    )
+    run.faults = recorder
+    #expect(try await run.run().kind == .success)
+    #expect(
+        recorder.snapshot() == Set(ExportFaultLocation.allCases),
+        "Every declared anchor/checkpoint transition must execute in the success path"
+    )
+}
+#endif
 
 private func propertyUUID(_ index: Int) -> String {
     String(format: "00000000-0000-4000-8000-%012x", index)

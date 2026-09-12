@@ -10,6 +10,6 @@
   },
   "transitionCoverage": {
     "minimum": 100.0,
-    "evidence": "Tests/ExportCoreTests/PropertyInvariantTests.swift::highRiskStatefulCommandsPreserveQueueCursorAndDestinationInvariants"
+    "evidence": "Tests/ExportCoreTests/PropertyInvariantTests.swift::anchorCheckpointTransitionGraphIsFullyCovered"
   }
 }
