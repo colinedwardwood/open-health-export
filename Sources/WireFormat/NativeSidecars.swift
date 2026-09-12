@@ -7,8 +7,43 @@ import MetricCatalog
 
 /// Live encodings that ride next to the canonical NDJSON archive (R-12).
 public enum NativeSidecars {
-    private struct QuantityValue: Decodable {
+    private struct QuantityLine: Decodable {
+        let kind: String
+        let metricId: String
+        let uuid: String
+        let start: String
+        let end: String
+        let tzOffsetMinutes: Int
+        let tzSource: String
         let value: Double
+        let unit: String
+        let observedAt: String
+    }
+
+    /// Decodes one `sample.quantity` line without requiring batch framing.
+    /// Callers must classify the line first; accepting structural records here would
+    /// make a streaming export checker capable of silently skipping them.
+    public static func quantitySample(fromNDJSONLine data: Data) throws -> SampleRecord {
+        // JSONDecoder uses correctly-rounded binary64 conversion. JSONSerialization
+        // rounds some 17-digit decimals to the adjacent Double on Linux.
+        let quantity = try JSONDecoder().decode(QuantityLine.self, from: data)
+        guard quantity.kind == "sample.quantity" else {
+            throw WireError.utf8
+        }
+        let wireId = quantity.metricId
+        let resolved = MetricCatalog.all.first { $0.wireId == wireId }?.id
+            ?? MetricID(rawValue: wireId)
+        return SampleRecord(
+            key: RecordKey(uuid: quantity.uuid),
+            metric: resolved,
+            start: quantity.start,
+            end: quantity.end,
+            timeZoneOffsetMinutes: quantity.tzOffsetMinutes,
+            timeZoneSource: TimeZoneSource(rawValue: quantity.tzSource) ?? .unknown,
+            value: quantity.value,
+            unit: CanonicalUnit(symbol: quantity.unit),
+            observedAt: quantity.observedAt
+        )
     }
 
     public static func quantitySamples(fromNDJSON data: Data) throws -> [SampleRecord] {
@@ -77,32 +112,10 @@ public enum NativeSidecars {
                     tzDatabaseVersion: object["tzDatabaseVersion"] as? String
                 )
             case "sample.quantity":
-                let wireId = object["metricId"] as? String ?? ""
-                let resolved = MetricCatalog.all.first { $0.wireId == wireId }?.id
-                    ?? MetricID(rawValue: wireId)
+                let sample = try quantitySample(fromNDJSONLine: Data(line.utf8))
+                let resolved = sample.metric
                 if metric == nil { metric = resolved }
-                // Foundation JSONSerialization rounds some 17-digit decimals to
-                // the adjacent Double on Linux. JSONDecoder uses correctly-rounded
-                // binary64 conversion and preserves the canonical wire value.
-                let quantity = try JSONDecoder().decode(
-                    QuantityValue.self,
-                    from: Data(line.utf8)
-                )
-                samples.append(
-                    SampleRecord(
-                        key: RecordKey(uuid: object["uuid"] as? String ?? ""),
-                        metric: resolved,
-                        start: object["start"] as? String ?? "",
-                        end: object["end"] as? String ?? "",
-                        timeZoneOffsetMinutes: (object["tzOffsetMinutes"] as? NSNumber)?.intValue ?? 0,
-                        timeZoneSource: TimeZoneSource(
-                            rawValue: object["tzSource"] as? String ?? "unknown"
-                        ) ?? .unknown,
-                        value: quantity.value,
-                        unit: CanonicalUnit(symbol: object["unit"] as? String ?? ""),
-                        observedAt: object["observedAt"] as? String ?? ""
-                    )
-                )
+                samples.append(sample)
             case "tombstone":
                 tombstones = true
             default:

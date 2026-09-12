@@ -11,7 +11,7 @@ jobs:
   tier-one-corpus:
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '41 5 * * *'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc
@@ -55,9 +55,15 @@ jobs:
           test "$(cat /tmp/t1-second.sha256)" = "$(cat /tmp/t1-first.sha256)"
           grep -Fx 'pipelinecheck lines=10000001' /tmp/t1-pipeline.out
       - name: Exercise ExportRun within its memory ceiling
+        shell: bash
         run: |
-          .build/release/corpusgen --tier T1 --seed 1 --count 5000 |
-            .build/release/exportruncheck
+          set -euo pipefail
+          .build/release/corpusgen --tier T1 --seed 1 |
+            .build/release/exportruncheck |
+            tee /tmp/t1-exportrun.out
+          grep -F 'exportruncheck outcome=success' /tmp/t1-exportrun.out
+          grep -F 'declared_records=10000000' /tmp/t1-exportrun.out
+          grep -F 'limit_mib=100' /tmp/t1-exportrun.out
   tier-two-pathologies:
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 4 * * 0'
     runs-on: ubuntu-latest

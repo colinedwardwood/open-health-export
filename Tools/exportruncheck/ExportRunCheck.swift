@@ -7,11 +7,23 @@ import CorrectnessEngine
 import EnginePorts
 import Foundation
 import MetricCatalog
-import SinkLocalFile
 import TestSupport
 import WireFormat
 
 private let memoryLimitMiB = 100
+private let defaultPageSize = 500
+private let maximumPageSize = 500
+private let maximumConcurrentMetrics = 4
+private let newline = Data([0x0A])
+private let t1StructuralKinds: Set<String> = [
+    "sample.category",
+    "sample.correlation",
+    "workout",
+    "sample.stateOfMind",
+    "series.ecgVoltage",
+    "sample.audiogram",
+    "medicationDose",
+]
 
 @main
 struct ExportRunCheck {
@@ -25,66 +37,135 @@ struct ExportRunCheck {
     }
 
     private static func run() async throws {
-        let input = FileHandle.standardInput.readDataToEndOfFile()
-        let inputLines = try validateT1Provenance(input)
-        // Every metric in the slice is exported, not one of them. Filtering to a single
-        // type turns a five-thousand-record volume check into a two-hundred-sample one,
-        // which would clear any ceiling worth declaring.
-        let byMetric = Dictionary(
-            grouping: try NativeSidecars.quantitySamples(fromNDJSON: input),
-            by: \.metric
-        )
-        guard !byMetric.isEmpty else {
-            throw CheckError.noSamples
-        }
+        let pageSize = try parsePageSize()
 
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("ohe-exportruncheck-\(UUID().uuidString)")
-        let destination = root.appendingPathComponent("destination")
         let scratch = root.appendingPathComponent("scratch")
-        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+        let spoolRoot = root.appendingPathComponent("spool")
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: spoolRoot, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let store = MemoryStateStore()
+        var reader = NDJSONLineReader(handle: .standardInput)
+        var spools: [MetricID: MetricSpool] = [:]
+        defer {
+            for spool in spools.values {
+                try? spool.handle.close()
+            }
+        }
+        var declaredRecords: Int?
+        var inputLines = 0
+        var headerRecords = 0
+        var structuralRecords = 0
+        var exportableRecords = 0
+        var submittedRecords = 0
+        var pages = 0
         var totalRead = 0
         var totalAcked = 0
-        var corpusSamples = 0
-        for (index, metric) in byMetric.keys.sorted(by: { $0.rawValue < $1.rawValue }).enumerated() {
-            let samples = byMetric[metric] ?? []
-            corpusSamples += samples.count
-            let run = ExportRun(
-                source: CorpusSliceSource(samples: samples),
-                destination: .testing(LocalFileSink(directory: destination)),
-                store: store,
-                metric: metric,
-                scratchDirectory: scratch.appendingPathComponent(metric.rawValue),
-                envelope: WireEnvelope(
-                    exporterId: "00000000-0000-4000-8000-000000000024",
-                    seq: index + 1,
-                    emittedAt: "2025-01-01T00:00:00Z",
-                    observedAt: "2025-01-01T00:00:00Z"
-                ),
-                clock: FrozenClock(instant: Date(timeIntervalSince1970: 1_735_689_600)),
-                trigger: .bgProcessing
-            )
-            let outcome = try await run.run()
-            guard outcome.kind == .success else {
-                throw CheckError.outcome(metric: metric.rawValue, outcome: outcome.kind.rawValue)
+
+        while let line = try reader.next() {
+            guard !line.isEmpty else { continue }
+            inputLines += 1
+            if inputLines == 1 {
+                guard let object = try JSONSerialization.jsonObject(with: line) as? [String: Any] else {
+                    throw CheckError.invalidRecord(line: inputLines)
+                }
+                declaredRecords = try validateT1Provenance(object)
+                headerRecords = 1
+                continue
             }
-            guard outcome.ackEvidence == .receiptFull else {
-                throw CheckError.ackEvidence(outcome.ackEvidence.rawValue)
+            let record: KindRecord
+            do {
+                record = try JSONDecoder().decode(KindRecord.self, from: line)
+            } catch {
+                throw CheckError.invalidRecord(line: inputLines)
             }
-            guard let event = store.transaction.journal.last else {
-                throw CheckError.missingJournal
+            switch record.kind {
+            case "sample.quantity":
+                guard let wireId = record.metricId else {
+                    throw CheckError.invalidRecord(line: inputLines)
+                }
+                let metric = MetricCatalog.all.first { $0.wireId == wireId }?.id
+                    ?? MetricID(rawValue: wireId)
+                let spool: MetricSpool
+                if let existing = spools[metric] {
+                    spool = existing
+                } else {
+                    let url = spoolRoot.appendingPathComponent("metric-\(spools.count).ndjson")
+                    _ = FileManager.default.createFile(atPath: url.path, contents: nil)
+                    let created = MetricSpool(
+                        url: url,
+                        handle: try FileHandle(forWritingTo: url)
+                    )
+                    spools[metric] = created
+                    spool = created
+                }
+                try spool.handle.write(contentsOf: line)
+                try spool.handle.write(contentsOf: newline)
+                exportableRecords += 1
+            case let structural where t1StructuralKinds.contains(structural):
+                structuralRecords += 1
+            default:
+                throw CheckError.unaccountedKind(kind: record.kind, line: inputLines)
             }
-            guard event.samplesRead == event.samplesAcked else {
-                throw CheckError.countMismatch(read: event.samplesRead, acked: event.samplesAcked)
-            }
-            totalRead += event.samplesRead
-            totalAcked += event.samplesAcked
         }
 
+        for spool in spools.values {
+            try spool.handle.close()
+        }
+        let work = spools.keys.sorted(by: { $0.rawValue < $1.rawValue }).enumerated().compactMap {
+            ordinal, metric -> MetricWork? in
+            spools[metric].map { MetricWork(ordinal: ordinal, metric: metric, url: $0.url) }
+        }
+        var nextWork = work.makeIterator()
+        try await withThrowingTaskGroup(of: MetricWorkResult.self) { group in
+            for _ in 0 ..< min(maximumConcurrentMetrics, work.count) {
+                if let item = nextWork.next() {
+                    group.addTask {
+                        try await process(
+                            item,
+                            pageSize: pageSize,
+                            scratchRoot: scratch
+                        )
+                    }
+                }
+            }
+            while let result = try await group.next() {
+                pages += result.pages
+                submittedRecords += result.submitted
+                totalRead += result.read
+                totalAcked += result.acked
+                if let item = nextWork.next() {
+                    group.addTask {
+                        try await process(
+                            item,
+                            pageSize: pageSize,
+                            scratchRoot: scratch
+                        )
+                    }
+                }
+            }
+        }
+
+        guard headerRecords == 1, let declaredRecords else {
+            throw CheckError.invalidProvenance
+        }
+        guard exportableRecords > 0 else {
+            throw CheckError.noSamples
+        }
+        guard declaredRecords == exportableRecords + structuralRecords else {
+            throw CheckError.declaredCountMismatch(
+                declared: declaredRecords,
+                accounted: exportableRecords + structuralRecords
+            )
+        }
+        guard submittedRecords == exportableRecords else {
+            throw CheckError.skippedExportable(
+                parsed: exportableRecords,
+                submitted: submittedRecords
+            )
+        }
         #if os(Linux)
         let peakKiB = try peakResidentMemoryKiB()
         // R-74 in docs/02-design/08-reliability-design.md declares a 100 MB maximum.
@@ -99,27 +180,129 @@ struct ExportRunCheck {
 
         print(
             "exportruncheck outcome=success"
-                + " metrics=\(byMetric.count)"
+                + " metrics=\(spools.count)"
+                + " pages=\(pages)"
+                + " page_size=\(pageSize)"
+                + " exportable_records=\(exportableRecords)"
+                + " submitted_records=\(submittedRecords)"
+                + " structural_records=\(structuralRecords)"
+                + " header_records=\(headerRecords)"
+                + " declared_records=\(declaredRecords)"
                 + " samples_read=\(totalRead)"
                 + " samples_acked=\(totalAcked)"
-                + " corpus_samples=\(corpusSamples)"
                 + " input_lines=\(inputLines)"
                 + " peak_rss_mib=\(memoryResult)"
                 + " limit_mib=\(memoryLimitMiB)"
         )
     }
 
-    private static func validateT1Provenance(_ data: Data) throws -> Int {
-        let lines = data.split(separator: 0x0A, omittingEmptySubsequences: true)
-        guard let first = lines.first,
-              let header = try JSONSerialization.jsonObject(with: Data(first)) as? [String: Any],
-              header["kind"] as? String == "batch.header",
+    private static func parsePageSize() throws -> Int {
+        let arguments = Array(CommandLine.arguments.dropFirst())
+        guard !arguments.isEmpty else { return defaultPageSize }
+        guard arguments.count == 2, arguments[0] == "--page-size",
+              let size = Int(arguments[1]), (1...maximumPageSize).contains(size)
+        else {
+            throw CheckError.invalidPageSize(maximum: maximumPageSize)
+        }
+        return size
+    }
+
+    private static func validateT1Provenance(_ header: [String: Any]) throws -> Int {
+        guard header["kind"] as? String == "batch.header",
               header["synthetic"] as? Bool == true,
-              header["tier"] as? String == "T1"
+              header["tier"] as? String == "T1",
+              let recordCount = (header["recordCount"] as? NSNumber)?.intValue,
+              recordCount >= 0
         else {
             throw CheckError.invalidProvenance
         }
-        return lines.count
+        return recordCount
+    }
+
+    private static func exercise(
+        samples: [SampleRecord],
+        metric: MetricID,
+        sequence: Int,
+        scratchRoot: URL
+    ) async throws -> (read: Int, acked: Int) {
+        let pageScratch = scratchRoot.appendingPathComponent("page-\(sequence)")
+        try FileManager.default.createDirectory(at: pageScratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: pageScratch) }
+        let store = MemoryStateStore()
+        let run = ExportRun(
+            source: CorpusSliceSource(samples: samples, sequence: sequence),
+            destination: .testing(AuditingSink(expectedQuantityRecords: samples.count)),
+            store: store,
+            metric: metric,
+            scratchDirectory: pageScratch,
+            envelope: WireEnvelope(
+                exporterId: "00000000-0000-4000-8000-000000000024",
+                seq: sequence,
+                emittedAt: "2025-01-01T00:00:00Z",
+                observedAt: "2025-01-01T00:00:00Z"
+            ),
+            clock: FrozenClock(instant: Date(timeIntervalSince1970: 1_735_689_600)),
+            trigger: .bgProcessing
+        )
+        let outcome = try await run.run()
+        guard outcome.kind == .success else {
+            throw CheckError.outcome(metric: metric.rawValue, outcome: outcome.kind.rawValue)
+        }
+        guard outcome.ackEvidence == .receiptFull else {
+            throw CheckError.ackEvidence(outcome.ackEvidence.rawValue)
+        }
+        guard let event = store.transaction.journal.last else {
+            throw CheckError.missingJournal
+        }
+        guard event.samplesRead == event.samplesAcked else {
+            throw CheckError.countMismatch(read: event.samplesRead, acked: event.samplesAcked)
+        }
+        return (event.samplesRead, event.samplesAcked)
+    }
+
+    private static func process(
+        _ work: MetricWork,
+        pageSize: Int,
+        scratchRoot: URL
+    ) async throws -> MetricWorkResult {
+        let handle = try FileHandle(forReadingFrom: work.url)
+        defer {
+            try? handle.close()
+            try? FileManager.default.removeItem(at: work.url)
+        }
+        var reader = NDJSONLineReader(handle: handle)
+        var page: [SampleRecord] = []
+        page.reserveCapacity(pageSize)
+        var result = MetricWorkResult()
+
+        func submit(_ samples: [SampleRecord], pageNumber: Int) async throws -> (Int, Int) {
+            let counts = try await exercise(
+                samples: samples,
+                metric: work.metric,
+                sequence: (work.ordinal + 1) * 1_000_000 + pageNumber,
+                scratchRoot: scratchRoot
+            )
+            return (counts.read, counts.acked)
+        }
+
+        while let line = try reader.next() {
+            page.append(try NativeSidecars.quantitySample(fromNDJSONLine: line))
+            guard page.count == pageSize else { continue }
+            let counts = try await submit(page, pageNumber: result.pages + 1)
+            result.pages += 1
+            result.submitted += page.count
+            result.read += counts.0
+            result.acked += counts.1
+            page.removeAll(keepingCapacity: true)
+        }
+        if !page.isEmpty {
+            let counts = try await submit(page, pageNumber: result.pages + 1)
+            result.pages += 1
+            result.submitted += page.count
+            result.read += counts.0
+            result.acked += counts.1
+        }
+        return result
     }
 
     #if os(Linux)
@@ -136,22 +319,84 @@ struct ExportRunCheck {
     #endif
 }
 
+private struct KindRecord: Decodable {
+    let kind: String
+    let metricId: String?
+}
+
+private struct MetricSpool {
+    let url: URL
+    let handle: FileHandle
+}
+
+private struct MetricWork: Sendable {
+    let ordinal: Int
+    let metric: MetricID
+    let url: URL
+}
+
+private struct MetricWorkResult: Sendable {
+    var pages = 0
+    var submitted = 0
+    var read = 0
+    var acked = 0
+}
+
 private struct CorpusSliceSource: SampleSource {
     let samples: [SampleRecord]
+    let sequence: Int
 
     func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage {
-        SamplePage(
+        if afterAnchor != nil {
+            return SamplePage(
+                samples: [],
+                tombstones: [],
+                metric: metric,
+                anchorBlob: afterAnchor ?? Data(),
+                observedThrough: Date(timeIntervalSince1970: 1_735_689_600)
+            )
+        }
+        return SamplePage(
             samples: samples,
             tombstones: [],
             metric: metric,
-            anchorBlob: Data([0x24]),
+            anchorBlob: withUnsafeBytes(of: UInt64(sequence).bigEndian) { Data($0) },
             observedThrough: Date(timeIntervalSince1970: 1_735_689_600)
+        )
+    }
+}
+
+private struct AuditingSink: DestinationSink {
+    let expectedQuantityRecords: Int
+
+    func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt {
+        let data = try Data(contentsOf: URL(fileURLWithPath: fileHandle))
+        let text = String(decoding: data, as: UTF8.self)
+        let quantityRecords = text.split(whereSeparator: \.isNewline)
+            .filter { $0.contains("\"kind\":\"sample.quantity\"") }
+            .count
+        guard quantityRecords == expectedQuantityRecords else {
+            throw CheckError.payloadQuantityMismatch(
+                expected: expectedQuantityRecords,
+                emitted: quantityRecords
+            )
+        }
+        return DeliveryReceipt(
+            batchID: idempotencyKey,
+            accepted: NativeWire.countRecords(in: text),
+            statusOnly: false
         )
     }
 }
 
 private enum CheckError: Error, CustomStringConvertible {
     case invalidProvenance
+    case invalidRecord(line: Int)
+    case unaccountedKind(kind: String, line: Int)
+    case declaredCountMismatch(declared: Int, accounted: Int)
+    case skippedExportable(parsed: Int, submitted: Int)
+    case payloadQuantityMismatch(expected: Int, emitted: Int)
+    case invalidPageSize(maximum: Int)
     case noSamples
     case outcome(metric: String, outcome: String)
     case ackEvidence(String)
@@ -164,8 +409,20 @@ private enum CheckError: Error, CustomStringConvertible {
         switch self {
         case .invalidProvenance:
             "stdin is not a synthetic T1 corpusgen stream"
+        case .invalidRecord(let line):
+            "stdin line \(line) is not a kind-bearing JSON record"
+        case .unaccountedKind(let kind, let line):
+            "stdin line \(line) has unaccounted record kind \(kind)"
+        case .declaredCountMismatch(let declared, let accounted):
+            "header declares \(declared) records but \(accounted) data records were accounted"
+        case .skippedExportable(let parsed, let submitted):
+            "parsed \(parsed) exportable records but submitted \(submitted) to ExportRun"
+        case .payloadQuantityMismatch(let expected, let emitted):
+            "ExportRun payload contains \(emitted) quantity records, expected \(expected)"
+        case .invalidPageSize(let maximum):
+            "--page-size must be an integer from 1 through \(maximum)"
         case .noSamples:
-            "T1 corpus slice contained no quantity samples"
+            "T1 corpus stream contained no quantity samples"
         case .outcome(let metric, let outcome):
             "ExportRun for \(metric) closed with \(outcome), expected success"
         case .ackEvidence(let evidence):
