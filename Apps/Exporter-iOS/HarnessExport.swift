@@ -382,7 +382,8 @@ enum HarnessExport {
 
     static func runOnePageEachMetric(
         metrics: [MetricID]? = nil,
-        trigger: RunTrigger = .manual
+        trigger: RunTrigger = .manual,
+        onProgress: (@Sendable (Int, Int) async -> Void)? = nil
     ) async throws -> [String] {
         let scope = try await destinationScope("local-file")
         try ExportScopeGate.requireConfigured(scope)
@@ -415,7 +416,9 @@ enum HarnessExport {
         let ledgerSealURL = root.appendingPathComponent("ledger-head-seal.json")
 
         var lines: [String] = []
-        for metric in metrics {
+        var kinds: [RunOutcome.Kind] = []
+        for (index, metric) in metrics.enumerated() {
+            await onProgress?(index + 1, metrics.count)
             let snapshotURL = StatusSnapshotLocation.url(destinationID: "local-file")
             let run = ExportRun(
                 source: source,
@@ -441,6 +444,7 @@ enum HarnessExport {
                 scope: scope
             )
             let outcome = try await run.run()
+            kinds.append(outcome.kind)
             await notifyIfFailed(
                 outcome,
                 destinationID: "local-file",
@@ -498,6 +502,16 @@ enum HarnessExport {
             root: root,
             destinationLabel: "Archive folder"
         )
+        let combined = CombinedExportSummary.kind(kinds)
+        if let snapshotURL = StatusSnapshotLocation.url(destinationID: "local-file"),
+           var snapshot = try? DestinationSnapshotFile.read(from: snapshotURL)
+        {
+            snapshot.applyLastOutcome(combined.rawValue)
+            snapshot.writtenAtEpoch = Date().timeIntervalSince1970
+            try DestinationSnapshotFile.write(snapshot, to: snapshotURL)
+            WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+        }
+        lines.insert(CombinedExportSummary.copy(kinds), at: 0)
         lines.append("Files: \(dest.path)")
         return lines
     }

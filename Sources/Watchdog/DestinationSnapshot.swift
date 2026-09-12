@@ -86,6 +86,13 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
         self.writtenAtEpoch = writtenAtEpoch
     }
 
+    /// UX-24: a multi-type run overwrites the last per-type outcome with the
+    /// combined kind so status is not the last type that happened to finish.
+    public mutating func applyLastOutcome(_ outcome: String) {
+        lastOutcome = outcome
+        state = Self.inferState(enabled: enabled, lastOutcome: outcome)
+    }
+
     private enum CodingKeys: String, CodingKey {
         case schemaVersion
         case destinationID

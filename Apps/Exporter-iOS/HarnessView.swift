@@ -1866,15 +1866,19 @@ struct HarnessView: View {
 
     private func runLocalExport(trigger: RunTrigger = .manual) async {
         phase = .working
-        status = "Working: local-file export."
+        status = CombinedExportSummary.progress(current: 0, total: 1)
         results = []
         do {
-            results = try await HarnessExport.runOnePageEachMetric(trigger: trigger)
+            results = try await HarnessExport.runOnePageEachMetric(trigger: trigger) { current, total in
+                await MainActor.run {
+                    status = CombinedExportSummary.progress(current: current, total: total)
+                }
+            }
             refreshDestinationSurfaces()
             await refreshLedgerIntegrity()
             await refreshWakeAttribution()
             await refreshQueueGaps()
-            status = "Ready. Local export finished. Outcome kinds are engine-derived, not assigned by this screen."
+            status = results.first ?? "Ready. Local export finished."
         } catch {
             await HarnessExport.notifyDestinationFailure(
                 destinationID: "local-file",
