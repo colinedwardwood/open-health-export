@@ -97,3 +97,19 @@ private enum R84DeterminismFixture {
         #expect((sample["tzOffsetMinutes"] as? NSNumber)?.intValue == 0)
     }
 }
+
+@Test func linuxCoreReproducesTheCommittedT0Digest() throws {
+    let spec = try JSONSerialization.jsonObject(
+        with: R84DeterminismFixture.data("spec/v1.0.0/README.md")
+    ) as? [String: Any]
+    let digest = try #require(
+        ((spec?["fixtures"] as? [String: Any])?["tier0.ndjson"] as? [String: Any])?["sha256"] as? String
+    )
+    let workflow = try R84DeterminismFixture.text(".github/workflows/linux-core.yml")
+    #expect(workflow.contains("swift run corpusgen --seed 1 --count 200"))
+    #expect(workflow.contains("cmp spec/v1.0.0/fixtures/tier0.ndjson /tmp/tier0.ndjson"))
+    #expect(workflow.contains("\(digest)  /tmp/tier0.ndjson"))
+    #expect(digest == ContentSHA256.hex(
+        try R84DeterminismFixture.data("spec/v1.0.0/fixtures/tier0.ndjson")
+    ))
+}
