@@ -66,13 +66,14 @@ jobs:
   ios-ui:
     needs: ios-build
     runs-on: macos-26
-    # The suite ran to the wall on one runner. Three runners share it, and they run the
-    # products the build job already produced rather than each rebuilding the app.
+    # The suite ran to the wall on one runner. Shards cover both required device
+    # families, and reuse the products built once above.
     timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
         shard: [0, 1, 2]
+        family: [iPhone, iPad]
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Collect the built products
@@ -80,11 +81,13 @@ jobs:
         with:
           name: ios-test-products
           path: ${{ runner.temp }}/products
-      - name: Test critical iOS UI paths (shard ${{ matrix.shard }} of 3)
+      - name: Test critical iOS UI paths on ${{ matrix.family }} (shard ${{ matrix.shard }} of 3)
+        env:
+          DEVICE_FAMILY: ${{ matrix.family }}
         run: |
           DESTINATION_ID="$(
             xcrun simctl list devices available -j |
-              python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for runtime in d.values() for x in runtime if "iPhone" in x["name"]))'
+              python3 -c 'import json,os,sys; d=json.load(sys.stdin)["devices"]; family=os.environ["DEVICE_FAMILY"]; print(next(x["udid"] for runtime in d.values() for x in runtime if family in x["name"]))'
           )"
           # One simulator per runner. Three clones on a runner this size timed out
           # launching the app, which reads as a test failure and is not one. The
@@ -108,7 +111,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ios-ui-xcresult-${{ matrix.shard }}
+          name: ios-ui-${{ matrix.family }}-xcresult-${{ matrix.shard }}
           path: ${{ runner.temp }}/ohe-ui.xcresult
           retention-days: 7
 
