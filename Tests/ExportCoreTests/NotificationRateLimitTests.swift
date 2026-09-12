@@ -97,7 +97,15 @@ import Watchdog
     #expect(notifier.contains("ohe.notificationCooldown.v1"))
     #expect(notifier.contains(#""dest.\(notice.destinationID)""#))
     #expect(notifier.contains(#""failure.\(notice.destinationID)""#))
-    #expect(notifier.contains(#""notification_policy_version": 1"#))
+    #expect(notifier.contains("FailureNotificationPayload.userInfo(for:"))
+    let payload = try String(
+        contentsOf: root.appendingPathComponent(
+            "Sources/Watchdog/UserFacingErrorRoute.swift"
+        ),
+        encoding: .utf8
+    )
+    #expect(payload.contains(#"notificationPolicyVersionKey = "notification_policy_version""#))
+    #expect(payload.contains("notificationPolicyVersionKey: 1"))
 
     let harness = try String(
         contentsOf: root.appendingPathComponent(
