@@ -67,6 +67,7 @@ jobs:
             --markdown nightly-flake-rate.md
       - name: Enforce QA, status, OS, and compliance gates
         run: |
+          python3 qa/validate-nfr-mapping.py
           swift run policycheck
           python3 scripts/validate-release.py \
             --tag "${{ inputs.tag }}" \

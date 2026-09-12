@@ -20,6 +20,7 @@ jobs:
           swift-version: "6.3.3"
       - name: Build and verify the regression comparator
         run: |
+          python3 qa/validate-nfr-mapping.py
           swift build -c release --product m0harness
           "$(swift build -c release --show-bin-path)/m0harness" verify
 

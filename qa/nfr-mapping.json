@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "metaRequirement": "R-91",
+  "qaStandard": "QA-23",
+  "overallStatus": "mapped-pending-device-measurement",
+  "regressionGate": {
+    "failureThresholdPercent": 20,
+    "runner": "scripts/check-performance-baseline.sh",
+    "comparator": "Tools/m0harness/M0Harness.swift"
+  },
+  "entries": [
+    {
+      "id": "R-70",
+      "sixTuple": {"workload":"HealthKit read-throughput spike","device":"REF-A and REF-B","os":"iOS 26","metric":"samples_per_second","threshold":"publish measured finding","percentile":"median and p90"},
+      "verificationKind": "physical-protocol",
+      "evidence": "docs/02-design/spikes/R-70-findings.md",
+      "status": "pending-measurement",
+      "satisfiesAcceptance": false
+    },
+    {
+      "id": "R-71",
+      "sixTuple": {"workload":"five-week background-delivery observation","device":"REF-A and REF-B","os":"iOS 26","metric":"delivery latency and wake distribution","threshold":"publish class A-D p95 placeholders","percentile":"p95"},
+      "verificationKind": "physical-protocol",
+      "evidence": "docs/02-design/spikes/R-71-findings.md",
+      "status": "pending-measurement",
+      "satisfiesAcceptance": false
+    },
+    {
+      "id": "R-72",
+      "sixTuple": {"workload":"delta export of 10000 samples","device":"REF-A and REF-B","os":"iOS 26","metric":"wall_clock_seconds","threshold":"8 REF-A; 15 REF-B","percentile":"p90"},
+      "verificationKind": "physical-protocol",
+      "evidence": "docs/02-design/07-test-architecture.md",
+      "status": "pending-measurement",
+      "satisfiesAcceptance": false
+    },
+    {
+      "id": "R-73",
+      "sixTuple": {"workload":"headless background launch to first HealthKit query","device":"REF-B and REF-C","os":"iOS 26 and iOS 18","metric":"wall_clock_milliseconds","threshold":"400 REF-B; REF-C set at M0","percentile":"p90"},
+      "verificationKind": "physical-protocol",
+      "evidence": "docs/02-design/spikes/R-73-findings.md",
+      "status": "pending-measurement",
+      "satisfiesAcceptance": false,
+      "automatedProxy": {
+        "kind": "automated-regression",
+        "sixTuple": {"workload":"cold process, SQLite open, anchor read, query-token construction","device":"labelled performance Mac","os":"macOS","metric":"wall_clock_milliseconds","threshold":"committed baseline plus 20 percent","percentile":"p90"},
+        "baseline": "qa/baselines/m0-host-permitted-launch.json",
+        "runner": "scripts/check-performance-baseline.sh",
+        "satisfiesAcceptance": false
+      }
+    },
+    {
+      "id": "R-74",
+      "sixTuple": {"workload":"full backfill","device":"REF-B and REF-C","os":"iOS 26 and iOS 18","metric":"peak_rss_megabytes","threshold":"100 REF-B; REF-C set at M0","percentile":"maximum"},
+      "verificationKind": "physical-protocol",
+      "evidence": "docs/02-design/07-test-architecture.md",
+      "status": "pending-measurement",
+      "satisfiesAcceptance": false,
+      "automatedProxy": {
+        "kind": "automated-absolute",
+        "sixTuple": {"workload":"T0, T1 and T2 streamed through ExportRun","device":"GitHub-hosted Linux runner","os":"Ubuntu with Swift 6.3.3","metric":"peak_rss_mebibytes","threshold":"100","percentile":"maximum"},
+        "runner": "Tools/exportruncheck/ExportRunCheck.swift",
+        "workflow": ".github/workflows/nightly-volume.yml",
+        "satisfiesAcceptance": false
+      }
+    },
+    {
+      "id": "R-75",
+      "sixTuple": {"workload":"five-year Watch-history full backfill","device":"REF-B and REF-C","os":"iOS 26 and iOS 18","metric":"wall_clock_minutes","threshold":"30 REF-B; REF-C foreground threshold set at M0","percentile":"p90"},
+      "verificationKind": "physical-protocol",
+      "evidence": "docs/02-design/07-test-architecture.md",
+      "status": "pending-measurement",
+      "satisfiesAcceptance": false
+    },
+    {
+      "id": "R-76",
+      "sixTuple": {"workload":"cold start to interactive","device":"REF-B and REF-C","os":"iOS 26 and iOS 18","metric":"wall_clock_milliseconds","threshold":"1200 REF-B; REF-C set at M0","percentile":"p90"},
+      "verificationKind": "physical-protocol",
+      "evidence": "docs/02-design/07-test-architecture.md",
+      "status": "pending-measurement",
+      "satisfiesAcceptance": false
+    },
+    {
+      "id": "R-77",
+      "sixTuple": {"workload":"24-hour steady-state export","device":"REF-A","os":"iOS 26","metric":"battery_percent_per_24_hours","threshold":"1.0","percentile":"mean"},
+      "verificationKind": "physical-protocol",
+      "evidence": "qa/energy-protocol.md",
+      "status": "pending-measurement",
+      "satisfiesAcceptance": false
+    },
+    {
+      "id": "R-78",
+      "sixTuple": {"workload":"foreground full backfill","device":"REF-A","os":"iOS 26","metric":"battery_percent_per_run","threshold":"12","percentile":"mean"},
+      "verificationKind": "physical-protocol",
+      "evidence": "qa/energy-protocol.md",
+      "status": "pending-measurement",
+      "satisfiesAcceptance": false
+    },
+    {
+      "id": "R-79",
+      "sixTuple": {"workload":"telemetry during scheduled export wakes","device":"REF-B","os":"iOS 26","metric":"wake_budget_percent","threshold":"2","percentile":"p90"},
+      "verificationKind": "physical-protocol",
+      "evidence": "qa/non-automated-verification.md",
+      "status": "pending-measurement",
+      "satisfiesAcceptance": false,
+      "automatedProxy": {
+        "kind": "automated-structural",
+        "sixTuple": {"workload":"telemetry opportunity and binary contribution gates","device":"GitHub-hosted Mac","os":"macOS 26 runner","metric":"background scheduling and uncompressed bytes","threshold":"no dedicated wake; at most 2 MiB","percentile":"not-applicable"},
+        "runner": "Tests/ExportCoreTests/OTLPExportTests.swift",
+        "workflow": ".github/workflows/macos-build.yml",
+        "satisfiesAcceptance": false
+      }
+    }
+  ]
+}

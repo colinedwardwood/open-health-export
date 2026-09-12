@@ -59,6 +59,8 @@ jobs:
           grep -F 'limit_mib=100' /tmp/t0-exportrun.out
       - name: Import policy
         run: swift run policycheck
+      - name: Validate NFR-to-evidence mapping
+        run: python3 qa/validate-nfr-mapping.py
       - name: Release objects omit R-83 fault seams
         run: |
           swift build -c release --target CorrectnessEngine
