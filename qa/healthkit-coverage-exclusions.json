@@ -1,0 +1,672 @@
+{
+  "exclusions": [
+    {
+      "identifier": "HKCategoryTypeIdentifierAbdominalCramps",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierAcne",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierAppetiteChanges",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierAppleStandHour",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierAppleWalkingSteadinessEvent",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierAudioExposureEvent",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierBladderIncontinence",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierBleedingAfterPregnancy",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierBleedingDuringPregnancy",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierBloating",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierBreastPain",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierCervicalMucusQuality",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierChestTightnessOrPain",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierChills",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierConstipation",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierContraceptive",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierCoughing",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierDiarrhea",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierDizziness",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierDrySkin",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierEnvironmentalAudioExposureEvent",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierFainting",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierFatigue",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierFever",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierGeneralizedBodyAche",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierHairLoss",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierHandwashingEvent",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierHeadache",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierHeadphoneAudioExposureEvent",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierHeartburn",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierHighHeartRateEvent",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierHotFlashes",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierHypertensionEvent",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierInfrequentMenstrualCycles",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierIntermenstrualBleeding",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierIrregularHeartRhythmEvent",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierIrregularMenstrualCycles",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierLactation",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierLossOfSmell",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierLossOfTaste",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierLowCardioFitnessEvent",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierLowHeartRateEvent",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierLowerBackPain",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierMemoryLapse",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierMenstrualFlow",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierMoodChanges",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierNausea",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierNightSweats",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierOvulationTestResult",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierPelvicPain",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierPersistentIntermenstrualBleeding",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierPregnancy",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierPregnancyTestResult",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierProgesteroneTestResult",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierProlongedMenstrualPeriods",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierRapidPoundingOrFlutteringHeartbeat",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierRunnyNose",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierSexualActivity",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierShortnessOfBreath",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierSinusCongestion",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierSkippedHeartbeat",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierSleepApneaEvent",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierSleepChanges",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierSoreThroat",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierToothbrushingEvent",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierVaginalDryness",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierVomiting",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierWheezing",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCharacteristicTypeIdentifierActivityMoveMode",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCharacteristicTypeIdentifierBiologicalSex",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCharacteristicTypeIdentifierBloodType",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCharacteristicTypeIdentifierDateOfBirth",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCharacteristicTypeIdentifierFitzpatrickSkinType",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCharacteristicTypeIdentifierWheelchairUse",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCorrelationTypeIdentifierBloodPressure",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKCorrelationTypeIdentifierFood",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKDataTypeIdentifierHeartbeatSeries",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKDataTypeIdentifierStateOfMind",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKDataTypeIdentifierUserAnnotatedMedicationConcept",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKDocumentTypeIdentifierCDA",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKMedicationDoseEventTypeIdentifierMedicationDoseEvent",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierAppleSleepingBreathingDisturbances",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierAppleSleepingWristTemperature",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierAppleWalkingSteadiness",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierAtrialFibrillationBurden",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierBloodAlcoholContent",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierCrossCountrySkiingSpeed",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierCyclingCadence",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierCyclingFunctionalThresholdPower",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierCyclingPower",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryBiotin",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryCaffeine",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryCalcium",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryCarbohydrates",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryChloride",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryCholesterol",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryChromium",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryCopper",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryEnergyConsumed",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryFatMonounsaturated",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryFatPolyunsaturated",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryFatSaturated",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryFatTotal",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryFiber",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryFolate",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryIodine",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryIron",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryMagnesium",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryManganese",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryMolybdenum",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryNiacin",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryPantothenicAcid",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryPhosphorus",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryPotassium",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryProtein",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryRiboflavin",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietarySelenium",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietarySodium",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietarySugar",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryThiamin",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryVitaminA",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryVitaminB12",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryVitaminB6",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryVitaminC",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryVitaminD",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryVitaminE",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryVitaminK",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDietaryZinc",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDistanceCrossCountrySkiing",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDistanceDownhillSnowSports",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDistancePaddleSports",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDistanceRowing",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierDistanceSkatingSports",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierElectrodermalActivity",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierEnvironmentalSoundReduction",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierEstimatedWorkoutEffortScore",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierForcedExpiratoryVolume1",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierForcedVitalCapacity",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierHeadphoneAudioExposure",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierHeartRateRecoveryOneMinute",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierInhalerUsage",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierInsulinDelivery",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierNikeFuel",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierNumberOfAlcoholicBeverages",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierNumberOfTimesFallen",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierPaddleSportsSpeed",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierPeakExpiratoryFlowRate",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierPeripheralPerfusionIndex",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierRowingSpeed",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierRunningGroundContactTime",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierRunningPower",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierRunningStrideLength",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierRunningVerticalOscillation",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierSixMinuteWalkTestDistance",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierStairDescentSpeed",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierUVExposure",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierUnderwaterDepth",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierWaistCircumference",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierWalkingAsymmetryPercentage",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierWalkingDoubleSupportPercentage",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierWalkingStepLength",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierWaterTemperature",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierWorkoutEffortScore",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKScoredAssessmentTypeIdentifierGAD7",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKScoredAssessmentTypeIdentifierPHQ9",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKVisionPrescriptionTypeIdentifier",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    },
+    {
+      "identifier": "HKWorkoutRouteTypeIdentifier",
+      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+    }
+  ]
+}
