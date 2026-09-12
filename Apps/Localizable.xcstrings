@@ -442,6 +442,17 @@
         }
       }
     },
+    "Close settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close settings"
+          }
+        }
+      }
+    },
     "Companion pairing": {
       "extractionState": "manual",
       "localizations": {
@@ -1901,6 +1912,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Status"
+          }
+        }
+      }
+    },
+    "Settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings"
           }
         }
       }

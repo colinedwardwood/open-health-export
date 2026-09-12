@@ -10,7 +10,7 @@ This file separates repository-complete engineering work from evidence that cann
 - HealthKit characteristics are in the selectable catalogue, off in Core Daily and bulk-select, flagged as re-identifying, and read on demand outside the anchored delta pipeline (HK-30).
 - Blood-pressure pairing is emitted as `sample.correlation` beside systolic and diastolic quantity pages. The correlation type stays off the selectable catalogue so it is not a second anchored cursor (ADR-6).
 - The Mac companion keeps a last-received clock, shows a quiet watch after three days of silence, and posts a local notification (Q12). Device-to-device radio evidence remains a later gate.
-- The iPhone exporter uses four root tabs in fixed order: Status, Data, Destinations, History. Destinations stays second from the right (R-41).
+- The iPhone exporter uses four root tabs in fixed order: Status, Data, Destinations, History. Destinations stays second from the right (R-41). Settings opens from the Status toolbar.
 - Destination tests, pinning, connect-time address-class checks, typed public-address confirmation, and explicit MQTT QoS/LWT exclusions are enforced on real transport paths (R-25, R-31, R-32, SEC-09–SEC-15).
 - HTTPS export payloads upload from a file handle. On iOS they use a background URLSession so the transfer can outlive suspension; later-wake retries are discretionary (HK-18, ADR-R5). Device terminate-and-relaunch evidence remains a later gate.
 - The optional foreground privacy gate fails closed without entering background export or delivery paths; stored credentials have no reveal path (SEC-29, SEC-65).

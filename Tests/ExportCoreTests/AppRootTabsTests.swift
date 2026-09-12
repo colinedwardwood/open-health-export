@@ -32,4 +32,6 @@ import Watchdog
     #expect(view.contains(".tabViewStyle(.sidebarAdaptable)"))
     #expect(view.contains("rootTab = .status"))
     #expect(view.contains("rootTab = .destinations"))
+    #expect(view.contains("accessibilityIdentifier(\"status-settings\")"))
+    #expect(view.contains("Label(\"Settings\""))
 }

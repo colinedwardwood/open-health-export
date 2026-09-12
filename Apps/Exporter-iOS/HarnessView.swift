@@ -36,6 +36,7 @@ struct HarnessView: View {
 
     @State private var phase: Phase = .disclosure
     @State private var rootTab = AppRootTabs.status
+    @State private var showSettings = false
     @AppStorage("ohe.disclosureAcknowledged")
     private var disclosureAcknowledged = false
     @State private var status = "Waiting for disclosure acknowledgement."
@@ -207,6 +208,21 @@ struct HarnessView: View {
                 .onChange(of: userFacingError) { _, error in
                     guard error != nil else { return }
                     rootTab = .status
+                }
+                .sheet(isPresented: $showSettings) {
+                    NavigationStack {
+                        ScrollView {
+                            statusSettings
+                                .padding()
+                        }
+                        .navigationTitle("Settings")
+                        .toolbar {
+                            Button("Close settings") {
+                                showSettings = false
+                            }
+                            .accessibilityIdentifier("settings-close")
+                        }
+                    }
                 }
             }
         }
@@ -599,7 +615,6 @@ struct HarnessView: View {
                             }
                             .accessibilityIdentifier("status-open-destinations")
                             statusOperations
-                            statusSettings
                             measurements
                         case .data:
                             dataBrowser
@@ -612,6 +627,16 @@ struct HarnessView: View {
                     .padding()
                 }
                 .navigationTitle(rootTabTitle(tab))
+                .toolbar {
+                    if tab == .status {
+                        Button {
+                            showSettings = true
+                        } label: {
+                            Label("Settings", systemImage: "gearshape")
+                        }
+                        .accessibilityIdentifier("status-settings")
+                    }
+                }
                 .onChange(of: userFacingError) { _, error in
                     guard tab == .status, error != nil else { return }
                     proxy.scrollTo("user-facing-error", anchor: .top)

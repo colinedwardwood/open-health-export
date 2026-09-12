@@ -1060,6 +1060,7 @@ final class ExporterUITests: XCTestCase {
     }
 
     private func selectRootTab(_ index: Int) {
+        dismissSettingsIfNeeded()
         let bar = app.tabBars.firstMatch
         guard bar.waitForExistence(timeout: uiWait) else { return }
         let button = bar.buttons.element(boundBy: index)
@@ -1068,8 +1069,16 @@ final class ExporterUITests: XCTestCase {
         }
     }
 
+    private func dismissSettingsIfNeeded() {
+        let close = app.buttons["settings-close"]
+        if close.exists, close.isHittable {
+            close.tap()
+        }
+    }
+
     @discardableResult
     private func scrollToHittable(_ element: XCUIElement) -> XCUIElement {
+        dismissSettingsIfNeeded()
         if becomeHittable(element) {
             return element
         }
@@ -1078,6 +1087,15 @@ final class ExporterUITests: XCTestCase {
             if becomeHittable(element) {
                 return element
             }
+        }
+        selectRootTab(0)
+        let settings = app.buttons["status-settings"]
+        if settings.waitForExistence(timeout: 2), settings.isHittable {
+            settings.tap()
+            if becomeHittable(element) {
+                return element
+            }
+            dismissSettingsIfNeeded()
         }
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = "Element did not become hittable"
