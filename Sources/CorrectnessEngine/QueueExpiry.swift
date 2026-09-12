@@ -42,7 +42,7 @@ public enum QueueExpiry {
             try tx.evict(
                 batch.id,
                 recording: GapRecord(
-                    batchID: batch.id,
+                    evicting: batch,
                     rangeDescription: "queue_ttl_expired"
                 )
             )

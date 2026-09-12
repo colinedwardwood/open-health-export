@@ -62,6 +62,7 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
             "ALTER TABLE gaps ADD COLUMN metric TEXT NOT NULL DEFAULT '';",
             "ALTER TABLE gaps ADD COLUMN range_start_day TEXT;",
             "ALTER TABLE gaps ADD COLUMN range_end_day TEXT;",
+            "ALTER TABLE gaps ADD COLUMN expected_records INTEGER NOT NULL DEFAULT 0;",
             "ALTER TABLE journal ADD COLUMN trigger TEXT NOT NULL DEFAULT 'manual';",
             "ALTER TABLE journal ADD COLUMN samples_read INTEGER NOT NULL DEFAULT 0;",
             "ALTER TABLE journal ADD COLUMN samples_committed INTEGER NOT NULL DEFAULT 0;",
@@ -152,7 +153,8 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 range_description TEXT NOT NULL,
                 metric TEXT NOT NULL DEFAULT '',
                 range_start_day TEXT,
-                range_end_day TEXT
+                range_end_day TEXT,
+                expected_records INTEGER NOT NULL DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS emitted_index (
                 uuid TEXT PRIMARY KEY,
@@ -403,7 +405,7 @@ private final class SQLiteTransaction: StateTransaction {
 
     func loadGaps() throws -> [GapRecord] {
         let stmt = try store.prepare(
-            "SELECT batch_id, range_description, metric, range_start_day, range_end_day FROM gaps ORDER BY rowid;"
+            "SELECT batch_id, range_description, metric, range_start_day, range_end_day, expected_records FROM gaps ORDER BY rowid;"
         )
         defer { sqlite3_finalize(stmt) }
         var gaps: [GapRecord] = []
@@ -414,7 +416,8 @@ private final class SQLiteTransaction: StateTransaction {
                     rangeDescription: text(stmt, 1),
                     metric: MetricID(rawValue: text(stmt, 2)),
                     rangeStartDay: optionalText(stmt, 3),
-                    rangeEndDay: optionalText(stmt, 4)
+                    rangeEndDay: optionalText(stmt, 4),
+                    expectedRecords: Int(sqlite3_column_int64(stmt, 5))
                 )
             )
         }
@@ -432,7 +435,7 @@ private final class SQLiteTransaction: StateTransaction {
             throw error
         }
         let stmt = try store.prepare(
-            "INSERT INTO gaps (batch_id, range_description, metric, range_start_day, range_end_day) VALUES (?, ?, ?, ?, ?) ON CONFLICT(batch_id) DO UPDATE SET range_description = excluded.range_description, metric = excluded.metric, range_start_day = excluded.range_start_day, range_end_day = excluded.range_end_day;"
+            "INSERT INTO gaps (batch_id, range_description, metric, range_start_day, range_end_day, expected_records) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(batch_id) DO UPDATE SET range_description = excluded.range_description, metric = excluded.metric, range_start_day = excluded.range_start_day, range_end_day = excluded.range_end_day, expected_records = excluded.expected_records;"
         )
         defer { sqlite3_finalize(stmt) }
         bindText(stmt, 1, batchID.rawValue)
@@ -440,6 +443,7 @@ private final class SQLiteTransaction: StateTransaction {
         bindText(stmt, 3, recording.metric.rawValue)
         bindOptionalText(stmt, 4, recording.rangeStartDay)
         bindOptionalText(stmt, 5, recording.rangeEndDay)
+        sqlite3_bind_int64(stmt, 6, sqlite3_int64(recording.expectedRecords))
         try stepDone(stmt)
     }
 
@@ -459,6 +463,13 @@ private final class SQLiteTransaction: StateTransaction {
         bindText(delete, 1, receipt.batchID.rawValue)
         sqlite3_bind_int64(delete, 2, sqlite3_int64(receipt.accepted))
         try stepDone(delete)
+    }
+
+    func deliveredAccepted() throws -> Int {
+        let stmt = try store.prepare("SELECT COALESCE(SUM(accepted), 0) FROM deliveries;")
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
+        return Int(sqlite3_column_int64(stmt, 0))
     }
 
     func appendJournal(_ event: RunEvent) throws {

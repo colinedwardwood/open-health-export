@@ -95,6 +95,10 @@ public final class MemoryTransaction: StateTransaction {
         }
     }
 
+    public func deliveredAccepted() throws -> Int {
+        deliveries.values.reduce(0) { $0 + $1.accepted }
+    }
+
     public func appendJournal(_ event: RunEvent) throws {
         journal.append(event)
         // OBS-02: same policy as the SQLite store, so a test that passes here is not

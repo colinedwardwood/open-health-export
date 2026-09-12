@@ -2751,7 +2751,8 @@ private func anchorHoldFixture(
         rangeDescription: "queue_eviction:2024-01-01:2024-01-02",
         metric: pending.metric,
         rangeStartDay: pending.rangeStartDay,
-        rangeEndDay: pending.rangeEndDay
+        rangeEndDay: pending.rangeEndDay,
+        expectedRecords: pending.expectedRecords
     )
     try await store.transact { try $0.evict(pending.id, recording: gap) }
     let restored = try #require(try await store.transact { try $0.loadGaps().first })
@@ -2759,6 +2760,8 @@ private func anchorHoldFixture(
     #expect(restored.metric == gap.metric)
     #expect(restored.rangeStartDay == gap.rangeStartDay)
     #expect(restored.rangeEndDay == gap.rangeEndDay)
+    #expect(restored.expectedRecords == gap.expectedRecords)
+    #expect(try await store.transact { try $0.deliveredAccepted() } == 0)
 }
 
 @Test func sqlitePersistsEmittedIndexOnCommit() async throws {

@@ -208,19 +208,35 @@ public struct GapRecord: Sendable {
     public var metric: MetricID
     public var rangeStartDay: String?
     public var rangeEndDay: String?
+    public var expectedRecords: Int
 
     public init(
         batchID: BatchID,
         rangeDescription: String,
         metric: MetricID = MetricID(rawValue: ""),
         rangeStartDay: String? = nil,
-        rangeEndDay: String? = nil
+        rangeEndDay: String? = nil,
+        expectedRecords: Int = 0
     ) {
         self.batchID = batchID
         self.rangeDescription = rangeDescription
         self.metric = metric
         self.rangeStartDay = rangeStartDay
         self.rangeEndDay = rangeEndDay
+        self.expectedRecords = expectedRecords
+    }
+
+    /// Queue eviction, TTL expiry, and type purge all copy the pending batch's
+    /// count and day extent so `delivered ∪ gap ⊇ read` can be checked later.
+    public init(evicting batch: PendingBatch, rangeDescription: String) {
+        self.init(
+            batchID: batch.id,
+            rangeDescription: rangeDescription,
+            metric: batch.metric,
+            rangeStartDay: batch.rangeStartDay,
+            rangeEndDay: batch.rangeEndDay,
+            expectedRecords: batch.expectedRecords
+        )
     }
 }
 
@@ -403,6 +419,9 @@ public protocol StateTransaction: AnyObject {
     func loadGaps() throws -> [GapRecord]
     func evict(_ batchID: BatchID, recording: GapRecord) throws
     func recordDelivery(_ receipt: DeliveryReceipt) throws
+    /// Sum of `accepted` on stored receipts. Used with gaps and pending for
+    /// `delivered ∪ gap ⊇ read`.
+    func deliveredAccepted() throws -> Int
     func appendJournal(_ event: RunEvent) throws
     func appendFreshnessLatency(_ observation: RunFreshnessLatency) throws
     func loadFreshnessLatencies(

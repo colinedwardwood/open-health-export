@@ -32,7 +32,7 @@ public enum TypePurge {
             try tx.evict(
                 victim.id,
                 recording: GapRecord(
-                    batchID: victim.id,
+                    evicting: victim,
                     rangeDescription: "purged_by_revocation:\(reason)"
                 )
             )
