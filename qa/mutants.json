@@ -21,6 +21,20 @@
       "find": "guard !key.isEmpty, !identity.isEmpty else { throw StreamError.badPreSharedKey }",
       "replace": "guard !key.isEmpty else { throw StreamError.badPreSharedKey }",
       "filter": "preSharedKeyRejectsEmptyMaterial"
+    },
+    {
+      "id": "bonjour-case-insensitive-match",
+      "file": "Sources/NetEgress/ByteStream.swift",
+      "find": "candidates.first { $0 == pairedName }",
+      "replace": "candidates.first { $0.lowercased() == pairedName.lowercased() }",
+      "filter": "discoveryOnlyMatchesTheExactPairedName"
+    },
+    {
+      "id": "keychain-entitlement-as-not-found",
+      "file": "Sources/NetEgress/KeychainSecretStore.swift",
+      "find": "status == errSecMissingEntitlement ? .unavailable : .notFound",
+      "replace": "status == errSecMissingEntitlement ? .notFound : .unavailable",
+      "filter": "r33KeychainAddMapsMissingEntitlementToUnavailable"
     }
   ]
 }

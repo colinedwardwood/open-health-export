@@ -99,6 +99,7 @@ import WireFormat
     #expect(BonjourService.match(candidates: advertised, pairedName: "Colin's Mac") == "Colin's Mac")
     #expect(BonjourService.match(candidates: advertised, pairedName: "Colin's MacBook") == nil)
     #expect(BonjourService.match(candidates: [], pairedName: "Colin's Mac") == nil)
+    #expect(BonjourService.match(candidates: ["colin's mac"], pairedName: "Colin's Mac") == nil)
 }
 
 @Test func pairingSecretBridgesToHandshakeMaterialWithoutLeaking() throws {
