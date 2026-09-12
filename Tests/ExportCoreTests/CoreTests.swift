@@ -1057,6 +1057,68 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     #expect(WidgetStatusRoute(url: URL(string: "openhealthexporter://other")!) == nil)
 }
 
+@Test func failureNotificationAndStatusRowReachFivePartErrorWithinTwoTaps() {
+    let failed = DestinationStatusSnapshot(
+        destinationID: "home-assistant",
+        destinationLabel: "Home Assistant",
+        enabled: true,
+        lastOutcome: "failed",
+        lastSuccessEpoch: 1,
+        errorClass: ErrorClass.destinationUnreachable.rawValue,
+        writtenAtEpoch: 2
+    )
+    let overdue = DestinationStatusSnapshot(
+        destinationID: "home-assistant",
+        destinationLabel: "Home Assistant",
+        enabled: true,
+        lastOutcome: "success",
+        lastSuccessEpoch: 1,
+        staleThresholdSeconds: 10,
+        overdueThresholdSeconds: 20,
+        writtenAtEpoch: 2
+    )
+    let healthy = DestinationStatusSnapshot(
+        destinationID: "home-assistant",
+        destinationLabel: "Home Assistant",
+        enabled: true,
+        lastOutcome: "success",
+        lastSuccessEpoch: 100,
+        errorClass: ErrorClass.none.rawValue,
+        writtenAtEpoch: 100
+    )
+    #expect(UserFacingErrorPresentation.archetype(for: failed, nowEpoch: 3) == .hostUnresolvable)
+    #expect(UserFacingErrorPresentation.object(for: failed, nowEpoch: 3)?.lines[0].hasPrefix("①") == true)
+    #expect(UserFacingErrorPresentation.object(for: failed, nowEpoch: 3)?.lines[3].hasPrefix("④") == true)
+    #expect(UserFacingErrorPresentation.archetype(for: overdue, nowEpoch: 30) == .backgroundNeverRan)
+    #expect(UserFacingErrorPresentation.object(for: healthy, nowEpoch: 100) == nil)
+
+    let notice = UserNotice(
+        kind: .exportFailed,
+        destinationID: "home-assistant",
+        destination: "Home Assistant",
+        errorClass: ErrorClass.destinationUnreachable.rawValue
+    )
+    let url = FailureNotificationPayload.url(for: notice)!
+    #expect(UserFacingErrorRoute(url: url)?.destinationID == "home-assistant")
+    #expect(UserFacingErrorRoute(url: url)?.archetype == .hostUnresolvable)
+    let info = FailureNotificationPayload.userInfo(for: notice)
+    #expect(FailureNotificationPayload.url(from: info) == url)
+    let overdueNotice = UserNotice(
+        kind: .exportOverdue,
+        destinationID: "home-assistant",
+        destination: "Home Assistant"
+    )
+    #expect(
+        UserFacingErrorRoute(url: FailureNotificationPayload.url(for: overdueNotice)!)?.archetype
+            == .backgroundNeverRan
+    )
+    #expect(
+        FailureNotificationPayload.url(
+            for: UserNotice(kind: .destinationEnabled, destination: "Home Assistant")
+        ) == nil
+    )
+}
+
 @Test func widgetTimelineDoesNotInventThresholdsBeforeR71() {
     let snapshot = DestinationStatusSnapshot(
         destinationID: "manual",

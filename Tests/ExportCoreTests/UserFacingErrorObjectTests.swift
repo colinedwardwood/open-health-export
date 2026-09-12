@@ -61,6 +61,12 @@ import Testing
     #expect(UserFacingErrorArchetype.fromHTTPStatus(413) == .http413)
     #expect(UserFacingErrorArchetype.fromHTTPStatus(429) == .http429)
     #expect(UserFacingErrorArchetype.fromHTTPStatus(502) == .http5xx)
+    #expect(UserFacingErrorArchetype.fromErrorClass(.deviceLocked) == .healthLocked)
+    #expect(UserFacingErrorArchetype.fromErrorClass(.healthDataRestricted) == .healthLocked)
+    #expect(UserFacingErrorArchetype.fromErrorClass(.destinationUnreachable) == .hostUnresolvable)
+    #expect(UserFacingErrorArchetype.fromErrorClass(.budgetExhausted) == .backgroundNeverRan)
+    #expect(UserFacingErrorArchetype.fromErrorClass(.internalFault) == .timeout)
+    #expect(UserFacingErrorArchetype.fromErrorClass(.none) == nil)
     #expect(
         UserFacingErrorObject.make(archetype: .healthLocked, destinationLabel: "Health")
             .nonActionable

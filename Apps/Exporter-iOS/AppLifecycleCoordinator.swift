@@ -8,14 +8,28 @@ import Foundation
 import HealthKitSource
 import RunJournal
 import UIKit
+import UserNotifications
+import Watchdog
 
 @MainActor
 final class AppLifecycleCoordinator {
     static let shared = AppLifecycleCoordinator()
 
     private var healthObservers: HealthKitObserverCoordinator?
+    private(set) var pendingDeepLink: URL?
 
     private init() {}
+
+    func queueDeepLink(_ url: URL) {
+        pendingDeepLink = url
+        NotificationCenter.default.post(name: .oheOpenDeepLink, object: url)
+    }
+
+    func consumePendingDeepLink() -> URL? {
+        let url = pendingDeepLink
+        pendingDeepLink = nil
+        return url
+    }
 
     func recordWake(_ trigger: RunTrigger) {
         guard let ledger = try? HarnessExport.wakeLedger() else { return }
@@ -46,13 +60,14 @@ final class AppLifecycleCoordinator {
     }
 }
 @MainActor
-final class ExporterAppDelegate: NSObject, UIApplicationDelegate {
+final class ExporterAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [
             UIApplication.LaunchOptionsKey: Any
         ]? = nil
     ) -> Bool {
+        UNUserNotificationCenter.current().delegate = self
         AppLifecycleCoordinator.shared.recordWake(.launch)
         BackgroundTaskCoordinator.register()
         ContinuedBackfillCoordinator.register()
@@ -60,6 +75,18 @@ final class ExporterAppDelegate: NSObject, UIApplicationDelegate {
             try? await AppLifecycleCoordinator.shared.startObserversIfEligible()
         }
         return true
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        guard let url = FailureNotificationPayload.url(
+            from: response.notification.request.content.userInfo
+        ) else {
+            return
+        }
+        AppLifecycleCoordinator.shared.queueDeepLink(url)
     }
 }
 

@@ -238,7 +238,13 @@ struct ExportStatusWidgetView: View {
     }
 
     private var statusURL: URL? {
-        WidgetStatusRoute(destinationID: worstSnapshot?.destinationID).url
+        let now = entry.date.timeIntervalSince1970
+        if let worst = worstSnapshot,
+           let route = UserFacingErrorPresentation.route(for: worst, nowEpoch: now)
+        {
+            return route.url
+        }
+        return WidgetStatusRoute(destinationID: worstSnapshot?.destinationID).url
     }
 }
 

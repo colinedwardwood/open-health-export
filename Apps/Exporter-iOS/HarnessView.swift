@@ -87,6 +87,7 @@ struct HarnessView: View {
     @AppStorage("ohe.diagnosticWindowHours")
     private var diagnosticWindowHours = 24
     @State private var destinationStatusLines: [String] = []
+    @State private var destinationSnapshots: [DestinationStatusSnapshot] = []
     @State private var dataFlowHops: [DataFlowHop] = []
     @State private var dataFlowTypeCount = 0
     @State private var ledgerLines: [String] = []
@@ -173,56 +174,66 @@ struct HarnessView: View {
                 privacyLock
             } else {
                 NavigationStack {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text(status)
-                                .font(.body)
-                                .multilineTextAlignment(.leading)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .accessibilityLabel("Status: \(status)")
-                                .accessibilityIdentifier("status-line")
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 16) {
+                                Text(status)
+                                    .font(.body)
+                                    .multilineTextAlignment(.leading)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .accessibilityLabel("Status: \(status)")
+                                    .accessibilityIdentifier("status-line")
+                                    .id("status-line")
 
-                            if let userFacingError {
-                                ForEach(Array(userFacingError.lines.enumerated()), id: \.offset) { index, line in
-                                    Text(line)
-                                        .font(.system(.footnote, design: .monospaced))
-                                        .textSelection(.enabled)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                        .accessibilityIdentifier("error-part-\(index)")
-                                }
-                                ForEach(userFacingError.actions, id: \.rawValue) { action in
-                                    Button(action.label) {
-                                        applyUserFacingFix(action)
+                                if let userFacingError {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        ForEach(Array(userFacingError.lines.enumerated()), id: \.offset) { index, line in
+                                            Text(line)
+                                                .font(.system(.footnote, design: .monospaced))
+                                                .textSelection(.enabled)
+                                                .fixedSize(horizontal: false, vertical: true)
+                                                .accessibilityIdentifier("error-part-\(index)")
+                                        }
+                                        ForEach(userFacingError.actions, id: \.rawValue) { action in
+                                            Button(action.label) {
+                                                applyUserFacingFix(action)
+                                            }
+                                            .disabled(phase == .working)
+                                            .accessibilityIdentifier("error-fix-\(action.rawValue)")
+                                        }
                                     }
-                                    .disabled(phase == .working)
-                                    .accessibilityIdentifier("error-fix-\(action.rawValue)")
+                                    .id("user-facing-error")
+                                }
+
+                                Text("Time to first screen: \(timeToFirstFrameMS, specifier: "%.0f") ms (foreground; R-73 is a background-launch budget).")
+                                    .font(.footnote)
+                                    .fixedSize(horizontal: false, vertical: true)
+
+                                if phase == .disclosure {
+                                    disclosure
+                                } else {
+                                    dataBrowser
+                                    controls
+                                }
+
+                                if !results.isEmpty {
+                                    Text("Measurements")
+                                        .font(.headline)
+                                    ForEach(Array(results.enumerated()), id: \.offset) { _, line in
+                                        Text(line)
+                                            .font(.body)
+                                            .textSelection(.enabled)
+                                    }
                                 }
                             }
-
-                            Text("Time to first screen: \(timeToFirstFrameMS, specifier: "%.0f") ms (foreground; R-73 is a background-launch budget).")
-                                .font(.footnote)
-                                .fixedSize(horizontal: false, vertical: true)
-
-                            if phase == .disclosure {
-                                disclosure
-                            } else {
-                                dataBrowser
-                                controls
-                            }
-
-                            if !results.isEmpty {
-                                Text("Measurements")
-                                    .font(.headline)
-                                ForEach(Array(results.enumerated()), id: \.offset) { _, line in
-                                    Text(line)
-                                        .font(.body)
-                                        .textSelection(.enabled)
-                                }
-                            }
+                            .padding()
                         }
-                        .padding()
+                        .navigationTitle("M0 harness")
+                        .onChange(of: userFacingError) { _, error in
+                            guard error != nil else { return }
+                            proxy.scrollTo("user-facing-error", anchor: .top)
+                        }
                     }
-                    .navigationTitle("M0 harness")
                 }
             }
         }
@@ -332,7 +343,10 @@ struct HarnessView: View {
                 if let raw = ProcessInfo.processInfo.environment["OHE_OPEN_URL"],
                    let url = URL(string: raw)
                 {
-                    applyWidgetStatusURL(url)
+                    applyOpenURL(url)
+                }
+                if let pending = AppLifecycleCoordinator.shared.consumePendingDeepLink() {
+                    applyOpenURL(pending)
                 }
                 // SEC-45 is a one-time warning, so exercising it needs the
                 // acknowledgement cleared rather than overridden: a launch argument
@@ -374,7 +388,11 @@ struct HarnessView: View {
             }
         }
         .onOpenURL { url in
-            applyWidgetStatusURL(url)
+            applyOpenURL(url)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .oheOpenDeepLink)) { note in
+            guard let url = note.object as? URL else { return }
+            applyOpenURL(url)
         }
         .onChange(of: scenePhase) { _, next in
             guard next == .active else {
@@ -979,19 +997,33 @@ struct HarnessView: View {
                 refreshDestinationSurfaces()
             }
             .accessibilityIdentifier("destination-refresh")
-            ForEach(Array(destinationStatusLines.enumerated()), id: \.offset) { index, line in
-                Text(line)
+            if destinationSnapshots.isEmpty {
+                Text(destinationStatusLines.first ?? DestinationStatusLine.emptyCopy)
                     .font(.footnote)
                     .foregroundStyle(.primary)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     .contentShape(Rectangle())
-                    .accessibilityIdentifier(
-                        line == "No destination snapshots yet."
-                            ? "destination-empty"
-                            : "destination-status-\(index)"
-                    )
+                    .accessibilityIdentifier("destination-empty")
+            } else {
+                ForEach(Array(destinationSnapshots.enumerated()), id: \.element.destinationID) { index, snapshot in
+                    let line = destinationStatusLines[index]
+                    Button {
+                        presentErrorFromStatus(snapshot)
+                    } label: {
+                        Text(line)
+                            .font(.footnote)
+                            .foregroundStyle(.primary)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("destination-status-\(index)")
+                    .accessibilityHint("Shows the error cause and fix when this destination needs attention.")
+                }
             }
             Button("Acknowledge destination changes") {
                 do {
@@ -2232,6 +2264,53 @@ struct HarnessView: View {
         publicAddressConfirmation = ""
     }
 
+    private func applyOpenURL(_ url: URL) {
+        if AppLifecycleCoordinator.shared.pendingDeepLink == url {
+            _ = AppLifecycleCoordinator.shared.consumePendingDeepLink()
+        }
+        if let route = UserFacingErrorRoute(url: url) {
+            applyErrorRoute(route)
+            return
+        }
+        applyWidgetStatusURL(url)
+    }
+
+    private func applyErrorRoute(_ route: UserFacingErrorRoute) {
+        refreshDestinationSurfaces()
+        let snapshot = destinationSnapshots.first { $0.destinationID == route.destinationID }
+        let now = Date().timeIntervalSince1970
+        guard let object = UserFacingErrorPresentation.object(
+            route: route,
+            snapshot: snapshot,
+            nowEpoch: now
+        ) else {
+            status = disclosureAcknowledged
+                ? "Ready. Opened destination status for \(route.destinationID) from a notification."
+                : "Review the disclosure before opening destination status."
+            return
+        }
+        userFacingError = object
+        results = object.lines
+        if disclosureAcknowledged {
+            phase = .ready
+            status = object.title
+        } else {
+            status = "Review the disclosure before opening destination status."
+        }
+    }
+
+    private func presentErrorFromStatus(_ snapshot: DestinationStatusSnapshot) {
+        refreshDestinationSurfaces()
+        let now = Date().timeIntervalSince1970
+        if let object = UserFacingErrorPresentation.object(for: snapshot, nowEpoch: now) {
+            userFacingError = object
+            results = object.lines
+            status = object.title
+            return
+        }
+        status = "Ready. Opened destination status for \(snapshot.destinationID)."
+    }
+
     private func applyWidgetStatusURL(_ url: URL) {
         guard let route = WidgetStatusRoute(url: url) else { return }
         refreshDestinationSurfaces()
@@ -2246,7 +2325,15 @@ struct HarnessView: View {
     }
 
     private func refreshDestinationSurfaces() {
-        destinationStatusLines = HarnessExport.destinationStatusLines()
+        destinationSnapshots = StatusSnapshotLocation.readAll()
+        let now = Date().timeIntervalSince1970
+        destinationStatusLines = destinationSnapshots.isEmpty
+            ? [DestinationStatusLine.emptyCopy]
+            : destinationSnapshots.map { snapshot in
+                DestinationStatusLine.render(snapshot, nowEpoch: now) {
+                    Date(timeIntervalSince1970: $0).formatted(date: .abbreviated, time: .shortened)
+                }
+            }
         destinationChangeBanner = HarnessExport.destinationChangeBannerDetail()
         overdueBanner = HarnessExport.overdueBannerDetail()
         dataFlowHops = HarnessExport.dataFlowHops()

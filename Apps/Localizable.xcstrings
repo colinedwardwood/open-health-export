@@ -1740,6 +1740,17 @@
         }
       }
     },
+    "Shows the error cause and fix when this destination needs attention.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows the error cause and fix when this destination needs attention."
+          }
+        }
+      }
+    },
     "Shows destination status and time since the last export. Never shows health values.": {
       "extractionState": "manual",
       "localizations": {

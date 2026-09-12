@@ -92,10 +92,16 @@ extension UserFacingErrorArchetype {
 
     public static func fromErrorClass(_ errorClass: ErrorClass) -> UserFacingErrorArchetype? {
         switch errorClass {
-        case .deviceLocked: .healthLocked
-        case .destinationUnreachable: .hostUnresolvable
-        case .localNetworkDenied: .hostUnresolvable
-        default: nil
+        case .deviceLocked, .healthDataRestricted:
+            .healthLocked
+        case .destinationUnreachable, .localNetworkDenied:
+            .hostUnresolvable
+        case .budgetExhausted, .cancelledBySystem:
+            .backgroundNeverRan
+        case .internalFault:
+            .timeout
+        case .none:
+            nil
         }
     }
 }

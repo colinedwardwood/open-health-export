@@ -308,7 +308,48 @@ final class ExporterUITests: XCTestCase {
             status.label.contains("Opened destination status for home-assistant"),
             status.label
         )
-        XCTAssertTrue(app.staticTexts["destination-status-0"].waitForExistence(timeout: uiWait))
+        XCTAssertTrue(destinationStatusElement(0).waitForExistence(timeout: uiWait))
+    }
+
+    func testFailureNotificationURLOpensFivePartErrorWithNoFurtherTap() {
+        app.terminate()
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.browserDemoMode", "true",
+            "-ohe.browserOnlyWithData", "true",
+        ]
+        app.launchEnvironment["OHE_SEED_DESTINATION_STATUS"] = "failed"
+        app.launchEnvironment["OHE_OPEN_URL"] =
+            "openhealthexporter://error?destination=home-assistant&archetype=hostUnresolvable"
+        app.launch()
+        let part0 = app.staticTexts["error-part-0"]
+        XCTAssertTrue(
+            part0.waitForExistence(timeout: uiWait),
+            visibleIdentifiers().joined(separator: ",")
+        )
+        XCTAssertTrue(part0.label.hasPrefix("①"), part0.label)
+        XCTAssertTrue(app.staticTexts["error-part-3"].label.hasPrefix("④"))
+        XCTAssertTrue(
+            app.staticTexts["status-line"].label.contains("Couldn't find"),
+            app.staticTexts["status-line"].label
+        )
+    }
+
+    func testStatusRowOpensFivePartErrorInOneTap() {
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_DESTINATION_STATUS"] = "failed"
+        app.launch()
+        enterControls()
+        let row = scrollToHittable(destinationStatusElement(0))
+        row.tap()
+        let part0 = scrollToHittable(app.staticTexts["error-part-0"])
+        XCTAssertTrue(
+            part0.waitForExistence(timeout: uiWait),
+            visibleIdentifiers().joined(separator: ",")
+        )
+        XCTAssertTrue(part0.label.hasPrefix("①"), part0.label)
+        XCTAssertTrue(app.staticTexts["error-part-3"].waitForExistence(timeout: uiWait))
     }
 
     private func destinationLine(seeding scenario: String) -> String {
@@ -318,7 +359,7 @@ final class ExporterUITests: XCTestCase {
         enterControls()
         let refresh = scrollToHittable(app.buttons["destination-refresh"])
         refresh.tap()
-        let line = app.staticTexts["destination-status-0"]
+        let line = destinationStatusElement(0)
         XCTAssertTrue(
             line.waitForExistence(timeout: uiWait),
             "no destination line for \(scenario); available: \(visibleIdentifiers())"
@@ -677,7 +718,7 @@ final class ExporterUITests: XCTestCase {
             app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Export is overdue"))
                 .firstMatch.waitForExistence(timeout: uiWait)
         )
-        let line = app.staticTexts["destination-status-0"]
+        let line = destinationStatusElement(0)
         XCTAssertTrue(line.waitForExistence(timeout: uiWait))
         XCTAssertTrue(line.label.contains("overdue"), line.label)
     }
@@ -745,7 +786,7 @@ final class ExporterUITests: XCTestCase {
             enterControls()
             let refresh = scrollToHittable(app.buttons["destination-refresh"])
             refresh.tap()
-            let line = app.staticTexts["destination-status-0"]
+            let line = destinationStatusElement(0)
             XCTAssertTrue(
                 line.waitForExistence(timeout: uiWait),
                 "no destination line for \(scenario); available: \(visibleIdentifiers())"
@@ -763,7 +804,7 @@ final class ExporterUITests: XCTestCase {
             let refresh = scrollToHittable(app.buttons["destination-refresh"])
             refresh.tap()
             XCTAssertTrue(
-                app.staticTexts["destination-status-0"]
+                destinationStatusElement(0)
                     .waitForExistence(timeout: uiWait),
                 "no destination line for \(scenario); available: \(visibleIdentifiers())"
             )
@@ -790,7 +831,7 @@ final class ExporterUITests: XCTestCase {
                 .waitForExistence(timeout: uiWait)
         )
         XCTAssertTrue(
-            app.staticTexts["destination-status-0"].waitForExistence(timeout: uiWait)
+            destinationStatusElement(0).waitForExistence(timeout: uiWait)
         )
     }
 
@@ -834,6 +875,10 @@ final class ExporterUITests: XCTestCase {
             XCTAssertTrue(line.label.contains("pending R-71"), line.label)
             XCTAssertTrue(line.label.contains("not a delivery promise"), line.label)
         }
+    }
+
+    private func destinationStatusElement(_ index: Int) -> XCUIElement {
+        app.descendants(matching: .any)["destination-status-\(index)"]
     }
 
     private func enterControls() {

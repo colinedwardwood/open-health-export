@@ -56,10 +56,7 @@ final class LocalUserNotifier: UserNotifier, Sendable {
         content.title = copy.title
         content.body = copy.body
         content.threadIdentifier = "dest.\(notice.destinationID)"
-        content.userInfo = [
-            "notification_policy_version": 1,
-            "destination_id": notice.destinationID,
-        ]
+        content.userInfo = FailureNotificationPayload.userInfo(for: notice)
         let identifier = NotificationRateLimit.isFailureKind(notice.kind)
             ? "failure.\(notice.destinationID)"
             : "\(notice.kind.rawValue).\(notice.destinationID)"
@@ -100,10 +97,13 @@ final class LocalUserNotifier: UserNotifier, Sendable {
         content.title = copy.title
         content.body = copy.body
         content.threadIdentifier = "dest.\(snapshot.destinationID)"
-        content.userInfo = [
-            "notification_policy_version": 1,
-            "destination_id": snapshot.destinationID,
-        ]
+        content.userInfo = FailureNotificationPayload.userInfo(
+            for: UserNotice(
+                kind: .exportOverdue,
+                destinationID: snapshot.destinationID,
+                destination: snapshot.destinationLabel
+            )
+        )
         let delay = max(1, fireEpoch - now.timeIntervalSince1970)
         try await center.add(
             UNNotificationRequest(

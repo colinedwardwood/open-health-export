@@ -636,11 +636,15 @@ enum HarnessExport {
         destinationID: String,
         destinationLabel: String
     ) async {
+        let errorClass = StatusSnapshotLocation.readAll().first {
+            $0.destinationID == destinationID
+        }?.errorClass
         _ = try? await LocalUserNotifier().notify(
             UserNotice(
                 kind: .exportFailed,
                 destinationID: destinationID,
-                destination: destinationLabel
+                destination: destinationLabel,
+                errorClass: errorClass
             )
         )
     }

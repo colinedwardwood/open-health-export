@@ -637,19 +637,23 @@ public struct UserNotice: Sendable, Equatable {
     public var destination: String
     public var fingerprint: String?
     public var previousFingerprint: String?
+    /// Closed error class for UX-32 deep links. Never interpolated into Lock Screen copy.
+    public var errorClass: String?
 
     public init(
         kind: Kind,
         destinationID: String? = nil,
         destination: String,
         fingerprint: String? = nil,
-        previousFingerprint: String? = nil
+        previousFingerprint: String? = nil,
+        errorClass: String? = nil
     ) {
         self.kind = kind
         self.destinationID = destinationID ?? destination
         self.destination = destination
         self.fingerprint = fingerprint
         self.previousFingerprint = previousFingerprint
+        self.errorClass = errorClass
     }
 }
 
