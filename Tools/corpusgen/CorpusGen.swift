@@ -14,8 +14,13 @@ struct CorpusGen {
         buffer.append(try provenanceHeader(options: options))
         buffer.append(0x0A)
         for index in 0..<options.resolvedCount {
-            let declaration = MetricCatalog.all[index % MetricCatalog.all.count]
-            let sample = DemoCorpus.sample(at: index, seed: options.seed, declaration: declaration)
+            let declaration = DemoCorpus.declaration(at: index, tier: options.tier)
+            let sample = DemoCorpus.sample(
+                at: index,
+                seed: options.seed,
+                declaration: declaration,
+                tier: options.tier
+            )
             let envelope = WireEnvelope(
                 exporterId: "00000000-0000-4000-8000-000000000082",
                 seq: index + 1,
@@ -82,6 +87,9 @@ struct CorpusGen {
         tier: SyntheticCorpusTier,
         seed: UInt64
     ) throws -> String {
+        if DemoCorpus.isConcentratedMetricRecord(at: index, tier: tier) {
+            return try NativeWire.encode(sample, envelope: envelope)
+        }
         if tier == .t2, index > 0, index.isMultiple(of: 257) {
             let priorIndex = index - 1
             let declaration = MetricCatalog.all[
@@ -90,7 +98,8 @@ struct CorpusGen {
             let prior = DemoCorpus.sample(
                 at: priorIndex,
                 seed: seed,
-                declaration: declaration
+                declaration: declaration,
+                tier: tier
             )
             return try NativeWire.encode(
                 TombstoneRecord(key: prior.key, metric: prior.metric),
@@ -297,7 +306,8 @@ struct CorpusGen {
                 quantity.key = DemoCorpus.sample(
                     at: priorIndex,
                     seed: seed,
-                    declaration: declaration
+                    declaration: declaration,
+                    tier: tier
                 ).key
             }
             return try NativeWire.encode(quantity, envelope: envelope)

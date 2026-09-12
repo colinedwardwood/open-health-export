@@ -94,3 +94,30 @@ import WireFormat
     )
     #expect(generatedTypes.count >= 60)
 }
+
+@Test func tierTwoCorpusSpansFifteenYearsWithTwentyMillionSingleTypeRecords() {
+    let tier = SyntheticCorpusTier.t2
+    #expect(tier.dateSpanYears == 15)
+    #expect(tier.concentratedMetricRecordCount == 20_000_000)
+    for index in [0, 1, 1_000_000, 19_999_999] {
+        #expect(DemoCorpus.isConcentratedMetricRecord(at: index, tier: tier))
+        #expect(
+            DemoCorpus.declaration(at: index, tier: tier).id == MetricCatalog.heartRate.id
+        )
+    }
+    #expect(!DemoCorpus.isConcentratedMetricRecord(at: 20_000_000, tier: tier))
+
+    let years = (0 ..< tier.dateSpanYears).map { offset in
+        let index = offset * 12 * 28
+        let declaration = DemoCorpus.declaration(at: index, tier: tier)
+        return DemoCorpus.sample(
+            at: index,
+            seed: 1,
+            declaration: declaration,
+            tier: tier
+        ).start.prefix(4)
+    }
+    #expect(years.first == "2010")
+    #expect(years.last == "2024")
+    #expect(Set(years).count == 15)
+}

@@ -98,6 +98,9 @@ jobs:
           digest="$(cat /tmp/t2.sha256)"
           test "${#digest}" -eq 64
           grep -Fx 'pipelinecheck lines=50000001' /tmp/t2-pipeline.out
+          grep -Fx \
+            'pipelinecheck concentrated_heart_prefix=20000000 year_range=2010-2024 distinct_years=15' \
+            /tmp/t2-pipeline.out
           grep -F 'exportruncheck outcome=success' /tmp/t2-exportrun.out
           grep -F 'declared_records=50000000' /tmp/t2-exportrun.out
           grep -F 'limit_mib=100' /tmp/t2-exportrun.out

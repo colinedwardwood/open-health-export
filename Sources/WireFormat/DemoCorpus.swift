@@ -18,6 +18,14 @@ public enum SyntheticCorpusTier: String, Sendable, Codable, CaseIterable {
         case .t2: 50_000_000
         }
     }
+
+    public var dateSpanYears: Int {
+        self == .t2 ? 15 : 6
+    }
+
+    public var concentratedMetricRecordCount: Int {
+        self == .t2 ? 20_000_000 : 0
+    }
 }
 
 public struct SyntheticCategoryType: Sendable, Equatable {
@@ -110,10 +118,12 @@ public enum DemoCorpus {
     public static func sample(
         at index: Int,
         seed: UInt64,
-        declaration: MetricDeclaration
+        declaration: MetricDeclaration,
+        tier: SyntheticCorpusTier = .t0
     ) -> SampleRecord {
         let random = splitMix64(UInt64(index) &+ seed)
-        let year = 2020 + (index / (12 * 28)) % 6
+        let firstYear = tier == .t2 ? 2010 : 2020
+        let year = firstYear + (index / (12 * 28)) % tier.dateSpanYears
         let month = 1 + (index / 28) % 12
         let day = 1 + index % 28
         let hour = Int((random >> 8) % 24)
@@ -149,6 +159,23 @@ public enum DemoCorpus {
             ),
             wasUserEntered: sourceIndex == sources.count - 1
         )
+    }
+
+    public static func declaration(
+        at index: Int,
+        tier: SyntheticCorpusTier
+    ) -> MetricDeclaration {
+        if isConcentratedMetricRecord(at: index, tier: tier) {
+            return MetricCatalog.heartRate
+        }
+        return MetricCatalog.all[index % MetricCatalog.all.count]
+    }
+
+    public static func isConcentratedMetricRecord(
+        at index: Int,
+        tier: SyntheticCorpusTier
+    ) -> Bool {
+        index < tier.concentratedMetricRecordCount
     }
 
     public static func splitMix64(_ input: UInt64) -> UInt64 {
