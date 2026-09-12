@@ -256,6 +256,18 @@ public struct ReconcileSweep: Sendable {
             rangeStartDay: days.first,
             rangeEndDay: days.last
         )
+        let queued = try await store.transact { try $0.queuedBytes() }
+        if !CatchUpAdmission.allows(queuedBytes: queued, incomingBytes: pending.byteCount) {
+            try? FileManager.default.removeItem(at: payloadURL)
+            let tally = RunTally(
+                read: recordCount,
+                acked: 0,
+                partialCause: CatchUpAdmission.parkedJournalDetail
+            )
+            let outcome = RunOutcome.derive(from: tally)
+            try await record(outcome: outcome, tally: tally, receipt: nil)
+            return outcome
+        }
         let victims = try await store.transact { tx in
             let evicted = try QueueAdmission.makeRoom(for: pending.byteCount, on: tx)
             try tx.enqueuePending(pending)

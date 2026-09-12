@@ -490,8 +490,32 @@ enum HarnessExport {
                 UserNotice(kind: .queueEvicted, destination: "Configured destinations")
             )
         }
+        if trigger == .appForeground || trigger == .launch {
+            lines.append(contentsOf: try await maybeScheduledFullReconcile(store: store))
+        }
         lines.append("Files: \(dest.path)")
         return lines
+    }
+
+    private static let lastScheduledFullReconcileEpochKey = "ohe.lastScheduledFullReconcileEpoch"
+
+    /// O-9: a low-priority full reconcile on a daily cadence, skipped when the
+    /// queue is already in I6 Amber so live deltas are not evicted.
+    private static func maybeScheduledFullReconcile(store: any StateStore) async throws -> [String] {
+        let queued = try await store.transact { try $0.queuedBytes() }
+        if !CatchUpAdmission.allows(queuedBytes: queued) {
+            return ["scheduled full reconcile skipped: catch_up_parked"]
+        }
+        let defaults = UserDefaults.standard
+        let stored = defaults.double(forKey: lastScheduledFullReconcileEpochKey)
+        let lastEpoch = stored > 0 ? stored : nil
+        let nowEpoch = Date().timeIntervalSince1970
+        guard ScheduledReconcile.due(lastEpoch: lastEpoch, nowEpoch: nowEpoch) else {
+            return []
+        }
+        let lines = try await runFullReconcile()
+        defaults.set(nowEpoch, forKey: lastScheduledFullReconcileEpochKey)
+        return ["scheduled full reconcile"] + lines
     }
 
     /// R-08: every live destination run also applies the trailing seven-day sweep.

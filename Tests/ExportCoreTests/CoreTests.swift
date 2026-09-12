@@ -3220,6 +3220,56 @@ private func anchorHoldFixture(
     #expect(payload.contains(recent.key.uuid))
 }
 
+@Test func catchUpAdmissionStopsAtSixtyPercentOfCap() {
+    let policy = QueuePolicy.production
+    #expect(policy.catchUpLimit == policy.cap * 3 / 5)
+    #expect(CatchUpAdmission.allows(queuedBytes: 0))
+    #expect(CatchUpAdmission.allows(queuedBytes: policy.catchUpLimit - 1))
+    #expect(!CatchUpAdmission.allows(queuedBytes: policy.catchUpLimit))
+    #expect(!CatchUpAdmission.allows(queuedBytes: policy.catchUpLimit - 10, incomingBytes: 10))
+}
+
+@Test func scheduledReconcileIsDueOnFirstRunAndAfterTheInterval() {
+    #expect(ScheduledReconcile.due(lastEpoch: nil, nowEpoch: 100))
+    #expect(!ScheduledReconcile.due(lastEpoch: 100, nowEpoch: 100 + 86_399))
+    #expect(ScheduledReconcile.due(lastEpoch: 100, nowEpoch: 100 + 86_400))
+}
+
+@Test func reconcileSweepParksWhenCatchUpOccupancyIsAmber() async throws {
+    let metric = MetricCatalog.heartRate.id
+    var sample = heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+    sample.start = "2024-01-01T10:00:00Z"
+    sample.end = sample.start
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-catchup-park-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let store = MemoryStateStore()
+    try await store.transact { tx in
+        try tx.enqueuePending(
+            PendingBatch(
+                id: BatchID(rawValue: "live-delta"),
+                payloadURL: "/tmp/live-delta",
+                expectedRecords: 1,
+                byteCount: QueuePolicy.production.catchUpLimit,
+                metric: metric
+            )
+        )
+    }
+    let outcome = try await ReconcileSweep(
+        observations: FixtureDays(byDay: ["2024-01-01": [sample]]),
+        destination: .testing(LocalFileSink(directory: root)),
+        store: store,
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    ).runFullHistory(throughDay: "2024-01-01")
+    #expect(outcome.kind == .partial)
+    #expect(outcome.partialCause == CatchUpAdmission.parkedJournalDetail)
+    let pending = try store.transaction.pendingBatches()
+    #expect(pending.map(\.id.rawValue) == ["live-delta"])
+}
+
 @Test func queueGapReExportReadsTheRecordedEvictedWindow() async throws {
     let metric = MetricCatalog.heartRate.id
     var sample = heartSample("cccccccc-cccc-cccc-cccc-cccccccccccc")
@@ -4021,6 +4071,21 @@ private func anchorHoldFixture(
             "missing trailing reconcile destination \(destinationID)"
         )
     }
+}
+
+@Test func o9ScheduledFullReconcileIsGatedByCatchUpAdmission() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let harness = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift"),
+        encoding: .utf8
+    )
+    #expect(harness.contains("maybeScheduledFullReconcile"))
+    #expect(harness.contains("CatchUpAdmission.allows"))
+    #expect(harness.contains("ScheduledReconcile.due"))
+    #expect(harness.contains("trigger == .appForeground || trigger == .launch"))
 }
 
 @Test func privacyGateCannotEnterBackgroundExportOrDeliveryPaths() throws {

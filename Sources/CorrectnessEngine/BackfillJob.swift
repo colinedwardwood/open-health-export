@@ -252,6 +252,14 @@ public struct BackfillJob: Sendable {
             )
             for day in allDays where !completed.contains(day) {
                 try Task.checkCancellation()
+                if let store {
+                    let queued = try await store.transact { try $0.queuedBytes() }
+                    if !CatchUpAdmission.allows(queuedBytes: queued) {
+                        checkpoint.progress.pausedReason = CatchUpAdmission.parkedJournalDetail
+                        try await persist(&checkpoint)
+                        return checkpoint
+                    }
+                }
                 checkpoint.progress.cursor = BackfillCursor(
                     metricIndex: metricIndex,
                     day: day

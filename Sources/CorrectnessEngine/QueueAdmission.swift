@@ -22,6 +22,37 @@ public struct QueuePolicy: Sendable, Equatable {
         cap: 256 * 1024 * 1024,
         lowWatermark: 230 * 1024 * 1024
     )
+
+    /// I6 Amber: catch-up (reconcile, backfill, re-export) stops at 60% of cap.
+    public var catchUpLimit: Int { cap * 3 / 5 }
+}
+
+/// I6: catch-up work never evicts live delta batches. Amber occupancy parks
+/// reconcile/backfill instead of calling `makeRoom`.
+public enum CatchUpAdmission {
+    public static let parkedJournalDetail = "catch_up_parked"
+
+    public static func allows(
+        queuedBytes: Int,
+        incomingBytes: Int = 0,
+        policy: QueuePolicy = .production
+    ) -> Bool {
+        queuedBytes + incomingBytes < policy.catchUpLimit
+    }
+}
+
+public enum ScheduledReconcile {
+    public static let defaultInterval: TimeInterval = 86_400
+
+    public static func due(
+        lastEpoch: TimeInterval?,
+        nowEpoch: TimeInterval,
+        interval: TimeInterval = defaultInterval
+    ) -> Bool {
+        guard interval > 0 else { return false }
+        guard let lastEpoch else { return true }
+        return nowEpoch - lastEpoch >= interval
+    }
 }
 
 public enum QueueAdmission {
