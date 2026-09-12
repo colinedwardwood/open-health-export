@@ -67,7 +67,7 @@ import Testing
     #expect(!interceptor.requests().isEmpty)
 }
 
-@Test func otlpProjectionContainsOnlyDeclaredAttributes() {
+@Test func p11OTLPProjectionContainsOnlyDeclaredAttributes() {
     let event = RunEvent(
         runID: RunID(rawValue: "run-secret-identifier"),
         outcomeKind: "partial",

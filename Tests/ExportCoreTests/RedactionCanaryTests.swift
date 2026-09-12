@@ -19,7 +19,7 @@ import WireFormat
 /// else — no health value, no type name, no destination address. Enumerating `Kind`
 /// means a notice added later cannot ship unchecked, and feeding the renderer addresses
 /// it should never print proves the copy cannot be talked into leaking one.
-@Test func notificationBodiesNameNoAddressAndNoHealthType() {
+@Test func p11NotificationBodiesNameNoAddressAndNoHealthType() {
     let addresses = [
         "ha.example.com",
         "https://ha.example.com:8123",
