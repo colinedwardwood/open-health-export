@@ -10,3 +10,7 @@ public-destination confirmation, browser selection and review, diagnostic
 sharing warning, successful/stale destinations, and the destination-change
 banner. The audits exposed and fixed clipped lock copy, undersized selectable
 status and confirmation rows, and insufficient cancel-button contrast.
+
+A weekly T2 workflow now runs the complete UI state suite on both iPhone and
+iPad simulators. A dedicated rendering audit combines dark appearance, bold
+text, and AX5 Dynamic Type; both device families pass locally.

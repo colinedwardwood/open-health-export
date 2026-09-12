@@ -144,6 +144,25 @@ final class ExporterUITests: XCTestCase {
         try performAccessibilityAudit()
     }
 
+    func testDarkBoldAX5AccessibilitySettingsPassAudit() throws {
+        app.terminate()
+        app.launchEnvironment["OHE_ACCESSIBILITY_MATRIX"] = "combined"
+        app.launchArguments += [
+            "-UIPreferredContentSizeCategoryName",
+            "UICTContentSizeCategoryAccessibilityExtraExtraExtraLarge",
+        ]
+        app.launch()
+        XCTAssertTrue(
+            app.buttons["disclosure-continue"]
+                .waitForExistence(timeout: uiWait)
+        )
+        try performAccessibilityAudit("dark-bold-ax5-disclosure")
+        enterControls()
+        try performAccessibilityAudit("dark-bold-ax5-controls")
+        _ = scrollToHittable(app.staticTexts["destination-title"])
+        try performAccessibilityAudit("dark-bold-ax5-destinations")
+    }
+
     /// QA-17: a paused type says so where the user will see it, and offers two named
     /// choices. Neither the pause nor the resumption may be silent.
     func testPausedAnchorIsVisibleAndOffersBothChoices() {

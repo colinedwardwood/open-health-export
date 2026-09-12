@@ -11,6 +11,30 @@ struct ExporterApp: App {
     var body: some Scene {
         WindowGroup {
             HarnessView(authenticator: UserPresenceAuthenticatorFactory.make())
+                .modifier(AccessibilityMatrixModifier())
         }
+    }
+}
+
+private struct AccessibilityMatrixModifier: ViewModifier {
+    #if DEBUG
+    private let enabled =
+        ProcessInfo.processInfo.environment["OHE_ACCESSIBILITY_MATRIX"]
+            == "combined"
+    #endif
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        #if DEBUG
+        if enabled {
+            content
+                .environment(\.colorScheme, .dark)
+                .environment(\.legibilityWeight, .bold)
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
     }
 }
