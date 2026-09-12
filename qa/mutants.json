@@ -34,7 +34,8 @@
       "file": "Sources/NetEgress/KeychainSecretStore.swift",
       "find": "status == errSecMissingEntitlement ? .unavailable : .notFound",
       "replace": "status == errSecMissingEntitlement ? .notFound : .unavailable",
-      "filter": "r33KeychainAddMapsMissingEntitlementToUnavailable"
+      "filter": "r33KeychainAddMapsMissingEntitlementToUnavailable",
+      "host": "darwin"
     }
   ]
 }

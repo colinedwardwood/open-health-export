@@ -154,6 +154,15 @@ class MutationAndQuarantineTests(unittest.TestCase):
         mutation.validate(ROOT, mutants)
         self.assertGreaterEqual(len(mutants), 3)
 
+    def test_darwin_host_is_skipped_on_linux(self):
+        mutation = load("mutation_check", "mutation-check.py")
+        self.assertFalse(
+            mutation.host_matches({"host": "darwin"}, "linux")
+        )
+        self.assertTrue(mutation.host_matches({"host": "darwin"}, "darwin"))
+        self.assertTrue(mutation.host_matches({}, "linux"))
+        self.assertTrue(mutation.ran_zero_tests("Test run with 0 tests in 0 suites passed"))
+
     def test_unmarked_skip_is_rejected(self):
         quarantine = load("quarantine_check", "quarantine-check.py")
         problems = quarantine.skip_windows('try XCTSkip("flaky on CI")\n')
