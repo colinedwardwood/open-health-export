@@ -22,6 +22,11 @@ path before the draft is consumed. Local-file, Home Assistant, and companion imp
 remain disabled drafts because their runtime setup paths cannot yet preserve the
 portable endpoint/settings contract.
 
+The app can export enabled HTTPS and MQTT destinations back to a deterministic
+`.tributary` document. It includes the imported local identity when present,
+endpoint, supported non-secret settings, and metric/date scope. Credential
+material and credential-presence flags are never represented in the document.
+
 Signed QR import remains a **Should** and is intentionally deferred. The product has
 not selected a signing authority, trust bootstrap, key rotation/revocation policy, or
 ownership model for server-generated configuration keys. No signing keys or implied

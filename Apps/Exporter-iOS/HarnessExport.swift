@@ -1794,6 +1794,81 @@ enum HarnessExport {
         try JSONEncoder().encode(record).write(to: url, options: .atomic)
     }
 
+    static func portableConfigurationExport() async throws -> URL {
+        let root = try applicationSupportRoot()
+        var destinations: [PortableDestinationConfiguration] = []
+        let httpsURL = root.appendingPathComponent("https-destination.json")
+        if let data = try? Data(contentsOf: httpsURL),
+           let record = try? JSONDecoder().decode(
+               HTTPSVerificationRecord.self,
+               from: data
+           ),
+           record.report.allowsEnablement {
+            let scope = try await destinationScope("https")
+            destinations.append(
+                try PortableDestinationConfiguration(
+                    sourceIdentifier:
+                        record.importedLocalIdentifier ?? "https",
+                    displayName:
+                        URL(string: record.urlString)?.host ?? "HTTPS",
+                    kind: .https,
+                    endpoint: record.urlString,
+                    settings: [
+                        "allowInsecureHTTP":
+                            record.allowInsecureHTTP ? "true" : "false",
+                        "method": "POST",
+                    ],
+                    exportScope: try PortableDestinationExportScope(
+                        metrics: scope.metrics.sorted {
+                            $0.rawValue < $1.rawValue
+                        },
+                        startInclusive: scope.startInclusive,
+                        endExclusive: scope.endExclusive
+                    )
+                )
+            )
+        }
+        let mqttURL = root.appendingPathComponent("mqtt-destination.json")
+        if let data = try? Data(contentsOf: mqttURL),
+           let record = try? JSONDecoder().decode(
+               MQTTVerificationRecord.self,
+               from: data
+           ),
+           record.report.allowsEnablement {
+            let scope = try await destinationScope("mqtt")
+            destinations.append(
+                try PortableDestinationConfiguration(
+                    sourceIdentifier:
+                        record.importedLocalIdentifier ?? "mqtt",
+                    displayName:
+                        URL(string: record.urlString)?.host ?? "MQTT",
+                    kind: .mqtt,
+                    endpoint: record.urlString,
+                    settings: [
+                        "allowInsecure":
+                            record.allowInsecure ? "true" : "false",
+                        "clientID": record.clientID,
+                        "qos": String(record.qos ?? 1),
+                        "topic": record.topic,
+                    ],
+                    exportScope: try PortableDestinationExportScope(
+                        metrics: scope.metrics.sorted {
+                            $0.rawValue < $1.rawValue
+                        },
+                        startInclusive: scope.startInclusive,
+                        endExclusive: scope.endExclusive
+                    )
+                )
+            )
+        }
+        let output = FileManager.default.temporaryDirectory
+            .appendingPathComponent("open-health-exporter.tributary")
+        try DestinationConfigurationDocument(destinations: destinations)
+            .encoded()
+            .write(to: output, options: [.atomic, .completeFileProtection])
+        return output
+    }
+
     #if !OHE_OBS25_SIZE_BASELINE
     static func storedOTLPURL() -> String {
         guard let root = try? applicationSupportRoot(),

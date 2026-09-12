@@ -15,3 +15,7 @@ HTTPS and MQTT drafts can now prefill the existing credential editors, preserve
 their metric/date scope and fresh imported identity, and are consumed only
 after the real destination probe and explicit server confirmation succeed.
 Imports refuse occupied slots or settings the runtime path cannot preserve.
+
+Enabled HTTPS and MQTT destinations can now be exported through an explicit
+share action as deterministic `.tributary` documents containing supported
+settings and scope but no credentials or credential-presence flags.

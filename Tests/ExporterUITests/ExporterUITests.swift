@@ -452,6 +452,17 @@ final class ExporterUITests: XCTestCase {
         )
     }
 
+    func testConfigurationExportIsExplicitAndCredentialFreeLabeled() {
+        enterControls()
+        XCTAssertFalse(app.buttons["configuration-export-share"].exists)
+        scrollToHittable(
+            app.buttons["configuration-export-prepare"]
+        ).tap()
+        let share = app.buttons["configuration-export-share"]
+        XCTAssertTrue(share.waitForExistence(timeout: uiWait))
+        XCTAssertEqual(share.label, "Share .tributary configuration")
+    }
+
     func testDataBrowserShowsAnExplicitEmptySearchState() {
         enterControls()
         let search = scrollToHittable(app.textFields["browser-search"])

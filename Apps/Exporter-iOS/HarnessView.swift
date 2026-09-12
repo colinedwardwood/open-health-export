@@ -63,6 +63,7 @@ struct HarnessView: View {
     @State private var mqttTestLines: [String] = []
     @State private var importedDestinationDraft: ImportedDestinationDraftRecord?
     @State private var importedDraftRefreshToken = 0
+    @State private var configurationExportURL: URL?
     #if !OHE_OBS25_SIZE_BASELINE
     @State private var otlpURL = ""
     @State private var allowInsecureOTLP = false
@@ -653,6 +654,16 @@ struct HarnessView: View {
             ConfigurationImportView(
                 refreshToken: importedDraftRefreshToken
             ) { loadImportedDestinationDraft($0) }
+            Button("Prepare credential-free configuration export") {
+                Task { await prepareConfigurationExport() }
+            }
+            .accessibilityIdentifier("configuration-export-prepare")
+            if let configurationExportURL {
+                ShareLink(item: configurationExportURL) {
+                    Text("Share .tributary configuration")
+                }
+                .accessibilityIdentifier("configuration-export-share")
+            }
             Button("Enable local archive folder (R-25 test)") {
                 Task { await enableLocalFile() }
             }
@@ -1808,6 +1819,18 @@ struct HarnessView: View {
             status = "Failed: \(error.localizedDescription)"
         }
         phase = .ready
+    }
+
+    @MainActor
+    private func prepareConfigurationExport() async {
+        configurationExportURL = nil
+        do {
+            configurationExportURL =
+                try await HarnessExport.portableConfigurationExport()
+            status = "Ready. The .tributary file contains destination settings and scope, but no credentials."
+        } catch {
+            status = "Configuration export failed: \(error.localizedDescription)"
+        }
     }
 
     @MainActor
