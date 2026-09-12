@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "slaBusinessDays": 1,
+  "issueTemplate": ".github/ISSUE_TEMPLATE/flake-quarantine.yml",
+  "checker": "scripts/quarantine-check.py",
+  "issueURLPrefix": "https://github.com/colinedwardwood/open-health-export/issues/",
+  "expiryMarker": "expires:"
+}

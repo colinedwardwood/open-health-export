@@ -122,5 +122,25 @@ class ReleaseTests(unittest.TestCase):
         )
 
 
+class MutationAndQuarantineTests(unittest.TestCase):
+    def test_mutation_catalog_self_test(self):
+        mutation = load("mutation_check", "mutation-check.py")
+        mutants = mutation.load_catalog(ROOT)
+        mutation.validate(ROOT, mutants)
+        self.assertGreaterEqual(len(mutants), 3)
+
+    def test_unmarked_skip_is_rejected(self):
+        quarantine = load("quarantine_check", "quarantine-check.py")
+        problems = quarantine.skip_windows('try XCTSkip("flaky on CI")\n')
+        self.assertEqual(len(problems), 1)
+        marked = (
+            "// quarantine https://github.com/colinedwardwood/open-health-export/issues/9 "
+            "expires: 2026-09-26\n"
+            "try XCTSkip(\"flaky on CI\")\n"
+        )
+        self.assertTrue(quarantine.ISSUE_RE.search(marked))
+        self.assertTrue(quarantine.EXPIRY_RE.search(marked))
+
+
 if __name__ == "__main__":
     unittest.main()

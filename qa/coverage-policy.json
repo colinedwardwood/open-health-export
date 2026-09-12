@@ -11,5 +11,10 @@
   "transitionCoverage": {
     "minimum": 100.0,
     "evidence": "Tests/ExportCoreTests/PropertyInvariantTests.swift::anchorCheckpointTransitionGraphIsFullyCovered"
+  },
+  "mutationTesting": {
+    "catalog": "qa/mutants.json",
+    "workflow": ".github/workflows/mutation.yml",
+    "checker": "scripts/mutation-check.py"
   }
 }

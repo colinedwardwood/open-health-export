@@ -1,0 +1,54 @@
+# SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+---
+name: Flake quarantine
+description: Skip a flaky test within one business day and give it an expiry.
+title: "Quarantine: "
+labels: ["flake", "quarantine"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        QA-32: a flaky test is quarantined (tagged and skipped, with an issue) within
+        **one business day**. Name the test, own the skip, and set `expires`. Do not
+        paste real health data.
+  - type: input
+    id: test-name
+    attributes:
+      label: Test name
+      description: Swift Testing function name or XCTest selector.
+      placeholder: discoveryOnlyMatchesTheExactPairedName
+    validations:
+      required: true
+  - type: input
+    id: owner
+    attributes:
+      label: Owner
+      placeholder: GitHub handle
+    validations:
+      required: true
+  - type: input
+    id: expires
+    attributes:
+      label: expires
+      description: ISO date after which the skip must be removed or the test deleted.
+      placeholder: "2026-09-26"
+    validations:
+      required: true
+  - type: input
+    id: evidence
+    attributes:
+      label: Nightly or CI evidence
+      placeholder: https://github.com/colinedwardwood/open-health-export/actions/runs/...
+    validations:
+      required: true
+  - type: textarea
+    id: skip-snippet
+    attributes:
+      label: Skip citation
+      description: >
+        The skip in Tests/ must cite this issue URL and `expires: YYYY-MM-DD`.
+        Example comment: `quarantine https://github.com/colinedwardwood/open-health-export/issues/1 expires: 2026-09-26`
+    validations:
+      required: true

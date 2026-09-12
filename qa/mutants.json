@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "mutants": [
+    {
+      "id": "scope-gate-always-configured",
+      "file": "Sources/CorrectnessEngine/ExportScopeGate.swift",
+      "find": "guard scope.isConfigured else {",
+      "replace": "guard true else {",
+      "filter": "exportScopeGateRefusesNewDestination"
+    },
+    {
+      "id": "bonjour-empty-name-accepted",
+      "file": "Sources/NetEgress/ByteStream.swift",
+      "find": "guard !name.isEmpty, name.utf8.count <= 63 else { throw StreamError.badServiceName }",
+      "replace": "guard name.utf8.count <= 63 else { throw StreamError.badServiceName }",
+      "filter": "bonjourServiceRejectsAnythingButThePairedCompanionType"
+    },
+    {
+      "id": "psk-empty-identity-accepted",
+      "file": "Sources/NetEgress/ByteStream.swift",
+      "find": "guard !key.isEmpty, !identity.isEmpty else { throw StreamError.badPreSharedKey }",
+      "replace": "guard !key.isEmpty else { throw StreamError.badPreSharedKey }",
+      "filter": "preSharedKeyRejectsEmptyMaterial"
+    }
+  ]
+}

@@ -1346,7 +1346,181 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck governance artifacts: ok")
+        try checkMutationCatalog(root: root)
+        try checkFlakeQuarantinePolicy(root: root)
         try checkLicenceTexts(root: root)
+    }
+
+    /// QA-33: committed mutants must remain unique, weekly, and not a required PR check.
+    static func checkMutationCatalog(root: URL) throws {
+        let coverageData = try Data(
+            contentsOf: root.appendingPathComponent("qa/coverage-policy.json")
+        )
+        guard
+            let coveragePolicy = try JSONSerialization.jsonObject(with: coverageData)
+                as? [String: Any],
+            let mutation = coveragePolicy["mutationTesting"] as? [String: Any],
+            let catalogPath = mutation["catalog"] as? String,
+            let workflowPath = mutation["workflow"] as? String,
+            let checkerPath = mutation["checker"] as? String
+        else {
+            FileHandle.standardError.write(
+                Data("QA-33: coverage-policy.json mutationTesting catalog is missing\n".utf8)
+            )
+            exit(1)
+        }
+        let catalogURL = root.appendingPathComponent(catalogPath)
+        guard
+            let catalogData = try? Data(contentsOf: catalogURL),
+            let catalog = try JSONSerialization.jsonObject(with: catalogData) as? [String: Any],
+            (catalog["schemaVersion"] as? NSNumber)?.intValue == 1,
+            let mutants = catalog["mutants"] as? [[String: Any]],
+            mutants.count >= 3
+        else {
+            FileHandle.standardError.write(
+                Data("QA-33: qa/mutants.json must declare schemaVersion 1 and at least 3 mutants\n".utf8)
+            )
+            exit(1)
+        }
+        var ids = Set<String>()
+        for mutant in mutants {
+            guard
+                let ident = mutant["id"] as? String, !ident.isEmpty,
+                let file = mutant["file"] as? String, !file.isEmpty,
+                let find = mutant["find"] as? String, !find.isEmpty,
+                let replace = mutant["replace"] as? String, !replace.isEmpty,
+                let filter = mutant["filter"] as? String, !filter.isEmpty
+            else {
+                FileHandle.standardError.write(Data("QA-33: mutant is missing required fields\n".utf8))
+                exit(1)
+            }
+            if !ids.insert(ident).inserted {
+                FileHandle.standardError.write(Data("QA-33: duplicate mutant id \(ident)\n".utf8))
+                exit(1)
+            }
+            if find == replace {
+                FileHandle.standardError.write(Data("QA-33: \(ident) find and replace are identical\n".utf8))
+                exit(1)
+            }
+            let source = try String(contentsOf: root.appendingPathComponent(file), encoding: .utf8)
+            let occurrences = source.components(separatedBy: find).count - 1
+            if occurrences != 1 {
+                FileHandle.standardError.write(
+                    Data("QA-33: \(ident) find must occur exactly once in \(file)\n".utf8)
+                )
+                exit(1)
+            }
+            if source.contains(replace) {
+                FileHandle.standardError.write(
+                    Data("QA-33: \(ident) replace is already present in \(file)\n".utf8)
+                )
+                exit(1)
+            }
+        }
+        var foundFilters = Set<String>()
+        let testsRoot = root.appendingPathComponent("Tests")
+        let enumerator = FileManager.default.enumerator(
+            at: testsRoot,
+            includingPropertiesForKeys: [.isRegularFileKey]
+        )
+        while let url = enumerator?.nextObject() as? URL {
+            guard url.pathExtension == "swift" else { continue }
+            let text = try String(contentsOf: url, encoding: .utf8)
+            for mutant in mutants {
+                guard let filter = mutant["filter"] as? String else { continue }
+                if text.contains("func \(filter)") {
+                    foundFilters.insert(filter)
+                }
+            }
+        }
+        for mutant in mutants {
+            guard let filter = mutant["filter"] as? String else { continue }
+            if !foundFilters.contains(filter) {
+                FileHandle.standardError.write(
+                    Data("QA-33: no test named \(filter) for mutant \(mutant["id"] ?? "")\n".utf8)
+                )
+                exit(1)
+            }
+        }
+        let workflow = try String(
+            contentsOf: root.appendingPathComponent(workflowPath),
+            encoding: .utf8
+        )
+        if workflow.contains("pull_request:") || workflow.contains("push:") {
+            FileHandle.standardError.write(
+                Data("QA-33: mutation workflow must not run on pull_request or push\n".utf8)
+            )
+            exit(1)
+        }
+        if !workflow.contains("schedule:") || !workflow.contains("workflow_dispatch:") {
+            FileHandle.standardError.write(
+                Data("QA-33: mutation workflow must be weekly and dispatchable\n".utf8)
+            )
+            exit(1)
+        }
+        let checker = root.appendingPathComponent(checkerPath)
+        guard FileManager.default.isReadableFile(atPath: checker.path) else {
+            FileHandle.standardError.write(Data("QA-33: mutation checker is missing\n".utf8))
+            exit(1)
+        }
+        let selfTest = Process()
+        selfTest.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        selfTest.arguments = [checker.path, "--self-test", "--root", root.path]
+        try selfTest.run()
+        selfTest.waitUntilExit()
+        guard selfTest.terminationStatus == 0 else {
+            FileHandle.standardError.write(Data("QA-33: mutation-check.py --self-test failed\n".utf8))
+            exit(1)
+        }
+        print("policycheck mutation catalog: ok")
+    }
+
+    /// QA-32: skipped tests must cite a quarantine issue and expiry; the issue template
+    /// carries the one-business-day SLA.
+    static func checkFlakeQuarantinePolicy(root: URL) throws {
+        let policyURL = root.appendingPathComponent("qa/flake-quarantine.json")
+        guard
+            let data = try? Data(contentsOf: policyURL),
+            let policy = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            (policy["schemaVersion"] as? NSNumber)?.intValue == 1,
+            (policy["slaBusinessDays"] as? NSNumber)?.intValue == 1,
+            let templatePath = policy["issueTemplate"] as? String,
+            let checkerPath = policy["checker"] as? String
+        else {
+            FileHandle.standardError.write(
+                Data("QA-32: qa/flake-quarantine.json is missing or incomplete\n".utf8)
+            )
+            exit(1)
+        }
+        let template = try String(
+            contentsOf: root.appendingPathComponent(templatePath),
+            encoding: .utf8
+        )
+        for token in ["flake", "quarantine", "expires", "one business day"] {
+            if !template.lowercased().contains(token) && token != "one business day" {
+                FileHandle.standardError.write(
+                    Data("QA-32: issue template is missing \(token)\n".utf8)
+                )
+                exit(1)
+            }
+        }
+        if !template.contains("one business day") {
+            FileHandle.standardError.write(
+                Data("QA-32: issue template must state the one-business-day SLA\n".utf8)
+            )
+            exit(1)
+        }
+        let checker = root.appendingPathComponent(checkerPath)
+        let selfTest = Process()
+        selfTest.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        selfTest.arguments = [checker.path, "--self-test", "--root", root.path]
+        try selfTest.run()
+        selfTest.waitUntilExit()
+        guard selfTest.terminationStatus == 0 else {
+            FileHandle.standardError.write(Data("QA-32: quarantine-check.py --self-test failed\n".utf8))
+            exit(1)
+        }
+        print("policycheck flake quarantine: ok")
     }
 
     /// OSS-15: `reuse lint` proves every file is annotated, but it cannot tell that the
