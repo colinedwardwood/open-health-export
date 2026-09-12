@@ -376,6 +376,40 @@ import Testing
     #expect(exporter.contains("\"Content-Type\": \"application/x-protobuf\""))
 }
 
+@Test func telemetrySizeBudgetUsesReleaseAppABBuilds() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let package = try String(
+        contentsOf: root.appendingPathComponent("Package.swift"),
+        encoding: .utf8
+    )
+    #expect(package.contains(".library(name: \"OTLPExport\", targets: [\"OTLPExport\"])"))
+    let gate = try String(
+        contentsOf: root.appendingPathComponent(
+            "scripts/check-obs25-telemetry-size.sh"
+        ),
+        encoding: .utf8
+    )
+    for evidence in [
+        "2 * 1024 * 1024",
+        "with-telemetry",
+        "without-telemetry",
+        "OHE_OBS25_SIZE_BASELINE",
+        "Release-iphoneos/OpenHealthExporter.app",
+    ] {
+        #expect(gate.contains(evidence), "OBS-25 A/B gate lacks \(evidence)")
+    }
+    let workflow = try String(
+        contentsOf: root.appendingPathComponent(
+            ".github/workflows/macos-build.yml"
+        ),
+        encoding: .utf8
+    )
+    #expect(workflow.contains("scripts/check-obs25-telemetry-size.sh"))
+}
+
 @Test func telemetrySerializerIsIsolatedAndItsOwnEgressCannotCreateSpans() throws {
     let root = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
