@@ -91,7 +91,7 @@ private func latency(
 @Test func snapshotThresholdsUseAlarmFloorUntilLocalP95Qualifies() {
     let empty = FreshnessTarget.snapshotThresholds(estimates: [:])
     #expect(empty.overdue == FreshnessTarget.alarmFloor)
-    #expect(empty.stale == FreshnessTarget.alarmFloor / 2)
+    #expect(empty.stale == FreshnessTarget.staleFloor)
     let unqualified = LocalFreshnessEstimate(sampleCount: 10, spanSeconds: 60)
     let stillFloor = FreshnessTarget.snapshotThresholds(estimates: [.b: unqualified])
     #expect(stillFloor.overdue == FreshnessTarget.alarmFloor)
@@ -104,7 +104,22 @@ private func latency(
     )
     let capped = FreshnessTarget.snapshotThresholds(estimates: [.a: qualified])
     #expect(capped.overdue == FreshnessTarget.alarmCap)
-    #expect(capped.stale == FreshnessTarget.alarmCap / 2)
+    #expect(capped.stale == FreshnessTarget.staleFloor)
+}
+
+@Test func loweringFreshnessCadenceWidensOverdueBeforeTheSixHourFloorMoves() {
+    let defaultCadence = FreshnessTarget.snapshotThresholds(estimates: [:], cadenceSeconds: 15 * 60)
+    var settings = OwnedExportSettings(freshnessIntervalMinutes: 15)
+    UserFacingFixApplier.apply(.lowerFreshness, to: &settings)
+    let slower = FreshnessTarget.snapshotThresholds(
+        estimates: [:],
+        cadenceSeconds: TimeInterval(settings.freshnessIntervalMinutes * 60)
+    )
+    #expect(defaultCadence.overdue == FreshnessTarget.alarmFloor)
+    #expect(slower.overdue == FreshnessTarget.alarmFloor)
+    let twoHours = FreshnessTarget.snapshotThresholds(estimates: [:], cadenceSeconds: 2 * 60 * 60)
+    #expect(twoHours.overdue == 8 * 60 * 60)
+    #expect(twoHours.stale == 4 * 60 * 60)
 }
 
 @Test func destinationSnapshotDecodesWithoutNewFreshnessField() throws {

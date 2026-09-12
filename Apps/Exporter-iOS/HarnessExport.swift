@@ -185,7 +185,8 @@ private struct HealthBackfillProcessor: BackfillChunkProcessor {
                 .deletingLastPathComponent()
                 .appendingPathComponent("exports/status.json"),
             ledgerHeadSeal: ledgerHeadSeal,
-            ledgerSealURL: ledgerSealURL
+            ledgerSealURL: ledgerSealURL,
+            freshnessCadenceSeconds: freshnessCadenceSeconds()
         ).runBackfill(days: days, mode: mode)
         return BackfillChunkResult(
             samplesRead: await counted.count(),
@@ -222,6 +223,11 @@ enum HarnessExport {
     static func samplePageLimit() -> Int {
         let stored = UserDefaults.standard.object(forKey: "ohe.exportWindowHours") as? Int
         return SamplePaging.pageLimit(windowHours: stored ?? 24)
+    }
+
+    static func freshnessCadenceSeconds() -> TimeInterval {
+        let stored = UserDefaults.standard.object(forKey: "ohe.freshnessIntervalMinutes") as? Int
+        return TimeInterval(max(1, stored ?? 15) * 60)
     }
 
     static func destinationScope(_ destinationID: String) async throws -> DestinationExportScope {
@@ -448,7 +454,8 @@ enum HarnessExport {
                 externalStatusURL: dest.appendingPathComponent("status.json"),
                 ledgerHeadSeal: ledgerSeal,
                 ledgerSealURL: ledgerSealURL,
-                scope: scope
+                scope: scope,
+                freshnessCadenceSeconds: freshnessCadenceSeconds()
             )
             let outcome = try await run.run()
             kinds.append(outcome.kind)
@@ -606,7 +613,8 @@ enum HarnessExport {
             externalStatusURL: externalStatusURL,
             ledgerHeadSeal: ledgerHeadSeal,
             ledgerSealURL: ledgerSealURL,
-            scope: scope
+            scope: scope,
+            freshnessCadenceSeconds: freshnessCadenceSeconds()
         ).run(throughDay: String(envelope.emittedAt.prefix(10)))
         await notifyIfFailed(
             reconciled,
@@ -709,7 +717,8 @@ enum HarnessExport {
                 externalStatusURL: dest.appendingPathComponent("status.json"),
                 ledgerHeadSeal: seal,
                 ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
-                scope: scope
+                scope: scope,
+                freshnessCadenceSeconds: freshnessCadenceSeconds()
             ).runFullHistory(throughDay: String(now.prefix(10)))
             await notifyIfFailed(
                 outcome,
@@ -912,7 +921,8 @@ enum HarnessExport {
             snapshotURL: StatusSnapshotLocation.url(destinationID: "local-file"),
             externalStatusURL: dest.appendingPathComponent("status.json"),
             ledgerHeadSeal: ledgerHeadSeal(),
-            ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json")
+            ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
+            freshnessCadenceSeconds: freshnessCadenceSeconds()
         ).run(gap: gap)
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
         return outcome
@@ -950,7 +960,8 @@ enum HarnessExport {
                 destinationName: "local-file",
                 envelope: envelope,
                 temporal: context,
-                trigger: .manual
+                trigger: .manual,
+                freshnessCadenceSeconds: freshnessCadenceSeconds()
             )
             let outcome = try await run.run()
             lines.append("\(declaration.id.rawValue): \(outcome.kind.rawValue) (demo)")
@@ -1053,7 +1064,8 @@ enum HarnessExport {
                 snapshotURL: StatusSnapshotLocation.url(destinationID: "companion"),
                 ledgerHeadSeal: ledgerSeal,
                 ledgerSealURL: ledgerSealURL,
-                scope: scope
+                scope: scope,
+                freshnessCadenceSeconds: freshnessCadenceSeconds()
             )
             let outcome = try await run.run()
             await notifyIfFailed(
@@ -1838,7 +1850,8 @@ enum HarnessExport {
                 snapshotURL: snapshotURL,
                 ledgerHeadSeal: ledgerSeal,
                 ledgerSealURL: ledgerSealURL,
-                scope: scope
+                scope: scope,
+                freshnessCadenceSeconds: freshnessCadenceSeconds()
             ).run()
             await notifyIfFailed(
                 outcome,
@@ -1970,7 +1983,8 @@ enum HarnessExport {
                 snapshotURL: snapshotURL,
                 ledgerHeadSeal: ledgerSeal,
                 ledgerSealURL: ledgerSealURL,
-                scope: scope
+                scope: scope,
+                freshnessCadenceSeconds: freshnessCadenceSeconds()
             ).run()
             await notifyIfFailed(
                 outcome,

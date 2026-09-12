@@ -32,6 +32,8 @@ public struct ExportRun: Sendable {
     public var scope: DestinationExportScope?
     /// QA-17: the page size above which a delta is treated as a replayed store.
     public var replaySampleLimit: Int
+    /// UX-22: C, the owned freshness cadence that drives stale and overdue windows.
+    public var freshnessCadenceSeconds: TimeInterval
     #if DEBUG
     public var faults: any ExportFaultInjector = NoExportFaults()
     #endif
@@ -55,7 +57,8 @@ public struct ExportRun: Sendable {
         ledgerHeadSeal: (any LedgerHeadSeal)? = nil,
         ledgerSealURL: URL? = nil,
         scope: DestinationExportScope? = nil,
-        replaySampleLimit: Int = AnchorGuard.implausibleDeltaSamples
+        replaySampleLimit: Int = AnchorGuard.implausibleDeltaSamples,
+        freshnessCadenceSeconds: TimeInterval = FreshnessTarget.defaultCadenceSeconds
     ) {
         self.source = source
         self.destination = destination
@@ -76,6 +79,7 @@ public struct ExportRun: Sendable {
         self.ledgerSealURL = ledgerSealURL
         self.scope = scope
         self.replaySampleLimit = replaySampleLimit
+        self.freshnessCadenceSeconds = freshnessCadenceSeconds
     }
 
     public func run() async throws -> RunOutcome {
@@ -632,7 +636,10 @@ public struct ExportRun: Sendable {
         let estimates = freshnessEstimates.isEmpty
             ? (prior?.freshnessEstimates ?? [:])
             : freshnessEstimates
-        let thresholds = FreshnessTarget.snapshotThresholds(estimates: estimates)
+        let thresholds = FreshnessTarget.snapshotThresholds(
+            estimates: estimates,
+            cadenceSeconds: freshnessCadenceSeconds
+        )
         try DestinationSnapshotFile.write(
             DestinationStatusSnapshot(
                 destinationID: destinationName,

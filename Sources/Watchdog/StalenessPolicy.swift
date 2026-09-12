@@ -66,6 +66,9 @@ public enum FreshnessTarget {
     public static let minimumSpan: TimeInterval = 14 * 24 * 60 * 60
     public static let alarmFloor: TimeInterval = 6 * 60 * 60
     public static let alarmCap: TimeInterval = 48 * 60 * 60
+    /// UX-22 / UX-33: C defaults to 15 minutes; stale is max(2·C, 90 min).
+    public static let defaultCadenceSeconds: TimeInterval = 15 * 60
+    public static let staleFloor: TimeInterval = 90 * 60
     public static let provisionalDisclosure =
         "Freshness target pending R-71 evidence. The overdue alarm floor is 6 hours; this is not a delivery promise."
 
@@ -170,11 +173,24 @@ public enum FreshnessTarget {
         max(1, overdue / 2)
     }
 
-    public static func snapshotThresholds(
-        estimates: [FreshnessClass: LocalFreshnessEstimate]
+    /// UX-22: notify at lastSuccess + max(4·C, 6 h). UX-33: Stale at max(2·C, 90 min).
+    public static func cadenceThresholds(
+        cadenceSeconds: TimeInterval
     ) -> (stale: TimeInterval, overdue: TimeInterval) {
-        let overdue = overdueThreshold(estimates: estimates)
-        return (staleThreshold(overdue: overdue), overdue)
+        let cadence = max(60, cadenceSeconds)
+        let overdue = max(4 * cadence, alarmFloor)
+        let stale = min(max(2 * cadence, staleFloor), overdue - 1)
+        return (stale, overdue)
+    }
+
+    public static func snapshotThresholds(
+        estimates: [FreshnessClass: LocalFreshnessEstimate],
+        cadenceSeconds: TimeInterval = defaultCadenceSeconds
+    ) -> (stale: TimeInterval, overdue: TimeInterval) {
+        let cadence = cadenceThresholds(cadenceSeconds: cadenceSeconds)
+        let overdue = max(cadence.overdue, overdueThreshold(estimates: estimates))
+        let stale = min(cadence.stale, staleThreshold(overdue: overdue), overdue - 1)
+        return (stale, overdue)
     }
 
     private static func p95(_ values: [TimeInterval]) -> TimeInterval? {

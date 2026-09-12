@@ -36,6 +36,7 @@ public struct ReconcileSweep: Sendable {
     public var ledgerHeadSeal: (any LedgerHeadSeal)?
     public var ledgerSealURL: URL?
     public var scope: DestinationExportScope?
+    public var freshnessCadenceSeconds: TimeInterval
 
     public init(
         observations: any DayObservationSource,
@@ -53,7 +54,8 @@ public struct ReconcileSweep: Sendable {
         externalStatusURL: URL? = nil,
         ledgerHeadSeal: (any LedgerHeadSeal)? = nil,
         ledgerSealURL: URL? = nil,
-        scope: DestinationExportScope? = nil
+        scope: DestinationExportScope? = nil,
+        freshnessCadenceSeconds: TimeInterval = FreshnessTarget.defaultCadenceSeconds
     ) {
         self.observations = observations
         self.destination = destination
@@ -71,6 +73,7 @@ public struct ReconcileSweep: Sendable {
         self.ledgerHeadSeal = ledgerHeadSeal
         self.ledgerSealURL = ledgerSealURL
         self.scope = scope
+        self.freshnessCadenceSeconds = freshnessCadenceSeconds
     }
 
     public func run(throughDay: String) async throws -> RunOutcome {
@@ -420,7 +423,8 @@ public struct ReconcileSweep: Sendable {
         let prior = try? DestinationSnapshotFile.read(from: snapshotURL)
         let succeeded = outcome.kind == .success || outcome.kind == .successNothingDue
         let thresholds = FreshnessTarget.snapshotThresholds(
-            estimates: prior?.freshnessEstimates ?? [:]
+            estimates: prior?.freshnessEstimates ?? [:],
+            cadenceSeconds: freshnessCadenceSeconds
         )
         try DestinationSnapshotFile.write(
             DestinationStatusSnapshot(
