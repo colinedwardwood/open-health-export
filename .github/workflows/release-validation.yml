@@ -26,7 +26,34 @@ permissions:
   contents: read
   issues: read
 jobs:
+  pre-release-performance:
+    runs-on: [self-hosted, macOS, performance]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.tag }}
+      - name: Fail on a greater-than-20-percent permitted-launch regression
+        env:
+          OHE_PERFORMANCE_ITERATIONS: "100"
+        run: |
+          python3 qa/validate-nfr-mapping.py
+          scripts/check-performance-baseline.sh \
+            qa/baselines/m0-host-permitted-launch.json \
+            "$RUNNER_TEMP/candidate.json" \
+            "$RUNNER_TEMP/comparison.json"
+      - name: Retain machine-readable performance evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pre-release-performance
+          path: |
+            ${{ runner.temp }}/candidate.json
+            ${{ runner.temp }}/comparison.json
+          retention-days: 30
+
   evidence:
+    needs: pre-release-performance
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
