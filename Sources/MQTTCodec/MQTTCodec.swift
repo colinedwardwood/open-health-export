@@ -25,6 +25,7 @@ public enum MQTTError: Error, Equatable {
     case qos2Unsupported
     case unsupportedQoS(Int)
     case lastWillUnsupported
+    case persistentSessionUnsupported
 }
 
 public enum MQTTQoS: UInt8, Sendable {

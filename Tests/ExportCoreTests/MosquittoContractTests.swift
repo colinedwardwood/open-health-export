@@ -98,6 +98,16 @@ func mosquittoContractRejectsExcludedQoS2AndLastWillBeforeDial() throws {
             lastWillEnabled: true
         )
     }
+    #expect(throws: MQTTError.persistentSessionUnsupported) {
+        _ = try MQTTDestination(
+            urlString: url,
+            allowedHosts: [host],
+            allowInsecure: true,
+            clientID: "ohe-r90-no-session",
+            topic: "ohe/health",
+            cleanSessionEnabled: false
+        )
+    }
 }
 }
 

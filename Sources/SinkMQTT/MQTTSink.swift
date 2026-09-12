@@ -39,6 +39,7 @@ public struct MQTTDestination: Sendable {
         topic: String,
         qos: MQTTQoS = .atLeastOnce,
         lastWillEnabled: Bool = false,
+        cleanSessionEnabled: Bool = true,
         username: String? = nil,
         password: String? = nil,
         clientPKCS12: Data? = nil,
@@ -55,6 +56,11 @@ public struct MQTTDestination: Sendable {
             // The app cannot keep an MQTT connection alive under the iOS background
             // model, so the wire contract deliberately has no meaningful LWT.
             throw MQTTError.lastWillUnsupported
+        }
+        if !cleanSessionEnabled {
+            // ADR-0003: republish from the app queue. Broker-side session state is
+            // an explicit exclusion, not a silent CleanSession=1 rewrite.
+            throw MQTTError.persistentSessionUnsupported
         }
         self.clientID = clientID
         self.topic = topic

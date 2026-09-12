@@ -188,6 +188,44 @@ private func portableMQTT(
     #expect(
         throws: DestinationConfigurationPortabilityError.unsupportedSetting(
             kind: .mqtt,
+            key: "cleanSession"
+        )
+    ) {
+        try PortableDestinationMaterializer.materialize(
+            try PortableDestinationConfiguration(
+                sourceIdentifier: "mqtt",
+                displayName: "MQTT",
+                kind: .mqtt,
+                endpoint: "mqtts://nas.example:8883",
+                settings: [
+                    "clientID": "phone",
+                    "qos": "1",
+                    "topic": "health/export",
+                    "cleanSession": "false",
+                ]
+            )
+        )
+    }
+
+    let clean = try PortableDestinationMaterializer.materialize(
+        try PortableDestinationConfiguration(
+            sourceIdentifier: "mqtt",
+            displayName: "MQTT",
+            kind: .mqtt,
+            endpoint: "mqtts://nas.example:8883",
+            settings: [
+                "clientID": "phone",
+                "qos": "1",
+                "topic": "health/export",
+                "cleanSession": "true",
+            ]
+        )
+    )
+    #expect(clean.clientID == "phone")
+
+    #expect(
+        throws: DestinationConfigurationPortabilityError.unsupportedSetting(
+            kind: .mqtt,
             key: "retain"
         )
     ) {

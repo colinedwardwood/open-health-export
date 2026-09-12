@@ -319,7 +319,7 @@ public enum PortableDestinationMaterializer {
                 qos: nil
             )
         case .mqtt:
-            supported = ["allowInsecure", "clientID", "qos", "topic"]
+            supported = ["allowInsecure", "clientID", "qos", "topic", "cleanSession"]
             try rejectUnsupported(
                 configuration.settings,
                 supported: supported,
@@ -330,6 +330,13 @@ public enum PortableDestinationMaterializer {
                 throw DestinationConfigurationPortabilityError.unsupportedSetting(
                     kind: .mqtt,
                     key: "qos"
+                )
+            }
+            if let cleanSession = configuration.settings["cleanSession"],
+               cleanSession != "true" {
+                throw DestinationConfigurationPortabilityError.unsupportedSetting(
+                    kind: .mqtt,
+                    key: "cleanSession"
                 )
             }
             return PortableDestinationSetupInputs(

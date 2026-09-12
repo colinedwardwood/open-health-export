@@ -74,6 +74,19 @@ import WireFormat
     #expect(flags & 0b0000_0010 != 0) // CleanSession remains required by ADR-0003.
 }
 
+@Test func mqttPersistentSessionIsRejectedBeforeConnect() throws {
+    #expect(throws: MQTTError.persistentSessionUnsupported) {
+        _ = try MQTTDestination(
+            urlString: "mqtt://broker.example:1883",
+            allowedHosts: ["broker.example"],
+            allowInsecure: true,
+            clientID: "c1",
+            topic: "ohe/health",
+            cleanSessionEnabled: false
+        )
+    }
+}
+
 @Test func mqttDataPublishNeverSetsRetain() throws {
     let off = try MQTTCodec.publish(
         topic: "ohe/health",
