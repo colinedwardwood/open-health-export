@@ -498,7 +498,10 @@ public struct ExportRun: Sendable {
             )
         }
         var freshnessEstimates: [FreshnessClass: LocalFreshnessEstimate] = [:]
+        var queueOccupancy = QueueOccupancy.green.snapshotToken
         if snapshotURL != nil {
+            let queued = try await store.transact { try $0.queuedBytes() }
+            queueOccupancy = QueueRed.occupancy(queuedBytes: queued).snapshotToken
             for freshnessClass in FreshnessClass.allCases {
                 let observations = try await store.transact {
                     try $0.loadFreshnessLatencies(
@@ -515,7 +518,8 @@ public struct ExportRun: Sendable {
         try writeSnapshot(
             outcome: outcome,
             tally: tally,
-            freshnessEstimates: freshnessEstimates
+            freshnessEstimates: freshnessEstimates,
+            queueOccupancy: queueOccupancy
         )
         try writeExternalStatus(outcome: outcome, tally: tally)
         try await writeLedgerHeadSeal()
@@ -524,7 +528,8 @@ public struct ExportRun: Sendable {
     private func writeSnapshot(
         outcome: RunOutcome,
         tally: RunTally,
-        freshnessEstimates: [FreshnessClass: LocalFreshnessEstimate]
+        freshnessEstimates: [FreshnessClass: LocalFreshnessEstimate],
+        queueOccupancy: String
     ) throws {
         guard let snapshotURL else { return }
         let now = clock.now().timeIntervalSince1970
@@ -551,6 +556,7 @@ public struct ExportRun: Sendable {
                 nextAttemptEarliestEpoch: prior?.nextAttemptEarliestEpoch,
                 nextAttemptLatestEpoch: prior?.nextAttemptLatestEpoch,
                 freshnessEstimates: estimates,
+                queueOccupancy: queueOccupancy,
                 unacknowledgedSecurityEventCount:
                     prior?.unacknowledgedSecurityEventCount ?? 0,
                 writtenAtEpoch: now

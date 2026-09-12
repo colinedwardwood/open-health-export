@@ -1187,6 +1187,7 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     #expect(snapshot.writtenAtEpoch == 42)
     #expect(snapshot.overdueThresholdSeconds == FreshnessTarget.alarmFloor)
     #expect(snapshot.staleThresholdSeconds == FreshnessTarget.alarmFloor / 2)
+    #expect(snapshot.queueOccupancy == QueueOccupancy.green.snapshotToken)
     let external = try ExternalStatusRecordFile.read(from: externalStatusURL)
     #expect(external.schemaVersion == 1)
     #expect(external.destinationID == "local-file")
@@ -3366,6 +3367,70 @@ private func anchorHoldFixture(
     #expect(CatchUpAdmission.allows(queuedBytes: policy.catchUpLimit - 1))
     #expect(!CatchUpAdmission.allows(queuedBytes: policy.catchUpLimit))
     #expect(!CatchUpAdmission.allows(queuedBytes: policy.catchUpLimit - 10, incomingBytes: 10))
+}
+
+@Test func destinationStatusLineShowsAmberCatchUpAdvisory() {
+    let snapshot = DestinationStatusSnapshot(
+        destinationID: "local-file",
+        destinationLabel: "Archive folder",
+        enabled: true,
+        lastOutcome: "success",
+        queueOccupancy: QueueOccupancy.amber.snapshotToken,
+        writtenAtEpoch: 1
+    )
+    let line = DestinationStatusLine.render(snapshot, nowEpoch: 2) { _ in "earlier" }
+    #expect(line.contains("Catch-up is parked while the destination queue fills"))
+    #expect(
+        DestinationStatusLine.queueAdvisory("green") == nil
+    )
+    #expect(
+        DestinationStatusLine.queueAdvisory("red")?
+            .contains("data loss is approaching") == true
+    )
+}
+
+@Test func exportRunWritesAmberQueueOccupancyOnTheDestinationSnapshot() async throws {
+    let metric = MetricCatalog.heartRate.id
+    let dest = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-amber-snap-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: dest) }
+    try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+    let snapshotURL = dest.appendingPathComponent("widget-status.json")
+    let store = MemoryStateStore()
+    try await store.transact { tx in
+        try tx.enqueuePending(
+            PendingBatch(
+                id: BatchID(rawValue: "live-delta"),
+                payloadURL: "/tmp/live-delta",
+                expectedRecords: 1,
+                byteCount: QueuePolicy.production.catchUpLimit,
+                metric: metric
+            )
+        )
+    }
+    let page = SamplePage(
+        samples: [heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0x61]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let outcome = try await ExportRun(
+        source: FixtureSource(pages: [page]),
+        destination: .testing(LocalFileSink(directory: dest)),
+        store: store,
+        metric: metric,
+        scratchDirectory: dest.appendingPathComponent("scratch"),
+        envelope: testEnvelope(),
+        snapshotURL: snapshotURL
+    ).run()
+    #expect(outcome.kind == .success)
+    let snapshot = try DestinationSnapshotFile.read(from: snapshotURL)
+    #expect(snapshot.queueOccupancy == QueueOccupancy.amber.snapshotToken)
+    #expect(
+        DestinationStatusLine.render(snapshot, nowEpoch: 1) { _ in "earlier" }
+            .contains("Catch-up is parked while the destination queue fills")
+    )
 }
 
 @Test func queueRedStartsAtEightyPercentAndPurgesAttemptCaches() throws {

@@ -52,6 +52,15 @@ public enum QueueOccupancy: Int, Sendable, Comparable {
     public static func < (lhs: QueueOccupancy, rhs: QueueOccupancy) -> Bool {
         lhs.rawValue < rhs.rawValue
     }
+
+    public var snapshotToken: String {
+        switch self {
+        case .green: "green"
+        case .amber: "amber"
+        case .red: "red"
+        case .overCap: "over_cap"
+        }
+    }
 }
 
 /// I6 Red: Amber still holds, plus derived attempt-body caches are dropped and

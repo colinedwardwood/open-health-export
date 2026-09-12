@@ -383,12 +383,21 @@ public struct ReconcileSweep: Sendable {
                 )
             )
         }
-        try writeSnapshot(outcome: outcome, tally: tally)
+        let queued = try await store.transact { try $0.queuedBytes() }
+        try writeSnapshot(
+            outcome: outcome,
+            tally: tally,
+            queueOccupancy: QueueRed.occupancy(queuedBytes: queued).snapshotToken
+        )
         try writeExternalStatus(outcome: outcome, tally: tally)
         try await writeLedgerHeadSeal()
     }
 
-    private func writeSnapshot(outcome: RunOutcome, tally: RunTally) throws {
+    private func writeSnapshot(
+        outcome: RunOutcome,
+        tally: RunTally,
+        queueOccupancy: String
+    ) throws {
         guard let snapshotURL else { return }
         let now = clock.now().timeIntervalSince1970
         let prior = try? DestinationSnapshotFile.read(from: snapshotURL)
@@ -412,6 +421,8 @@ public struct ReconcileSweep: Sendable {
                 overdueThresholdSeconds: thresholds.overdue,
                 nextAttemptEarliestEpoch: prior?.nextAttemptEarliestEpoch,
                 nextAttemptLatestEpoch: prior?.nextAttemptLatestEpoch,
+                freshnessEstimates: prior?.freshnessEstimates ?? [:],
+                queueOccupancy: queueOccupancy,
                 unacknowledgedSecurityEventCount:
                     prior?.unacknowledgedSecurityEventCount ?? 0,
                 writtenAtEpoch: now

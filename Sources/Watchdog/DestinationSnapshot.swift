@@ -39,6 +39,8 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
     public var nextAttemptEarliestEpoch: TimeInterval?
     public var nextAttemptLatestEpoch: TimeInterval?
     public var freshnessEstimates: [FreshnessClass: LocalFreshnessEstimate]
+    /// I6: green / amber / red / over_cap. Amber and above show on the destination row.
+    public var queueOccupancy: String?
     public var unacknowledgedSecurityEventCount: Int
     public var writtenAtEpoch: TimeInterval
 
@@ -58,6 +60,7 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
         nextAttemptEarliestEpoch: TimeInterval? = nil,
         nextAttemptLatestEpoch: TimeInterval? = nil,
         freshnessEstimates: [FreshnessClass: LocalFreshnessEstimate] = [:],
+        queueOccupancy: String? = nil,
         unacknowledgedSecurityEventCount: Int = 0,
         writtenAtEpoch: TimeInterval
     ) {
@@ -77,6 +80,7 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
         self.nextAttemptEarliestEpoch = nextAttemptEarliestEpoch
         self.nextAttemptLatestEpoch = nextAttemptLatestEpoch
         self.freshnessEstimates = freshnessEstimates
+        self.queueOccupancy = queueOccupancy
         self.unacknowledgedSecurityEventCount = max(0, unacknowledgedSecurityEventCount)
         self.writtenAtEpoch = writtenAtEpoch
     }
@@ -98,6 +102,7 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
         case nextAttemptEarliestEpoch
         case nextAttemptLatestEpoch
         case freshnessEstimates
+        case queueOccupancy
         case unacknowledgedSecurityEventCount
         case writtenAtEpoch
     }
@@ -132,6 +137,7 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
                 [FreshnessClass: LocalFreshnessEstimate].self,
                 forKey: .freshnessEstimates
             ) ?? [:]
+        queueOccupancy = try values.decodeIfPresent(String.self, forKey: .queueOccupancy)
         unacknowledgedSecurityEventCount =
             try values.decodeIfPresent(Int.self, forKey: .unacknowledgedSecurityEventCount) ?? 0
         writtenAtEpoch = try values.decode(TimeInterval.self, forKey: .writtenAtEpoch)

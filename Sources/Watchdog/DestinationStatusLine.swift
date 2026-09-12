@@ -32,7 +32,22 @@ public enum DestinationStatusLine {
         if changes > 0 {
             line += " · \(changes) unacknowledged change(s)"
         }
+        if let advisory = queueAdvisory(snapshot.queueOccupancy) {
+            line += " · \(advisory)"
+        }
         return line
+    }
+
+    /// I6: occupancy is a destination-row advisory, not a run failure.
+    public static func queueAdvisory(_ occupancy: String?) -> String? {
+        switch occupancy {
+        case "amber":
+            "Catch-up is parked while the destination queue fills. Live exports continue."
+        case "red", "over_cap":
+            "Catch-up is parked. The destination queue is filling and data loss is approaching."
+        default:
+            nil
+        }
     }
 
     /// The reason belongs on screen whenever the last run did not succeed. `none` is
