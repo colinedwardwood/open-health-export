@@ -196,6 +196,37 @@ private func browserSample(
     #expect(!SchedulingHonesty.body.lowercased().contains("every hour"))
 }
 
+@Test func iPadOnlyExporterNoticeIsPermanentAndNamesThePlatformLimit() throws {
+    #expect(IPadExporterNotice.title == "This iPad is your only exporter.")
+    #expect(IPadExporterNotice.body.contains("syncs to it"))
+    #expect(IPadExporterNotice.body.contains("iPhone"))
+    #expect(IPadExporterNotice.isVisible(idiomIsPad: true, environment: [:]))
+    #expect(!IPadExporterNotice.isVisible(idiomIsPad: false, environment: [:]))
+    #expect(
+        IPadExporterNotice.isVisible(
+            idiomIsPad: false,
+            environment: [IPadExporterNotice.environmentKey: "1"]
+        )
+    )
+    #expect(
+        !IPadExporterNotice.isVisible(
+            idiomIsPad: true,
+            environment: [IPadExporterNotice.environmentKey: "0"]
+        )
+    )
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let view = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
+        encoding: .utf8
+    )
+    #expect(view.contains("ipad-only-exporter"))
+    #expect(view.contains("showsIPadOnlyExporterNotice"))
+    #expect(!view.contains("ipad-only-exporter-dismiss"))
+}
+
 @Test func ux07UnavailableCopyNamesThePlatformLimitWithoutRetryOrDashboard() {
     #expect(HealthAvailability.unavailableTitle == "Apple Health is not on this device")
     #expect(

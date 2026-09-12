@@ -182,6 +182,13 @@ struct HarnessView: View {
         HealthKitAvailability.isAvailable()
     }
 
+    private var showsIPadOnlyExporterNotice: Bool {
+        IPadExporterNotice.isVisible(
+            idiomIsPad: UIDevice.current.userInterfaceIdiom == .pad,
+            environment: ProcessInfo.processInfo.environment
+        )
+    }
+
     var body: some View {
         ZStack {
             if !healthKitAvailable {
@@ -564,6 +571,19 @@ struct HarnessView: View {
                 .accessibilityLabel("Status: \(status)")
                 .accessibilityIdentifier("status-line")
                 .id("status-line")
+
+            if showsIPadOnlyExporterNotice {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(IPadExporterNotice.title)
+                        .font(.headline)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(IPadExporterNotice.body)
+                        .font(.footnote)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("ipad-only-exporter")
+            }
 
             if let userFacingError {
                 VStack(alignment: .leading, spacing: 8) {

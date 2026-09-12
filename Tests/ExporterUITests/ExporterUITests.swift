@@ -89,6 +89,24 @@ final class ExporterUITests: XCTestCase {
         try performAccessibilityAudit("healthkit-unavailable")
     }
 
+    func testIPadOnlyExporterNoticeIsVisibleWhenForced() {
+        app.terminate()
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "false",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launchEnvironment["OHE_IPAD_ONLY_EXPORTER"] = "1"
+        app.launch()
+
+        XCTAssertTrue(app.otherElements["ipad-only-exporter"].waitForExistence(timeout: uiWait))
+        XCTAssertTrue(
+            app.staticTexts["This iPad is your only exporter."].exists
+            || app.otherElements["ipad-only-exporter"].label.contains("This iPad is your only exporter.")
+        )
+        XCTAssertFalse(app.buttons["ipad-only-exporter-dismiss"].exists)
+    }
+
     /// UX-46: Delete everything is two taps from Settings, with counts and the
     /// two limits we do not honour.
     func testDeleteEverythingShowsHonestLimitsWithinTwoTaps() {
