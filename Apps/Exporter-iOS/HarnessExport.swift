@@ -2566,6 +2566,100 @@ enum HarnessExport {
         return report.allowsEnablement
     }
 
+    /// UX-45: hops for the onboarding and Settings explainer. Credential *kinds*
+    /// only — never tokens, passwords, or PKCS#12 bytes.
+    static func dataFlowHops() -> [DataFlowHop] {
+        guard let root = try? applicationSupportRoot() else { return [] }
+        var hops: [DataFlowHop] = []
+        if isLocalFileEnabled() {
+            hops.append(
+                DataFlowHop(
+                    id: "local-file",
+                    host: "Files on this iPhone",
+                    transport: "Local files",
+                    credential: DataFlowHop.noNetwork
+                )
+            )
+        }
+        if let data = try? Data(contentsOf: root.appendingPathComponent("https-destination.json")),
+           let record = try? JSONDecoder().decode(HTTPSVerificationRecord.self, from: data),
+           record.report.allowsEnablement
+        {
+            hops.append(
+                DataFlowHop(
+                    id: "https",
+                    host: dataFlowHost(record.urlString),
+                    transport: record.allowInsecureHTTP ? "HTTP" : "HTTPS",
+                    credential: record.hasBearer ? DataFlowHop.bearerToken : DataFlowHop.noCredential
+                )
+            )
+        }
+        if let data = try? Data(contentsOf: root.appendingPathComponent("mqtt-destination.json")),
+           let record = try? JSONDecoder().decode(MQTTVerificationRecord.self, from: data),
+           record.report.allowsEnablement
+        {
+            let credential: String
+            if record.hasClientPKCS12 == true {
+                credential = DataFlowHop.clientCertificate
+            } else if record.username != nil || record.hasPassword == true {
+                credential = DataFlowHop.usernamePassword
+            } else {
+                credential = DataFlowHop.noCredential
+            }
+            hops.append(
+                DataFlowHop(
+                    id: "mqtt",
+                    host: dataFlowHost(record.urlString),
+                    transport: record.allowInsecure ? "MQTT" : "MQTTS",
+                    credential: credential
+                )
+            )
+        }
+        if let data = try? Data(contentsOf: companionTestReportURL(root: root)),
+           let record = try? JSONDecoder().decode(CompanionVerificationRecord.self, from: data),
+           record.report.allowsEnablement
+        {
+            hops.append(
+                DataFlowHop(
+                    id: "companion",
+                    host: record.serviceName,
+                    transport: "Mac companion",
+                    credential: DataFlowHop.pairing
+                )
+            )
+        }
+        #if !OHE_OBS25_SIZE_BASELINE
+        if let data = try? Data(contentsOf: root.appendingPathComponent("otlp-destination.json")),
+           let record = try? JSONDecoder().decode(OTLPDestinationRecord.self, from: data),
+           let host = URL(string: record.urlString)?.host
+        {
+            hops.append(
+                DataFlowHop(
+                    id: "otlp",
+                    host: host,
+                    transport: "OTLP HTTP",
+                    credential: DataFlowHop.noCredential
+                )
+            )
+        }
+        #endif
+        return hops
+    }
+
+    static func dataFlowTypeCount() async -> Int {
+        (try? await selectedMetrics())?.count ?? 0
+    }
+
+    private static func dataFlowHost(_ urlString: String) -> String {
+        guard let url = URL(string: urlString), let host = url.host, !host.isEmpty else {
+            return urlString
+        }
+        if let port = url.port {
+            return "\(host):\(port)"
+        }
+        return host
+    }
+
     static func wakeLedger() throws -> WakeLedger {
         let root = try applicationSupportRoot()
         return WakeLedger(path: root.appendingPathComponent("wake-ledger.log").path)

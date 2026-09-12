@@ -37,6 +37,15 @@ final class ExporterUITests: XCTestCase {
             "This is not a medical device. It does not diagnose or treat anything."
         )
         XCTAssertFalse(app.buttons["health-request"].exists)
+        XCTAssertTrue(app.otherElements["data-flow-explainer"].waitForExistence(timeout: uiWait))
+        XCTAssertTrue(
+            app.staticTexts["No destinations yet. Health stays on this iPhone until you add one."]
+                .exists
+        )
+        XCTAssertTrue(
+            app.staticTexts["Nowhere else. No account. No analytics. No crash reporting."]
+                .exists
+        )
 
         disclosure.tap()
         XCTAssertTrue(app.buttons["health-request"].waitForExistence(timeout: uiWait))

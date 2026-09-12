@@ -82,6 +82,8 @@ struct HarnessView: View {
     @AppStorage("ohe.diagnosticWindowHours")
     private var diagnosticWindowHours = 24
     @State private var destinationStatusLines: [String] = []
+    @State private var dataFlowHops: [DataFlowHop] = []
+    @State private var dataFlowTypeCount = 0
     @State private var ledgerLines: [String] = []
     @State private var historyLines: [String] = []
     @State private var ledgerWarning = ""
@@ -459,6 +461,40 @@ struct HarnessView: View {
         .accessibilityIdentifier("privacy-gate")
     }
 
+    private var dataFlowExplainer: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(DataFlowExplainer.title)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+            Text(DataFlowExplainer.source)
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(DataFlowExplainer.typeCountCopy(dataFlowTypeCount))
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(DataFlowExplainer.transform)
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+            if dataFlowHops.isEmpty {
+                Text(DataFlowExplainer.empty)
+                    .font(.footnote)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                ForEach(Array(dataFlowHops.enumerated()), id: \.element.id) { index, hop in
+                    Text(DataFlowExplainer.hopLine(hop))
+                        .font(.footnote)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("data-flow-hop-\(index)")
+                }
+            }
+            Text(DataFlowExplainer.nowhereElse)
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("data-flow-explainer")
+    }
+
     private var mqttPKCS12Types: [UTType] {
         ["p12", "pfx"].compactMap { UTType(filenameExtension: $0) } + [.data]
     }
@@ -474,6 +510,7 @@ struct HarnessView: View {
                 .fixedSize(horizontal: false, vertical: true)
             Text("You choose what is read. We do not hide destinations, and we do not send telemetry to the maintainers.")
                 .fixedSize(horizontal: false, vertical: true)
+            dataFlowExplainer
             Button("I understand — continue") {
                 disclosureAcknowledged = true
                 phase = .ready
@@ -664,6 +701,7 @@ struct HarnessView: View {
             Text("Where your data goes")
                 .font(.headline)
                 .accessibilityIdentifier("destination-title")
+            dataFlowExplainer
             Text(FreshnessTarget.provisionalDisclosure)
                 .font(.footnote)
                 .accessibilityIdentifier("freshness-target")
@@ -2119,6 +2157,10 @@ struct HarnessView: View {
         destinationStatusLines = HarnessExport.destinationStatusLines()
         destinationChangeBanner = HarnessExport.destinationChangeBannerDetail()
         overdueBanner = HarnessExport.overdueBannerDetail()
+        dataFlowHops = HarnessExport.dataFlowHops()
+        Task {
+            dataFlowTypeCount = await HarnessExport.dataFlowTypeCount()
+        }
     }
 
     @ViewBuilder
