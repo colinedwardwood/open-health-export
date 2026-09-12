@@ -165,6 +165,16 @@ private func browserSample(
     )
 }
 
+@Test func ux20SchedulingCopyNamesIOSTimingLockAndChosenTimeControls() {
+    #expect(SchedulingHonesty.body.contains("iOS decides when background export runs"))
+    #expect(SchedulingHonesty.body.contains("locked"))
+    #expect(SchedulingHonesty.body.contains("Shortcut"))
+    #expect(SchedulingHonesty.body.contains("Control Centre"))
+    #expect(SchedulingHonesty.noSchedulePromise.contains("3 a.m."))
+    #expect(!SchedulingHonesty.body.lowercased().contains("will definitely"))
+    #expect(!SchedulingHonesty.body.lowercased().contains("every hour"))
+}
+
 @Test func ux07UnavailableCopyNamesThePlatformLimitWithoutRetryOrDashboard() {
     #expect(HealthAvailability.unavailableTitle == "Apple Health is not on this device")
     #expect(

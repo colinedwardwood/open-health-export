@@ -46,6 +46,10 @@ final class ExporterUITests: XCTestCase {
             app.staticTexts["Nowhere else. No account. No analytics. No crash reporting."]
                 .exists
         )
+        XCTAssertTrue(app.otherElements["scheduling-honesty"].waitForExistence(timeout: uiWait))
+        XCTAssertTrue(
+            app.staticTexts["Nothing here promises a send at 3 a.m."].exists
+        )
 
         disclosure.tap()
         XCTAssertTrue(app.buttons["health-request"].waitForExistence(timeout: uiWait))
@@ -58,6 +62,7 @@ final class ExporterUITests: XCTestCase {
             app.staticTexts["shortcut-export"].label,
             "Shortcuts can run one page to the local archive after you enable it."
         )
+        XCTAssertTrue(app.otherElements["scheduling-honesty"].exists)
     }
 
     /// UX-07 / HK-01: no Health store means one terminal screen, not onboarding

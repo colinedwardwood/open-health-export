@@ -496,6 +496,22 @@ struct HarnessView: View {
         .accessibilityIdentifier("data-flow-explainer")
     }
 
+    private var schedulingHonesty: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(SchedulingHonesty.title)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+            Text(SchedulingHonesty.body)
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(SchedulingHonesty.noSchedulePromise)
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("scheduling-honesty")
+    }
+
     private var mqttPKCS12Types: [UTType] {
         ["p12", "pfx"].compactMap { UTType(filenameExtension: $0) } + [.data]
     }
@@ -507,8 +523,7 @@ struct HarnessView: View {
             Text("This is not a medical device. It does not diagnose or treat anything.")
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("first-run-disclaimer")
-            Text("When the phone is locked, Apple withholds Health data after a short window. Background export is best-effort: iOS may not wake the app, and we will say so instead of pretending a schedule ran.")
-                .fixedSize(horizontal: false, vertical: true)
+            schedulingHonesty
             Text("You choose what is read. We do not hide destinations, and we do not send telemetry to the maintainers.")
                 .fixedSize(horizontal: false, vertical: true)
             dataFlowExplainer
@@ -585,10 +600,11 @@ struct HarnessView: View {
             }
             .disabled(phase == .working)
             .accessibilityHint("Writes NDJSON under Application Support using the engine and local-file sink.")
-            Text("Shortcuts can run one page to the local archive after you enable it.")
+            Text(SchedulingHonesty.shortcutsLine)
                 .font(.footnote)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("shortcut-export")
+            schedulingHonesty
             Text("Backfill runs newest-first and resumes from an inspectable checkpoint. On iOS 26 or later it continues unattended after you leave the app. On iOS 18 through 25, keep this screen open; the app prevents idle sleep while it works.")
                 .font(.footnote)
                 .fixedSize(horizontal: false, vertical: true)
