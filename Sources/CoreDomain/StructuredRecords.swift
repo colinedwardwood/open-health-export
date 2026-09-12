@@ -3,6 +3,26 @@
 
 import Foundation
 
+/// HK-30: static HealthKit characteristics. Identity is `(exporterId, characteristicId)`.
+public struct CharacteristicRecord: Sendable, Codable, Equatable {
+    public var characteristicId: String
+    public var value: String
+    public var reidentifying: Bool
+    public var observedAt: String
+
+    public init(
+        characteristicId: String,
+        value: String,
+        reidentifying: Bool = true,
+        observedAt: String
+    ) {
+        self.characteristicId = characteristicId
+        self.value = value
+        self.reidentifying = reidentifying
+        self.observedAt = observedAt
+    }
+}
+
 public struct StateOfMindRecord: Sendable, Codable, Equatable {
     public var key: RecordKey
     public var metric: MetricID

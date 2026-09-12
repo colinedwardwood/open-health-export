@@ -272,6 +272,44 @@ private func browserSample(
     #expect(MetricCatalog.all.allSatisfy { $0.kind == "sample.quantity" })
 }
 
+@Test func hk30CharacteristicsStayOffByDefaultAndAreFlaggedReidentifying() throws {
+    #expect(MetricCatalog.characteristics.count == 6)
+    #expect(MetricCatalog.characteristics.allSatisfy { $0.kind == "characteristic" })
+    #expect(MetricCatalog.characteristics.allSatisfy { $0.reidentifying })
+    #expect(MetricCatalog.characteristics.allSatisfy { $0.sensitivity == .sensitive })
+    #expect(Set(MetricCatalog.coreDaily.map(\.id)).isDisjoint(with: Set(MetricCatalog.characteristics.map(\.id))))
+    #expect(Set(MetricCatalog.all.map(\.id)).isDisjoint(with: Set(MetricCatalog.characteristics.map(\.id))))
+    var draft = DataSelectionDraft(baseline: [])
+    draft.invertRoutine(MetricCatalog.selectable.map(\.id))
+    #expect(draft.selected.isDisjoint(with: Set(MetricCatalog.characteristics.map(\.id))))
+    #expect(throws: DataSelectionError.sensitiveConfirmationRequired) {
+        try draft.toggle(
+            MetricCatalog.dateOfBirth.id,
+            destinationName: "local-file"
+        )
+    }
+    try draft.toggle(
+        MetricCatalog.dateOfBirth.id,
+        destinationName: "local-file",
+        sensitiveConfirmation: "local-file"
+    )
+    #expect(draft.selected.contains(MetricCatalog.dateOfBirth.id))
+    let rows = DataBrowser.rows(latest: [:])
+    let dob = try #require(rows.first { $0.metric == MetricCatalog.dateOfBirth.id })
+    #expect(dob.reidentifying)
+    #expect(dob.sensitive)
+    #expect(dob.subtitle == DataBrowser.characteristicCopy)
+    let view = try String(
+        contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
+        encoding: .utf8
+    )
+    #expect(view.contains("DataBrowser.reidentifyingBadge"))
+}
+
 @Test func ux18PresetUpgradeIsOptInDiffAndLeavesV1UntilAccepted() {
     let v1 = CoreDailyPreset.current
     #expect(v1.version == 1)

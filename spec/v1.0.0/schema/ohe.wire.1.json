@@ -20,6 +20,7 @@
     { "$ref": "#/$defs/workoutMetric" },
     { "$ref": "#/$defs/tombstone" },
     { "$ref": "#/$defs/aggregate" },
+    { "$ref": "#/$defs/characteristic" },
     { "$ref": "#/$defs/canary" }
   ],
   "$defs": {
@@ -471,6 +472,34 @@
         "v": { "type": "integer", "const": 1 },
         "value": { "type": "number" },
         "supersedes": { "type": "integer" },
+        "demo": { "type": "boolean" }
+      }
+    },
+    "characteristic": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "batchSeq", "characteristicId", "kind", "observedAt", "reidentifying", "v", "value"
+      ],
+      "properties": {
+        "kind": { "type": "string", "const": "characteristic", "x-ohe-open": false },
+        "batchSeq": { "type": "integer" },
+        "characteristicId": {
+          "type": "string",
+          "enum": [
+            "biologicalSex",
+            "bloodType",
+            "dateOfBirth",
+            "fitzpatrickSkinType",
+            "wheelchairUse",
+            "activityMoveMode"
+          ],
+          "x-ohe-open": false
+        },
+        "observedAt": { "type": "string" },
+        "reidentifying": { "type": "boolean", "const": true },
+        "v": { "type": "integer", "const": 1 },
+        "value": { "type": "string" },
         "demo": { "type": "boolean" }
       }
     },

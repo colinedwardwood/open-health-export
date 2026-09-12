@@ -626,6 +626,11 @@ public protocol SampleSource: Sendable {
     func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage
 }
 
+/// On-demand HealthKit characteristic read. Never an anchored sample query (HK-30).
+public protocol CharacteristicSource: Sendable {
+    func read(metric: MetricID, observedAt: String) async throws -> CharacteristicRecord?
+}
+
 /// Date-ranged observations for R-08. Does not use the HealthKit anchored query.
 public protocol DayObservationSource: Sendable {
     func samples(metric: MetricID, day: String) async throws -> [SampleRecord]

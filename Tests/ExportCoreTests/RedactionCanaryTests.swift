@@ -200,7 +200,13 @@ enum LeakMutant: String, CaseIterable {
 @Test func dataBrowserNeverClaimsDenialAndDemoFillsEveryRow() {
     let empty = DataBrowser.rows(latest: [:], exported: [MetricCatalog.heartRate.id])
     #expect(empty.count == MetricCatalog.selectable.count)
-    #expect(empty.allSatisfy { $0.subtitle == DataBrowser.noDataCopy })
+    #expect(empty.allSatisfy { row in
+        if MetricCatalog.isCharacteristic(row.metric) {
+            row.subtitle == DataBrowser.characteristicCopy
+        } else {
+            row.subtitle == DataBrowser.noDataCopy
+        }
+    })
     #expect(!empty.contains { $0.subtitle.lowercased().contains("denied") })
     #expect(empty.first { $0.metric == MetricCatalog.heartRate.id }?.exported == true)
 

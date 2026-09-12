@@ -612,6 +612,9 @@ public enum HealthKitAuthorization {
         if metric == AudiogramConversion.metric {
             return HKObjectType.audiogramSampleType()
         }
+        if let type = CharacteristicConversion.objectType(for: metric) {
+            return type
+        }
         if #available(iOS 18.0, macOS 15.0, *), metric == StateOfMindConversion.metric {
             return HKObjectType.stateOfMindType()
         }
@@ -716,6 +719,15 @@ public final class HealthKitAnchoredSource: SampleSource, @unchecked Sendable {
     }
 
     public func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage {
+        if MetricCatalog.isCharacteristic(metric) {
+            return SamplePage(
+                samples: [],
+                tombstones: [],
+                metric: metric,
+                anchorBlob: afterAnchor ?? Data(),
+                observedThrough: Date(timeIntervalSince1970: 0)
+            )
+        }
         if SampleConversion.quantityType(for: metric) != nil {
             return try await HealthKitSampleSource(
                 store: store,

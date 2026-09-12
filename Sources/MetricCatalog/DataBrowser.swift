@@ -49,6 +49,7 @@ public struct DataBrowserRow: Sendable, Equatable, Identifiable {
     public var subtitle: String
     public var exported: Bool
     public var sensitive: Bool
+    public var reidentifying: Bool
     public var hasData: Bool
     public var coverage: CoverageState?
 
@@ -59,13 +60,15 @@ public struct DataBrowserRow: Sendable, Equatable, Identifiable {
         exported: Bool,
         sensitive: Bool,
         hasData: Bool,
-        coverage: CoverageState? = nil
+        coverage: CoverageState? = nil,
+        reidentifying: Bool = false
     ) {
         self.metric = metric
         self.title = title
         self.subtitle = subtitle
         self.exported = exported
         self.sensitive = sensitive
+        self.reidentifying = reidentifying
         self.hasData = hasData
         self.coverage = coverage
     }
@@ -215,6 +218,10 @@ public struct DataSelectionDraft: Sendable, Equatable {
 /// R-69 type list: catalogue rows with values when present, never a denial claim.
 public enum DataBrowser {
     public static let noDataCopy = "No data on this iPhone"
+    /// HK-30: characteristics are identity-adjacent and off until the user enables them.
+    public static let characteristicCopy =
+        "Health characteristic. Off by default because it is re-identifying."
+    public static let reidentifyingBadge = "re-identifying"
     /// R-60: a denied read and absent data are indistinguishable, so zero results name
     /// both causes and hand over the route to check, rather than claiming either one.
     public static let healthPathCopy =
@@ -255,6 +262,8 @@ public enum DataBrowser {
                 )
                 let source = sample.source.map { " · \($0.name)" } ?? ""
                 subtitle = "\(formatValue(display.value)) \(display.unit) · \(sample.start)\(source)"
+            } else if declaration.kind == "characteristic" {
+                subtitle = characteristicCopy
             } else {
                 subtitle = noDataCopy
             }
@@ -275,7 +284,8 @@ public enum DataBrowser {
                 exported: exported.contains(declaration.id),
                 sensitive: declaration.sensitivity == .sensitive,
                 hasData: hasData,
-                coverage: state
+                coverage: state,
+                reidentifying: declaration.reidentifying
             )
             if onlyWithData, !row.hasData { return nil }
             return MetricSearch.matches(declaration, needle: search) ? row : nil

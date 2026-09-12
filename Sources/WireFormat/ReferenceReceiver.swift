@@ -78,6 +78,13 @@ public struct ReferenceReceiver: Sendable, Equatable {
             quantityMetrics.removeValue(forKey: uuid)
             categories.removeValue(forKey: uuid)
             tombstones.remove(uuid)
+        case "characteristic":
+            guard let characteristicId = object["characteristicId"] as? String,
+                  object["value"] as? String != nil
+            else {
+                throw JSONSchemaError.missingRequired("characteristicId")
+            }
+            structuralRecords[characteristicId] = kind
         case "tombstone":
             guard let uuid = object["uuid"] as? String else {
                 throw JSONSchemaError.missingRequired("uuid")

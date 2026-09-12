@@ -19,8 +19,12 @@ public struct MetricDeclaration: Sendable {
     /// Omitted when nil (enum / timestamp / unmapped). Never `measurement` with energy/volume.
     public var haStateClass: String?
     public var haRequiresAggregate: Bool
-    /// Wire family: `sample.quantity`, `sample.category`, or `workout`.
+    /// Wire family: `sample.quantity`, `sample.category`, `workout`, or `characteristic`.
     public var kind: String
+    /// HK-30: static identity-adjacent types. Always confirmed individually.
+    public var reidentifying: Bool
+    /// Closed wire `characteristicId` when `kind` is `characteristic`.
+    public var characteristicId: String?
 
     public init(
         id: MetricID,
@@ -35,7 +39,9 @@ public struct MetricDeclaration: Sendable {
         haDeviceClass: String?,
         haStateClass: String?,
         haRequiresAggregate: Bool,
-        kind: String = "sample.quantity"
+        kind: String = "sample.quantity",
+        reidentifying: Bool = false,
+        characteristicId: String? = nil
     ) {
         self.id = id
         self.wireId = wireId
@@ -50,6 +56,8 @@ public struct MetricDeclaration: Sendable {
         self.haStateClass = haStateClass
         self.haRequiresAggregate = haRequiresAggregate
         self.kind = kind
+        self.reidentifying = reidentifying
+        self.characteristicId = characteristicId
     }
 }
 
@@ -720,10 +728,79 @@ public enum MetricCatalog {
         workout,
     ]
 
-    public static var selectable: [MetricDeclaration] { all + structural }
+    public static let biologicalSex = characteristic(
+        id: "biologicalSex",
+        wireId: "biological_sex",
+        hkIdentifier: "HKCharacteristicTypeIdentifierBiologicalSex"
+    )
+    public static let bloodType = characteristic(
+        id: "bloodType",
+        wireId: "blood_type",
+        hkIdentifier: "HKCharacteristicTypeIdentifierBloodType"
+    )
+    public static let dateOfBirth = characteristic(
+        id: "dateOfBirth",
+        wireId: "date_of_birth",
+        hkIdentifier: "HKCharacteristicTypeIdentifierDateOfBirth"
+    )
+    public static let fitzpatrickSkinType = characteristic(
+        id: "fitzpatrickSkinType",
+        wireId: "fitzpatrick_skin_type",
+        hkIdentifier: "HKCharacteristicTypeIdentifierFitzpatrickSkinType"
+    )
+    public static let wheelchairUse = characteristic(
+        id: "wheelchairUse",
+        wireId: "wheelchair_use",
+        hkIdentifier: "HKCharacteristicTypeIdentifierWheelchairUse"
+    )
+    public static let activityMoveMode = characteristic(
+        id: "activityMoveMode",
+        wireId: "activity_move_mode",
+        hkIdentifier: "HKCharacteristicTypeIdentifierActivityMoveMode"
+    )
+
+    /// Off by default (HK-30). Never in Core Daily or the anchored delta pipeline.
+    public static let characteristics: [MetricDeclaration] = [
+        biologicalSex,
+        bloodType,
+        dateOfBirth,
+        fitzpatrickSkinType,
+        wheelchairUse,
+        activityMoveMode,
+    ]
+
+    public static var selectable: [MetricDeclaration] { all + structural + characteristics }
 
     public static func declaration(for id: MetricID) -> MetricDeclaration? {
         selectable.first { $0.id == id }
+    }
+
+    public static func isCharacteristic(_ id: MetricID) -> Bool {
+        declaration(for: id)?.kind == "characteristic"
+    }
+
+    private static func characteristic(
+        id: String,
+        wireId: String,
+        hkIdentifier: String
+    ) -> MetricDeclaration {
+        MetricDeclaration(
+            id: MetricID(rawValue: id),
+            wireId: wireId,
+            hkIdentifier: hkIdentifier,
+            canonicalUnit: CanonicalUnit(symbol: "token"),
+            wireUnit: "token",
+            cumulative: false,
+            usesHealthKitStatistics: false,
+            sensitivity: .sensitive,
+            haUnit: nil,
+            haDeviceClass: nil,
+            haStateClass: nil,
+            haRequiresAggregate: false,
+            kind: "characteristic",
+            reidentifying: true,
+            characteristicId: id
+        )
     }
 
     /// First-run preset (R-61 / UX-13). Sensitive types stay visible but are never in this list.

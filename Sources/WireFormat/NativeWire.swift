@@ -127,6 +127,7 @@ public enum NativeWire {
         series: [SeriesRecord] = [],
         tombstones: [TombstoneRecord],
         aggregates: [AggregateRecord] = [],
+        characteristics: [CharacteristicRecord] = [],
         metric: MetricID,
         batchID: BatchID,
         envelope: WireEnvelope
@@ -183,9 +184,12 @@ public enum NativeWire {
                 (lhs.bucketStart, lhs.bucketKey) < (rhs.bucketStart, rhs.bucketKey)
             }
             .map { try encodeAggregate($0, envelope: envelope) }
+        let characteristicLines = try characteristics
+            .sorted { $0.characteristicId < $1.characteristicId }
+            .map { try encodeCharacteristic($0, envelope: envelope) }
         let records = sampleLines + categoryLines + correlationLines
             + workoutLines + mindLines + ecgLines + audiogramLines + doseLines
-            + seriesLines + tombLines + aggregateLines
+            + seriesLines + tombLines + aggregateLines + characteristicLines
         var body = Data()
         for line in records {
             body.append(contentsOf: line.utf8)
@@ -205,6 +209,7 @@ public enum NativeWire {
                     + electrocardiograms.map(\.metric.rawValue)
                     + audiograms.map(\.metric.rawValue)
                     + medicationDoses.map(\.metric.rawValue)
+                    + characteristics.map(\.characteristicId)
             ).sorted(),
             recordCount: records.count
         )
@@ -225,7 +230,8 @@ public enum NativeWire {
             tombstoneCount: tombstones.count,
             canaryCount: 0,
             digest: digest,
-            aggregateCount: aggregates.count
+            aggregateCount: aggregates.count,
+            characteristicCount: characteristics.count
         )
         var out = Data()
         out.append(contentsOf: header.utf8)
@@ -377,7 +383,8 @@ private extension NativeWire {
         tombstoneCount: Int,
         canaryCount: Int,
         digest: String,
-        aggregateCount: Int = 0
+        aggregateCount: Int = 0,
+        characteristicCount: Int = 0
     ) throws -> String {
         var counts: [String: CanonicalJSON] = [:]
         if sampleCount > 0 {
@@ -412,6 +419,9 @@ private extension NativeWire {
         }
         if aggregateCount > 0 {
             counts["aggregate"] = .integer(aggregateCount)
+        }
+        if characteristicCount > 0 {
+            counts["characteristic"] = .integer(characteristicCount)
         }
         if canaryCount > 0 {
             counts["canary"] = .integer(canaryCount)
@@ -901,6 +911,25 @@ private extension NativeWire {
         if let supersedes = record.supersedes {
             object["supersedes"] = .integer(supersedes)
         }
+        if envelope.demo {
+            object["demo"] = .bool(true)
+        }
+        return try CanonicalJSON.object(object).serialized()
+    }
+
+    static func encodeCharacteristic(
+        _ record: CharacteristicRecord,
+        envelope: WireEnvelope
+    ) throws -> String {
+        var object: [String: CanonicalJSON] = [
+            "batchSeq": .integer(envelope.seq),
+            "characteristicId": .string(record.characteristicId),
+            "kind": .string("characteristic"),
+            "observedAt": .string(record.observedAt),
+            "reidentifying": .bool(true),
+            "v": .integer(1),
+            "value": .string(record.value),
+        ]
         if envelope.demo {
             object["demo"] = .bool(true)
         }

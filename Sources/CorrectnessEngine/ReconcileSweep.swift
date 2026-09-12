@@ -5,6 +5,7 @@ import CoreDomain
 import CoreTemporal
 import DestinationTrust
 import EnginePorts
+import MetricCatalog
 import FileWriteKit
 import Foundation
 import RunJournal
@@ -154,6 +155,12 @@ public struct ReconcileSweep: Sendable {
                 terminalError: .lowPowerMode,
                 partialCause: ErrorClass.lowPowerMode.rawValue
             )
+            let outcome = RunOutcome.derive(from: tally)
+            try await record(outcome: outcome, tally: tally, receipt: nil)
+            return outcome
+        }
+        if MetricCatalog.isCharacteristic(metric) {
+            let tally = RunTally(nothingDue: true)
             let outcome = RunOutcome.derive(from: tally)
             try await record(outcome: outcome, tally: tally, receipt: nil)
             return outcome

@@ -15,6 +15,12 @@ public enum MetricSearch {
         MetricCatalog.bloodPressureDiastolic.id: ["bp", "blood pressure"],
         MetricCatalog.vo2Max.id: ["vo2", "vo2max", "vo2 max"],
         MetricCatalog.bloodGlucose.id: ["glucose"],
+        MetricCatalog.biologicalSex.id: ["sex", "gender"],
+        MetricCatalog.bloodType.id: ["blood type"],
+        MetricCatalog.dateOfBirth.id: ["dob", "birthday", "birth date"],
+        MetricCatalog.fitzpatrickSkinType.id: ["skin type"],
+        MetricCatalog.wheelchairUse.id: ["wheelchair"],
+        MetricCatalog.activityMoveMode.id: ["move mode"],
     ]
 
     public static func haystack(for declaration: MetricDeclaration) -> String {

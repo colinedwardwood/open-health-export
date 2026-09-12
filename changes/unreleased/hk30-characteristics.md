@@ -1,0 +1,1 @@
+HealthKit characteristics (sex, blood type, date of birth, Fitzpatrick skin type, wheelchair use, and activity move mode) are now selectable, off by default, flagged as re-identifying, and emitted as wire `characteristic` records on demand rather than through the anchored sample pipeline.

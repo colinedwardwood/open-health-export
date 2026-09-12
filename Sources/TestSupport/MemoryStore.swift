@@ -429,6 +429,18 @@ public struct FixtureSource: SampleSource {
     }
 }
 
+public struct FixtureCharacteristicSource: CharacteristicSource {
+    public var records: [MetricID: CharacteristicRecord]
+    public init(records: [MetricID: CharacteristicRecord] = [:]) {
+        self.records = records
+    }
+
+    public func read(metric: MetricID, observedAt: String) async throws -> CharacteristicRecord? {
+        _ = observedAt
+        return records[metric]
+    }
+}
+
 public struct FixtureDays: BoundedDayObservationSource, Sendable {
     public var byDay: [String: [SampleRecord]]
     public init(byDay: [String: [SampleRecord]]) { self.byDay = byDay }

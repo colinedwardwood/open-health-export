@@ -430,6 +430,28 @@ private func sleepCategory(value: Int = 3) -> CategoryRecord {
         envelope: envelope
     )
     try WireJSONSchema.validateNDJSON(String(decoding: canary, as: UTF8.self), schema: schema)
+
+    let characteristicBatch = try NativeWire.encode(
+        samples: [],
+        tombstones: [],
+        characteristics: [
+            CharacteristicRecord(
+                characteristicId: "dateOfBirth",
+                value: "1998-04-17",
+                observedAt: envelope.observedAt
+            )
+        ],
+        metric: MetricCatalog.dateOfBirth.id,
+        batchID: BatchID(rawValue: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"),
+        envelope: envelope
+    )
+    try WireJSONSchema.validateNDJSON(
+        String(decoding: characteristicBatch, as: UTF8.self),
+        schema: schema
+    )
+    var receiver = ReferenceReceiver()
+    try receiver.ingest(ndjson: String(decoding: characteristicBatch, as: UTF8.self))
+    #expect(receiver.structuralRecords["dateOfBirth"] == "characteristic")
 }
 
 @Test func quantityWirePreservesSourceDeviceAndUserEntry() throws {

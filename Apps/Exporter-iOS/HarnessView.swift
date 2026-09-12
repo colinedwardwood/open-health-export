@@ -1822,7 +1822,11 @@ struct HarnessView: View {
                                         .accessibilityHidden(true)
                                 }
                                 Text(row.title)
-                                if row.sensitive {
+                                if row.reidentifying {
+                                    Text(DataBrowser.reidentifyingBadge)
+                                        .font(.body)
+                                        .foregroundStyle(.primary)
+                                } else if row.sensitive {
                                     Text("sensitive")
                                         .font(.body)
                                         .foregroundStyle(.primary)

@@ -7,6 +7,7 @@ import DestinationTrust
 import EnginePorts
 import FileWriteKit
 import Foundation
+import MetricCatalog
 import RunJournal
 import Watchdog
 import WireFormat
@@ -24,6 +25,7 @@ public struct ExportRun: Sendable {
     public var temporal: TemporalContext
     public var statistics: (any StatisticsSource)?
     public var observations: (any DayObservationSource)?
+    public var characteristics: (any CharacteristicSource)?
     public var trigger: RunTrigger
     public var snapshotURL: URL?
     public var externalStatusURL: URL?
@@ -52,6 +54,7 @@ public struct ExportRun: Sendable {
         temporal: TemporalContext = .utc,
         statistics: (any StatisticsSource)? = nil,
         observations: (any DayObservationSource)? = nil,
+        characteristics: (any CharacteristicSource)? = nil,
         trigger: RunTrigger = .manual,
         snapshotURL: URL? = nil,
         externalStatusURL: URL? = nil,
@@ -74,6 +77,7 @@ public struct ExportRun: Sendable {
         self.temporal = temporal
         self.statistics = statistics
         self.observations = observations
+        self.characteristics = characteristics
         self.trigger = trigger
         self.snapshotURL = snapshotURL
         self.externalStatusURL = externalStatusURL
@@ -124,6 +128,9 @@ public struct ExportRun: Sendable {
             let outcome = RunOutcome.derive(from: tally)
             try await record(outcome: outcome, tally: tally, receipt: nil, startedAt: startedAt)
             return outcome
+        }
+        if MetricCatalog.isCharacteristic(metric) {
+            return try await runCharacteristic(startedAt: startedAt, mark: mark)
         }
         let effectiveEpoch = max(epoch, typeStatus?.generation ?? epoch)
         let openHold = try await store.transact { try $0.loadAnchorHold(metric: metric) }
@@ -729,6 +736,153 @@ public struct ExportRun: Sendable {
             }
         return timings.max { $0.latency < $1.latency }
             .map { (freshnessClass, $0.0, $0.1) }
+    }
+
+    private func runCharacteristic(
+        startedAt: Date,
+        mark: (String) -> Void
+    ) async throws -> RunOutcome {
+        try await persistOpenRun(phase: "reading", startedAt: startedAt)
+        let snapshot: CharacteristicRecord?
+        do {
+            snapshot = try await characteristics?.read(
+                metric: metric,
+                observedAt: envelope.observedAt
+            )
+        } catch {
+            let errorClass = (error as? DestinationSendError)?.errorClass ?? .internalFault
+            let tally = RunTally(
+                failed: 1,
+                terminalError: errorClass,
+                partialCause: errorClass.rawValue
+            )
+            let outcome = RunOutcome.derive(from: tally)
+            try await record(outcome: outcome, tally: tally, receipt: nil, startedAt: startedAt)
+            if errorClass == .deviceLocked
+                || errorClass == .healthDataRestricted
+                || errorClass == .lowPowerMode
+                || errorClass == .awaitingUnmetered
+            {
+                return outcome
+            }
+            throw error
+        }
+        mark("read")
+        guard let snapshot else {
+            let tally = RunTally(nothingDue: true)
+            let outcome = RunOutcome.derive(from: tally)
+            try await record(outcome: outcome, tally: tally, receipt: nil, startedAt: startedAt)
+            return outcome
+        }
+        let identity = Data("ohe.characteristic.v1:\(snapshot.characteristicId):\(snapshot.value)".utf8)
+        let batchID = NativeWire.batchID(metric: metric, anchorBlob: identity)
+        let payload = try NativeWire.encode(
+            samples: [],
+            tombstones: [],
+            characteristics: [snapshot],
+            metric: metric,
+            batchID: batchID,
+            envelope: envelope
+        )
+        let payloadURL = scratchDirectory.appendingPathComponent(
+            NativeWire.outputFileName(batchID: batchID, demo: envelope.demo)
+        )
+        try FileWriteKit.writeAtomically(payload, to: payloadURL)
+        mark("transform")
+        let applyEpoch = clock.now().timeIntervalSince1970
+        let day = String(envelope.observedAt.prefix(10))
+        let pending = PendingBatch(
+            id: batchID,
+            payloadURL: payloadURL.path,
+            expectedRecords: 1,
+            byteCount: payload.count,
+            metric: metric,
+            createdAtEpoch: applyEpoch,
+            rangeStartDay: day,
+            rangeEndDay: day
+        )
+        let dummyPage = SamplePage(
+            samples: [],
+            tombstones: [],
+            metric: metric,
+            anchorBlob: identity,
+            observedThrough: clock.now()
+        )
+        try await store.transact { tx in
+            _ = try QueueAdmission.makeRoom(for: pending.byteCount, on: tx)
+            try tx.commitBatch(
+                pending,
+                advancing: CursorAdvance(
+                    page: dummyPage,
+                    epoch: epoch,
+                    tzDatabaseVersion: temporal.tzDatabaseVersion
+                )
+            )
+        }
+        mark("enqueue")
+        let receipt: DeliveryReceipt
+        do {
+            #if DEBUG
+            receipt = try await DeliveryExecutor.send(
+                batch: pending,
+                destination: destination,
+                destinationName: destinationName,
+                store: store,
+                faults: faults,
+                clock: clock,
+                scope: scope
+            )
+            #else
+            receipt = try await DeliveryExecutor.send(
+                batch: pending,
+                destination: destination,
+                destinationName: destinationName,
+                store: store,
+                clock: clock,
+                scope: scope
+            )
+            #endif
+        } catch let error as DestinationSendError {
+            mark("send")
+            let tally = RunTally(
+                read: 1,
+                committed: 1,
+                failed: 1,
+                terminalError: error.errorClass,
+                partialCause: error.errorClass.rawValue
+            )
+            let outcome = RunOutcome.derive(from: tally)
+            try await record(
+                outcome: outcome,
+                tally: tally,
+                receipt: nil,
+                startedAt: startedAt,
+                pending: pending,
+                payload: payload
+            )
+            return outcome
+        }
+        mark("send")
+        var tally = RunTally(
+            read: 1,
+            committed: 1,
+            acked: receipt.accepted,
+            unconfirmed: receipt.unconfirmed,
+            ackEvidenceStatusOnly: receipt.statusOnly
+        )
+        if receipt.accepted < 1, receipt.unconfirmed == 0 {
+            tally.partialCause = "receipt_short"
+        }
+        let outcome = RunOutcome.derive(from: tally)
+        try await record(
+            outcome: outcome,
+            tally: tally,
+            receipt: receipt,
+            startedAt: startedAt,
+            pending: pending,
+            payload: payload
+        )
+        return outcome
     }
 
     private func persistOpenRun(

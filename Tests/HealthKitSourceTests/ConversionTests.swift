@@ -182,6 +182,32 @@ import WireFormat
     )
 }
 
+@Test func hk30CharacteristicTypesAuthorizeWithoutAnAnchoredQuery() {
+    let metrics = MetricCatalog.characteristics.map(\.id)
+    let types = HealthKitAuthorization.readTypes(for: metrics)
+    #expect(types.count == 6)
+    #expect(
+        types.contains(
+            HKObjectType.characteristicType(forIdentifier: .biologicalSex)!
+        )
+    )
+    #expect(
+        types.contains(
+            HKObjectType.characteristicType(forIdentifier: .dateOfBirth)!
+        )
+    )
+    #expect(
+        CharacteristicConversion.dateOfBirthValue(year: 1998, month: 4, day: 17)
+            == "1998-04-17"
+    )
+    #expect(CharacteristicConversion.dateOfBirthValue(year: nil, month: 4, day: 17) == nil)
+    #expect(CharacteristicConversion.biologicalSexName(.female) == "female")
+    #expect(CharacteristicConversion.bloodTypeName(.aPositive) == "aPositive")
+    #expect(CharacteristicConversion.fitzpatrickName(.III) == "III")
+    #expect(CharacteristicConversion.wheelchairName(.yes) == "yes")
+    #expect(CharacteristicConversion.activityMoveModeName(.appleMoveTime) == "appleMoveTime")
+}
+
 @Test func coverageWindowProbeNamesTheDocumentedLimitedHistoryAPI() async throws {
     let source = try String(
         contentsOf: URL(fileURLWithPath: #filePath)

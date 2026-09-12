@@ -49,6 +49,9 @@ public final class HealthKitObserverCoordinator: @unchecked Sendable {
 
         do {
             for metric in metrics {
+                if MetricCatalog.isCharacteristic(metric) {
+                    continue
+                }
                 guard let type = SampleConversion.quantityType(for: metric) else {
                     throw HealthKitObserverError.unknownMetric(metric)
                 }

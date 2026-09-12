@@ -273,30 +273,6 @@
       "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
     },
     {
-      "identifier": "HKCharacteristicTypeIdentifierActivityMoveMode",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCharacteristicTypeIdentifierBiologicalSex",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCharacteristicTypeIdentifierBloodType",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCharacteristicTypeIdentifierDateOfBirth",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCharacteristicTypeIdentifierFitzpatrickSkinType",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCharacteristicTypeIdentifierWheelchairUse",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
       "identifier": "HKCorrelationTypeIdentifierBloodPressure",
       "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
     },
