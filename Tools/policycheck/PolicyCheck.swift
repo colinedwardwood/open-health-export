@@ -44,6 +44,9 @@ struct PolicyCheck {
             if text.contains(platformSecurity), !allowedNetwork.contains(target) {
                 violations.append("\(file.path): \(platformSecurity)")
             }
+            for token in ["UIPasteboard", "NSPasteboard"] where text.contains(token) {
+                violations.append("\(file.path): SEC-44 prohibited \(token)")
+            }
         }
         if !violations.isEmpty {
             FileHandle.standardError.write(Data((violations.joined(separator: "\n") + "\n").utf8))
@@ -61,8 +64,8 @@ struct PolicyCheck {
                     where text.contains(token) {
                     appNetworkBypasses.append("\(file.path): \(token)")
                 }
-                if text.contains("UIPasteboard") {
-                    pasteboardBypasses.append("\(file.path): UIPasteboard")
+                for token in ["UIPasteboard", "NSPasteboard"] where text.contains(token) {
+                    pasteboardBypasses.append("\(file.path): \(token)")
                 }
             }
         }
@@ -188,6 +191,8 @@ struct PolicyCheck {
             ".protectionKey: FileProtectionType.completeUntilFirstUserAuthentication"
         ),
             harnessExport.contains("try fm.setAttributes("),
+            harnessExport.contains("FileProtectionType.completeUnlessOpen"),
+            harnessExport.contains("protectedPayloadDirectory(named:"),
             sqliteStore.contains(
                 "SQLITE_OPEN_FILEPROTECTION_COMPLETEUNTILFIRSTUSERAUTHENTICATION"
             ),
@@ -1265,6 +1270,27 @@ struct PolicyCheck {
         }
         if !missing.isEmpty {
             FileHandle.standardError.write(Data((missing.joined(separator: "\n") + "\n").utf8))
+            exit(1)
+        }
+        let coverageData = try Data(
+            contentsOf: root.appendingPathComponent("qa/coverage-policy.json")
+        )
+        let coveragePolicy = try JSONSerialization.jsonObject(with: coverageData)
+            as? [String: Any]
+        let transition = coveragePolicy?["transitionCoverage"] as? [String: Any]
+        let evidence = transition?["evidence"] as? String
+        let evidenceParts = evidence?.components(separatedBy: "::") ?? []
+        guard (transition?["minimum"] as? NSNumber)?.doubleValue == 100,
+              evidenceParts.count == 2,
+              let evidenceSource = try? String(
+                  contentsOf: root.appendingPathComponent(evidenceParts[0]),
+                  encoding: .utf8
+              ),
+              evidenceSource.contains("func \(evidenceParts[1])")
+        else {
+            FileHandle.standardError.write(
+                Data("QA-33: 100% transition evidence is missing or stale\n".utf8)
+            )
             exit(1)
         }
         print("policycheck governance artifacts: ok")

@@ -3,7 +3,7 @@
 
 import Foundation
 
-public enum StreamError: Error, Equatable {
+public enum StreamError: Error, Equatable, LocalizedError {
     case notOpen
     case closedByPeer
     case connectTimeout
@@ -19,6 +19,35 @@ public enum StreamError: Error, Equatable {
     case unsupportedPlatform
     /// SEC-15: a destination approved for local/private egress resolved outside that class.
     case addressClassViolation(host: String, address: String, addressClass: AddressClass)
+
+    public var errorDescription: String? {
+        switch self {
+        case .addressClassViolation:
+            "The destination resolved outside its approved network class. Export stopped before sending data. Review and reconfirm the destination."
+        case .notOpen:
+            "The connection is not open."
+        case .closedByPeer:
+            "The destination closed the connection."
+        case .connectTimeout:
+            "The destination connection timed out."
+        case .readTimeout:
+            "The destination did not answer in time."
+        case .transport:
+            "The destination transport failed."
+        case .pinMismatch:
+            "The destination identity changed. Export stopped before sending data."
+        case .badPort:
+            "The destination port is invalid."
+        case .badServiceName:
+            "The companion service name is invalid."
+        case .badPreSharedKey:
+            "The pairing secret is invalid."
+        case .serviceNotFound:
+            "The paired companion was not found."
+        case .unsupportedPlatform:
+            "This connection is not supported on this platform."
+        }
+    }
 }
 
 /// A duplex byte stream. `MQTTSink` and `CompanionSink` both ride one of these, so the only

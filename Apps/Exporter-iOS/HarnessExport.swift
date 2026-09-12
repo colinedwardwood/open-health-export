@@ -366,13 +366,10 @@ enum HarnessExport {
         for metric in metrics {
             try ExportScopeGate.require(metric: metric, scope: scope)
         }
-        let fm = FileManager.default
         let root = try applicationSupportRoot()
         let sqliteURL = root.appendingPathComponent("state.sqlite")
-        let dest = root.appendingPathComponent("exports", isDirectory: true)
-        let scratch = root.appendingPathComponent("scratch", isDirectory: true)
-        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
-        try fm.createDirectory(at: scratch, withIntermediateDirectories: true)
+        let dest = try protectedPayloadDirectory(named: "exports", under: root)
+        let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
 
         let store = try SQLiteStateStore(path: sqliteURL.path)
         let gapIDsBefore = try await store.transact {
@@ -488,16 +485,8 @@ enum HarnessExport {
             try ExportScopeGate.require(metric: metric, scope: scope)
         }
         let root = try applicationSupportRoot()
-        let dest = root.appendingPathComponent("exports", isDirectory: true)
-        let scratch = root.appendingPathComponent("scratch", isDirectory: true)
-        try FileManager.default.createDirectory(
-            at: dest,
-            withIntermediateDirectories: true
-        )
-        try FileManager.default.createDirectory(
-            at: scratch,
-            withIntermediateDirectories: true
-        )
+        let dest = try protectedPayloadDirectory(named: "exports", under: root)
+        let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
         let store = try SQLiteStateStore(
             path: root.appendingPathComponent("state.sqlite").path
         )
@@ -548,19 +537,8 @@ enum HarnessExport {
 
     static func runBackfill(mode: BackfillMode) async throws -> [String] {
         let root = try applicationSupportRoot()
-        let destinationDirectory = root.appendingPathComponent(
-            "exports",
-            isDirectory: true
-        )
-        let scratch = root.appendingPathComponent("backfill-scratch", isDirectory: true)
-        try FileManager.default.createDirectory(
-            at: destinationDirectory,
-            withIntermediateDirectories: true
-        )
-        try FileManager.default.createDirectory(
-            at: scratch,
-            withIntermediateDirectories: true
-        )
+        let destinationDirectory = try protectedPayloadDirectory(named: "exports", under: root)
+        let scratch = try protectedPayloadDirectory(named: "backfill-scratch", under: root)
         let store = try SQLiteStateStore(
             path: root.appendingPathComponent("state.sqlite").path
         )
@@ -702,16 +680,8 @@ enum HarnessExport {
 
     static func reExportQueueGap(_ gap: GapRecord) async throws -> RunOutcome {
         let root = try applicationSupportRoot()
-        let dest = root.appendingPathComponent("exports", isDirectory: true)
-        let scratch = root.appendingPathComponent("scratch", isDirectory: true)
-        try FileManager.default.createDirectory(
-            at: dest,
-            withIntermediateDirectories: true
-        )
-        try FileManager.default.createDirectory(
-            at: scratch,
-            withIntermediateDirectories: true
-        )
+        let dest = try protectedPayloadDirectory(named: "exports", under: root)
+        let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
         let store = try SQLiteStateStore(
             path: root.appendingPathComponent("state.sqlite").path
         )
@@ -752,13 +722,10 @@ enum HarnessExport {
 
     static func runDemoDataset(typedDestinationName: String) async throws -> [String] {
         try DemoExportGate.confirmSending(to: "local-file", typed: typedDestinationName)
-        let fm = FileManager.default
         let root = try applicationSupportRoot()
         let sqliteURL = root.appendingPathComponent("demo-state.sqlite")
-        let dest = root.appendingPathComponent("demo-exports", isDirectory: true)
-        let scratch = root.appendingPathComponent("demo-scratch", isDirectory: true)
-        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
-        try fm.createDirectory(at: scratch, withIntermediateDirectories: true)
+        let dest = try protectedPayloadDirectory(named: "demo-exports", under: root)
+        let scratch = try protectedPayloadDirectory(named: "demo-scratch", under: root)
         let store = try SQLiteStateStore(path: sqliteURL.path)
         let (verified, events) = try verifiedLocalFile(root: root, destinationDirectory: dest)
         try await emitTrustNotices(events)
@@ -797,11 +764,9 @@ enum HarnessExport {
     static func runCompanion(session: PairingSession) async throws -> [String] {
         let scope = try await destinationScope("companion")
         try ExportScopeGate.requireConfigured(scope)
-        let fm = FileManager.default
         let root = try applicationSupportRoot()
         let sqliteURL = root.appendingPathComponent("state.sqlite")
-        let scratch = root.appendingPathComponent("scratch", isDirectory: true)
-        try fm.createDirectory(at: scratch, withIntermediateDirectories: true)
+        let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
         let store = try SQLiteStateStore(path: sqliteURL.path)
         let psk = try CompanionPSK.preSharedKey(from: session.secret)
         let discovered = try await CompanionDiscovery().find(pairedName: session.serviceName, for: .seconds(8))
@@ -928,6 +893,25 @@ enum HarnessExport {
         // under here, and none of it may reach a backup.
         try FileWriteKit.excludeFromBackup(root)
         return root
+    }
+
+    private static func protectedPayloadDirectory(
+        named name: String,
+        under root: URL
+    ) throws -> URL {
+        let directory = root.appendingPathComponent(name, isDirectory: true)
+        let protection = FileProtectionType.completeUnlessOpen
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true,
+            attributes: [.protectionKey: protection]
+        )
+        // Apply the accepted ADR-0002 Class B split to pre-existing directories too.
+        try FileManager.default.setAttributes(
+            [.protectionKey: protection],
+            ofItemAtPath: directory.path
+        )
+        return directory
     }
 
     @MainActor
@@ -1542,11 +1526,7 @@ enum HarnessExport {
         let store = try SQLiteStateStore(
             path: root.appendingPathComponent("state.sqlite").path
         )
-        let scratch = root.appendingPathComponent("scratch", isDirectory: true)
-        try FileManager.default.createDirectory(
-            at: scratch,
-            withIntermediateDirectories: true
-        )
+        let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
         let context = TemporalContext.utcHost
         let now = Date().ISO8601Format()
         let exporterID = try installationID()
@@ -1643,11 +1623,7 @@ enum HarnessExport {
         let store = try SQLiteStateStore(
             path: root.appendingPathComponent("state.sqlite").path
         )
-        let scratch = root.appendingPathComponent("scratch", isDirectory: true)
-        try FileManager.default.createDirectory(
-            at: scratch,
-            withIntermediateDirectories: true
-        )
+        let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
         let context = TemporalContext.utcHost
         let now = Date().ISO8601Format()
         let exporterID = try installationID()
@@ -1695,8 +1671,7 @@ enum HarnessExport {
     static func enableLocalFileDestination() async throws -> [String] {
         try ExportScopeGate.requireConfigured(try await destinationScope("local-file"))
         let root = try applicationSupportRoot()
-        let dest = root.appendingPathComponent("exports", isDirectory: true)
-        try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+        let dest = try protectedPayloadDirectory(named: "exports", under: root)
         try? FileManager.default.removeItem(at: localFileTestReportURL(root: root))
         let (_, events) = try verifiedLocalFile(root: root, destinationDirectory: dest)
         try await emitTrustNotices(events)
@@ -1948,11 +1923,7 @@ enum HarnessExport {
         guard !selection.events.isEmpty || !metricDestinations.isEmpty else {
             return "No unprojected runs."
         }
-        let scratch = root.appendingPathComponent("scratch", isDirectory: true)
-        try FileManager.default.createDirectory(
-            at: scratch,
-            withIntermediateDirectories: true
-        )
+        let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
         let transport = try SystemHTTPTransport.make(
             probing: endpoint.url,
             allowedHosts: Set(record.allowedHosts),
@@ -2068,24 +2039,49 @@ enum HarnessExport {
             secretStores: [
                 KeychainSecretStore(service: "app.openhealthexporter.ios.psk"),
                 KeychainSecretStore(service: "app.openhealthexporter.ios.https"),
+                KeychainSecretStore(service: "app.openhealthexporter.mqtt"),
             ],
             ledgerSeal: resettableLedgerHeadSeal(),
             ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
             atEpoch: Date().timeIntervalSince1970
         )
-        try? FileManager.default.removeItem(at: localFileTestReportURL(root: root))
-        try? FileManager.default.removeItem(at: companionTestReportURL(root: root))
-        try? FileManager.default.removeItem(at: root.appendingPathComponent("otlp-destination.json"))
-        try? FileManager.default.removeItem(at: root.appendingPathComponent("backfill-raw.json"))
-        try? FileManager.default.removeItem(
-            at: root.appendingPathComponent("backfill-aggregate.json")
-        )
         try await vault().forget()
-        UserDefaults.standard.removeObject(forKey: "ohe.companion.propagateTraceparent")
+        for name in [
+            "exports",
+            "scratch",
+            "backfill-scratch",
+            "demo-exports",
+            "demo-scratch",
+            "demo-state.sqlite",
+            "demo-state.sqlite-shm",
+            "demo-state.sqlite-wal",
+            "https-destination.json",
+            "mqtt-destination.json",
+            "mqtt-client.p12",
+            "otlp-destination.json",
+            "local-file-test.json",
+            "companion-test.json",
+            "backfill-raw.json",
+            "backfill-aggregate.json",
+            "advisory-request-body",
+            "exporter-id",
+            "wake-ledger.log",
+            "health-authorization.json",
+        ] {
+            try removeIfPresent(root.appendingPathComponent(name))
+        }
+        if let bundleID = Bundle.main.bundleIdentifier {
+            UserDefaults.standard.removePersistentDomain(forName: bundleID)
+        }
         if let directory = StatusSnapshotLocation.directory() {
-            try? FileManager.default.removeItem(at: directory)
+            try removeIfPresent(directory)
         }
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+    }
+
+    private static func removeIfPresent(_ url: URL) throws {
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        try FileManager.default.removeItem(at: url)
     }
 
     private static func verifiedLocalFile(

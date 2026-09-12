@@ -416,7 +416,28 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
     }
 }
 
-@Test func p13CorruptCheckpointDoesNotSilentlyResetTheCursor() async throws {
+@Test func p13BoundedResourceGateStreamsEveryT1RecordUnderTheRSSCeiling() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let workflow = try String(
+        contentsOf: root.appendingPathComponent(".github/workflows/nightly-volume.yml"),
+        encoding: .utf8
+    )
+    let checker = try String(
+        contentsOf: root.appendingPathComponent("Tools/exportruncheck/ExportRunCheck.swift"),
+        encoding: .utf8
+    )
+    #expect(workflow.contains("corpusgen --tier T1 --seed 1 |"))
+    #expect(!workflow.contains("corpusgen --tier T1 --seed 1 --count"))
+    #expect(workflow.contains(".build/release/exportruncheck"))
+    #expect(checker.contains("private let memoryLimitMiB = 100"))
+    #expect(checker.contains("submittedRecords == exportableRecords"))
+    #expect(checker.contains("peakKiB <= limitKiB"))
+}
+
+@Test func p14CorruptCheckpointDoesNotSilentlyResetTheCursor() async throws {
     let metric = MetricCatalog.heartRate.id
     let sample = propertySample(uuid: propertyUUID(13), value: 72, minute: 1)
     let page = SamplePage(
@@ -427,7 +448,7 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
         observedThrough: Date(timeIntervalSince1970: 1)
     )
     let root = FileManager.default.temporaryDirectory
-        .appendingPathComponent("ohe-p13-\(UUID().uuidString)")
+        .appendingPathComponent("ohe-p14-\(UUID().uuidString)")
     defer { try? FileManager.default.removeItem(at: root) }
     let store = MemoryStateStore()
     let run = ExportRun(

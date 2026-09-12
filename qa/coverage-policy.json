@@ -10,6 +10,6 @@
   },
   "transitionCoverage": {
     "minimum": 100.0,
-    "evidence": null
+    "evidence": "Tests/ExportCoreTests/PropertyInvariantTests.swift::highRiskStatefulCommandsPreserveQueueCursorAndDestinationInvariants"
   }
 }

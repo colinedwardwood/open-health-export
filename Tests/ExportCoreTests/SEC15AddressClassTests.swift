@@ -23,6 +23,8 @@ import Testing
             addressClass: .publicUnicast
         )
     )
+    #expect(failure?.localizedDescription.contains("stopped before sending data") == true)
+    #expect(failure?.localizedDescription.contains("homeassistant.local") == false)
     #expect(resolver.calls == ["homeassistant.local"])
 }
 

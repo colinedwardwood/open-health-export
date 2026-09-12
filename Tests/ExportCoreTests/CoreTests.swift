@@ -3714,6 +3714,65 @@ private func anchorHoldFixture(
     )
 }
 
+@Test func appWipeEnumeratesEveryCredentialServiceAndManagedArtifact() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let harness = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift"),
+        encoding: .utf8
+    )
+    for service in [
+        "app.openhealthexporter.ios.psk",
+        "app.openhealthexporter.ios.https",
+        "app.openhealthexporter.mqtt",
+    ] {
+        #expect(harness.contains("KeychainSecretStore(service: \"\(service)\")"))
+    }
+    for artifact in [
+        "exports",
+        "scratch",
+        "backfill-scratch",
+        "demo-exports",
+        "demo-scratch",
+        "https-destination.json",
+        "mqtt-destination.json",
+        "mqtt-client.p12",
+        "otlp-destination.json",
+        "wake-ledger.log",
+        "health-authorization.json",
+    ] {
+        #expect(harness.contains("\"\(artifact)\""))
+    }
+    #expect(harness.contains("removePersistentDomain"))
+    #expect(harness.contains("try removeIfPresent(directory)"))
+}
+
+@Test func privacyGateCannotEnterBackgroundExportOrDeliveryPaths() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let privacyGate = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/AppPrivacyGate.swift"),
+        encoding: .utf8
+    )
+    let exportHarness = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift"),
+        encoding: .utf8
+    )
+    let lifecycle = try String(
+        contentsOf: root.appendingPathComponent(
+            "Apps/Exporter-iOS/AppLifecycleCoordinator.swift"
+        ),
+        encoding: .utf8
+    )
+    #expect(privacyGate.contains("Export and destination-delivery code deliberately have no dependency"))
+    #expect(!exportHarness.contains("AppPrivacyGate"))
+    #expect(!lifecycle.contains("AppPrivacyGate"))
+}
+
 @Test func exportRunJournalRecordsTriggerAndCounts() async throws {
     let metric = MetricID(rawValue: "heartRate")
     let page = SamplePage(

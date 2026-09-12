@@ -32,6 +32,8 @@ swift run policycheck
 ```
 
 HealthKit is confined to `Sources/HealthKitSource`. The Linux job fails if core imports it.
+To complete a synthetic simulator export without Health access, follow the
+[demo quickstart](docs/03-implementation/demo-quickstart.md).
 
 Validate the committed conformance sequence with the reference receiver:
 
@@ -84,6 +86,11 @@ callback and iOS may not wake the app when a deletion occurs. A later
 reconciliation sweep compares date-ranged HealthKit contents with the emitted
 index and repairs missed deletions.
 
+iOS also provides no authorization-revocation callback. The app checks selected
+types at every foreground launch and background wake; when it observes a revocation,
+it disables and purges that type. Until the next execution, exposure is bounded by
+the queue's seven-day TTL and size cap. Access can be revoked in iOS Health settings.
+
 The sole built-in network host is the security advisory feed
 `https://advisories.openhealthexporter.org/advisories/v1.json` (R-38). It is fetched only on a
 user-visible foreground launch, never during export, and is disableable in the app. The GET
@@ -133,6 +140,7 @@ covered-entity stop condition—not a claim of HIPAA status or legal review—is
 `compliance/HIPAA-CONTEXT.md`.
 Monitoring signal and failure taxonomy: `docs/03-implementation/r27-failure-taxonomy.md`.
 Uninstall and complete data-removal steps: `docs/03-implementation/uninstall-and-data-removal.md`.
+Repository-complete work and external release gates: `docs/03-implementation/final-scope-audit.md`.
 Volunteer device runs: `qa/community-device-matrix/CHECKLIST.md`. Energy measurement
 (not a CI gate): `qa/energy-protocol.md`.
 Reference receiver and Grafana lab stack: `receiver/README.md` (`docker compose up` from
