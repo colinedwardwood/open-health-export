@@ -16,6 +16,7 @@ public struct DestinationMonitoringStatus: Sendable, Equatable, Codable {
     public var attribution: String?
     public var attributionConfidence: String?
     public var errorClass: String?
+    public var failureReason: String?
     public var freshnessEstimates: [FreshnessClass: LocalFreshnessEstimate]
 
     public init(snapshot: DestinationStatusSnapshot, nowEpoch: TimeInterval) {
@@ -34,7 +35,8 @@ public struct DestinationMonitoringStatus: Sendable, Equatable, Codable {
         lastOutcome = snapshot.lastOutcome
         attribution = snapshot.attribution
         attributionConfidence = snapshot.attributionConfidence
-        errorClass = snapshot.errorClass
+        errorClass = DestinationStatusLine.reasonCode(snapshot)
+        failureReason = ErrorClassManifest.userFacingReason(forRaw: errorClass)
         freshnessEstimates = snapshot.freshnessEstimates
     }
 }

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import AppIntents
-import CoreDomain
 import Foundation
 import Watchdog
 
@@ -59,7 +58,7 @@ struct DestinationStatusEntity: AppEntity {
         attribution = status.attribution
         attributionConfidence = status.attributionConfidence
         errorClass = status.errorClass
-        failureReason = ErrorClassManifest.userFacingReason(forRaw: status.errorClass)
+        failureReason = status.failureReason
     }
 }
 

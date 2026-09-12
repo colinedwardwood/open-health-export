@@ -206,6 +206,7 @@ final class ExporterUITests: XCTestCase {
         let failed = destinationLine(seeding: "failed")
         XCTAssertTrue(failed.contains("failing"), failed)
         XCTAssertTrue(failed.contains("destinationUnreachable"), failed)
+        XCTAssertTrue(failed.contains("Couldn't find your Mac"), failed)
         // A failure still says when it last worked, which is what makes it reportable.
         XCTAssertTrue(failed.contains("last success"), failed)
     }

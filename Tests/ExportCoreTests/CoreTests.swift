@@ -1204,6 +1204,27 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     #expect(status.state == "stale")
     #expect(status.lastOutcome == "success")
     #expect(status.attribution == "execution")
+    #expect(status.errorClass == nil)
+    #expect(status.failureReason == nil)
+
+    let failed = DestinationMonitoringStatus(
+        snapshot: DestinationStatusSnapshot(
+            destinationID: "archive",
+            destinationLabel: "Archive folder",
+            enabled: true,
+            state: .failing,
+            lastOutcome: "failed",
+            lastSuccessEpoch: 100,
+            errorClass: ErrorClass.destinationUnreachable.rawValue,
+            writtenAtEpoch: 160
+        ),
+        nowEpoch: 160
+    )
+    #expect(failed.errorClass == ErrorClass.destinationUnreachable.rawValue)
+    #expect(
+        failed.failureReason
+            == ErrorClassManifest.record(for: .destinationUnreachable).userFacingCopy
+    )
 }
 
 @Test func ux34EveryDestinationStateAgreesAcrossStatusWidgetIntentAndEscalation() throws {
