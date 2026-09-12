@@ -87,6 +87,42 @@ import WireFormat
     }
 }
 
+@Test func mqttErrorsNameTheFailureWithoutBrokerSecrets() throws {
+    let errors: [MQTTError] = [
+        .remainingLength,
+        .truncated,
+        .badUTF8,
+        .badTopic,
+        .connack(5),
+        .unexpectedPacket(8),
+        .packetID,
+        .retainForbidden,
+        .qos2Unsupported,
+        .unsupportedQoS(3),
+        .lastWillUnsupported,
+        .persistentSessionUnsupported,
+    ]
+    for error in errors {
+        let text = try #require(error.errorDescription)
+        #expect(!text.isEmpty)
+        #expect(!text.contains("broker.example"))
+        #expect(!text.contains("password"))
+        #expect(!text.contains("nas.example"))
+    }
+    #expect(
+        MQTTError.qos2Unsupported.errorDescription?
+            .contains("QoS 2 is not supported") == true
+    )
+    #expect(
+        MQTTError.lastWillUnsupported.errorDescription?
+            .contains("stopped before connecting") == true
+    )
+    #expect(
+        MQTTError.persistentSessionUnsupported.errorDescription?
+            .contains("persistent sessions are not supported") == true
+    )
+}
+
 @Test func mqttDataPublishNeverSetsRetain() throws {
     let off = try MQTTCodec.publish(
         topic: "ohe/health",

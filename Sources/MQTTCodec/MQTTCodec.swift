@@ -13,7 +13,7 @@ public enum MQTTPacketKind: UInt8, Sendable {
     case disconnect = 14
 }
 
-public enum MQTTError: Error, Equatable {
+public enum MQTTError: Error, Equatable, LocalizedError {
     case remainingLength
     case truncated
     case badUTF8
@@ -26,6 +26,27 @@ public enum MQTTError: Error, Equatable {
     case unsupportedQoS(Int)
     case lastWillUnsupported
     case persistentSessionUnsupported
+
+    public var errorDescription: String? {
+        switch self {
+        case .remainingLength, .truncated, .badUTF8, .packetID, .unexpectedPacket:
+            "The MQTT destination did not complete the exchange."
+        case .badTopic:
+            "The MQTT topic is invalid."
+        case .connack:
+            "The MQTT broker refused the connection."
+        case .retainForbidden:
+            "This MQTT topic is not allowed to retain a payload."
+        case .qos2Unsupported:
+            "MQTT QoS 2 is not supported. Choose at most once or at least once."
+        case .unsupportedQoS:
+            "That MQTT quality-of-service value is not supported."
+        case .lastWillUnsupported:
+            "MQTT last-will is not supported. Export stopped before connecting."
+        case .persistentSessionUnsupported:
+            "MQTT persistent sessions are not supported. Export stopped before connecting."
+        }
+    }
 }
 
 public enum MQTTQoS: UInt8, Sendable {
