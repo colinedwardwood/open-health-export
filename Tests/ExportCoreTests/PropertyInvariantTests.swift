@@ -416,7 +416,7 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
     }
 }
 
-@Test func p13BoundedResourceGateStreamsEveryT1RecordUnderTheRSSCeiling() throws {
+@Test func p12BoundedResourceGateStreamsEveryT1AndT2RecordUnderTheRSSCeiling() throws {
     let root = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
         .deletingLastPathComponent()
@@ -430,6 +430,7 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
         encoding: .utf8
     )
     #expect(workflow.contains("corpusgen --tier T1 --seed 1 |"))
+    #expect(workflow.contains("corpusgen --tier T2 --seed 1 |"))
     #expect(!workflow.contains("corpusgen --tier T1 --seed 1 --count"))
     #expect(workflow.contains(".build/release/exportruncheck"))
     #expect(checker.contains("private let memoryLimitMiB = 100"))
@@ -437,7 +438,7 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
     #expect(checker.contains("peakKiB <= limitKiB"))
 }
 
-@Test func p14CorruptCheckpointDoesNotSilentlyResetTheCursor() async throws {
+@Test func p13CorruptCheckpointDoesNotSilentlyResetTheCursor() async throws {
     let metric = MetricCatalog.heartRate.id
     let sample = propertySample(uuid: propertyUUID(13), value: 72, minute: 1)
     let page = SamplePage(
@@ -652,7 +653,7 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
     }
 }
 
-@Test func p11BucketKeyIsStableUnderRecomputation() {
+@Test func aggregateBucketKeyIsStableUnderRecomputation() {
     let context = TemporalContext(
         timeZoneIdentifier: "UTC",
         localeIdentifier: "en_US_POSIX",
@@ -691,11 +692,11 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
             now: Date(timeIntervalSince1970: 1_767_312_000),
             priorEmitSeq: 1
         )
-        #expect(first?.record.bucketKey == second?.record.bucketKey, "P11 key drift seed \(seed)")
+        #expect(first?.record.bucketKey == second?.record.bucketKey, "bucket key drift seed \(seed)")
     }
 }
 
-@Test func p15AtomicWriteLeavesPriorCompleteBytesOrAbsentNeverTorn() throws {
+@Test func p14AtomicWriteLeavesPriorCompleteBytesOrAbsentNeverTorn() throws {
     let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-p15-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -720,17 +721,81 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
     #expect(try Data(contentsOf: destination) == next)
 }
 
+@Test func p15InstantInvarianceUnderZoneChange() throws {
+    let sample = propertySample(
+        uuid: propertyUUID(15),
+        value: 72,
+        minute: 15
+    )
+    let batchID = BatchID(rawValue: propertyUUID(1515))
+    let before = try NativeWire.encode(
+        samples: [sample],
+        tombstones: [],
+        metric: MetricCatalog.heartRate.id,
+        batchID: batchID,
+        envelope: testEnvelope()
+    )
+    for zone in ["Pacific/Auckland", "America/Los_Angeles", "Asia/Kathmandu"] {
+        let context = TemporalContext(
+            timeZoneIdentifier: zone,
+            localeIdentifier: "en_US_POSIX",
+            tzDatabaseVersion: "fixture-2024"
+        )
+        _ = DayBucket.containing(
+            Date(timeIntervalSince1970: 1_767_225_600),
+            context: context
+        )
+        let after = try NativeWire.encode(
+            samples: [sample],
+            tombstones: [],
+            metric: MetricCatalog.heartRate.id,
+            batchID: batchID,
+            envelope: testEnvelope()
+        )
+        #expect(after == before, "P15 UTC instant drifted in \(zone)")
+    }
+}
+
 @Test func qa19EveryCorrectnessPropertyHasANamedTest() throws {
     let tests = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-    var found = Set<Int>()
+    var names: [Int: [String]] = [:]
     let enumerator = FileManager.default.enumerator(at: tests, includingPropertiesForKeys: nil)
-    let pattern = try NSRegularExpression(pattern: #"@Test func p(1[0-6]|[1-9])[A-Z]"#)
+    let pattern = try NSRegularExpression(
+        pattern: #"@Test func p(1[0-6]|[1-9])([A-Z][A-Za-z0-9]*)"#
+    )
     for case let file as URL in enumerator! where file.pathExtension == "swift" {
         let text = try String(contentsOf: file, encoding: .utf8)
         let ns = text as NSString
         for match in pattern.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
-            found.insert(Int(ns.substring(with: match.range(at: 1)))!)
+            names[Int(ns.substring(with: match.range(at: 1)))!, default: []]
+                .append(ns.substring(with: match.range(at: 2)))
         }
     }
-    #expect(found == Set(1 ... 16), "missing \(Set(1 ... 16).subtracting(found).sorted())")
+    let semanticWitnesses: [Int: [String]] = [
+        1: ["Lossless"],
+        2: ["ReExport"],
+        3: ["WithoutLoss"],
+        4: ["LiveSet"],
+        5: ["Cursor"],
+        6: ["DeltaAndFull"],
+        7: ["Tombstones"],
+        8: ["Determinism"],
+        9: ["Aggregation"],
+        10: ["Conserve"],
+        11: ["Redaction"],
+        12: ["BoundedResource"],
+        13: ["Migrates", "CorruptCheckpoint"],
+        14: ["AtomicWrite"],
+        15: ["InstantInvariance"],
+        16: ["NetworkDials"],
+    ]
+    for property in 1 ... 16 {
+        let witnesses = names[property] ?? []
+        for semantic in semanticWitnesses[property] ?? [] {
+            #expect(
+                witnesses.contains { $0.contains(semantic) },
+                "P\(property) lacks semantic witness \(semantic); found \(witnesses)"
+            )
+        }
+    }
 }

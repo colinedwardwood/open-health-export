@@ -2052,7 +2052,7 @@ private func runUntilProcessExitSeam() async throws {
     }
 }
 
-@Test func p14PriorSQLiteSchemaMigratesWithoutResettingTheCursor() async throws {
+@Test func p13PriorSQLiteSchemaMigratesWithoutResettingTheCursor() async throws {
     let path = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-legacy-\(UUID().uuidString).sqlite")
         .path
@@ -2079,7 +2079,7 @@ private func runUntilProcessExitSeam() async throws {
     #expect(journal.first?.projectedAtEpoch == nil)
 }
 
-@Test func p12CheckpointBytesDoNotEmbedSampleIdentifiers() {
+@Test func checkpointBytesDoNotEmbedSampleIdentifiers() {
     let canary = "ffffffff-ffff-4fff-8fff-ffffffffffff"
     let envelope = CheckpointEnvelope(
         tzDatabaseVersion: "2024a",

@@ -72,7 +72,7 @@ import WireFormat
     #expect(rendered.body.contains("Archive folder"))
 }
 
-@Test func diagnosticBundleCanaryStaysGreen() throws {
+@Test func p11RedactionCanaryStaysGreenInDiagnosticProjection() throws {
     let canary = RedactionCanary.tokens.joined(separator: " ")
     let data = try BundleAssembler(maxRuns: 2).assemble(
         header: DiagnosticHeader(

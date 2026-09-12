@@ -11,3 +11,8 @@ and stranger-build evidence rather than accepting a non-empty evidence section.
 The weekly T2 job now streams all fifty million pathological records through
 both structural validation and bounded `ExportRun` processing while hashing
 the same stream, with the 100 MiB RSS ceiling enforced at the full tier.
+
+QA-19 property witnesses now use the authoritative P1–P16 numbering. The
+meta-test validates semantic witness names—not merely the presence of every
+number—and P15 explicitly proves exported UTC instant invariance across
+hostile device time zones.
