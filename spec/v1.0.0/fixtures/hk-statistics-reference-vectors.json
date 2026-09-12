@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "kind": "synthetic-pipeline-reference",
+  "canonicality": "pending-R-87-device-pass",
+  "day": "2024-01-01",
+  "note": "These vectors exercise the Linux hkStatistics seam. They are not Apple HealthKit capture evidence.",
+  "vectors": [
+    {"metricId": "active_energy", "value": 1001},
+    {"metricId": "basal_energy", "value": 1002},
+    {"metricId": "cycling_distance", "value": 1003},
+    {"metricId": "dietary_water", "value": 1004},
+    {"metricId": "exercise_time", "value": 1005},
+    {"metricId": "flights_climbed", "value": 1006},
+    {"metricId": "stand_time", "value": 1007},
+    {"metricId": "step_count", "value": 1008},
+    {"metricId": "walking_running_distance", "value": 1009},
+    {"metricId": "apple_move_time", "value": 1010},
+    {"metricId": "push_count", "value": 1011},
+    {"metricId": "swimming_distance", "value": 1012},
+    {"metricId": "swimming_stroke_count", "value": 1013},
+    {"metricId": "time_in_daylight", "value": 1014},
+    {"metricId": "wheelchair_distance", "value": 1015}
+  ]
+}

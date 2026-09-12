@@ -2,4 +2,5 @@
 
 Commits the cumulative-metric exception golden with a reason and accepted ADR for every row.
 Policy CI rejects catalogue drift, missing decisions, and attempts to add a metric under the
-initial ADR. Real-device numerical vectors remain explicitly assigned to the R-87 release pass.
+initial ADR. Linux CI now replays a committed synthetic pipeline vector for every exception
+metric. Real-device numerical vectors remain explicitly assigned to the R-87 release pass.

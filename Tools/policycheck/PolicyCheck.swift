@@ -1832,6 +1832,25 @@ struct PolicyCheck {
             }
         }
 
+        let vectors = try JSONSerialization.jsonObject(
+            with: Data(
+                contentsOf: spec.appendingPathComponent(
+                    "fixtures/hk-statistics-reference-vectors.json"
+                )
+            )
+        ) as? [String: Any]
+        let vectorRows = vectors?["vectors"] as? [[String: Any]] ?? []
+        let vectorIDs = vectorRows.compactMap { $0["metricId"] as? String }.sorted()
+        guard vectors?["kind"] as? String == "synthetic-pipeline-reference",
+              vectors?["canonicality"] as? String == "pending-R-87-device-pass",
+              vectorIDs == committedExceptionIDs
+        else {
+            FileHandle.standardError.write(
+                Data("hkStatistics Linux reference vectors drifted from the exception list\n".utf8)
+            )
+            exit(1)
+        }
+
         let frozenMarker = spec.appendingPathComponent("FROZEN")
         if FileManager.default.fileExists(atPath: frozenMarker.path) {
             let frozenURL = spec.appendingPathComponent("schema/ohe.wire.1.frozen.json")
