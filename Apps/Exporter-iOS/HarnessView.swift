@@ -1238,6 +1238,18 @@ struct HarnessView: View {
 
     private var statusSettings: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Button("Where your data goes") {
+                showSettings = false
+                rootTab = .destinations
+            }
+            .accessibilityIdentifier("settings-open-destinations")
+            dataFlowExplainer
+            ForEach(Array(provenanceLines.enumerated()), id: \.offset) { index, line in
+                Text(line)
+                    .font(.footnote)
+                    .textSelection(.enabled)
+                    .accessibilityIdentifier("settings-build-provenance-\(index)")
+            }
             Text("If someone else set this up")
                 .font(.headline)
             Text("iOS can hide this app. We cannot prevent that, and we do not offer stealth mode, alternate icons, or a second name. Check Settings → Apps → Hidden Apps, Screen Time, Battery, and App Store purchase history. Apple's Personal Safety guide: https://support.apple.com/guide/personal-safety/lock-or-hide-apps-on-your-iphone-ipsd0be4c185/web")

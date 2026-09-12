@@ -52,6 +52,7 @@ struct ExportStatusProvider: TimelineProvider {
 
 struct ExportStatusWidgetView: View {
     @Environment(\.widgetFamily) private var family
+    @Environment(\.widgetRenderingMode) private var renderingMode
     var entry: ExportStatusEntry
 
     var body: some View {
@@ -78,11 +79,12 @@ struct ExportStatusWidgetView: View {
         return VStack(alignment: .leading, spacing: 8) {
             Label(state.label, systemImage: state.glyph)
                 .font(.headline)
+                .modifier(ExportStatusChrome(mode: chrome))
             Spacer()
             if let success = worst?.lastSuccessEpoch {
                 Text("Last export")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(captionStyle)
                 Text(Date(timeIntervalSince1970: success), style: .relative)
                     .font(.title3)
                     .bold()
@@ -101,10 +103,11 @@ struct ExportStatusWidgetView: View {
             if securityEventCount > 0 {
                 Label("\(securityEventCount) change", systemImage: "exclamationmark.shield.fill")
                     .font(.caption)
+                    .modifier(ExportStatusChrome(mode: chrome))
             } else {
                 Text(destinationSummary)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(captionStyle)
             }
         }
     }
@@ -115,12 +118,14 @@ struct ExportStatusWidgetView: View {
                 let state = worst.state(at: entry.date.timeIntervalSince1970)
                 Label(state.label, systemImage: state.glyph)
                     .font(.headline)
+                    .modifier(ExportStatusChrome(mode: chrome))
             }
             ForEach(Array(entry.snapshots.prefix(3)), id: \.destinationID) { snapshot in
                 HStack {
                     let state = snapshot.state(at: entry.date.timeIntervalSince1970)
                     Image(systemName: state.glyph)
                         .accessibilityHidden(true)
+                        .modifier(ExportStatusChrome(mode: chrome))
                     Text(snapshot.destinationLabel)
                         .lineLimit(1)
                     Spacer()
@@ -131,7 +136,7 @@ struct ExportStatusWidgetView: View {
                     }
                     if let reason = DestinationStatusLine.compactFailure(snapshot) {
                         Text(reason)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(captionStyle)
                             .lineLimit(1)
                             .minimumScaleFactor(0.6)
                     }
@@ -142,7 +147,7 @@ struct ExportStatusWidgetView: View {
             if let nextAttempt = nextAttemptText {
                 Text(nextAttempt)
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(captionStyle)
             }
             if securityEventCount > 0 {
                 Label(
@@ -161,6 +166,7 @@ struct ExportStatusWidgetView: View {
             Image(systemName: securityEventCount > 0 ? "exclamationmark.shield.fill" : state.glyph)
                 .font(.title2)
                 .accessibilityHidden(true)
+                .modifier(ExportStatusChrome(mode: chrome))
             VStack(alignment: .leading, spacing: 2) {
                 Text(securityEventCount > 0 ? "Destination changed" : state.label)
                     .font(.headline)
@@ -190,6 +196,7 @@ struct ExportStatusWidgetView: View {
         return VStack(spacing: 2) {
             Image(systemName: securityEventCount > 0 ? "exclamationmark.shield.fill" : state.glyph)
                 .font(.title2)
+                .modifier(ExportStatusChrome(mode: chrome))
             Text(securityEventCount > 0 ? "Changed" : state.label)
                 .font(.caption2)
                 .lineLimit(1)
@@ -202,13 +209,14 @@ struct ExportStatusWidgetView: View {
         VStack(alignment: .leading, spacing: 8) {
             Label("Not set up", systemImage: DestinationDisplayState.notSetUp.glyph)
                 .font(.headline)
+                .modifier(ExportStatusChrome(mode: chrome))
             Spacer()
             Text("Nothing set up yet")
                 .font(.title3)
                 .bold()
             Text("Tap to start")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(captionStyle)
         }
         .accessibilityIdentifier("widget-empty")
     }
@@ -237,6 +245,18 @@ struct ExportStatusWidgetView: View {
         return "Next attempt \(Date(timeIntervalSince1970: next).formatted(date: .omitted, time: .shortened))"
     }
 
+    private var chrome: WidgetStatusRenderingMode {
+        switch renderingMode {
+        case .accented: .accented
+        case .vibrant: .vibrant
+        default: .fullColor
+        }
+    }
+
+    private var captionStyle: HierarchicalShapeStyle {
+        chrome.stripsHue ? .primary : .secondary
+    }
+
     private var statusURL: URL? {
         let now = entry.date.timeIntervalSince1970
         if let worst = worstSnapshot,
@@ -245,6 +265,16 @@ struct ExportStatusWidgetView: View {
             return route.url
         }
         return WidgetStatusRoute(destinationID: worstSnapshot?.destinationID).url
+    }
+}
+
+private struct ExportStatusChrome: ViewModifier {
+    var mode: WidgetStatusRenderingMode
+
+    func body(content: Content) -> some View {
+        content
+            .widgetAccentable()
+            .symbolRenderingMode(mode.stripsHue ? .monochrome : .hierarchical)
     }
 }
 

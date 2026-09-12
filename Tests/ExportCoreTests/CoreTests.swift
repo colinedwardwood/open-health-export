@@ -1477,6 +1477,33 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     #expect(Set(states.map(\.severity)).isSubset(of: Set(0 ... 4)))
 }
 
+@Test func ux41WidgetChromeKeepsGlyphAndLabelIdentityWhenHueIsStripped() throws {
+    #expect(WidgetStatusRenderingMode.accented.stripsHue)
+    #expect(WidgetStatusRenderingMode.vibrant.stripsHue)
+    #expect(!WidgetStatusRenderingMode.fullColor.stripsHue)
+    for mode in WidgetStatusRenderingMode.allCases {
+        let identities = DestinationDisplayState.allCases.map {
+            WidgetStatusChrome.identity(for: $0, mode: mode)
+        }
+        #expect(Set(identities).count == identities.count, "\(mode.rawValue) collapsed a state")
+    }
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let widget = try String(
+        contentsOf: root.appendingPathComponent("Apps/StatusWidget/StatusWidget.swift"),
+        encoding: .utf8
+    )
+    #expect(widget.contains("@Environment(\\.widgetRenderingMode)"))
+    #expect(widget.contains("WidgetStatusRenderingMode"))
+    #expect(widget.contains(".widgetAccentable("))
+    #expect(widget.contains(".symbolRenderingMode(mode.stripsHue ? .monochrome"))
+    #expect(!widget.contains("Color.red"))
+    #expect(!widget.contains(".foregroundStyle(.red"))
+    #expect(!widget.contains(".foregroundStyle(.green"))
+}
+
 @Test func externalStatusKeepsLastSuccessAcrossFailuresAndAdvancesSequence() {
     let successTally = RunTally(read: 3, committed: 3, acked: 3)
     let success = ExternalStatusRecord.next(

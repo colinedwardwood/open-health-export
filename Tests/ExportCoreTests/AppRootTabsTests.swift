@@ -34,4 +34,11 @@ import Watchdog
     #expect(view.contains("rootTab = .destinations"))
     #expect(view.contains("accessibilityIdentifier(\"status-settings\")"))
     #expect(view.contains("Label(\"Settings\""))
+    guard let settings = view.range(of: "private var statusSettings") else {
+        Issue.record("statusSettings is missing")
+        return
+    }
+    let window = String(view[settings.lowerBound...].prefix(1200))
+    #expect(window.contains("settings-open-destinations"))
+    #expect(window.contains("dataFlowExplainer"))
 }
