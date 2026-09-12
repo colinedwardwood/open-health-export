@@ -9,6 +9,10 @@ import WireFormat
 struct PolicyCheck {
     static func main() throws {
         let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        if CommandLine.arguments.dropFirst() == ["--string-catalog"] {
+            try checkStringCatalog(root: root)
+            return
+        }
         let sources = root.appendingPathComponent("Sources")
         let forbidden = ["import HealthKit", "import UIKit", "import WidgetKit"]
         let allowedHealthKit = Set(["HealthKitSource"])
@@ -148,7 +152,6 @@ struct PolicyCheck {
             "app.openhealthexporter.refresh",
             "app.openhealthexporter.processing",
             "app.openhealthexporter.backfill",
-            "app.openhealthexporter.otlp",
         ] where !exporterInfoText.contains(required) {
             FileHandle.standardError.write(
                 Data("iOS background task configuration is missing \(required)\n".utf8)
@@ -230,6 +233,7 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck privacy manifests declare zero collection: ok")
+        try checkLocalGovernance(root: root, manifest: manifest)
         try checkATS(root: root)
         let ambient = ["Date()", "Calendar.current", "TimeZone.current", "Locale.current"]
         let allowedAmbient = Set(["CoreTemporal", "HealthKitSource"])
@@ -294,6 +298,196 @@ struct PolicyCheck {
         try checkBackupExclusion(root: root)
         try checkHealthAuthorizationScope(root: root)
         try checkHostTZDataPin(root: root)
+    }
+
+    /// SEC-60/SEC-75/SEC-79/SEC-73: keep the public policies, the complete set of
+    /// shipping privacy manifests, known first-party endpoints, and destination targets
+    /// tied to one machine-readable inventory. App Store Connect remains an external
+    /// declaration: the inventory may record an assessment, never claim submission.
+    static func checkLocalGovernance(root: URL, manifest: String) throws {
+        let inventoryRelative = "compliance/egress-inventory.json"
+        let inventoryURL = root.appendingPathComponent(inventoryRelative)
+        guard
+            let inventory = try JSONSerialization.jsonObject(
+                with: Data(contentsOf: inventoryURL)
+            ) as? [String: Any],
+            inventory["schemaVersion"] as? Int == 1,
+            let flows = inventory["flows"] as? [[String: Any]],
+            let firstPartyEndpoints = inventory["firstPartyNetworkEndpoints"] as? [String],
+            let apple = inventory["applePrivacyMapping"] as? [String: Any],
+            let declaredManifests = apple["privacyManifests"] as? [String],
+            let label = apple["appPrivacyLabelAssessment"] as? [String: Any]
+        else {
+            FileHandle.standardError.write(
+                Data("SEC-60 egress inventory is missing or malformed\n".utf8)
+            )
+            exit(1)
+        }
+
+        var problems: [String] = []
+        let expectedFlowTargets: [String: Set<String>] = [
+            "security-advisory-feed": ["NetEgress", "WireFormat"],
+            "user-https-export": ["SinkHTTP"],
+            "user-mqtt-export": ["SinkMQTT"],
+            "user-otlp-export": ["OTLPExport"],
+            "paired-companion-discovery": ["NetEgress"],
+            "paired-companion-export": ["SinkCompanion", "NetEgress"],
+            "user-local-file-export": ["SinkLocalFile"],
+        ]
+        let flowIDs = flows.compactMap { $0["id"] as? String }
+        if flowIDs.count != flows.count || Set(flowIDs) != Set(expectedFlowTargets.keys) {
+            problems.append(
+                "SEC-60 flow IDs drifted; expected "
+                    + expectedFlowTargets.keys.sorted().joined(separator: ", ")
+            )
+        }
+        for flow in flows {
+            guard let id = flow["id"] as? String else { continue }
+            let targets = Set(flow["sourceTargets"] as? [String] ?? [])
+            if targets != expectedFlowTargets[id] {
+                problems.append("SEC-60 \(id) sourceTargets drifted")
+            }
+            if flow["destinationControl"] as? String == "project" {
+                if flow["telemetry"] as? Bool != false || flow["healthData"] as? Bool != false {
+                    problems.append("SEC-75 project-controlled flow \(id) carries telemetry or Health data")
+                }
+            }
+        }
+        let projectControlled = flows.filter { $0["destinationControl"] as? String == "project" }
+            .compactMap { $0["id"] as? String }
+        if projectControlled != ["security-advisory-feed"] {
+            problems.append("SEC-75 project-controlled egress must be only security-advisory-feed")
+        }
+
+        if firstPartyEndpoints != [AdvisoryPinnedKeys.urlString] {
+            problems.append(
+                "SEC-60 first-party endpoints drifted from WireFormat.AdvisoryPinnedKeys"
+            )
+        }
+        let advisoryDestination = flows.first {
+            $0["id"] as? String == "security-advisory-feed"
+        }?["destination"] as? String
+        if advisoryDestination != AdvisoryPinnedKeys.urlString {
+            problems.append("SEC-60 advisory flow endpoint drifted from its compiled endpoint")
+        }
+
+        let expectedManifests = [
+            "Apps/Companion-macOS/PrivacyInfo.xcprivacy",
+            "Apps/Exporter-iOS/PrivacyInfo.xcprivacy",
+            "Apps/StatusWidget/PrivacyInfo.xcprivacy",
+        ]
+        if declaredManifests.sorted() != expectedManifests {
+            problems.append("SEC-60 inventory privacy-manifest list drifted")
+        }
+        var foundManifests: [String] = []
+        let apps = root.appendingPathComponent("Apps")
+        if let files = FileManager.default.enumerator(at: apps, includingPropertiesForKeys: nil) {
+            for case let file as URL in files where file.lastPathComponent == "PrivacyInfo.xcprivacy" {
+                foundManifests.append(
+                    file.path.replacingOccurrences(of: root.path + "/", with: "")
+                )
+            }
+        }
+        if foundManifests.sorted() != expectedManifests {
+            problems.append("SEC-60 shipping privacy-manifest set drifted from the inventory")
+        }
+        if apple["tracking"] as? Bool != false
+            || (apple["trackingDomains"] as? [Any])?.isEmpty != true
+            || (apple["collectedDataTypes"] as? [Any])?.isEmpty != true
+            || (label["dataCollected"] as? [Any])?.isEmpty != true
+        {
+            problems.append("SEC-60 inventory and privacy-label assessment must declare zero collection")
+        }
+        if label["status"] as? String
+            != "repository assessment only; not an App Store Connect declaration"
+        {
+            problems.append("SEC-60 label status must not claim an App Store declaration")
+        }
+
+        let sinkPattern = try NSRegularExpression(
+            pattern: #"\.target\(\s*name:\s*"(Sink[^"]+)""#
+        )
+        let targetPattern = try NSRegularExpression(
+            pattern: #"\.target\(\s*name:\s*"([^"]+)""#
+        )
+        let nsManifest = manifest as NSString
+        let sinkTargets = Set(sinkPattern.matches(
+            in: manifest,
+            range: NSRange(location: 0, length: nsManifest.length)
+        ).map { nsManifest.substring(with: $0.range(at: 1)) })
+        let packageTargets = Set(targetPattern.matches(
+            in: manifest,
+            range: NSRange(location: 0, length: nsManifest.length)
+        ).map { nsManifest.substring(with: $0.range(at: 1)) })
+        let inventoriedSinkTargets = Set(
+            expectedFlowTargets.values.flatMap { $0 }.filter { $0.hasPrefix("Sink") }
+        )
+        if sinkTargets != inventoriedSinkTargets {
+            problems.append("SEC-60 Package.swift sink targets drifted from the egress inventory")
+        }
+        let missingSourceTargets = Set(expectedFlowTargets.values.flatMap { $0 })
+            .subtracting(packageTargets)
+        if !missingSourceTargets.isEmpty {
+            problems.append(
+                "SEC-60 inventory names missing package targets: "
+                    + missingSourceTargets.sorted().joined(separator: ", ")
+            )
+        }
+        if label["submissionReadiness"] as? String
+            != "blocked pending verification of the built privacy report, live advisory-host logging, and current App Store questions"
+        {
+            problems.append("SEC-60 privacy-label assessment must stay blocked pending live verification")
+        }
+
+        let requiredDocs: [(String, [String])] = [
+            ("PRIVACY.md", [
+                inventoryRelative,
+                "does not collect, sell, or share personal information",
+                AdvisoryPinnedKeys.urlString,
+                "not an App Store Connect declaration",
+            ]),
+            ("CYBERSECURITY.md", [
+                "Article 24",
+                "not a claim of CRA compliance",
+                "actively exploited vulnerability",
+                inventoryRelative,
+            ]),
+            ("compliance/HIPAA-CONTEXT.md", [
+                "must not contract with, provide the app to, or operate it for",
+                "fresh, fact-specific legal review",
+                "does not fabricate",
+            ]),
+            ("SECURITY.md", [
+                "CYBERSECURITY.md",
+                "PRIVACY.md",
+                inventoryRelative,
+                "compliance/HIPAA-CONTEXT.md",
+            ]),
+            ("README.md", [
+                "CYBERSECURITY.md",
+                "PRIVACY.md",
+                inventoryRelative,
+                "compliance/HIPAA-CONTEXT.md",
+            ]),
+        ]
+        for (relative, needles) in requiredDocs {
+            guard let text = try? String(
+                contentsOf: root.appendingPathComponent(relative),
+                encoding: .utf8
+            ) else {
+                problems.append("SEC governance artifact missing: \(relative)")
+                continue
+            }
+            for needle in needles where !text.contains(needle) {
+                problems.append("\(relative) does not contain \(needle)")
+            }
+        }
+
+        if !problems.isEmpty {
+            FileHandle.standardError.write(Data((problems.joined(separator: "\n") + "\n").utf8))
+            exit(1)
+        }
+        print("policycheck SEC-60/SEC-75/SEC-79/SEC-73 governance mapping: ok")
     }
 
     /// R-35 / SEC-19: App Transport Security stays on. The only allowed exception is
@@ -367,66 +561,302 @@ struct PolicyCheck {
         let data = try Data(contentsOf: catalogURL)
         guard
             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-            json["sourceLanguage"] as? String == "en",
+            let sourceLanguage = json["sourceLanguage"] as? String,
+            !sourceLanguage.isEmpty,
             let strings = json["strings"] as? [String: Any]
         else {
-            FileHandle.standardError.write(Data("Apps/Localizable.xcstrings is missing or not English\n".utf8))
+            FileHandle.standardError.write(
+                Data("Apps/Localizable.xcstrings is missing or malformed\n".utf8)
+            )
             exit(1)
         }
-        let shipped = ["en"]
-        for language in shipped {
-            var translated = 0
-            for value in strings.values {
-                let entry = value as? [String: Any]
-                let locales = entry?["localizations"] as? [String: Any]
-                let unit = (locales?[language] as? [String: Any])?["stringUnit"] as? [String: Any]
-                if unit?["state"] as? String == "translated" || unit?["state"] as? String == "needs_review" {
-                    translated += 1
-                }
+
+        // The source language and every locale represented in the shipping catalogue
+        // are shipped locales. This deliberately makes an accidentally partial locale
+        // fail instead of silently dropping it from the gate.
+        var shipped = Set([sourceLanguage])
+        for value in strings.values {
+            let entry = value as? [String: Any]
+            let localizations = entry?["localizations"] as? [String: Any] ?? [:]
+            shipped.formUnion(localizations.keys)
+        }
+        guard !strings.isEmpty else {
+            FileHandle.standardError.write(Data("string catalog contains no strings\n".utf8))
+            exit(1)
+        }
+        for language in shipped.sorted() {
+            let eligible = strings.values.compactMap { value -> [String: Any]? in
+                guard let entry = value as? [String: Any],
+                      entry["shouldTranslate"] as? Bool != false
+                else { return nil }
+                return entry
             }
-            let ratio = strings.isEmpty ? 0.0 : Double(translated) / Double(strings.count)
+            let translated = eligible.filter { entry in
+                let localizations = entry["localizations"] as? [String: Any]
+                guard let localization = localizations?[language] as? [String: Any] else {
+                    return false
+                }
+                return catalogLocalizationIsTranslated(localization)
+            }.count
+            let ratio = eligible.isEmpty ? 0.0 : Double(translated) / Double(eligible.count)
             if ratio < 0.95 {
                 FileHandle.standardError.write(
-                    Data("string catalog \(language) completeness \(ratio) is below 0.95\n".utf8)
+                    Data(
+                        (
+                            "QA-27 string catalog \(language) completeness "
+                                + "\(translated)/\(eligible.count) "
+                                + "(\(String(format: "%.1f", ratio * 100))%) is below 95%\n"
+                        ).utf8
+                    )
                 )
                 exit(1)
             }
+            print(
+                "policycheck string catalog \(language) completeness: "
+                    + "\(translated)/\(eligible.count) "
+                    + "(\(String(format: "%.1f", ratio * 100))%)"
+            )
         }
 
         let apps = root.appendingPathComponent("Apps")
-        let patterns = [
-            #"(?:Text|Button|Label|TextField|SecureField|Toggle|Section|Picker|navigationTitle|configurationDisplayName|description)\(\s*"([^"\\]*)""#,
-            #"\? "([^"\\]*)" : "([^"\\]*)""#,
-            #"\?\? "([^"\\]*)""#,
-            #"case \.[A-Za-z]+: "([^"\\]*)""#,
-        ].map { try! NSRegularExpression(pattern: $0) }
         var missing: [String] = []
         if let files = FileManager.default.enumerator(at: apps, includingPropertiesForKeys: nil) {
             for case let file as URL in files where file.pathExtension == "swift" {
                 let text = try String(contentsOf: file, encoding: .utf8)
-                let ns = text as NSString
-                let range = NSRange(location: 0, length: ns.length)
-                for pattern in patterns {
-                    for match in pattern.matches(in: text, range: range) {
-                        for index in 1 ..< match.numberOfRanges {
-                            let captured = match.range(at: index)
-                            guard captured.location != NSNotFound else { continue }
-                            let key = ns.substring(with: captured)
-                            if key.isEmpty { continue }
-                            if key == key.lowercased() { continue }
-                            if strings[key] == nil {
-                                missing.append("\(file.lastPathComponent): \(key)")
-                            }
-                        }
+                let relative = file.path.replacingOccurrences(of: root.path + "/", with: "")
+                for literal in appUILiterals(in: text) + appLocalizedValueLiterals(in: text) {
+                    if strings[literal.value] == nil {
+                        missing.append(
+                            "\(relative):\(literal.line): \(String(reflecting: literal.value))"
+                        )
                     }
                 }
             }
         }
         if !missing.isEmpty {
-            FileHandle.standardError.write(Data((missing.joined(separator: "\n") + "\n").utf8))
+            FileHandle.standardError.write(
+                Data(
+                    (
+                        "QA-27 app UI literals missing from Apps/Localizable.xcstrings:\n"
+                            + missing.sorted().joined(separator: "\n")
+                            + "\n"
+                    ).utf8
+                )
+            )
             exit(1)
         }
         print("policycheck string catalog covers app UI literals: ok")
+    }
+
+    static func catalogLocalizationIsTranslated(_ localization: [String: Any]) -> Bool {
+        var foundUnit = false
+        func visit(_ value: Any) -> Bool {
+            if let dictionary = value as? [String: Any] {
+                if let unit = dictionary["stringUnit"] as? [String: Any] {
+                    foundUnit = true
+                    guard unit["state"] as? String == "translated",
+                          let text = unit["value"] as? String,
+                          !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    else { return false }
+                }
+                for (key, child) in dictionary where key != "stringUnit" {
+                    if !visit(child) { return false }
+                }
+            } else if let array = value as? [Any] {
+                for child in array where !visit(child) { return false }
+            }
+            return true
+        }
+        return visit(localization) && foundUnit
+    }
+
+    struct AppUILiteral {
+        let value: String
+        let line: Int
+    }
+
+    /// QA-27: inspect string literals passed to APIs that put copy on screen or expose
+    /// it to accessibility. Matching the first argument avoids flagging technical
+    /// values such as SF Symbol names, accessibility identifiers and URLs.
+    static func appUILiterals(in source: String) -> [AppUILiteral] {
+        let uiAPIs = [
+            "Text", "Button", "Label", "TextField", "SecureField", "Toggle",
+            "Section", "Picker", "Menu", "Link", "ContentUnavailableView",
+            "IntentDescription",
+            "navigationTitle", "alert", "confirmationDialog",
+            "accessibilityLabel", "accessibilityHint",
+            "configurationDisplayName", "description",
+        ]
+        let names = uiAPIs.map(NSRegularExpression.escapedPattern(for:))
+            .joined(separator: "|")
+        let calls = try! NSRegularExpression(pattern: #"\b("# + names + #")\s*\("#)
+        let ns = source as NSString
+        let fullRange = NSRange(location: 0, length: ns.length)
+        var literals: [AppUILiteral] = []
+        for call in calls.matches(in: source, range: fullRange) {
+            let openParen = call.range.location + call.range.length - 1
+            let argument = firstSwiftArgument(in: ns, afterOpenParen: openParen)
+            guard argument.length > 0 else { continue }
+            let argumentText = ns.substring(with: argument)
+            // A Swift interpolation may itself contain quoted expressions. A regex
+            // would misread those quotes and the suffix as separate literals. The
+            // compiler/catalog owns substitution metadata for these dynamic keys.
+            guard !argumentText.contains(#"\("#) else { continue }
+            let argumentNS = argumentText as NSString
+            let stringPattern = try! NSRegularExpression(pattern: #""((?:\\.|[^"\\])*)""#)
+            for match in stringPattern.matches(
+                in: argumentText,
+                range: NSRange(location: 0, length: argumentNS.length)
+            ) {
+                let raw = argumentNS.substring(with: match.range(at: 1))
+                let value = decodeSwiftStringLiteral(raw)
+                guard !value.isEmpty else { continue }
+                let absolute = argument.location + match.range.location
+                let prefix = ns.substring(with: NSRange(location: 0, length: absolute))
+                literals.append(
+                    AppUILiteral(
+                        value: value,
+                        line: prefix.reduce(into: 1) { if $1 == "\n" { $0 += 1 } }
+                    )
+                )
+            }
+        }
+        return literals
+    }
+
+    /// Values passed through a named UI property are not direct SwiftUI arguments at
+    /// their declaration site (for example `Text(state.label)`). Keep those computed
+    /// labels and explicitly localized resource declarations inside the same gate.
+    static func appLocalizedValueLiterals(in source: String) -> [AppUILiteral] {
+        let ns = source as NSString
+        let fullRange = NSRange(location: 0, length: ns.length)
+        let declarations = try! NSRegularExpression(
+            pattern: #"\b(?:let|var)\s+\w+\s*:\s*(?:LocalizedStringResource|LocalizedStringKey)\s*="#
+        )
+        let properties = try! NSRegularExpression(
+            pattern: #"\bvar\s+(?:label|title|copy|message|hint|errorDescription)\s*:\s*String\??\s*\{"#,
+            options: [.caseInsensitive]
+        )
+        var ranges: [NSRange] = []
+        for match in declarations.matches(in: source, range: fullRange) {
+            let remainder = NSRange(
+                location: match.range.location + match.range.length,
+                length: ns.length - match.range.location - match.range.length
+            )
+            let newline = ns.range(of: "\n", options: [], range: remainder)
+            let end = newline.location == NSNotFound ? ns.length : newline.location
+            ranges.append(NSRange(location: remainder.location, length: end - remainder.location))
+        }
+        for match in properties.matches(in: source, range: fullRange) {
+            let openBrace = match.range.location + match.range.length - 1
+            if let body = balancedSwiftBlock(in: ns, afterOpenBrace: openBrace) {
+                ranges.append(body)
+            }
+        }
+
+        let stringPattern = try! NSRegularExpression(pattern: #""((?:\\.|[^"\\])*)""#)
+        var literals: [AppUILiteral] = []
+        for range in ranges {
+            let text = ns.substring(with: range)
+            guard !text.contains(#"\("#) else { continue }
+            let textNS = text as NSString
+            for match in stringPattern.matches(
+                in: text,
+                range: NSRange(location: 0, length: textNS.length)
+            ) {
+                let value = decodeSwiftStringLiteral(textNS.substring(with: match.range(at: 1)))
+                guard !value.isEmpty else { continue }
+                let absolute = range.location + match.range.location
+                let prefix = ns.substring(with: NSRange(location: 0, length: absolute))
+                literals.append(
+                    AppUILiteral(
+                        value: value,
+                        line: prefix.reduce(into: 1) { if $1 == "\n" { $0 += 1 } }
+                    )
+                )
+            }
+        }
+        return literals
+    }
+
+    static func balancedSwiftBlock(in text: NSString, afterOpenBrace openBrace: Int) -> NSRange? {
+        var index = openBrace + 1
+        let start = index
+        var nesting = 0
+        var inString = false
+        var escaped = false
+        while index < text.length {
+            let scalar = text.character(at: index)
+            if inString {
+                if escaped {
+                    escaped = false
+                } else if scalar == 92 {
+                    escaped = true
+                } else if scalar == 34 {
+                    inString = false
+                }
+            } else if scalar == 34 {
+                inString = true
+            } else if scalar == 123 {
+                nesting += 1
+            } else if scalar == 125 {
+                if nesting == 0 {
+                    return NSRange(location: start, length: index - start)
+                }
+                nesting -= 1
+            }
+            index += 1
+        }
+        return nil
+    }
+
+    static func firstSwiftArgument(in text: NSString, afterOpenParen openParen: Int) -> NSRange {
+        var index = openParen + 1
+        let start = index
+        var nesting = 0
+        var inString = false
+        var escaped = false
+        while index < text.length {
+            let scalar = text.character(at: index)
+            if inString {
+                if escaped {
+                    escaped = false
+                } else if scalar == 92 {
+                    escaped = true
+                } else if scalar == 34 {
+                    inString = false
+                }
+            } else {
+                switch scalar {
+                case 34:
+                    inString = true
+                case 40, 91, 123:
+                    nesting += 1
+                case 41:
+                    if nesting == 0 {
+                        return NSRange(location: start, length: index - start)
+                    }
+                    nesting -= 1
+                case 93, 125:
+                    nesting = max(0, nesting - 1)
+                case 44 where nesting == 0:
+                    return NSRange(location: start, length: index - start)
+                default:
+                    break
+                }
+            }
+            index += 1
+        }
+        return NSRange(location: start, length: max(0, text.length - start))
+    }
+
+    static func decodeSwiftStringLiteral(_ raw: String) -> String {
+        raw
+            .replacingOccurrences(of: #"\""#, with: #"""#)
+            .replacingOccurrences(of: #"\\n"#, with: "\n")
+            .replacingOccurrences(of: #"\\t"#, with: "\t")
+            .replacingOccurrences(of: #"\\r"#, with: "\r")
+            .replacingOccurrences(of: #"\\\\"#, with: #"\"#)
     }
 
     /// R-60: Apple guarantees a denied HealthKit read is indistinguishable from absent
@@ -493,6 +923,7 @@ struct PolicyCheck {
         var missingDisclaimer: [String] = []
         for relative in [
             "README.md",
+            "landing/index.html",
             "Apps/Exporter-iOS/HarnessView.swift",
             "Apps/Localizable.xcstrings",
             "receiver/README.md",
@@ -589,6 +1020,7 @@ struct PolicyCheck {
 
         for relative in [
             "README.md",
+            "landing/index.html",
             "CONTINUITY.md",
             "CHANGELOG.md",
             "CONTRIBUTING.md",

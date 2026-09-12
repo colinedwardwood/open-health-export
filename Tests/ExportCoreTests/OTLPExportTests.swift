@@ -107,7 +107,7 @@ import Testing
     )
     let attributes = try #require(object["attributes"] as? [[String: Any]])
     let keys = Set(attributes.compactMap { $0["key"] as? String })
-    #expect(keys == ["service.name", "outcome", "trigger"])
+    #expect(keys == ["service.name", "ohe.destination.id", "outcome", "trigger"])
     let outcome = try #require(
         attributes.first { $0["key"] as? String == "outcome" }
     )
@@ -182,7 +182,56 @@ import Testing
     #expect(!body.isEmpty)
 }
 
+@Test func enabledOTLPPostsFreshnessGaugesToMetricsEndpoint() async throws {
+    let transport = RecordingHTTPTransport(
+        response: OutboundHTTPResponse(status: 200, body: Data())
+    )
+    let traces = try HTTPSDestination(
+        urlString: "https://collector.example/v1/traces",
+        allowedHosts: ["collector.example"]
+    )
+    let metrics = try HTTPSDestination(
+        urlString: "https://collector.example/v1/metrics",
+        allowedHosts: ["collector.example"]
+    )
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+        "ohe-otlp-metrics-\(UUID().uuidString)",
+        isDirectory: true
+    )
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let destinations = [
+        OTLPMetricsDestination(destinationID: "opaque-id", lastSuccessEpoch: 100),
+    ]
+    let exported = try await OTLPExporter(
+        settings: OTLPExportSettings(enabled: true, endpoint: traces),
+        transport: transport
+    ).exportMetrics(
+        destinations: destinations,
+        nowEpoch: 200,
+        endpoint: metrics,
+        bodyDirectory: directory
+    )
+
+    #expect(exported)
+    let requests = await transport.requests
+    let request = try #require(requests.first)
+    #expect(requests.count == 1)
+    #expect(request.url.absoluteString == "https://collector.example/v1/metrics")
+    #expect(request.headers == ["Content-Type": "application/x-protobuf"])
+    #expect(
+        try Data(contentsOf: request.bodyFile)
+            == OTLPMetricsProjector.metrics(destinations: destinations, nowEpoch: 200)
+    )
+}
+
 @Test func otlpOpportunityForbidsObserverWakesAndAllowsForegroundOrChargingWiFi() {
+    #expect(OTLPOpportunity.maximumExportWakeWorkNanoseconds == 0)
+    #expect(OTLPOpportunity.allow(.foreground))
+    #expect(OTLPOpportunity.allow(.chargingOnWiFi))
+    #expect(!OTLPOpportunity.allow(.exportBackgroundWake))
+    #expect(!OTLPOpportunity.allow(.dedicatedTelemetryTask))
     #expect(
         !OTLPOpportunity.allow(
             foreground: true,
@@ -217,7 +266,80 @@ import Testing
     )
 }
 
-@Test func otlpBackgroundTaskStaysOffTheHealthExportProcessingPath() throws {
+@Test func destinationFreshnessMetricsContainBothSeriesAndNoLabels() {
+    let payload = OTLPMetricsProjector.metrics(
+        destinations: [
+            OTLPMetricsDestination(
+                destinationID: "778615f4-opaque",
+                lastSuccessEpoch: 1_699_999_900
+            )
+        ],
+        nowEpoch: 1_700_000_000
+    )
+    let text = String(decoding: payload, as: UTF8.self)
+    #expect(text.contains(OTLPMetricsProjector.lastSuccessMetric))
+    #expect(text.contains(OTLPMetricsProjector.stalenessMetric))
+    #expect(text.contains(OTLPMetricsProjector.destinationIDAttribute))
+    #expect(text.contains("778615f4-opaque"))
+    #expect(!text.contains("Kitchen Home Assistant"))
+    #expect(
+        OTLPProjector.attributeKeys(in: payload)
+            == ["service.name", "ohe.destination.id"]
+    )
+}
+
+@Test func destinationFreshnessMetricIDsStayInsideCardinalityCap() {
+    let destinations = (0 ..< 12).map {
+        OTLPMetricsDestination(
+            destinationID: "destination-\(String(format: "%02d", $0))",
+            lastSuccessEpoch: TimeInterval($0)
+        )
+    }
+    let payload = OTLPMetricsProjector.metrics(destinations: destinations, nowEpoch: 100)
+    let text = String(decoding: payload, as: UTF8.self)
+    #expect(text.contains("destination-00"))
+    #expect(text.contains("destination-06"))
+    #expect(!text.contains("destination-07"))
+    #expect(text.contains("other"))
+}
+
+@Test func telemetryCardinalityBudgetEnumeratesBelowBothCaps() {
+    let names = TelemetryCardinalityBudget.declarations.map(\.name)
+    #expect(Set(names).count == names.count)
+    #expect(TelemetryCardinalityBudget.totalSeries(healthTypeEnabled: false) == 377)
+    #expect(
+        TelemetryCardinalityBudget.totalSeries(healthTypeEnabled: false)
+            <= TelemetryCardinalityBudget.defaultLimit
+    )
+    #expect(TelemetryCardinalityBudget.totalSeries(healthTypeEnabled: true) == 1_448)
+    #expect(
+        TelemetryCardinalityBudget.totalSeries(healthTypeEnabled: true)
+            <= TelemetryCardinalityBudget.healthTypeEnabledLimit
+    )
+}
+
+@Test func unknownMetricAttributeBecomesOtherAndIncrementsDroppedCounter() {
+    var dropped = TelemetryDroppedCounter()
+    let known = TelemetryAttributeGuard.normalize(
+        TelemetryTriggerClass.user.rawValue,
+        as: TelemetryTriggerClass.self,
+        dropped: &dropped
+    )
+    let unknown = TelemetryAttributeGuard.normalize(
+        "runtime-user-authored-value",
+        as: TelemetryTriggerClass.self,
+        dropped: &dropped
+    )
+    #expect(known == .user)
+    #expect(unknown == .other)
+    #expect(dropped.unknownAttributeValues == 1)
+    #expect(dropped.metricPoint.metric == "ohe.telemetry.dropped")
+    #expect(dropped.metricPoint.signal == .metric)
+    #expect(dropped.metricPoint.reason == .unknownAttributeValue)
+    #expect(dropped.metricPoint.count == 1)
+}
+
+@Test func otlpCreatesNoDedicatedBackgroundSchedule() throws {
     let root = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
         .deletingLastPathComponent()
@@ -226,26 +348,32 @@ import Testing
         contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/Info.plist"),
         encoding: .utf8
     )
-    #expect(info.contains("app.openhealthexporter.otlp"))
+    #expect(!info.contains("app.openhealthexporter.otlp"))
     let source = try String(
         contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/AppLifecycleCoordinator.swift"),
         encoding: .utf8
     )
-    let parts = source.components(separatedBy: "enum OTLPBackgroundCoordinator")
-    #expect(parts.count == 2)
-    #expect(!parts[0].contains("projectOTLP"))
-    #expect(parts[1].contains("projectOTLP"))
-    #expect(!parts[1].contains("runOnePageEachMetric"))
-    #expect(parts[1].contains("requiresExternalPower = true"))
-    #expect(parts[1].contains("requiresNetworkConnectivity = true"))
+    #expect(!source.contains("OTLPBackgroundCoordinator"))
+    #expect(!source.contains("projectOTLP"))
+}
 
-    let launchParts = source.components(separatedBy: "didFinishLaunchingWithOptions")
-    #expect(launchParts.count == 2)
-    let launchBody = String(launchParts[1].prefix { $0 != "}" })
-    #expect(launchBody.contains("OTLPBackgroundCoordinator.register()"))
-    #expect(!launchBody.contains("projectOTLP"))
-    #expect(!launchBody.contains("OTLPProjector"))
-    #expect(!launchBody.contains("OTLPExporter"))
+@Test func otlpDependencyGraphUsesHTTPProtobufWithoutGRPCOrNIO() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let package = try String(
+        contentsOf: root.appendingPathComponent("Package.swift"),
+        encoding: .utf8
+    ).lowercased()
+    for forbidden in ["grpc-swift", "swift-nio", "grpcswift", "nioposix"] {
+        #expect(!package.contains(forbidden), "Package.swift links forbidden product \(forbidden)")
+    }
+    let exporter = try String(
+        contentsOf: root.appendingPathComponent("Sources/OTLPExport/OTLPExporter.swift"),
+        encoding: .utf8
+    )
+    #expect(exporter.contains("\"Content-Type\": \"application/x-protobuf\""))
 }
 
 @Test func otlpSettingsStayDisabledUntilPreviewCompletes() {

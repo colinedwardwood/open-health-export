@@ -1860,6 +1860,31 @@ enum HarnessExport {
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
     }
 
+    private static func otlpMetricsDestination(
+        tracesEndpoint: HTTPSDestination,
+        allowedHosts: Set<String>
+    ) throws -> HTTPSDestination {
+        var components = URLComponents(
+            url: tracesEndpoint.url,
+            resolvingAgainstBaseURL: false
+        )
+        if components?.path.hasSuffix("/v1/traces") == true {
+            components?.path.removeLast("traces".count)
+            components?.path.append("metrics")
+        } else {
+            let path = components?.path ?? ""
+            components?.path = path.hasSuffix("/") ? "\(path)v1/metrics" : "\(path)/v1/metrics"
+        }
+        guard let url = components?.url else {
+            throw OTLPExportError.endpointRequired
+        }
+        return try HTTPSDestination(
+            urlString: url.absoluteString,
+            allowedHosts: allowedHosts,
+            allowInsecureHTTP: tracesEndpoint.allowInsecureHTTP
+        )
+    }
+
     static func projectOTLP() async throws -> String {
         let root = try applicationSupportRoot()
         guard let data = try? Data(
@@ -1901,7 +1926,20 @@ enum HarnessExport {
                 )
             }
         }
-        guard !selection.events.isEmpty else {
+        let metricDestinations = StatusSnapshotLocation.readAll().compactMap {
+            snapshot -> OTLPMetricsDestination? in
+            guard snapshot.enabled,
+                  snapshot.destinationID != "otlp",
+                  let lastSuccessEpoch = snapshot.lastSuccessEpoch
+            else {
+                return nil
+            }
+            return OTLPMetricsDestination(
+                destinationID: snapshot.destinationID,
+                lastSuccessEpoch: lastSuccessEpoch
+            )
+        }
+        guard !selection.events.isEmpty || !metricDestinations.isEmpty else {
             return "No unprojected runs."
         }
         let scratch = root.appendingPathComponent("scratch", isDirectory: true)
@@ -1915,13 +1953,41 @@ enum HarnessExport {
             allowInsecureHTTP: record.allowInsecureHTTP
         )
         do {
-            let posted = try await OTLPExporter(
+            let exporter = OTLPExporter(
                 settings: settings,
                 transport: transport
-            ).export(events: selection.events, bodyDirectory: scratch)
-            let byteCount = OTLPProjector.traces(events: selection.events).count
+            )
+            let metricsPosted: Bool
+            if metricDestinations.isEmpty {
+                metricsPosted = false
+            } else {
+                metricsPosted = try await exporter.exportMetrics(
+                    destinations: metricDestinations,
+                    nowEpoch: now,
+                    endpoint: try otlpMetricsDestination(
+                        tracesEndpoint: endpoint,
+                        allowedHosts: Set(record.allowedHosts)
+                    ),
+                    bodyDirectory: scratch
+                )
+            }
+            let tracesPosted = try await exporter.export(
+                events: selection.events,
+                bodyDirectory: scratch
+            )
+            let posted = tracesPosted || metricsPosted
+            let traceByteCount = tracesPosted
+                ? OTLPProjector.traces(events: selection.events).count
+                : 0
+            let metricsByteCount = metricsPosted
+                ? OTLPMetricsProjector.metrics(
+                    destinations: metricDestinations,
+                    nowEpoch: now
+                ).count
+                : 0
+            let byteCount = traceByteCount + metricsByteCount
             try await store.transact { tx in
-                if posted {
+                if tracesPosted {
                     try tx.markJournalProjected(
                         runIDs: selection.events.map(\.runID),
                         atEpoch: now
@@ -1933,7 +1999,7 @@ enum HarnessExport {
                         sampleCount: 0,
                         outcomeKind: posted ? "success" : "disabled",
                         byteCount: byteCount,
-                        detail: "runs=\(selection.events.count)",
+                        detail: "runs=\(selection.events.count),metrics=\(metricDestinations.count)",
                         wallTimeEpoch: now
                     )
                 )
@@ -1955,7 +2021,7 @@ enum HarnessExport {
             }
             WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
             return posted
-                ? "Projected \(selection.events.count) run(s)."
+                ? "Projected \(selection.events.count) run(s) and \(metricDestinations.count) destination gauge set(s)."
                 : "OTLP is disabled."
         } catch {
             try await store.transact { tx in

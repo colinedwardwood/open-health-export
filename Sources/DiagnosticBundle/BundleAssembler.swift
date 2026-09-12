@@ -6,6 +6,15 @@ import EnginePorts
 import Foundation
 import Redaction
 
+public enum DiagnosticDegradation: String, Sendable, Equatable, CaseIterable {
+    case networkUnavailable = "network_unavailable"
+    case healthAuthorizationLimited = "health_authorization_limited"
+    case destinationConfigurationInvalid = "destination_configuration_invalid"
+    case databaseUnreadable = "database_unreadable"
+    case sqliteIntegrityCheckFailed = "sqlite_integrity_check_failed"
+    case journalUnreadable = "journal_unreadable"
+}
+
 public struct DiagnosticHeader: Sendable, Equatable {
     public var appVersion: String
     public var osVersion: String

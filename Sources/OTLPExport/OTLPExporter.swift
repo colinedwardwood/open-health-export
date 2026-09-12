@@ -37,7 +37,36 @@ public struct OTLPExporter: Sendable {
             return false
         }
         let payload = OTLPProjector.traces(events: events)
-        let file = bodyDirectory.appendingPathComponent("otlp-traces.pb")
+        return try await post(
+            payload,
+            filename: "otlp-traces.pb",
+            destination: destination,
+            bodyDirectory: bodyDirectory
+        )
+    }
+
+    public func exportMetrics(
+        destinations: [OTLPMetricsDestination],
+        nowEpoch: TimeInterval,
+        endpoint: HTTPSDestination,
+        bodyDirectory: URL
+    ) async throws -> Bool {
+        guard settings.enabled, !destinations.isEmpty else { return false }
+        return try await post(
+            OTLPMetricsProjector.metrics(destinations: destinations, nowEpoch: nowEpoch),
+            filename: "otlp-metrics.pb",
+            destination: endpoint,
+            bodyDirectory: bodyDirectory
+        )
+    }
+
+    private func post(
+        _ payload: Data,
+        filename: String,
+        destination: HTTPSDestination,
+        bodyDirectory: URL
+    ) async throws -> Bool {
+        let file = bodyDirectory.appendingPathComponent(filename)
         try payload.write(to: file, options: .atomic)
         let request = OutboundHTTPRequest(
             method: "POST",

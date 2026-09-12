@@ -31,6 +31,9 @@ public enum OTLPProjector {
         if text.contains("service.name") { keys.insert("service.name") }
         if text.contains("outcome") { keys.insert("outcome") }
         if text.contains("trigger") { keys.insert("trigger") }
+        if text.contains(OTLPMetricsProjector.destinationIDAttribute) {
+            keys.insert(OTLPMetricsProjector.destinationIDAttribute)
+        }
         return keys
     }
 

@@ -9,6 +9,13 @@
       "justification": "Names the locally built service in the user's collector."
     },
     {
+      "key": "ohe.destination.id",
+      "type": "string",
+      "healthDerived": false,
+      "domain": ["opaque local identifier", "other"],
+      "justification": "Keys per-destination freshness gauges without exporting a label or address; the metric projector bounds active values to eight slots."
+    },
+    {
       "key": "outcome",
       "type": "string",
       "healthDerived": false,

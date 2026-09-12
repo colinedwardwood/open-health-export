@@ -148,6 +148,69 @@ private struct DeviceLockedSource: SampleSource {
     }
 }
 
+@Test(arguments: [
+    DiagnosticDegradation.networkUnavailable,
+    .healthAuthorizationLimited,
+    .destinationConfigurationInvalid,
+])
+func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
+    _ degradation: DiagnosticDegradation
+) throws {
+    let data = try BundleAssembler().assemble(
+        header: DiagnosticHeader(
+            appVersion: "test",
+            osVersion: "test",
+            deviceModel: "test",
+            localeIdentifier: "en_US_POSIX",
+            utcOffsetMinutes: 0,
+            generatedAt: "2024-01-01T00:00:00Z",
+            degraded: [degradation.rawValue]
+        ),
+        events: [
+            RunEvent(
+                runID: RunID(rawValue: "degraded-run"),
+                outcomeKind: "failed",
+                detail: "intentionally excluded",
+                errorClass: degradation.rawValue
+            )
+        ]
+    )
+    let object = try #require(
+        JSONSerialization.jsonObject(with: data) as? [String: Any]
+    )
+    let header = try #require(object["header"] as? [String: Any])
+    let notes = try #require(header["degraded"] as? [String])
+    #expect(!data.isEmpty)
+    #expect(object["schema"] as? String == "ohe.diagnostic/1")
+    #expect(notes == [degradation.rawValue])
+    #expect((object["runs"] as? [[String: Any]])?.count == 1)
+}
+
+@Test func diagnosticBundleSurvivesAMissingDatabase() throws {
+    let path = FileManager.default.temporaryDirectory
+        .appendingPathComponent("missing-\(UUID().uuidString).sqlite").path
+    let read = SQLiteDiagnosticReader.read(path: path)
+    #expect(read.events.isEmpty)
+    #expect(read.degraded.contains(DiagnosticDegradation.databaseUnreadable.rawValue))
+    let data = try BundleAssembler().assemble(
+        header: DiagnosticHeader(
+            appVersion: "test",
+            osVersion: "test",
+            deviceModel: "test",
+            localeIdentifier: "en_US_POSIX",
+            utcOffsetMinutes: 0,
+            generatedAt: "2024-01-01T00:00:00Z",
+            degraded: read.degraded
+        ),
+        events: read.events
+    )
+    #expect(!data.isEmpty)
+    #expect(
+        String(decoding: data, as: UTF8.self)
+            .contains(DiagnosticDegradation.databaseUnreadable.rawValue)
+    )
+}
+
 @Test func diagnosticReaderUsesIndependentReadOnlyConnectionAndBoundsRuns() async throws {
     let url = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-diagnostic-reader-\(UUID().uuidString).sqlite")
@@ -372,6 +435,20 @@ private struct DeviceLockedSource: SampleSource {
     #expect(read.events.isEmpty)
     #expect(read.degraded.contains("sqlite_integrity_check_failed"))
     #expect(read.degraded.contains("journal_unreadable"))
+    let bundle = try BundleAssembler().assemble(
+        header: DiagnosticHeader(
+            appVersion: "test",
+            osVersion: "test",
+            deviceModel: "test",
+            localeIdentifier: "en_US_POSIX",
+            utcOffsetMinutes: 0,
+            generatedAt: "2024-01-01T00:00:00Z",
+            degraded: read.degraded
+        ),
+        events: read.events
+    )
+    #expect(!bundle.isEmpty)
+    #expect(String(decoding: bundle, as: UTF8.self).contains("journal_unreadable"))
 }
 
 @Test func redactionManifestKeysAreUnique() {

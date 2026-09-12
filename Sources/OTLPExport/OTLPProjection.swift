@@ -99,8 +99,27 @@ public enum OTLPSettingsGate {
     }
 }
 
-/// R-53 opportunity policy: foreground, or charging on Wi-Fi. Never an observer-query wake.
+public enum OTLPOpportunityContext: Sendable, Equatable {
+    case foreground
+    case chargingOnWiFi
+    case exportBackgroundWake
+    case dedicatedTelemetryTask
+}
+
+/// R-53 opportunity policy. Projection is deferred until foreground or charging Wi-Fi;
+/// it receives no budget inside an export wake and may not create its own schedule.
 public enum OTLPOpportunity {
+    public static let maximumExportWakeWorkNanoseconds: UInt64 = 0
+
+    public static func allow(_ context: OTLPOpportunityContext) -> Bool {
+        switch context {
+        case .foreground, .chargingOnWiFi:
+            true
+        case .exportBackgroundWake, .dedicatedTelemetryTask:
+            false
+        }
+    }
+
     public static func allow(
         foreground: Bool,
         charging: Bool,
@@ -108,6 +127,12 @@ public enum OTLPOpportunity {
         observerWake: Bool
     ) -> Bool {
         guard !observerWake else { return false }
-        return foreground || (charging && onWiFi)
+        if foreground {
+            return allow(.foreground)
+        }
+        if charging && onWiFi {
+            return allow(.chargingOnWiFi)
+        }
+        return false
     }
 }
