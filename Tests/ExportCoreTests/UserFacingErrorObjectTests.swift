@@ -64,6 +64,39 @@ import Testing
     )
 }
 
+@Test func applyingOwnedFixesResolves413429AndQoS0() {
+    var settings = OwnedExportSettings(windowHours: 24, freshnessIntervalMinutes: 15, mqttQoS: 0)
+    let before413 = settings
+    UserFacingFixApplier.apply(.shortenWindow, to: &settings)
+    #expect(
+        UserFacingFixApplier.http413Resolved(
+            bytesSent: 3_600_000,
+            fromHours: before413.windowHours,
+            toHours: settings.windowHours,
+            serverLimitBytes: 1_000_000
+        )
+    )
+
+    settings = OwnedExportSettings(windowHours: 24, freshnessIntervalMinutes: 15, mqttQoS: 0)
+    let before429 = settings
+    UserFacingFixApplier.apply(.lowerFreshness, to: &settings)
+    #expect(
+        UserFacingFixApplier.http429Resolved(
+            fromMinutes: before429.freshnessIntervalMinutes,
+            toMinutes: settings.freshnessIntervalMinutes,
+            retryAfterMinutes: 30
+        )
+    )
+
+    settings = OwnedExportSettings(mqttQoS: 0)
+    let beforeQoS = settings.mqttQoS
+    UserFacingFixApplier.apply(.setQoS1, to: &settings)
+    #expect(UserFacingFixApplier.mqttQoS0Resolved(from: beforeQoS, to: settings.mqttQoS))
+    #expect(
+        UserFacingErrorArchetype.fromErrorClass(.deviceLocked) == .healthLocked
+    )
+}
+
 @Test func errorClassManifestCopyAvoidsUX28Phrases() {
     for errorClass in ErrorClass.allCases {
         let copy = ErrorClassManifest.record(for: errorClass).userFacingCopy

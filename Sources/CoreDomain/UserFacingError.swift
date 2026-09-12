@@ -89,6 +89,15 @@ extension UserFacingErrorArchetype {
         default: nil
         }
     }
+
+    public static func fromErrorClass(_ errorClass: ErrorClass) -> UserFacingErrorArchetype? {
+        switch errorClass {
+        case .deviceLocked: .healthLocked
+        case .destinationUnreachable: .hostUnresolvable
+        case .localNetworkDenied: .hostUnresolvable
+        default: nil
+        }
+    }
 }
 
 public struct UserFacingErrorObject: Sendable, Equatable {
@@ -304,5 +313,70 @@ public enum UserFacingErrorCopy {
 
     public static func violations(in text: String) -> [String] {
         denylist.filter { text.localizedCaseInsensitiveContains($0) }
+    }
+
+    public static func applied(_ action: UserFacingFixAction) -> String {
+        "Applied \(action.label)."
+    }
+}
+
+/// Settings this app owns and can change from a five-part error action (UX-29).
+public struct OwnedExportSettings: Sendable, Equatable {
+    public var windowHours: Int
+    public var freshnessIntervalMinutes: Int
+    public var mqttQoS: UInt8
+
+    public init(windowHours: Int = 24, freshnessIntervalMinutes: Int = 15, mqttQoS: UInt8 = 1) {
+        self.windowHours = max(1, windowHours)
+        self.freshnessIntervalMinutes = max(1, freshnessIntervalMinutes)
+        self.mqttQoS = mqttQoS
+    }
+}
+
+public enum UserFacingFixApplier {
+    public static func apply(_ action: UserFacingFixAction, to settings: inout OwnedExportSettings) {
+        switch action {
+        case .shortenWindow:
+            settings.windowHours = max(1, settings.windowHours / 4)
+        case .lowerFreshness:
+            settings.freshnessIntervalMinutes = min(
+                24 * 60,
+                max(settings.freshnessIntervalMinutes * 2, 30)
+            )
+        case .setQoS1:
+            settings.mqttQoS = 1
+        default:
+            break
+        }
+    }
+
+    public static func scaledBytes(sent: Int, fromHours: Int, toHours: Int) -> Int {
+        guard fromHours > 0 else { return sent }
+        return sent * toHours / fromHours
+    }
+
+    public static func http413Resolved(
+        bytesSent: Int,
+        fromHours: Int,
+        toHours: Int,
+        serverLimitBytes: Int
+    ) -> Bool {
+        toHours < fromHours && scaledBytes(
+            sent: bytesSent,
+            fromHours: fromHours,
+            toHours: toHours
+        ) <= serverLimitBytes
+    }
+
+    public static func http429Resolved(
+        fromMinutes: Int,
+        toMinutes: Int,
+        retryAfterMinutes: Int
+    ) -> Bool {
+        toMinutes > fromMinutes && toMinutes >= retryAfterMinutes
+    }
+
+    public static func mqttQoS0Resolved(from: UInt8, to: UInt8) -> Bool {
+        from == 0 && to == 1
     }
 }

@@ -53,6 +53,11 @@ struct HarnessView: View {
     @State private var mqttClientID = "ohe-iphone"
     @State private var mqttTopic = "ohe/health"
     @State private var mqttQoS: UInt8 = 1
+    @State private var userFacingError: UserFacingErrorObject?
+    @AppStorage("ohe.exportWindowHours")
+    private var exportWindowHours = 24
+    @AppStorage("ohe.freshnessIntervalMinutes")
+    private var freshnessIntervalMinutes = 15
     @State private var mqttUsername = ""
     @State private var mqttPassword = ""
     @State private var allowInsecureMQTT = false
@@ -176,6 +181,23 @@ struct HarnessView: View {
                                 .fixedSize(horizontal: false, vertical: true)
                                 .accessibilityLabel("Status: \(status)")
                                 .accessibilityIdentifier("status-line")
+
+                            if let userFacingError {
+                                ForEach(Array(userFacingError.lines.enumerated()), id: \.offset) { index, line in
+                                    Text(line)
+                                        .font(.system(.footnote, design: .monospaced))
+                                        .textSelection(.enabled)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                        .accessibilityIdentifier("error-part-\(index)")
+                                }
+                                ForEach(userFacingError.actions, id: \.rawValue) { action in
+                                    Button(action.label) {
+                                        applyUserFacingFix(action)
+                                    }
+                                    .disabled(phase == .working)
+                                    .accessibilityIdentifier("error-fix-\(action.rawValue)")
+                                }
+                            }
 
                             Text("Time to first screen: \(timeToFirstFrameMS, specifier: "%.0f") ms (foreground; R-73 is a background-launch budget).")
                                 .font(.footnote)
@@ -1884,7 +1906,7 @@ struct HarnessView: View {
                 destinationID: "local-file",
                 destinationLabel: "Archive folder"
             )
-            status = "Failed: \(error.localizedDescription)"
+            presentUserFacingFailure(error, destinationLabel: "Archive folder")
         }
         phase = .ready
     }
@@ -2084,12 +2106,13 @@ struct HarnessView: View {
                         ? importedDestinationDraft?.localIdentifier : nil
             )
             httpsTestLines = confirmationCard?.lines ?? []
+            userFacingError = nil
             status = "Ready. Confirm this server before any Health data moves."
         } catch {
             confirmationCard = nil
             confirmationKind = nil
             httpsTestLines = []
-            status = "Failed: \(error.localizedDescription)"
+            presentUserFacingFailure(error, destinationLabel: httpsURL)
         }
         phase = .ready
     }
@@ -2115,12 +2138,23 @@ struct HarnessView: View {
                         ? importedDestinationDraft?.localIdentifier : nil
             )
             mqttTestLines = confirmationCard?.lines ?? []
-            status = "Ready. Confirm this server before any Health data moves."
+            if mqttQoS == 0 {
+                let error = UserFacingErrorObject.make(
+                    archetype: .mqttQoS0,
+                    destinationLabel: mqttURL
+                )
+                userFacingError = error
+                status = error.title
+                results = error.lines
+            } else {
+                userFacingError = nil
+                status = "Ready. Confirm this server before any Health data moves."
+            }
         } catch {
             confirmationCard = nil
             confirmationKind = nil
             mqttTestLines = []
-            status = "Failed: \(error.localizedDescription)"
+            presentUserFacingFailure(error, destinationLabel: mqttURL)
         }
         phase = .ready
     }
@@ -2296,7 +2330,7 @@ struct HarnessView: View {
                 destinationID: "mqtt",
                 destinationLabel: "MQTT destination"
             )
-            status = "Failed: \(error.localizedDescription)"
+            presentUserFacingFailure(error, destinationLabel: "MQTT destination")
         }
         phase = .ready
     }
@@ -2316,7 +2350,7 @@ struct HarnessView: View {
                 destinationID: "https",
                 destinationLabel: "HTTPS destination"
             )
-            status = "Failed: \(error.localizedDescription)"
+            presentUserFacingFailure(error, destinationLabel: "HTTPS destination")
         }
         phase = .ready
     }
@@ -2462,6 +2496,81 @@ struct HarnessView: View {
             status = "Ready. Companion pairing forgotten and its destination disabled."
         } catch {
             status = "Failed: \(error.localizedDescription)"
+        }
+    }
+
+    @MainActor
+    private func presentUserFacingFailure(_ error: Error, destinationLabel: String) {
+        let object: UserFacingErrorObject?
+        if let egress = error as? EgressError {
+            switch egress {
+            case .httpStatus(let status):
+                object = UserFacingErrorArchetype.fromHTTPStatus(status).map {
+                    UserFacingErrorObject.make(
+                        archetype: $0,
+                        destinationLabel: destinationLabel,
+                        evidence: UserFacingErrorEvidence(statusCode: status)
+                    )
+                }
+            case .httpRetryAfter(let status, let seconds):
+                object = UserFacingErrorObject.make(
+                    archetype: .http429,
+                    destinationLabel: destinationLabel,
+                    evidence: UserFacingErrorEvidence(
+                        statusCode: status,
+                        retryAfterSeconds: Int(seconds)
+                    )
+                )
+            case .transport:
+                object = UserFacingErrorObject.make(
+                    archetype: .timeout,
+                    destinationLabel: destinationLabel
+                )
+            default:
+                object = nil
+            }
+        } else if let send = error as? DestinationSendError,
+                  let archetype = UserFacingErrorArchetype.fromErrorClass(send.errorClass) {
+            object = UserFacingErrorObject.make(
+                archetype: archetype,
+                destinationLabel: destinationLabel
+            )
+        } else {
+            object = nil
+        }
+        userFacingError = object
+        if let object {
+            status = object.title
+            results = object.lines
+        } else {
+            status = "Failed: \(error.localizedDescription)"
+        }
+    }
+
+    @MainActor
+    private func applyUserFacingFix(_ action: UserFacingFixAction) {
+        var settings = OwnedExportSettings(
+            windowHours: exportWindowHours,
+            freshnessIntervalMinutes: freshnessIntervalMinutes,
+            mqttQoS: mqttQoS
+        )
+        UserFacingFixApplier.apply(action, to: &settings)
+        exportWindowHours = settings.windowHours
+        freshnessIntervalMinutes = settings.freshnessIntervalMinutes
+        mqttQoS = settings.mqttQoS
+        userFacingError = nil
+        status = UserFacingErrorCopy.applied(action)
+        switch action {
+        case .testAgain:
+            if confirmationKind == .mqtt || !mqttURL.isEmpty && httpsURL.isEmpty {
+                Task { await testMQTT() }
+            } else if !httpsURL.isEmpty {
+                Task { await testHTTPS() }
+            }
+        case .setQoS1:
+            Task { await testMQTT() }
+        default:
+            break
         }
     }
 
