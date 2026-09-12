@@ -29,6 +29,9 @@
     },
     "receiver-expected-state.json": {
       "role": "G4 expected final state"
+    },
+    "t2-tombstone-slice.ndjson": {
+      "role": "T2 ExportRun accounting regression: one quantity plus one tombstone"
     }
   },
   "schema": "schema/ohe.wire.1.json",

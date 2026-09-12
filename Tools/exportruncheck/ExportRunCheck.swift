@@ -12,10 +12,10 @@ import WireFormat
 
 private let memoryLimitMiB = 100
 private let defaultPageSize = 500
-private let maximumPageSize = 500
+private let maximumPageSize = 10_000
 private let maximumConcurrentMetrics = 4
 private let newline = Data([0x0A])
-private let t1StructuralKinds: Set<String> = [
+private let volumeStructuralKinds: Set<String> = [
     "sample.category",
     "sample.correlation",
     "workout",
@@ -23,6 +23,7 @@ private let t1StructuralKinds: Set<String> = [
     "series.ecgVoltage",
     "sample.audiogram",
     "medicationDose",
+    "tombstone",
 ]
 
 @main
@@ -104,7 +105,7 @@ struct ExportRunCheck {
                 try spool.handle.write(contentsOf: line)
                 try spool.handle.write(contentsOf: newline)
                 exportableRecords += 1
-            case let structural where t1StructuralKinds.contains(structural):
+            case let structural where volumeStructuralKinds.contains(structural):
                 structuralRecords += 1
             default:
                 throw CheckError.unaccountedKind(kind: record.kind, line: inputLines)

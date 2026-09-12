@@ -19,7 +19,13 @@ This file separates repository-complete engineering work from evidence that cann
 
 ## Pending automated run
 
-The manually dispatched `nightly-volume` run is the first remote execution of the new full T1 `ExportRun` and Linux RSS gate. Its result is CI evidence, not physical-device evidence. A failure must be fixed before this item is treated as verified.
+Tier-1 remote `ExportRun` (10 million records, 100 MiB RSS) succeeded on
+https://github.com/colinedwardwood/open-health-export/actions/runs/34667824738.
+Tier-2 failed on that same run when `exportruncheck` rejected T2 `tombstone`
+records; that accounting hole is in the working tree and must go green on a
+later `nightly-volume` run before T2 is treated as verified.
+
+T2 remains CI evidence, not physical-device evidence.
 
 ## External-only release gates
 

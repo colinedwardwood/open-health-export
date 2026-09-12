@@ -550,7 +550,9 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
     #expect(workflow.contains("corpusgen --tier T2 --seed 1 |"))
     #expect(!workflow.contains("corpusgen --tier T1 --seed 1 --count"))
     #expect(workflow.contains(".build/release/exportruncheck"))
+    #expect(workflow.contains("exportruncheck --page-size 10000"))
     #expect(checker.contains("private let memoryLimitMiB = 100"))
+    #expect(checker.contains("\"tombstone\""))
     #expect(checker.contains("submittedRecords == exportableRecords"))
     #expect(checker.contains("peakKiB <= limitKiB"))
 }

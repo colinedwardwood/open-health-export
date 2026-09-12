@@ -58,6 +58,14 @@ jobs:
           grep -F 'declared_records=200' /tmp/t0-exportrun.out
           grep -F 'limit_mib=100' /tmp/t0-exportrun.out
           grep -F 'formats=native-ndjson,native-json,native-json-pretty,csv,hae' /tmp/t0-exportrun.out
+      - name: Account T2 tombstones in bounded ExportRun
+        run: |
+          swift run exportruncheck \
+            < spec/v1.0.0/fixtures/t2-tombstone-slice.ndjson \
+            | tee /tmp/t2-tombstone-exportrun.out
+          grep -F 'exportruncheck outcome=success' /tmp/t2-tombstone-exportrun.out
+          grep -F 'declared_records=2' /tmp/t2-tombstone-exportrun.out
+          grep -F 'structural_records=1' /tmp/t2-tombstone-exportrun.out
       - name: Import policy
         run: swift run policycheck
       - name: Validate NFR-to-evidence mapping
