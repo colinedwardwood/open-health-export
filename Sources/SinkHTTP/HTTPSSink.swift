@@ -16,6 +16,8 @@ public struct HTTPSSink: DestinationSink, Sendable {
     public var bodyTemplate: String?
     public var secrets: (any TemplateSecrets)?
     public var traceparent: TraceparentEmission?
+    public var meteredPolicy: MeteredNetworkPolicy
+    public var pathConditions: NetworkPathConditions
 
     public init(
         destination: HTTPSDestination,
@@ -23,7 +25,9 @@ public struct HTTPSSink: DestinationSink, Sendable {
         headerTemplates: [String: String] = [:],
         bodyTemplate: String? = nil,
         secrets: (any TemplateSecrets)? = nil,
-        traceparent: TraceparentEmission? = nil
+        traceparent: TraceparentEmission? = nil,
+        meteredPolicy: MeteredNetworkPolicy = .refuseMetered,
+        pathConditions: NetworkPathConditions = .clear
     ) {
         self.destination = destination
         self.transport = transport
@@ -31,9 +35,12 @@ public struct HTTPSSink: DestinationSink, Sendable {
         self.bodyTemplate = bodyTemplate
         self.secrets = secrets
         self.traceparent = traceparent
+        self.meteredPolicy = meteredPolicy
+        self.pathConditions = pathConditions
     }
 
     public func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt {
+        try MeteredNetworkGate.require(path: pathConditions, policy: meteredPolicy)
         let payloadFile = URL(fileURLWithPath: fileHandle)
         let payloadText = String(decoding: try Data(contentsOf: payloadFile), as: UTF8.self)
         let recordCount = NativeWire.countRecords(in: payloadText)

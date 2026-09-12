@@ -75,6 +75,98 @@ import WireFormat
     #expect(requests[0].headers["baggage"] == nil)
 }
 
+@Test func httpsRefusesMeteredPathBeforeAnyTransportByte() async throws {
+    let (file, batchID) = try writeHTTPSPayload()
+    let transport = RecordingHTTPTransport(
+        response: OutboundHTTPResponse(status: 204, body: Data())
+    )
+    let destination = try HTTPSDestination(
+        urlString: "https://ha.example/api/webhook/ohe",
+        allowedHosts: ["ha.example"]
+    )
+    let sink = HTTPSSink(
+        destination: destination,
+        transport: transport,
+        meteredPolicy: .refuseMetered,
+        pathConditions: NetworkPathConditions(isExpensive: true, isConstrained: false)
+    )
+    await #expect(throws: DestinationSendError.awaitingUnmetered) {
+        _ = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
+    }
+    #expect(await transport.requests.isEmpty)
+}
+
+@Test func httpsMeteredOptInSendsOnAnExpensivePath() async throws {
+    let (file, batchID) = try writeHTTPSPayload()
+    let transport = RecordingHTTPTransport(
+        response: OutboundHTTPResponse(status: 204, body: Data())
+    )
+    let destination = try HTTPSDestination(
+        urlString: "https://ha.example/api/webhook/ohe",
+        allowedHosts: ["ha.example"]
+    )
+    let sink = HTTPSSink(
+        destination: destination,
+        transport: transport,
+        meteredPolicy: .allowAll,
+        pathConditions: NetworkPathConditions(isExpensive: true, isConstrained: true)
+    )
+    _ = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
+    #expect(await transport.requests.count == 1)
+}
+
+@Test func httpsEnableProbeRefusesMeteredPathBeforeTLS() async throws {
+    let destination = try HTTPSDestination(
+        urlString: "https://receiver.example/export",
+        allowedHosts: ["receiver.example"]
+    )
+    let transport = RecordingHTTPTransport(
+        response: OutboundHTTPResponse(status: 204, body: Data()),
+        tls: sampleIdentity(leaf: "aaaabbbbccccdddd")
+    )
+    await #expect(throws: DestinationSendError.awaitingUnmetered) {
+        _ = try await HTTPSDestinationEnable.probe(
+            destination: destination,
+            transport: transport,
+            exporterID: "00000000-0000-4000-8000-000000000025",
+            emittedAt: "2026-01-01T00:00:00Z",
+            meteredPolicy: .refuseMetered,
+            pathConditions: NetworkPathConditions(isExpensive: true, isConstrained: false)
+        )
+    }
+    #expect(await transport.requests.isEmpty)
+}
+
+@Test func meteredNetworkGateDefaultsRefuseExpensiveAndConstrained() {
+    #expect(
+        !MeteredNetworkGate.allows(
+            path: NetworkPathConditions(isExpensive: true, isConstrained: false),
+            policy: .refuseMetered
+        )
+    )
+    #expect(
+        !MeteredNetworkGate.allows(
+            path: NetworkPathConditions(isExpensive: false, isConstrained: true),
+            policy: .refuseMetered
+        )
+    )
+    #expect(
+        MeteredNetworkGate.allows(path: .clear, policy: .refuseMetered)
+    )
+    #expect(
+        MeteredNetworkGate.allows(
+            path: NetworkPathConditions(isExpensive: true, isConstrained: true),
+            policy: .fromAllowsMetered(true)
+        )
+    )
+    #expect(
+        !MeteredNetworkGate.allows(
+            path: NetworkPathConditions(isExpensive: true, isConstrained: false),
+            policy: .fromAllowsMetered(false)
+        )
+    )
+}
+
 @Test func duplicateHTTPSDeliveryConvergesAtTheReceiver() async throws {
     let (file, batchID) = try writeHTTPSPayload()
     let receiver = ConvergingHTTPReceiver()

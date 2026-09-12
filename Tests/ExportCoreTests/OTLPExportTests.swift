@@ -182,6 +182,32 @@ import Testing
     #expect(!body.isEmpty)
 }
 
+@Test func otlpRefusesMeteredPathBeforeAnyTransportByte() async throws {
+    let transport = RecordingHTTPTransport(
+        response: OutboundHTTPResponse(status: 200, body: Data())
+    )
+    let destination = try HTTPSDestination(
+        urlString: "https://collector.example/v1/traces",
+        allowedHosts: ["collector.example"]
+    )
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+        "ohe-otlp-metered-\(UUID().uuidString)",
+        isDirectory: true
+    )
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    await #expect(throws: DestinationSendError.awaitingUnmetered) {
+        _ = try await OTLPExporter(
+            settings: OTLPExportSettings(enabled: true, endpoint: destination),
+            transport: transport,
+            meteredPolicy: .refuseMetered,
+            pathConditions: NetworkPathConditions(isExpensive: true, isConstrained: false)
+        ).export(events: [otlpRunEvent()], bodyDirectory: directory)
+    }
+    #expect(await transport.requests.isEmpty)
+}
+
 @Test func enabledOTLPPostsFreshnessGaugesToMetricsEndpoint() async throws {
     let transport = RecordingHTTPTransport(
         response: OutboundHTTPResponse(status: 200, body: Data())

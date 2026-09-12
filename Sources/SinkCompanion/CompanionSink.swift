@@ -25,20 +25,27 @@ public struct CompanionSink: DestinationSink, Sendable {
     public var installationID: String
     public var chunkSize: Int
     public var traceparent: TraceparentEmission?
+    public var meteredPolicy: MeteredNetworkPolicy
+    public var pathConditions: NetworkPathConditions
 
     public init(
         pipe: any CompanionBytePipe,
         installationID: String,
         chunkSize: Int = 16_384,
-        traceparent: TraceparentEmission? = nil
+        traceparent: TraceparentEmission? = nil,
+        meteredPolicy: MeteredNetworkPolicy = .refuseMetered,
+        pathConditions: NetworkPathConditions = .clear
     ) {
         self.pipe = pipe
         self.installationID = installationID
         self.chunkSize = max(1, min(chunkSize, CompanionFrame.maxPayload - 4))
         self.traceparent = traceparent
+        self.meteredPolicy = meteredPolicy
+        self.pathConditions = pathConditions
     }
 
     public func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt {
+        try MeteredNetworkGate.require(path: pathConditions, policy: meteredPolicy)
         let file = URL(fileURLWithPath: fileHandle)
         let payload = try Data(contentsOf: file)
         let count = NativeWire.countRecords(in: String(decoding: payload, as: UTF8.self))

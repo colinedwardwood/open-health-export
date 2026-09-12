@@ -114,6 +114,37 @@ import WireFormat
     #expect(second.accepted == 1)
 }
 
+@Test func companionSinkRefusesMeteredPathBeforeAnyByte() async throws {
+    let (file, batchID, _) = try writeCompanionPayload()
+    let broker = LoopbackCompanionBroker()
+    let sink = CompanionSink(
+        pipe: broker,
+        installationID: "phone",
+        chunkSize: 32,
+        meteredPolicy: .refuseMetered,
+        pathConditions: NetworkPathConditions(isExpensive: true, isConstrained: false)
+    )
+    await #expect(throws: DestinationSendError.awaitingUnmetered) {
+        _ = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
+    }
+    #expect(await broker.storedDigest(batchID: batchID.rawValue) == nil)
+}
+
+@Test func companionEnableRefusesMeteredPathBeforeCanary() async throws {
+    let broker = LoopbackCompanionBroker()
+    await #expect(throws: DestinationSendError.awaitingUnmetered) {
+        _ = try await CompanionDestinationEnable.complete(
+            testPipe: broker,
+            deliveryPipe: broker,
+            installationID: "phone",
+            emittedAt: "2026-01-01T00:00:00Z",
+            meteredPolicy: .refuseMetered,
+            pathConditions: NetworkPathConditions(isExpensive: true, isConstrained: false)
+        )
+    }
+    #expect(await broker.storedDigest(batchID: "00000000-0000-4000-8000-000000000002") == nil)
+}
+
 @Test func companionSinkDrivesAcknowledgedOnTheEngine() async throws {
     let metric = MetricID(rawValue: "heartRate")
     let page = SamplePage(

@@ -147,6 +147,8 @@ enum DeliveryExecutor {
             return .auth
         case .cancelledBySystem, .budgetExhausted, .deviceLocked, .lowPowerMode:
             return .storeLocked
+        case .awaitingUnmetered:
+            return .awaitingUnmetered
         case .healthDataRestricted:
             return .auth
         case .internalFault:

@@ -25,6 +25,11 @@ import Watchdog
     #expect(CombinedExportSummary.progress(current: 24, total: 41) == "Reading 24 of 41 types")
 }
 
+@Test func combinedExportCopyParksMeteredAndLowPowerAsDeferred() {
+    #expect(CombinedExportSummary.copy([.blockedUnmetered]) == "Export deferred.")
+    #expect(CombinedExportSummary.kind([.success, .blockedUnmetered]) == .blockedUnmetered)
+}
+
 @Test func combinedPartialOverwritesLastPerTypeOutcomeOnSnapshot() {
     var snapshot = DestinationStatusSnapshot(
         destinationID: "local-file",

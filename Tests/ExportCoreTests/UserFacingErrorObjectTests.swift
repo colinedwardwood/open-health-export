@@ -6,7 +6,7 @@ import EnginePorts
 import Testing
 
 @Test func everyUserFacingErrorArchetypeHasFivePartsAndOwnedFixes() {
-    #expect(UserFacingErrorArchetype.allCases.count == 15)
+    #expect(UserFacingErrorArchetype.allCases.count == 16)
     for archetype in UserFacingErrorArchetype.allCases {
         let error = UserFacingErrorObject.make(
             archetype: archetype,
@@ -67,6 +67,7 @@ import Testing
     #expect(UserFacingErrorArchetype.fromErrorClass(.destinationUnreachable) == .hostUnresolvable)
     #expect(UserFacingErrorArchetype.fromErrorClass(.budgetExhausted) == .backgroundNeverRan)
     #expect(UserFacingErrorArchetype.fromErrorClass(.lowPowerMode) == .backgroundNeverRan)
+    #expect(UserFacingErrorArchetype.fromErrorClass(.awaitingUnmetered) == .waitingForUnmetered)
     #expect(UserFacingErrorArchetype.fromErrorClass(.internalFault) == .timeout)
     #expect(UserFacingErrorArchetype.fromErrorClass(.none) == nil)
     #expect(

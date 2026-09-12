@@ -606,6 +606,7 @@ public enum DestinationSendError: Error, Sendable, Equatable, LocalizedError {
     case deviceLocked
     case healthDataRestricted
     case lowPowerMode
+    case awaitingUnmetered
     case internalFault(String)
 
     public var errorClass: ErrorClass {
@@ -617,6 +618,7 @@ public enum DestinationSendError: Error, Sendable, Equatable, LocalizedError {
         case .deviceLocked: .deviceLocked
         case .healthDataRestricted: .healthDataRestricted
         case .lowPowerMode: .lowPowerMode
+        case .awaitingUnmetered: .awaitingUnmetered
         case .internalFault: .internalFault
         }
     }

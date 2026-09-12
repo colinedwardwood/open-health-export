@@ -25,10 +25,19 @@ public struct OTLPExportSettings: Sendable, Equatable {
 public struct OTLPExporter: Sendable {
     public var settings: OTLPExportSettings
     public var transport: any HTTPTransport
+    public var meteredPolicy: MeteredNetworkPolicy
+    public var pathConditions: NetworkPathConditions
 
-    public init(settings: OTLPExportSettings, transport: any HTTPTransport) {
+    public init(
+        settings: OTLPExportSettings,
+        transport: any HTTPTransport,
+        meteredPolicy: MeteredNetworkPolicy = .refuseMetered,
+        pathConditions: NetworkPathConditions = .clear
+    ) {
         self.settings = settings
         self.transport = transport
+        self.meteredPolicy = meteredPolicy
+        self.pathConditions = pathConditions
     }
 
     /// Returns false when disabled so callers can skip work. Never constructs a request then.
@@ -66,6 +75,7 @@ public struct OTLPExporter: Sendable {
         destination: HTTPSDestination,
         bodyDirectory: URL
     ) async throws -> Bool {
+        try MeteredNetworkGate.require(path: pathConditions, policy: meteredPolicy)
         let file = bodyDirectory.appendingPathComponent(filename)
         try payload.write(to: file, options: .atomic)
         let request = OutboundHTTPRequest(

@@ -46,6 +46,14 @@ struct HarnessView: View {
     @State private var httpsURL = ""
     @State private var httpsBearer = ""
     @State private var allowInsecureHTTP = false
+    @AppStorage("ohe.https.allowsMeteredNetwork")
+    private var allowMeteredHTTPS = false
+    @AppStorage("ohe.mqtt.allowsMeteredNetwork")
+    private var allowMeteredMQTT = false
+    @AppStorage("ohe.companion.allowsMeteredNetwork")
+    private var allowMeteredCompanion = false
+    @AppStorage("ohe.otlp.allowsMeteredNetwork")
+    private var allowMeteredOTLP = false
     @State private var propagateTraceparent = false
     @State private var companionTraceparent = false
     @State private var httpsTestLines: [String] = []
@@ -822,6 +830,12 @@ struct HarnessView: View {
             Toggle("Allow plain HTTP (unsafe)", isOn: $allowInsecureHTTP)
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("https-insecure")
+            Toggle("Allow cellular and other metered networks", isOn: $allowMeteredHTTPS)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("https-metered")
+            Text("Off by default. Exports wait for Wi-Fi unless you turn this on.")
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
             if allowInsecureHTTP {
                 Text("Plain HTTP exposes health exports to anyone able to observe this network.")
                     .font(.footnote)
@@ -916,6 +930,12 @@ struct HarnessView: View {
             Toggle("Allow plain MQTT (unsafe)", isOn: $allowInsecureMQTT)
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("mqtt-insecure")
+            Toggle("Allow cellular and other metered networks", isOn: $allowMeteredMQTT)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("mqtt-metered")
+            Text("Off by default. Exports wait for Wi-Fi unless you turn this on.")
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
             if allowInsecureMQTT {
                 Text("Plain MQTT exposes health exports to anyone able to observe this network.")
                     .font(.footnote)
@@ -947,6 +967,12 @@ struct HarnessView: View {
             Toggle("Allow plain HTTP for OTLP (unsafe)", isOn: $allowInsecureOTLP)
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("otlp-insecure")
+            Toggle("Allow cellular and other metered networks", isOn: $allowMeteredOTLP)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("otlp-metered")
+            Text("Off by default. Exports wait for Wi-Fi unless you turn this on.")
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
             if allowInsecureOTLP {
                 Text("Plain HTTP exposes traces to anyone able to observe this network.")
                     .font(.footnote)
@@ -1231,6 +1257,12 @@ struct HarnessView: View {
                 .onChange(of: companionTraceparent) { _, enabled in
                     try? HarnessExport.setCompanionTraceparent(enabled)
                 }
+            Toggle("Allow cellular and other metered networks", isOn: $allowMeteredCompanion)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("companion-metered")
+            Text("Off by default. Exports wait for Wi-Fi unless you turn this on.")
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .buttonStyle(HarnessButtonStyle())
         .controlSize(.large)

@@ -110,6 +110,16 @@ public enum ErrorClassManifest {
                 scheduleFailure: true,
                 r88P1: false
             )
+        case .awaitingUnmetered:
+            return ErrorClassRecord(
+                userCopyKey: "error.awaitingUnmetered",
+                userFacingCopy: "This destination skips cellular and other metered networks. Export will continue on Wi-Fi, or after you allow metered networks for this destination.",
+                retryable: true,
+                blocksEnablement: false,
+                ledgerKind: "schedule",
+                scheduleFailure: false,
+                r88P1: false
+            )
         }
     }
 

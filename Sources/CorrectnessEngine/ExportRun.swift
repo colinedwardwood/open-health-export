@@ -184,6 +184,7 @@ public struct ExportRun: Sendable {
             if errorClass == .deviceLocked
                 || errorClass == .healthDataRestricted
                 || errorClass == .lowPowerMode
+                || errorClass == .awaitingUnmetered
             {
                 return outcome
             }

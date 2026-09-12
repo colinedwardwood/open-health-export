@@ -112,7 +112,8 @@ enum ShortcutExportKind: String, AppEnum {
         case .failed: .failed
         case .unknownAck: .sentUnconfirmed
         case .localNetworkDenied: .blocked
-        case .blockedDeviceLocked, .abandonedNoBudget, .cancelledBySystem, .blockedLowPower:
+        case .blockedDeviceLocked, .abandonedNoBudget, .cancelledBySystem, .blockedLowPower,
+             .blockedUnmetered:
             .deferred
         }
     }

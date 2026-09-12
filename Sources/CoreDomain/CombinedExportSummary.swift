@@ -16,6 +16,7 @@ public enum CombinedExportSummary {
         if outcomes.contains(.abandonedNoBudget) { return .abandonedNoBudget }
         if outcomes.contains(.cancelledBySystem) { return .cancelledBySystem }
         if outcomes.contains(.blockedLowPower) { return .blockedLowPower }
+        if outcomes.contains(.blockedUnmetered) { return .blockedUnmetered }
         if outcomes.contains(.partial) || outcomes.contains(.unknownAck) {
             return .partial
         }
@@ -41,7 +42,8 @@ public enum CombinedExportSummary {
             return "Nothing new to export."
         case .failed:
             return "Export failed."
-        case .blockedDeviceLocked, .abandonedNoBudget, .cancelledBySystem, .blockedLowPower:
+        case .blockedDeviceLocked, .abandonedNoBudget, .cancelledBySystem, .blockedLowPower,
+             .blockedUnmetered:
             return "Export deferred."
         case .localNetworkDenied:
             return "Export is waiting for Local Network access."

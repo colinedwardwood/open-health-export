@@ -25,7 +25,9 @@ public enum MQTTDestinationEnable {
         emittedAt: String,
         identity: TLSIdentity? = nil,
         pinPolicy: PinPolicy = .leaf,
-        canaryCode: String = "OHE1-MQTT"
+        canaryCode: String = "OHE1-MQTT",
+        meteredPolicy: MeteredNetworkPolicy = .refuseMetered,
+        pathConditions: NetworkPathConditions = .clear
     ) async throws -> MQTTDestinationProbe {
         let prepared = try await prepare(
             destination: destination,
@@ -34,7 +36,9 @@ public enum MQTTDestinationEnable {
             emittedAt: emittedAt,
             identity: identity,
             pinPolicy: pinPolicy,
-            canaryCode: canaryCode
+            canaryCode: canaryCode,
+            meteredPolicy: meteredPolicy,
+            pathConditions: pathConditions
         )
         guard prepared.report.allowsEnablement else {
             throw SetupError.verificationRequired
@@ -74,7 +78,9 @@ public enum MQTTDestinationEnable {
         emittedAt: String,
         identity: TLSIdentity? = nil,
         pinPolicy: PinPolicy = .leaf,
-        canaryCode: String = "OHE1-MQTT"
+        canaryCode: String = "OHE1-MQTT",
+        meteredPolicy: MeteredNetworkPolicy = .refuseMetered,
+        pathConditions: NetworkPathConditions = .clear
     ) async throws -> (
         destination: VerifiedDestination,
         events: [TrustEvent],
@@ -89,7 +95,9 @@ public enum MQTTDestinationEnable {
             emittedAt: emittedAt,
             identity: identity,
             pinPolicy: pinPolicy,
-            canaryCode: canaryCode
+            canaryCode: canaryCode,
+            meteredPolicy: meteredPolicy,
+            pathConditions: pathConditions
         )
         let committed = try commit(probe: probe, pipe: pipe)
         return (
@@ -118,13 +126,16 @@ public enum MQTTDestinationEnable {
         emittedAt: String,
         identity: TLSIdentity?,
         pinPolicy: PinPolicy,
-        canaryCode: String
+        canaryCode: String,
+        meteredPolicy: MeteredNetworkPolicy,
+        pathConditions: NetworkPathConditions
     ) async throws -> (
         setup: DestinationSetup,
         identity: TLSIdentity?,
         preview: Data,
         report: DestinationTestReport
     ) {
+        try MeteredNetworkGate.require(path: pathConditions, policy: meteredPolicy)
         let canary = try NativeWire.encodeCanary(
             code: canaryCode,
             batchID: BatchID(rawValue: "00000000-0000-4000-8000-000000000090"),

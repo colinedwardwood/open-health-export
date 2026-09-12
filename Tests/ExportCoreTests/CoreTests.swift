@@ -588,6 +588,7 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
         (RunTally(terminalError: .deviceLocked), .blockedDeviceLocked),
         (RunTally(terminalError: .localNetworkDenied), .localNetworkDenied),
         (RunTally(terminalError: .lowPowerMode), .blockedLowPower),
+        (RunTally(terminalError: .awaitingUnmetered), .blockedUnmetered),
     ]
     #expect(Set(cases.map(\.1)) == Set(RunOutcome.Kind.allCases))
     for (tally, kind) in cases {
@@ -1548,6 +1549,15 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     )
     #expect(locked.consecutiveFailures == 4)
     #expect(locked.state == .closed)
+
+    let unmetered = RetryPolicy.record(
+        .failed(.awaitingUnmetered),
+        snapshot: prior,
+        now: now,
+        jitter: 0
+    )
+    #expect(unmetered.consecutiveFailures == 4)
+    #expect(unmetered.state == .closed)
 
     let snapshot = DestinationStatusSnapshot(
         destinationID: "archive",
@@ -4798,6 +4808,40 @@ private func anchorHoldFixture(
     #expect(harness.contains("deferForThermal: isThermalDeferred()"))
     #expect(harness.contains("thermalState"))
     #expect(harness.components(separatedBy: "try await applyQueueRedIfNeeded(").count - 1 == 4)
+}
+
+@Test func meteredNetworkOptInIsOffByDefaultOnEveryOutboundHealthPath() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let harness = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift"),
+        encoding: .utf8
+    )
+    #expect(harness.contains("allowsMeteredNetwork(destinationID:"))
+    #expect(harness.contains("NetworkPathMonitorCache.conditions()"))
+    for destinationID in ["https", "mqtt", "companion", "otlp"] {
+        #expect(
+            harness.contains("allowsMeteredNetwork(destinationID: \"\(destinationID)\")"),
+            "missing metered opt-in for \(destinationID)"
+        )
+    }
+    for relative in [
+        "Sources/SinkHTTP/HTTPSSink.swift",
+        "Sources/SinkMQTT/MQTTSink.swift",
+        "Sources/SinkCompanion/CompanionSink.swift",
+        "Sources/OTLPExport/OTLPExporter.swift",
+        "Sources/SinkHTTP/HTTPSDestinationEnable.swift",
+        "Sources/SinkMQTT/MQTTDestinationEnable.swift",
+        "Sources/SinkCompanion/CompanionDestinationEnable.swift",
+    ] {
+        let source = try String(contentsOf: root.appendingPathComponent(relative), encoding: .utf8)
+        #expect(
+            source.contains("MeteredNetworkGate.require"),
+            "missing metered gate in \(relative)"
+        )
+    }
 }
 
 @Test func privacyGateCannotEnterBackgroundExportOrDeliveryPaths() throws {

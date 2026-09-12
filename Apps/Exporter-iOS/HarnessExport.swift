@@ -244,6 +244,14 @@ enum HarnessExport {
         }
     }
 
+    static func allowsMeteredNetwork(destinationID: String) -> Bool {
+        UserDefaults.standard.bool(forKey: "ohe.\(destinationID).allowsMeteredNetwork")
+    }
+
+    static func networkPathConditions() -> NetworkPathConditions {
+        NetworkPathMonitorCache.conditions()
+    }
+
     static func destinationScope(_ destinationID: String) async throws -> DestinationExportScope {
         let root = try applicationSupportRoot()
         let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
@@ -1032,7 +1040,9 @@ enum HarnessExport {
                 deliveryPipe: deliveryPipe,
                 installationID: session.localInstallationID,
                 testReport: saved.report,
-                traceparent: emission
+                traceparent: emission,
+                meteredPolicy: .fromAllowsMetered(allowsMeteredNetwork(destinationID: "companion")),
+                pathConditions: networkPathConditions()
             )
         } else {
             let testPipe = ByteStreamCompanionPipe(
@@ -1043,7 +1053,9 @@ enum HarnessExport {
                 deliveryPipe: deliveryPipe,
                 installationID: session.localInstallationID,
                 emittedAt: Date().ISO8601Format(),
-                traceparent: emission
+                traceparent: emission,
+                meteredPolicy: .fromAllowsMetered(allowsMeteredNetwork(destinationID: "companion")),
+                pathConditions: networkPathConditions()
             )
             verified = completed.destination
             let record = CompanionVerificationRecord(
@@ -1559,7 +1571,9 @@ enum HarnessExport {
             destination: destination,
             transport: transport,
             exporterID: try installationID(),
-            emittedAt: now
+            emittedAt: now,
+            meteredPolicy: .fromAllowsMetered(allowsMeteredNetwork(destinationID: "https")),
+            pathConditions: networkPathConditions()
         )
         await PendingDestination.shared.setHTTPS(PendingHTTPS(
             probe: probe,
@@ -1687,7 +1701,9 @@ enum HarnessExport {
             destination: destination,
             pipe: sink.pipe,
             exporterID: try installationID(),
-            emittedAt: now
+            emittedAt: now,
+            meteredPolicy: .fromAllowsMetered(allowsMeteredNetwork(destinationID: "mqtt")),
+            pathConditions: networkPathConditions()
         )
         await PendingDestination.shared.setMQTT(PendingMQTT(
             probe: probe,
@@ -1842,7 +1858,9 @@ enum HarnessExport {
         } else {
             pin = nil
         }
-        let sink = try MQTTSink.overNetwork(destination: destination, pin: pin)
+        var sink = try MQTTSink.overNetwork(destination: destination, pin: pin)
+        sink.meteredPolicy = .fromAllowsMetered(allowsMeteredNetwork(destinationID: "mqtt"))
+        sink.pathConditions = networkPathConditions()
         var setup = DestinationSetup()
         try setup.resumeEnabled(testReport: saved.report)
         let verified = try setup.enable(sink: sink)
@@ -1981,7 +1999,9 @@ enum HarnessExport {
             sink: HTTPSSink(
                 destination: destination,
                 transport: transport,
-                traceparent: emission
+                traceparent: emission,
+                meteredPolicy: .fromAllowsMetered(allowsMeteredNetwork(destinationID: "https")),
+                pathConditions: networkPathConditions()
             )
         )
         let store = try SQLiteStateStore(
@@ -2411,7 +2431,9 @@ enum HarnessExport {
         do {
             let exporter = OTLPExporter(
                 settings: settings,
-                transport: transport
+                transport: transport,
+                meteredPolicy: .fromAllowsMetered(allowsMeteredNetwork(destinationID: "otlp")),
+                pathConditions: networkPathConditions()
             )
             let metricsPosted: Bool
             if metricDestinations.isEmpty {

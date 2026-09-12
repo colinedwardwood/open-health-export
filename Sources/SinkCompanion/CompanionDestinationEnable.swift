@@ -15,12 +15,15 @@ public enum CompanionDestinationEnable {
         installationID: String,
         emittedAt: String,
         canaryCode: String = "OHE1-COMP",
-        traceparent: TraceparentEmission? = nil
+        traceparent: TraceparentEmission? = nil,
+        meteredPolicy: MeteredNetworkPolicy = .refuseMetered,
+        pathConditions: NetworkPathConditions = .clear
     ) async throws -> (
         destination: VerifiedDestination,
         events: [TrustEvent],
         report: DestinationTestReport
     ) {
+        try MeteredNetworkGate.require(path: pathConditions, policy: meteredPolicy)
         let batchID = "00000000-0000-4000-8000-000000000002"
         let preview = try NativeWire.encodeCanary(
             code: canaryCode,
@@ -48,7 +51,9 @@ public enum CompanionDestinationEnable {
             sink: CompanionSink(
                 pipe: deliveryPipe,
                 installationID: installationID,
-                traceparent: traceparent
+                traceparent: traceparent,
+                meteredPolicy: meteredPolicy,
+                pathConditions: pathConditions
             )
         )
         return (destination, setup.drainEvents(), report)
@@ -58,7 +63,9 @@ public enum CompanionDestinationEnable {
         deliveryPipe: any CompanionBytePipe,
         installationID: String,
         testReport: DestinationTestReport,
-        traceparent: TraceparentEmission? = nil
+        traceparent: TraceparentEmission? = nil,
+        meteredPolicy: MeteredNetworkPolicy = .refuseMetered,
+        pathConditions: NetworkPathConditions = .clear
     ) throws -> VerifiedDestination {
         var setup = DestinationSetup()
         try setup.resumeEnabled(testReport: testReport)
@@ -66,7 +73,9 @@ public enum CompanionDestinationEnable {
             sink: CompanionSink(
                 pipe: deliveryPipe,
                 installationID: installationID,
-                traceparent: traceparent
+                traceparent: traceparent,
+                meteredPolicy: meteredPolicy,
+                pathConditions: pathConditions
             )
         )
     }

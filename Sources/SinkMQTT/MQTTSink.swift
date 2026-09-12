@@ -181,13 +181,23 @@ public actor MQTTSession {
 public struct MQTTSink: DestinationSink, Sendable {
     public var destination: MQTTDestination
     public var pipe: any MQTTBytePipe
+    public var meteredPolicy: MeteredNetworkPolicy
+    public var pathConditions: NetworkPathConditions
 
-    public init(destination: MQTTDestination, pipe: any MQTTBytePipe) {
+    public init(
+        destination: MQTTDestination,
+        pipe: any MQTTBytePipe,
+        meteredPolicy: MeteredNetworkPolicy = .refuseMetered,
+        pathConditions: NetworkPathConditions = .clear
+    ) {
         self.destination = destination
         self.pipe = pipe
+        self.meteredPolicy = meteredPolicy
+        self.pathConditions = pathConditions
     }
 
     public func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt {
+        try MeteredNetworkGate.require(path: pathConditions, policy: meteredPolicy)
         let file = URL(fileURLWithPath: fileHandle)
         let payload = try Data(contentsOf: file)
         let count = NativeWire.countRecords(in: String(decoding: payload, as: UTF8.self))

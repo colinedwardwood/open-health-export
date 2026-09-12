@@ -74,6 +74,7 @@ public enum UserFacingErrorArchetype: String, Sendable, Equatable, CaseIterable 
     case mqttQoS0
     case healthLocked
     case backgroundNeverRan
+    case waitingForUnmetered
     case zeroRecords
 }
 
@@ -98,6 +99,8 @@ extension UserFacingErrorArchetype {
             .hostUnresolvable
         case .budgetExhausted, .cancelledBySystem, .lowPowerMode:
             .backgroundNeverRan
+        case .awaitingUnmetered:
+            .waitingForUnmetered
         case .internalFault:
             .timeout
         case .none:
@@ -266,6 +269,13 @@ public struct UserFacingErrorObject: Sendable, Equatable {
                 "iOS decides when apps may run in the background and can skip us, especially in Low Power Mode or if Background App Refresh is off.",
                 "Turn on Settings → General → Background App Refresh for this app, or export now for exact timing.",
                 [.exportNow, .openBackgroundSettings]
+            )
+        case .waitingForUnmetered:
+            return (
+                "\(label) is waiting for Wi-Fi",
+                "This destination skips cellular and other metered networks.",
+                "Join Wi-Fi, or turn on Allow cellular and other metered networks for this destination.",
+                [.editDestination, .exportNow]
             )
         case .zeroRecords:
             return (

@@ -227,6 +227,49 @@ import WireFormat
     #expect(receipt.unconfirmed == 0)
 }
 
+@Test func mqttRefusesMeteredPathBeforeConnecting() async throws {
+    let (file, batchID) = try writeMQTTPayload()
+    let broker = LoopbackMQTTBroker()
+    let destination = try MQTTDestination(
+        urlString: "mqtts://broker.example:8883",
+        allowedHosts: ["broker.example"],
+        clientID: "c1",
+        topic: "ohe/health"
+    )
+    let sink = MQTTSink(
+        destination: destination,
+        pipe: broker,
+        meteredPolicy: .refuseMetered,
+        pathConditions: NetworkPathConditions(isExpensive: true, isConstrained: false)
+    )
+    await #expect(throws: DestinationSendError.awaitingUnmetered) {
+        _ = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
+    }
+    #expect(await broker.lastConnectFlags == nil)
+}
+
+@Test func mqttEnableProbeRefusesMeteredPathBeforeConnect() async throws {
+    let broker = LoopbackMQTTBroker()
+    let destination = try MQTTDestination(
+        urlString: "mqtt://broker.example:1883",
+        allowedHosts: ["broker.example"],
+        allowInsecure: true,
+        clientID: "c1",
+        topic: "ohe/health"
+    )
+    await #expect(throws: DestinationSendError.awaitingUnmetered) {
+        _ = try await MQTTDestinationEnable.probe(
+            destination: destination,
+            pipe: broker,
+            exporterID: "00000000-0000-4000-8000-000000000090",
+            emittedAt: "2026-01-01T00:00:00Z",
+            meteredPolicy: .refuseMetered,
+            pathConditions: NetworkPathConditions(isExpensive: true, isConstrained: false)
+        )
+    }
+    #expect(await broker.lastConnectFlags == nil)
+}
+
 @Test func mqttQoS0IsUnknownAckOnTheEngine() async throws {
     let metric = MetricID(rawValue: "heartRate")
     let page = SamplePage(

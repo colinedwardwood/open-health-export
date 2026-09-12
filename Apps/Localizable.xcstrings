@@ -211,6 +211,17 @@
         }
       }
     },
+    "Allow cellular and other metered networks": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow cellular and other metered networks"
+          }
+        }
+      }
+    },
     "Allow plain HTTP (unsafe)": {
       "extractionState": "manual",
       "localizations": {
@@ -1296,6 +1307,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "OTLP collector URL"
+          }
+        }
+      }
+    },
+    "Off by default. Exports wait for Wi-Fi unless you turn this on.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Off by default. Exports wait for Wi-Fi unless you turn this on."
           }
         }
       }

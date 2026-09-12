@@ -436,6 +436,7 @@ public enum ErrorClass: String, Sendable, Codable, CaseIterable {
     case internalFault
     case healthDataRestricted
     case lowPowerMode
+    case awaitingUnmetered
 }
 
 public struct RunTally: Sendable, Equatable {
@@ -485,6 +486,7 @@ public struct RunOutcome: Sendable, Equatable, CustomStringConvertible {
         case blockedDeviceLocked
         case localNetworkDenied
         case blockedLowPower
+        case blockedUnmetered
     }
 
     public let kind: Kind
@@ -521,6 +523,9 @@ public struct RunOutcome: Sendable, Equatable, CustomStringConvertible {
         }
         if tally.terminalError == .lowPowerMode {
             return RunOutcome(kind: .blockedLowPower)
+        }
+        if tally.terminalError == .awaitingUnmetered {
+            return RunOutcome(kind: .blockedUnmetered)
         }
         if tally.terminalError == .destinationUnreachable
             || tally.terminalError == .internalFault
