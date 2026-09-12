@@ -93,6 +93,7 @@ jobs:
           # A single retry covers the launch timeouts that remain: they come from the
           # simulator, not the app, and a case that genuinely fails still fails twice.
           # The result bundle keeps the first attempt either way.
+          # shellcheck disable=SC2046
           xcodebuild test-without-building \
             -xctestrun "$RUNNER_TEMP"/products/*.xctestrun \
             -destination "platform=iOS Simulator,id=${DESTINATION_ID}" \

@@ -82,14 +82,14 @@ jobs:
         run: |
           swift run wirefuzz --iterations 200000
           swift run wirefuzz --seed 0x1 --iterations 200000
-          swift run wirefuzz --seed $(date +%s) --iterations 200000
+          swift run wirefuzz --seed "$(date +%s)" --iterations 200000
       - name: Reference receiver HTTP surface
         run: |
           swift run receiver serve --port 18080 --seed spec/v1.0.0/fixtures/receiver-sequence.ndjson &
           pid=$!
           trap 'kill $pid 2>/dev/null || true' EXIT
           ok=0
-          for i in $(seq 1 40); do
+          for _ in $(seq 1 40); do
             if curl -fsS http://127.0.0.1:18080/health >/dev/null; then
               ok=1
               break

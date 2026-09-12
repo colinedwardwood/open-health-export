@@ -27,7 +27,7 @@ jobs:
             -p 1883:1883 \
             -v "$PWD/spec/v1.0.0/fixtures/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf" \
             eclipse-mosquitto:2.0.22
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             python3 -c 'import socket;s=socket.create_connection(("127.0.0.1",1883),2);s.close()' && exit 0
             sleep 1
           done
@@ -55,7 +55,7 @@ jobs:
             -p 8123:8123 \
             -v "$PWD/spec/v1.0.0/fixtures/ha-ci:/config" \
             ghcr.io/home-assistant/home-assistant:2026.8.3
-          for i in $(seq 1 90); do
+          for _ in $(seq 1 90); do
             curl -fsS http://127.0.0.1:8123/api/onboarding >/dev/null && exit 0
             sleep 2
           done
@@ -85,7 +85,7 @@ jobs:
             -p 8123:8123 \
             -v "$PWD/spec/v1.0.0/fixtures/ha-ci:/config" \
             ghcr.io/home-assistant/home-assistant:2025.9.4
-          for i in $(seq 1 90); do
+          for _ in $(seq 1 90); do
             curl -fsS http://127.0.0.1:8123/api/onboarding >/dev/null && exit 0
             sleep 2
           done
@@ -110,7 +110,7 @@ jobs:
             -p 4318:4318 \
             -v "$PWD/spec/v1.0.0/fixtures/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro" \
             otel/opentelemetry-collector-contrib:0.160.0
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             nc -z 127.0.0.1 4318 && exit 0
             sleep 1
           done
@@ -121,7 +121,7 @@ jobs:
           OHE_OTLP_ENDPOINT: http://127.0.0.1:4318/v1/traces
         run: |
           swift run otlpcontract
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             if docker logs ohe-otel 2>&1 | grep -q 'Name[[:space:]]*: export.run'; then
               exit 0
             fi
