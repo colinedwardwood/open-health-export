@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import CoreDomain
 import EnginePorts
 import Foundation
 
@@ -37,6 +38,10 @@ public enum CatchUpAdmission {
     public static let parkedJournalDetail = "catch_up_parked"
     /// I6: destination still broken; catch-up waits instead of occupying the live queue.
     public static let destinationParkedJournalDetail = "breaker_open"
+    /// UX-21: Low Power Mode parks catch-up instead of reading HealthKit.
+    public static let lowPowerParkedJournalDetail = ErrorClass.lowPowerMode.rawValue
+    /// I6: thermal state ≥ serious parks backfill until the device cools.
+    public static let thermalParkedJournalDetail = "thermal"
 
     public static func allows(
         queuedBytes: Int,

@@ -235,6 +235,15 @@ enum HarnessExport {
         ProcessInfo.processInfo.isLowPowerModeEnabled
     }
 
+    static func isThermalDeferred() -> Bool {
+        switch ProcessInfo.processInfo.thermalState {
+        case .serious, .critical:
+            return true
+        default:
+            return false
+        }
+    }
+
     static func destinationScope(_ destinationID: String) async throws -> DestinationExportScope {
         let root = try applicationSupportRoot()
         let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
@@ -800,7 +809,9 @@ enum HarnessExport {
         let job = BackfillJob(
             checkpointURL: checkpointURL,
             processor: processor,
-            store: store
+            store: store,
+            deferForLowPower: isLowPowerDeferred(),
+            deferForThermal: isThermalDeferred()
         )
         if !FileManager.default.fileExists(atPath: checkpointURL.path) {
             let hostModel = await UIDevice.current.model
@@ -821,6 +832,15 @@ enum HarnessExport {
         }
         let completed = try await job.run(onProgress: onProgress)
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+        if let parked = completed.progress.pausedReason {
+            return [
+                "\(mode.rawValue) backfill parked",
+                parked,
+                "Samples read: \(completed.progress.samplesRead)",
+                "Batches enqueued: \(completed.progress.batchesEnqueued)",
+                "Checkpoint: \(checkpointURL.path)",
+            ]
+        }
         return [
             "\(mode.rawValue) backfill complete",
             "Samples read: \(completed.progress.samplesRead)",

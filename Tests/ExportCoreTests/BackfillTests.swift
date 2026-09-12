@@ -148,6 +148,39 @@ private func backfillCheckpoint(
     #expect(await processor.recordedDays().isEmpty)
 }
 
+@Test func backfillParksOnLowPowerAndThermalWithoutReadingADay() async throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-backfill-park-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: url) }
+    let lowPowerProcessor = RecordingBackfillProcessor()
+    let lowPower = BackfillJob(
+        checkpointURL: url,
+        processor: lowPowerProcessor,
+        clock: FrozenClock(instant: Date(timeIntervalSince1970: 1)),
+        deferForLowPower: true
+    )
+    try await lowPower.create(try backfillCheckpoint())
+    let lowPowerPaused = try await lowPower.run()
+    #expect(lowPowerPaused.progress.pausedReason == CatchUpAdmission.lowPowerParkedJournalDetail)
+    #expect(lowPowerPaused.progress.completed[0].days.isEmpty)
+    #expect(await lowPowerProcessor.recordedDays().isEmpty)
+
+    let thermalURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-backfill-thermal-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: thermalURL) }
+    let thermalProcessor = RecordingBackfillProcessor()
+    let thermal = BackfillJob(
+        checkpointURL: thermalURL,
+        processor: thermalProcessor,
+        clock: FrozenClock(instant: Date(timeIntervalSince1970: 1)),
+        deferForThermal: true
+    )
+    try await thermal.create(try backfillCheckpoint())
+    let thermalPaused = try await thermal.run()
+    #expect(thermalPaused.progress.pausedReason == CatchUpAdmission.thermalParkedJournalDetail)
+    #expect(await thermalProcessor.recordedDays().isEmpty)
+}
+
 @Test func firstRunBackfillDefaultsToAggregateOnlyAndRawIsExplicit() throws {
     #expect(try backfillCheckpoint().plan.mode == .aggregateOnly)
     #expect(try backfillCheckpoint(mode: .raw).plan.mode == .raw)

@@ -217,17 +217,23 @@ public struct BackfillJob: Sendable {
     public var processor: any BackfillChunkProcessor
     public var clock: any Clock
     public var store: (any StateStore)?
+    public var deferForLowPower: Bool
+    public var deferForThermal: Bool
 
     public init(
         checkpointURL: URL,
         processor: any BackfillChunkProcessor,
         clock: any Clock = SystemClock(),
-        store: (any StateStore)? = nil
+        store: (any StateStore)? = nil,
+        deferForLowPower: Bool = false,
+        deferForThermal: Bool = false
     ) {
         self.checkpointURL = checkpointURL
         self.processor = processor
         self.clock = clock
         self.store = store
+        self.deferForLowPower = deferForLowPower
+        self.deferForThermal = deferForThermal
     }
 
     public func create(_ checkpoint: BackfillCheckpoint) async throws {
@@ -242,6 +248,11 @@ public struct BackfillJob: Sendable {
         onProgress: (@Sendable (String) async -> Void)? = nil
     ) async throws -> BackfillCheckpoint {
         var checkpoint = try await load()
+        if let parked = parkReason() {
+            checkpoint.progress.pausedReason = parked
+            try await persist(&checkpoint)
+            return checkpoint
+        }
         let days = try ReconcilePlanner.days(
             from: checkpoint.plan.windowStartDay,
             through: checkpoint.plan.windowEndDay
@@ -336,6 +347,12 @@ public struct BackfillJob: Sendable {
         checkpoint.progress.pausedReason = nil
         try await persist(&checkpoint)
         return checkpoint
+    }
+
+    private func parkReason() -> String? {
+        if deferForLowPower { return CatchUpAdmission.lowPowerParkedJournalDetail }
+        if deferForThermal { return CatchUpAdmission.thermalParkedJournalDetail }
+        return nil
     }
 
     private func load() async throws -> BackfillCheckpoint {

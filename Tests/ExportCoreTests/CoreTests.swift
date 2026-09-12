@@ -4756,6 +4756,9 @@ private func anchorHoldFixture(
     #expect(harness.contains("ScheduledReconcile.due"))
     #expect(harness.contains("trigger == .appForeground || trigger == .launch"))
     #expect(harness.contains("applyQueueRedIfNeeded"))
+    #expect(harness.contains("deferForLowPower: isLowPowerDeferred()"))
+    #expect(harness.contains("deferForThermal: isThermalDeferred()"))
+    #expect(harness.contains("thermalState"))
     #expect(harness.components(separatedBy: "try await applyQueueRedIfNeeded(").count - 1 == 4)
 }
 

@@ -1987,7 +1987,7 @@ struct HarnessView: View {
             }
             refreshDestinationSurfaces()
             await refreshLedgerIntegrity()
-            status = "Ready. Foreground backfill completed."
+            status = backfillFinishedStatus(results)
         } catch {
             await HarnessExport.notifyDestinationFailure(
                 destinationID: "local-file",
@@ -1996,6 +1996,25 @@ struct HarnessView: View {
             status = "Failed: \(error.localizedDescription)"
         }
         phase = .ready
+    }
+
+    private func backfillFinishedStatus(_ results: [String]) -> String {
+        if results.contains(where: { $0.hasSuffix("backfill parked") }) {
+            if results.contains(CatchUpAdmission.lowPowerParkedJournalDetail) {
+                return "Ready. Backfill is paused while Low Power Mode is on."
+            }
+            if results.contains(CatchUpAdmission.thermalParkedJournalDetail) {
+                return "Ready. Backfill is paused while your iPhone cools down."
+            }
+            if results.contains(CatchUpAdmission.parkedJournalDetail) {
+                return "Ready. Backfill is paused until queued work drains."
+            }
+            if results.contains(CatchUpAdmission.destinationParkedJournalDetail) {
+                return "Ready. Backfill is paused until the destination recovers."
+            }
+            return "Ready. Backfill is paused."
+        }
+        return "Ready. Foreground backfill completed."
     }
 
     @MainActor
