@@ -593,27 +593,49 @@ public enum HealthKitSourceError: Error, Sendable {
 }
 
 public enum HealthKitAuthorization {
-    public static func readTypes(for metrics: [MetricID]) -> Set<HKObjectType> {
-        var types: Set<HKObjectType> = []
-        for metric in metrics {
-            if let type = SampleConversion.quantityType(for: metric) {
-                types.insert(type)
-            } else if let type = CategoryConversion.categoryType(for: metric) {
-                types.insert(type)
-            } else if let type = CorrelationConversion.correlationType(for: metric) {
-                types.insert(type)
-            } else if metric == WorkoutConversion.metric {
-                types.insert(HKWorkoutType.workoutType())
-            } else if metric == ECGConversion.metric {
-                types.insert(HKObjectType.electrocardiogramType())
-            } else if metric == AudiogramConversion.metric {
-                types.insert(HKObjectType.audiogramSampleType())
-            } else if #available(iOS 18.0, macOS 15.0, *),
-                      metric == StateOfMindConversion.metric {
-                types.insert(HKObjectType.stateOfMindType())
-            }
+    public static func objectType(for metric: MetricID) -> HKObjectType? {
+        if let type = SampleConversion.quantityType(for: metric) {
+            return type
         }
-        return types
+        if let type = CategoryConversion.categoryType(for: metric) {
+            return type
+        }
+        if let type = CorrelationConversion.correlationType(for: metric) {
+            return type
+        }
+        if metric == WorkoutConversion.metric {
+            return HKWorkoutType.workoutType()
+        }
+        if metric == ECGConversion.metric {
+            return HKObjectType.electrocardiogramType()
+        }
+        if metric == AudiogramConversion.metric {
+            return HKObjectType.audiogramSampleType()
+        }
+        if #available(iOS 18.0, macOS 15.0, *), metric == StateOfMindConversion.metric {
+            return HKObjectType.stateOfMindType()
+        }
+        return nil
+    }
+
+    public static func readTypes(for metrics: [MetricID]) -> Set<HKObjectType> {
+        Set(metrics.compactMap(objectType(for:)))
+    }
+
+    /// UX-05: limited history is the only positively detectable HealthKit read
+    /// restriction. This SDK does not yet declare `earliestAuthorizedSampleDate(for:)`,
+    /// so the probe returns no dates and the classifier uses sample counts until
+    /// the selector ships.
+    public static func earliestAuthorizedDays(
+        for metrics: [MetricID],
+        store: HKHealthStore = HKHealthStore(),
+        context: TemporalContext = .utc
+    ) async throws -> [MetricID: String] {
+        guard HKHealthStore.isHealthDataAvailable() else { return [:] }
+        // Documented HealthKit API: earliestAuthorizedSampleDate(for:). This
+        // SDK does not declare it yet; mapped types stay ready for the call.
+        _ = (store, context, metrics.compactMap(objectType(for:)))
+        return [:]
     }
 
     public static func requestReadAccess(

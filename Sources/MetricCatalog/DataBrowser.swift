@@ -50,6 +50,7 @@ public struct DataBrowserRow: Sendable, Equatable, Identifiable {
     public var exported: Bool
     public var sensitive: Bool
     public var hasData: Bool
+    public var coverage: CoverageState?
 
     public init(
         metric: MetricID,
@@ -57,7 +58,8 @@ public struct DataBrowserRow: Sendable, Equatable, Identifiable {
         subtitle: String,
         exported: Bool,
         sensitive: Bool,
-        hasData: Bool
+        hasData: Bool,
+        coverage: CoverageState? = nil
     ) {
         self.metric = metric
         self.title = title
@@ -65,6 +67,7 @@ public struct DataBrowserRow: Sendable, Equatable, Identifiable {
         self.exported = exported
         self.sensitive = sensitive
         self.hasData = hasData
+        self.coverage = coverage
     }
 }
 
@@ -219,6 +222,10 @@ public enum DataBrowser {
     public static let emptyDetailCopy =
         "No samples for this type on this iPhone. Either there aren't any, or access is off in Health. "
             + healthPathCopy
+    /// UX-05 third state: zero samples and no limited-window date. Neutral, not a warning.
+    public static let nothingReturnedCopy =
+        "Nothing returned. Either Health has no data for this type, or access is off. "
+            + healthPathCopy
 
     public static func horizonCopy(day: String) -> String {
         "Deletions older than \(day) are not attributed to a day until a full reconcile."
@@ -229,14 +236,19 @@ public enum DataBrowser {
         exported: Set<MetricID> = [],
         search: String = "",
         onlyWithData: Bool = false,
-        displayUnits: UnitDisplayPolicy = .canonical
+        displayUnits: UnitDisplayPolicy = .canonical,
+        coverage: [MetricID: CoverageObservation] = [:]
     ) -> [DataBrowserRow] {
         let needle = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return MetricCatalog.selectable.compactMap { declaration in
             let title = declaration.wireId.replacingOccurrences(of: "_", with: " ")
             let sample = latest[declaration.id]
+            let observation = coverage[declaration.id]
+            let state = observation.map(CoverageClassification.classify)
             let subtitle: String
-            if let sample {
+            if let state {
+                subtitle = CoverageClassification.subtitle(state)
+            } else if let sample {
                 let display = displayMeasurement(
                     sample.value,
                     unit: declaration.wireUnit,
@@ -247,13 +259,24 @@ public enum DataBrowser {
             } else {
                 subtitle = noDataCopy
             }
+            let hasData: Bool
+            if let state {
+                if case .nothingReturned = state {
+                    hasData = false
+                } else {
+                    hasData = true
+                }
+            } else {
+                hasData = sample != nil
+            }
             let row = DataBrowserRow(
                 metric: declaration.id,
                 title: title,
                 subtitle: subtitle,
                 exported: exported.contains(declaration.id),
                 sensitive: declaration.sensitivity == .sensitive,
-                hasData: sample != nil
+                hasData: hasData,
+                coverage: state
             )
             if onlyWithData, !row.hasData { return nil }
             if needle.isEmpty { return row }

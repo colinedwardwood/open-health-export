@@ -182,6 +182,23 @@ import WireFormat
     )
 }
 
+@Test func coverageWindowProbeNamesTheDocumentedLimitedHistoryAPI() async throws {
+    let source = try String(
+        contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/HealthKitSource/HealthKitSampleSource.swift"),
+        encoding: .utf8
+    )
+    #expect(source.contains("earliestAuthorizedSampleDate(for:)"))
+    #expect(HealthKitAuthorization.objectType(for: MetricCatalog.heartRate.id) == HKQuantityType(.heartRate))
+    let days = try await HealthKitAuthorization.earliestAuthorizedDays(
+        for: [MetricCatalog.heartRate.id]
+    )
+    #expect(days.isEmpty)
+}
+
 @Test func structuredHealthKitTypesAreAuthorizedAndStateOfMindConverts() {
     let readTypes = HealthKitAuthorization.readTypes(
         for: [

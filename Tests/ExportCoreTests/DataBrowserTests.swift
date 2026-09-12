@@ -105,7 +105,64 @@ private func browserSample(
     for claim in ["denied", "denial", "not authorised", "not authorized", "no permission"] {
         #expect(!copy.lowercased().contains(claim))
         #expect(!DataBrowser.noDataCopy.lowercased().contains(claim))
+        #expect(!DataBrowser.nothingReturnedCopy.lowercased().contains(claim))
     }
+}
+
+@Test func coverageCheckClassifiesAvailableLimitedAndNothingReturned() throws {
+    let available = CoverageObservation(
+        sampleCount: 4812,
+        latestStart: "2026-09-12T08:41:00Z"
+    )
+    let limited = CoverageObservation(
+        sampleCount: 4,
+        latestStart: "2026-08-02T00:00:00Z",
+        earliestAuthorizedDay: "2026-08-01"
+    )
+    let empty = CoverageObservation()
+    #expect(CoverageClassification.classify(available) == .dataAvailable(
+        sampleCount: 4812,
+        latestStart: "2026-09-12T08:41:00Z"
+    ))
+    #expect(CoverageClassification.classify(limited) == .limitedWindow(
+        earliestAuthorizedDay: "2026-08-01",
+        sampleCount: 4,
+        latestStart: "2026-08-02T00:00:00Z"
+    ))
+    #expect(CoverageClassification.classify(empty) == .nothingReturned)
+
+    let heart = MetricCatalog.heartRate.id
+    let steps = MetricCatalog.stepCount.id
+    let glucose = MetricCatalog.bloodGlucose.id
+    let rows = DataBrowser.rows(
+        latest: [:],
+        coverage: [
+            heart: limited,
+            steps: available,
+            glucose: empty,
+        ]
+    )
+    let byID = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0) })
+    #expect(byID[heart]?.coverage == CoverageClassification.classify(limited))
+    #expect(byID[heart]?.subtitle.contains("2026-08-01") == true)
+    #expect(byID[heart]?.hasData == true)
+    #expect(byID[steps]?.subtitle == "4812 samples, latest 2026-09-12T08:41:00Z")
+    #expect(byID[glucose]?.subtitle == DataBrowser.nothingReturnedCopy)
+    #expect(byID[glucose]?.hasData == false)
+    #expect(
+        DataBrowser.rows(
+            latest: [:],
+            onlyWithData: true,
+            coverage: [heart: limited, glucose: empty]
+        ).map(\.id).contains(heart)
+    )
+    #expect(
+        !DataBrowser.rows(
+            latest: [:],
+            onlyWithData: true,
+            coverage: [glucose: empty]
+        ).map(\.id).contains(glucose)
+    )
 }
 
 @Test func selectionReviewRequiresSensitiveIndividualConfirmation() throws {

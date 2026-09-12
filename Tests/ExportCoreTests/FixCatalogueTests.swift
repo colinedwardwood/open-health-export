@@ -627,6 +627,31 @@ enum FixWitness {
         )
         #expect(!status.disabled)
         #expect(status.reason == "history_clipped")
+        let limited = CoverageClassification.classify(
+            sampleCount: 3,
+            latestStart: "2026-08-02T00:00:00Z",
+            earliestAuthorizedDay: "2026-08-01"
+        )
+        #expect(
+            limited == .limitedWindow(
+                earliestAuthorizedDay: "2026-08-01",
+                sampleCount: 3,
+                latestStart: "2026-08-02T00:00:00Z"
+            )
+        )
+        let copy = CoverageClassification.subtitle(limited)
+        #expect(copy.contains("2026-08-01"))
+        #expect(copy.contains("stay in Health"))
+        #expect(!copy.lowercased().contains("denied"))
+        #expect(!copy.contains("can't"))
+        #expect(
+            CoverageClassification.classify(sampleCount: 12, latestStart: "2026-09-01T08:41:00Z", earliestAuthorizedDay: nil)
+                == .dataAvailable(sampleCount: 12, latestStart: "2026-09-01T08:41:00Z")
+        )
+        #expect(
+            CoverageClassification.classify(sampleCount: 0, latestStart: nil, earliestAuthorizedDay: nil)
+                == .nothingReturned
+        )
     }
 
     static func a03() throws {

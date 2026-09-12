@@ -103,6 +103,7 @@ struct HarnessView: View {
     @State private var pendingSensitiveMetric: MetricID?
     @State private var sensitiveDestinationConfirmation = ""
     @State private var liveBrowserSamples: [MetricID: [SampleRecord]] = [:]
+    @State private var browserAuthorizedDays: [MetricID: String] = [:]
     @State private var browserSentThroughDay: [MetricID: String] = [:]
     @State private var browserIndexHorizonDay: String?
     @State private var browserLoadingHealth = false
@@ -332,6 +333,7 @@ struct HarnessView: View {
                 }
                 #endif
                 await refreshQueueGaps()
+                await refreshCoverageWindows()
                 if disclosureAcknowledged,
                    !foregroundCatchUpStarted,
                    HarnessExport.isLocalFileEnabled() {
@@ -359,6 +361,7 @@ struct HarnessView: View {
                 try? await HarnessExport.recordNotificationSuppressionIfNeeded()
                 await startHealthObserversIfEligible()
                 await refreshSecurityAdvisory()
+                await refreshCoverageWindows()
             }
         }
         .onChange(of: advisoryEnabled) {
@@ -1335,12 +1338,14 @@ struct HarnessView: View {
             }
         )
         let latest = browserDemoMode ? demoLatest : liveLatest
+        let coverage = browserDemoMode ? [:] : browserCoverageObservations()
         let rows = DataBrowser.rows(
             latest: latest,
             exported: browserSelection,
             search: browserSearch,
             onlyWithData: browserOnlyWithData && !browserSelecting,
-            displayUnits: displayUnitPolicy
+            displayUnits: displayUnitPolicy,
+            coverage: coverage
         )
         let selectedDetail = selectedBrowserMetric.flatMap { metric in
             let live = liveBrowserSamples[metric]
@@ -1657,6 +1662,35 @@ struct HarnessView: View {
         return records
     }
 
+    private func browserCoverageObservations() -> [MetricID: CoverageObservation] {
+        var observations: [MetricID: CoverageObservation] = [:]
+        let metrics = Set(liveBrowserSamples.keys).union(browserAuthorizedDays.keys).union(browserSelection)
+        for metric in metrics {
+            let samples = liveBrowserSamples[metric] ?? []
+            let latest = samples.max { $0.start < $1.start }
+            observations[metric] = CoverageObservation(
+                sampleCount: samples.count,
+                latestStart: latest?.start,
+                earliestAuthorizedDay: browserAuthorizedDays[metric]
+            )
+        }
+        return observations
+    }
+
+    @MainActor
+    private func refreshCoverageWindows(metrics: [MetricID]? = nil) async {
+        let probed = metrics ?? Array(browserSelection.union(Set(liveBrowserSamples.keys)))
+        guard !probed.isEmpty else { return }
+        do {
+            let days = try await HealthKitAuthorization.earliestAuthorizedDays(for: probed)
+            for metric in probed {
+                browserAuthorizedDays[metric] = days[metric]
+            }
+        } catch {
+            return
+        }
+    }
+
     @MainActor
     private func loadBrowserSamples(metric: MetricID) async {
         browserLoadingHealth = true
@@ -1694,9 +1728,13 @@ struct HarnessView: View {
             }
             liveBrowserSamples[metric] = loaded
             await refreshSentThroughDay(metric)
+            await refreshCoverageWindows(metrics: [metric])
+            let state = CoverageClassification.classify(
+                browserCoverageObservations()[metric] ?? CoverageObservation(sampleCount: loaded.count)
+            )
             status = loaded.isEmpty
                 ? DataBrowser.emptyDetailCopy
-                : "Loaded \(loaded.count) Health samples for comparison."
+                : CoverageClassification.subtitle(state)
         } catch {
             status = "Couldn't read this type. Health data may be locked; this usually resolves on its own."
         }
