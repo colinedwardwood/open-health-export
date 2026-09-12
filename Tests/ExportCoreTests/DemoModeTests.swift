@@ -131,6 +131,9 @@ import WireFormat
     #expect(kinds.isSubset(of: accounted))
     #expect(kinds.contains("sample.ecg"))
     #expect(kinds.contains("series.ecgVoltage"))
+    #expect(kinds.contains("series.heartbeat"))
+    #expect(kinds.contains("series.workoutRoute"))
+    #expect(kinds.contains("series.workoutMetric"))
 
     let parent = try volumeObject(at: 4, tier: .t0)
     let chunk = try volumeObject(at: 104, tier: .t0)
@@ -138,10 +141,26 @@ import WireFormat
     #expect(chunk["kind"] as? String == "series.ecgVoltage")
     #expect(chunk["parentUuid"] as? String == parent["uuid"] as? String)
 
+    let workout = try volumeObject(at: 2, tier: .t0)
+    let route = try volumeObject(at: 7, tier: .t0)
+    let metric = try volumeObject(at: 9, tier: .t0)
+    let heartbeat = try volumeObject(at: 8, tier: .t0)
+    #expect(workout["kind"] as? String == "workout")
+    #expect(route["kind"] as? String == "series.workoutRoute")
+    #expect(metric["kind"] as? String == "series.workoutMetric")
+    #expect(heartbeat["kind"] as? String == "series.heartbeat")
+    #expect(route["parentUuid"] as? String == workout["uuid"] as? String)
+    #expect(metric["parentUuid"] as? String == workout["uuid"] as? String)
+    #expect(heartbeat["parentUuid"] as? String == parent["uuid"] as? String)
+
     let t2Parent = try volumeKind(at: 20_000_004, tier: .t2)
     let t2Chunk = try volumeKind(at: 20_000_104, tier: .t2)
     #expect(t2Parent == "sample.ecg")
     #expect(t2Chunk == "series.ecgVoltage")
+    #expect(try volumeKind(at: 20_000_007, tier: .t2) == "series.workoutRoute")
+    #expect(try volumeKind(at: 20_000_008, tier: .t2) == "series.heartbeat")
+    #expect(try volumeKind(at: 20_000_009, tier: .t2) == "series.workoutMetric")
+    #expect(try volumeKind(at: 20_000_254, tier: .t2) == "tombstone")
 }
 
 private func volumeKind(at index: Int, tier: SyntheticCorpusTier) throws -> String {

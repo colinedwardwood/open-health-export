@@ -302,7 +302,7 @@ public enum DemoCorpus {
                         ),
                     ],
                     hasRoute: index % 200 == 2,
-                    seriesIncluded: index % 200 == 2 ? ["workoutRoute"] : [],
+                    seriesIncluded: index % 200 == 2 ? ["workoutRoute", "workoutMetric"] : [],
                     observedAt: sample.observedAt,
                     source: provenance.source,
                     device: provenance.device,
@@ -428,6 +428,80 @@ public enum DemoCorpus {
                     source: provenance.source,
                     device: provenance.device,
                     wasUserEntered: provenance.wasUserEntered
+                ),
+                envelope: envelope
+            )
+        case 7:
+            let parentIndex = (index / 100) * 100 + 2
+            let parent = Self.sample(
+                at: parentIndex,
+                seed: seed,
+                declaration: declaration(at: parentIndex, tier: tier),
+                tier: tier
+            )
+            return try NativeWire.encode(
+                SeriesRecord(
+                    parentUUID: fixtureUUID(family: 5, index: parentIndex),
+                    parentStart: parent.start,
+                    chunkIndex: 0,
+                    chunkCount: 1,
+                    startIndex: 0,
+                    payload: .workoutRoute(
+                        points: [
+                            WorkoutRoutePoint(
+                                timestamp: parent.start,
+                                latitude: 51.5073512,
+                                longitude: -0.1277585
+                            ),
+                        ]
+                    )
+                ),
+                envelope: envelope
+            )
+        case 8:
+            let parentIndex = (index / 200) * 200 + 4
+            let parent = Self.sample(
+                at: parentIndex,
+                seed: seed,
+                declaration: declaration(at: parentIndex, tier: tier),
+                tier: tier
+            )
+            return try NativeWire.encode(
+                SeriesRecord(
+                    parentUUID: fixtureUUID(family: 7, index: parentIndex),
+                    parentStart: parent.start,
+                    chunkIndex: 0,
+                    chunkCount: 1,
+                    startIndex: 0,
+                    payload: .heartbeat(
+                        intervalsMs: [800, 790, 810],
+                        precededByGap: [false, false, true]
+                    )
+                ),
+                envelope: envelope
+            )
+        case 9:
+            let parentIndex = (index / 100) * 100 + 2
+            let parent = Self.sample(
+                at: parentIndex,
+                seed: seed,
+                declaration: declaration(at: parentIndex, tier: tier),
+                tier: tier
+            )
+            return try NativeWire.encode(
+                SeriesRecord(
+                    parentUUID: fixtureUUID(family: 5, index: parentIndex),
+                    parentStart: parent.start,
+                    chunkIndex: 0,
+                    chunkCount: 1,
+                    startIndex: 0,
+                    payload: .workoutMetric(
+                        metricId: "heart_rate",
+                        unit: "count/min",
+                        points: [
+                            SeriesMetricPoint(timestamp: parent.start, value: 128)
+                        ]
+                    )
                 ),
                 envelope: envelope
             )
