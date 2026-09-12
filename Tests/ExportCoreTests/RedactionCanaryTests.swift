@@ -2,13 +2,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import CoreDomain
+import CorrectnessEngine
 import DestinationTrust
 import DiagnosticBundle
 import EnginePorts
 import Foundation
 import MetricCatalog
 import Redaction
+import SinkLocalFile
+import StorageSQLite
 import Testing
+import TestSupport
 import WireFormat
 
 @Test func redactionSinkRegistryMatchesTheCommittedCanaryList() {
@@ -94,6 +98,66 @@ import WireFormat
     )
     let text = try #require(String(data: data, encoding: .utf8))
     #expect(RedactionCanary.isClean(text), "production assembler leaked \(RedactionCanary.leaks(in: text))")
+}
+
+@Test func p12CheckpointAndJournalOmitSampleCanaries() async throws {
+    let metric = MetricCatalog.heartRate.id
+    var sample = heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa51")
+    sample.value = 72.123456
+    sample.source = SampleSourceIdentity(name: RedactionCanary.sourceName)
+    sample.device = SampleDevice(name: RedactionCanary.hostname)
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-p12-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let destination = root.appendingPathComponent("destination")
+    try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+    let database = root.appendingPathComponent("state.sqlite")
+    let store = try SQLiteStateStore(path: database.path)
+    let outcome = try await ExportRun(
+        source: FixtureSource(
+            pages: [
+                SamplePage(
+                    samples: [sample],
+                    tombstones: [],
+                    metric: metric,
+                    anchorBlob: Data("hk-anchor".utf8),
+                    observedThrough: Date(timeIntervalSince1970: 0)
+                )
+            ]
+        ),
+        destination: .testing(LocalFileSink(directory: destination)),
+        store: store,
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    ).run()
+    #expect(outcome.kind == .success)
+
+    let cursor = try #require(try await store.transact { try $0.loadCursor(metric: metric) })
+    let anchorText = String(decoding: cursor.anchorBlob, as: UTF8.self)
+    #expect(RedactionCanary.isClean(anchorText))
+    #expect(!anchorText.contains(sample.key.uuid))
+
+    var sqliteBytes = Data()
+    for suffix in ["", "-wal", "-shm"] {
+        let url = URL(fileURLWithPath: database.path + suffix)
+        if FileManager.default.fileExists(atPath: url.path) {
+            sqliteBytes.append(try Data(contentsOf: url))
+        }
+    }
+    let sqliteText = String(decoding: sqliteBytes, as: UTF8.self)
+    #expect(
+        RedactionCanary.isClean(sqliteText),
+        "managed SQLite leaked \(RedactionCanary.leaks(in: sqliteText))"
+    )
+
+    let journal = try await store.transact { try $0.loadJournal() }
+    #expect(!journal.isEmpty)
+    for event in journal {
+        #expect(RedactionCanary.isClean(event.detail))
+        #expect(RedactionCanary.isClean(event.outcomeKind))
+        #expect(RedactionCanary.isClean(event.errorClass ?? ""))
+    }
 }
 
 @Test(arguments: LeakMutant.allCases)
