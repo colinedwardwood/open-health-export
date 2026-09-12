@@ -1,6 +1,6 @@
 # Stage 3/4 scope audit
 
-Audit date: 2026-09-11.
+Audit date: 2026-09-12.
 
 This file separates repository-complete engineering work from evidence that cannot be produced honestly without hardware, elapsed time, external accounts, another maintainer, publication, or legal review. “Repository complete” does not mean release-ready.
 
@@ -21,9 +21,16 @@ This file separates repository-complete engineering work from evidence that cann
 
 Tier-1 remote `ExportRun` (10 million records, 100 MiB RSS) succeeded on
 https://github.com/colinedwardwood/open-health-export/actions/runs/34667824738.
-Tier-2 failed on that same run when `exportruncheck` rejected T2 `tombstone`
-records; that accounting hole is in the working tree and must go green on a
-later `nightly-volume` run before T2 is treated as verified.
+
+T2 tombstone accounting is on `main` (`volumeStructuralKinds` includes `tombstone`;
+`exportruncheck --page-size 10000`). The verification run is
+https://github.com/colinedwardwood/open-health-export/actions/runs/34697618358
+(dispatched on `cd652d6`, which already contains that fix). T2 is not verified
+until that job, or a later `nightly-volume` run on `main`, concludes success.
+
+Weekly mutation (`qa/mutants.json`) and flake-quarantine skip citations are
+wired. Darwin-only mutants skip on Linux. Home Assistant `currentStable` is
+`2026.9.2` after the latest-stable contract passed.
 
 T2 remains CI evidence, not physical-device evidence.
 

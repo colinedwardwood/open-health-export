@@ -1402,6 +1402,12 @@ struct PolicyCheck {
                 FileHandle.standardError.write(Data("QA-33: \(ident) find and replace are identical\n".utf8))
                 exit(1)
             }
+            if let host = mutant["host"] as? String, host != "darwin", host != "linux" {
+                FileHandle.standardError.write(
+                    Data("QA-33: \(ident) host must be darwin or linux\n".utf8)
+                )
+                exit(1)
+            }
             let source = try String(contentsOf: root.appendingPathComponent(file), encoding: .utf8)
             let occurrences = source.components(separatedBy: find).count - 1
             if occurrences != 1 {
