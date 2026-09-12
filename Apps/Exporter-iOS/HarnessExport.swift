@@ -646,7 +646,8 @@ enum HarnessExport {
     }
 
     static func runFullReconcile(
-        metrics: [MetricID]? = nil
+        metrics: [MetricID]? = nil,
+        onProgress: (@Sendable (Int, Int) async -> Void)? = nil
     ) async throws -> [String] {
         let scope = try await destinationScope("local-file")
         try ExportScopeGate.requireConfigured(scope)
@@ -675,7 +676,8 @@ enum HarnessExport {
         let exporterID = try installationID()
         let seal = ledgerHeadSeal()
         var lines: [String] = []
-        for metric in metrics {
+        for (index, metric) in metrics.enumerated() {
+            await onProgress?(index + 1, metrics.count)
             let outcome = try await ReconcileSweep(
                 observations: observations,
                 destination: verified,
@@ -710,7 +712,10 @@ enum HarnessExport {
         return lines
     }
 
-    static func runBackfill(mode: BackfillMode) async throws -> [String] {
+    static func runBackfill(
+        mode: BackfillMode,
+        onProgress: (@Sendable (String) async -> Void)? = nil
+    ) async throws -> [String] {
         let root = try applicationSupportRoot()
         let destinationDirectory = try protectedPayloadDirectory(named: "exports", under: root)
         let scratch = try protectedPayloadDirectory(named: "backfill-scratch", under: root)
@@ -786,7 +791,7 @@ enum HarnessExport {
                 )
             )
         }
-        let completed = try await job.run()
+        let completed = try await job.run(onProgress: onProgress)
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
         return [
             "\(mode.rawValue) backfill complete",

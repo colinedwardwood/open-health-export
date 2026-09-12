@@ -238,13 +238,16 @@ public struct BackfillJob: Sendable {
     }
 
     @discardableResult
-    public func run() async throws -> BackfillCheckpoint {
+    public func run(
+        onProgress: (@Sendable (String) async -> Void)? = nil
+    ) async throws -> BackfillCheckpoint {
         var checkpoint = try await load()
         let days = try ReconcilePlanner.days(
             from: checkpoint.plan.windowStartDay,
             through: checkpoint.plan.windowEndDay
         ).reversed()
         let allDays = Array(days)
+        let typeCount = checkpoint.plan.metrics.count
 
         for (metricIndex, metric) in checkpoint.plan.metrics.enumerated() {
             let completed = Set(
@@ -252,6 +255,16 @@ public struct BackfillJob: Sendable {
             )
             for day in allDays where !completed.contains(day) {
                 try Task.checkCancellation()
+                if let dayIndex = allDays.firstIndex(of: day) {
+                    await onProgress?(
+                        NamedWorkProgress.backfill(
+                            day: dayIndex + 1,
+                            days: allDays.count,
+                            type: metricIndex + 1,
+                            types: typeCount
+                        )
+                    )
+                }
                 if let store {
                     let queued = try await store.transact { try $0.queuedBytes() }
                     if !CatchUpAdmission.allows(queuedBytes: queued) {

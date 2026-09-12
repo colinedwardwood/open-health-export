@@ -185,3 +185,30 @@ private func backfillCheckpoint(
         _ = try await job.run()
     }
 }
+
+@Test func backfillProgressNamesDayAndTypeTotals() async throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-backfill-progress-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: url) }
+    let processor = RecordingBackfillProcessor()
+    let job = BackfillJob(
+        checkpointURL: url,
+        processor: processor,
+        clock: FrozenClock(instant: Date(timeIntervalSince1970: 1))
+    )
+    try await job.create(try backfillCheckpoint())
+    let log = ProgressLog()
+    _ = try await job.run { line in
+        await log.add(line)
+    }
+    let lines = await log.snapshot()
+    #expect(lines.contains("Reading day 1 of 3 · type 1 of 1"))
+    #expect(lines.contains("Reading day 3 of 3 · type 1 of 1"))
+    #expect(NamedWorkProgress.reconcile(current: 2, total: 5) == "Reconciling 2 of 5 types")
+}
+
+private actor ProgressLog {
+    private var lines: [String] = []
+    func add(_ line: String) { lines.append(line) }
+    func snapshot() -> [String] { lines }
+}

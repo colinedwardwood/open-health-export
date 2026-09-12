@@ -1914,10 +1914,14 @@ struct HarnessView: View {
     @MainActor
     private func runFullReconcile() async {
         phase = .working
-        status = "Working: full Health history reconciliation."
+        status = NamedWorkProgress.reconcile(current: 0, total: 1)
         results = []
         do {
-            results = try await HarnessExport.runFullReconcile()
+            results = try await HarnessExport.runFullReconcile { current, total in
+                await MainActor.run {
+                    status = NamedWorkProgress.reconcile(current: current, total: total)
+                }
+            }
             refreshDestinationSurfaces()
             await refreshLedgerIntegrity()
             status = "Ready. Full reconciliation finished without advancing anchored cursors."
@@ -1934,9 +1938,7 @@ struct HarnessView: View {
     @MainActor
     private func runBackfill(mode: BackfillMode) async {
         phase = .working
-        status = mode == .raw
-            ? "Working: preparing explicit raw-history backfill."
-            : "Working: preparing aggregate-only history backfill."
+        status = NamedWorkProgress.backfill(day: 0, days: 1, type: 0, types: 1)
         results = []
         do {
             if try ContinuedBackfillCoordinator.submit(mode: mode) {
@@ -1946,7 +1948,11 @@ struct HarnessView: View {
             }
             UIApplication.shared.isIdleTimerDisabled = true
             defer { UIApplication.shared.isIdleTimerDisabled = false }
-            results = try await HarnessExport.runBackfill(mode: mode)
+            results = try await HarnessExport.runBackfill(mode: mode) { line in
+                await MainActor.run {
+                    status = line
+                }
+            }
             refreshDestinationSurfaces()
             await refreshLedgerIntegrity()
             status = "Ready. Foreground backfill completed."
