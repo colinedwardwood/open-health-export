@@ -177,7 +177,7 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
             return .partial
         case "failed":
             return .failing
-        case "blockedDeviceLocked", "abandonedNoBudget", "cancelledBySystem":
+        case "blockedDeviceLocked", "abandonedNoBudget", "cancelledBySystem", "blockedLowPower":
             return .deferred
         case "localNetworkDenied":
             return .blocked

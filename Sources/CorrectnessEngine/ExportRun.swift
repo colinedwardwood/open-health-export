@@ -34,6 +34,7 @@ public struct ExportRun: Sendable {
     public var replaySampleLimit: Int
     /// UX-22: C, the owned freshness cadence that drives stale and overdue windows.
     public var freshnessCadenceSeconds: TimeInterval
+    public var deferForLowPower: Bool
     #if DEBUG
     public var faults: any ExportFaultInjector = NoExportFaults()
     #endif
@@ -58,7 +59,8 @@ public struct ExportRun: Sendable {
         ledgerSealURL: URL? = nil,
         scope: DestinationExportScope? = nil,
         replaySampleLimit: Int = AnchorGuard.implausibleDeltaSamples,
-        freshnessCadenceSeconds: TimeInterval = FreshnessTarget.defaultCadenceSeconds
+        freshnessCadenceSeconds: TimeInterval = FreshnessTarget.defaultCadenceSeconds,
+        deferForLowPower: Bool = false
     ) {
         self.source = source
         self.destination = destination
@@ -80,6 +82,7 @@ public struct ExportRun: Sendable {
         self.scope = scope
         self.replaySampleLimit = replaySampleLimit
         self.freshnessCadenceSeconds = freshnessCadenceSeconds
+        self.deferForLowPower = deferForLowPower
     }
 
     public func run() async throws -> RunOutcome {
@@ -98,6 +101,16 @@ public struct ExportRun: Sendable {
         }
         if let scope {
             try ExportScopeGate.require(metric: metric, scope: scope)
+        }
+        if deferForLowPower {
+            let tally = RunTally(
+                failed: 1,
+                terminalError: .lowPowerMode,
+                partialCause: ErrorClass.lowPowerMode.rawValue
+            )
+            let outcome = RunOutcome.derive(from: tally)
+            try await record(outcome: outcome, tally: tally, receipt: nil, startedAt: startedAt)
+            return outcome
         }
         let typeStatus = try await store.transact {
             try $0.loadTypeStatus(metric: metric)
@@ -168,7 +181,10 @@ public struct ExportRun: Sendable {
             )
             let outcome = RunOutcome.derive(from: tally)
             try await record(outcome: outcome, tally: tally, receipt: nil, startedAt: startedAt)
-            if errorClass == .deviceLocked || errorClass == .healthDataRestricted {
+            if errorClass == .deviceLocked
+                || errorClass == .healthDataRestricted
+                || errorClass == .lowPowerMode
+            {
                 return outcome
             }
             throw error

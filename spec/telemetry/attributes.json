@@ -28,7 +28,8 @@
         "abandonedNoBudget",
         "cancelledBySystem",
         "blockedDeviceLocked",
-        "localNetworkDenied"
+        "localNetworkDenied",
+        "blockedLowPower"
       ],
       "justification": "Projects the closed journal outcome without free-form detail."
     },

@@ -90,6 +90,7 @@ public enum WakeAttribution {
         if lastJournal.outcomeKind == "success"
             || lastJournal.outcomeKind == "successNothingDue"
             || lastJournal.outcomeKind == "blockedDeviceLocked"
+            || lastJournal.outcomeKind == "blockedLowPower"
         {
             return .none
         }

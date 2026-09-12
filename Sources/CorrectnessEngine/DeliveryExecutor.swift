@@ -145,7 +145,7 @@ enum DeliveryExecutor {
             return .transientNetwork
         case .localNetworkDenied:
             return .auth
-        case .cancelledBySystem, .budgetExhausted, .deviceLocked:
+        case .cancelledBySystem, .budgetExhausted, .deviceLocked, .lowPowerMode:
             return .storeLocked
         case .healthDataRestricted:
             return .auth

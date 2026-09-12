@@ -66,6 +66,7 @@ import Testing
     #expect(UserFacingErrorArchetype.fromErrorClass(.healthDataRestricted) == .healthLocked)
     #expect(UserFacingErrorArchetype.fromErrorClass(.destinationUnreachable) == .hostUnresolvable)
     #expect(UserFacingErrorArchetype.fromErrorClass(.budgetExhausted) == .backgroundNeverRan)
+    #expect(UserFacingErrorArchetype.fromErrorClass(.lowPowerMode) == .backgroundNeverRan)
     #expect(UserFacingErrorArchetype.fromErrorClass(.internalFault) == .timeout)
     #expect(UserFacingErrorArchetype.fromErrorClass(.none) == nil)
     #expect(

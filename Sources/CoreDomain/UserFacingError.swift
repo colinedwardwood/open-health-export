@@ -96,7 +96,7 @@ extension UserFacingErrorArchetype {
             .healthLocked
         case .destinationUnreachable, .localNetworkDenied:
             .hostUnresolvable
-        case .budgetExhausted, .cancelledBySystem:
+        case .budgetExhausted, .cancelledBySystem, .lowPowerMode:
             .backgroundNeverRan
         case .internalFault:
             .timeout

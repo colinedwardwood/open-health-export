@@ -37,6 +37,7 @@ public struct ReconcileSweep: Sendable {
     public var ledgerSealURL: URL?
     public var scope: DestinationExportScope?
     public var freshnessCadenceSeconds: TimeInterval
+    public var deferForLowPower: Bool
 
     public init(
         observations: any DayObservationSource,
@@ -55,7 +56,8 @@ public struct ReconcileSweep: Sendable {
         ledgerHeadSeal: (any LedgerHeadSeal)? = nil,
         ledgerSealURL: URL? = nil,
         scope: DestinationExportScope? = nil,
-        freshnessCadenceSeconds: TimeInterval = FreshnessTarget.defaultCadenceSeconds
+        freshnessCadenceSeconds: TimeInterval = FreshnessTarget.defaultCadenceSeconds,
+        deferForLowPower: Bool = false
     ) {
         self.observations = observations
         self.destination = destination
@@ -74,6 +76,7 @@ public struct ReconcileSweep: Sendable {
         self.ledgerSealURL = ledgerSealURL
         self.scope = scope
         self.freshnessCadenceSeconds = freshnessCadenceSeconds
+        self.deferForLowPower = deferForLowPower
     }
 
     public func run(throughDay: String) async throws -> RunOutcome {
@@ -145,6 +148,16 @@ public struct ReconcileSweep: Sendable {
         reason: String,
         includeRaw: Bool = true
     ) async throws -> RunOutcome {
+        if deferForLowPower {
+            let tally = RunTally(
+                failed: 1,
+                terminalError: .lowPowerMode,
+                partialCause: ErrorClass.lowPowerMode.rawValue
+            )
+            let outcome = RunOutcome.derive(from: tally)
+            try await record(outcome: outcome, tally: tally, receipt: nil)
+            return outcome
+        }
         var permittedDays = days
         if let scope {
             try ExportScopeGate.require(metric: metric, scope: scope)

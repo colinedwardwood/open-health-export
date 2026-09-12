@@ -75,6 +75,33 @@ private struct DeviceLockedSource: SampleSource {
     #expect(store.transaction.pending.isEmpty)
 }
 
+@Test func lowPowerModeParksExportAsDeferredWithoutReadingHealth() async throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-low-power-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = MemoryStateStore()
+    let snapshotURL = root.appendingPathComponent("status.json")
+    let run = ExportRun(
+        source: DeviceLockedSource(),
+        destination: .testing(LocalFileSink(directory: root)),
+        store: store,
+        metric: MetricCatalog.heartRate.id,
+        scratchDirectory: root,
+        envelope: testEnvelope(),
+        trigger: .bgProcessing,
+        snapshotURL: snapshotURL,
+        deferForLowPower: true
+    )
+    let outcome = try await run.run()
+    #expect(outcome.kind == .blockedLowPower)
+    let event = try #require(store.transaction.journal.last)
+    #expect(event.outcomeKind == RunOutcome.Kind.blockedLowPower.rawValue)
+    #expect(event.errorClass == ErrorClass.lowPowerMode.rawValue)
+    let snapshot = try DestinationSnapshotFile.read(from: snapshotURL)
+    #expect(snapshot.state == .deferred)
+    #expect(snapshot.errorClass == ErrorClass.lowPowerMode.rawValue)
+}
+
 private struct HealthDataRestrictedSource: SampleSource {
     func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage {
         throw DestinationSendError.healthDataRestricted
@@ -560,6 +587,7 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
         (RunTally(terminalError: .cancelledBySystem), .cancelledBySystem),
         (RunTally(terminalError: .deviceLocked), .blockedDeviceLocked),
         (RunTally(terminalError: .localNetworkDenied), .localNetworkDenied),
+        (RunTally(terminalError: .lowPowerMode), .blockedLowPower),
     ]
     #expect(Set(cases.map(\.1)) == Set(RunOutcome.Kind.allCases))
     for (tally, kind) in cases {

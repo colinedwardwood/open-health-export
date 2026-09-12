@@ -100,6 +100,16 @@ public enum ErrorClassManifest {
                 scheduleFailure: false,
                 r88P1: false
             )
+        case .lowPowerMode:
+            return ErrorClassRecord(
+                userCopyKey: "error.lowPowerMode",
+                userFacingCopy: "Low Power Mode is on, so iOS is holding this export. It will retry when Low Power Mode is off.",
+                retryable: true,
+                blocksEnablement: false,
+                ledgerKind: "schedule",
+                scheduleFailure: true,
+                r88P1: false
+            )
         }
     }
 
