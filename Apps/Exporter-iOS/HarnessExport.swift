@@ -441,6 +441,11 @@ enum HarnessExport {
                 scope: scope
             )
             let outcome = try await run.run()
+            await notifyIfFailed(
+                outcome,
+                destinationID: "local-file",
+                destinationLabel: "Archive folder"
+            )
             WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
             lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
             if (outcome.kind == .success || outcome.kind == .successNothingDue),
@@ -471,6 +476,11 @@ enum HarnessExport {
                 scope: scope
             )
             let reconciled = try await reconcile.run(throughDay: String(now.prefix(10)))
+            await notifyIfFailed(
+                reconciled,
+                destinationID: "local-file",
+                destinationLabel: "Archive folder"
+            )
             lines.append("\(metric.rawValue) reconcile: \(reconciled.kind.rawValue)")
             if (reconciled.kind == .success || reconciled.kind == .successNothingDue),
                let snapshotURL {
@@ -497,6 +507,31 @@ enum HarnessExport {
             return
         }
         _ = try? await LocalUserNotifier().rescheduleExportOverdue(snapshot: snapshot)
+    }
+
+    private static func notifyIfFailed(
+        _ outcome: RunOutcome,
+        destinationID: String,
+        destinationLabel: String
+    ) async {
+        guard outcome.kind == .failed else { return }
+        await notifyDestinationFailure(
+            destinationID: destinationID,
+            destinationLabel: destinationLabel
+        )
+    }
+
+    static func notifyDestinationFailure(
+        destinationID: String,
+        destinationLabel: String
+    ) async {
+        _ = try? await LocalUserNotifier().notify(
+            UserNotice(
+                kind: .exportFailed,
+                destinationID: destinationID,
+                destination: destinationLabel
+            )
+        )
     }
 
     static func runFullReconcile(
@@ -552,6 +587,11 @@ enum HarnessExport {
                 ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
                 scope: scope
             ).runFullHistory(throughDay: String(now.prefix(10)))
+            await notifyIfFailed(
+                outcome,
+                destinationID: "local-file",
+                destinationLabel: "Archive folder"
+            )
             lines.append("\(metric.rawValue) full reconcile: \(outcome.kind.rawValue)")
         }
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
@@ -882,6 +922,11 @@ enum HarnessExport {
                 scope: scope
             )
             let outcome = try await run.run()
+            await notifyIfFailed(
+                outcome,
+                destinationID: "companion",
+                destinationLabel: "Mac companion"
+            )
             WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
             lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
         }
@@ -1603,6 +1648,11 @@ enum HarnessExport {
                 ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
                 scope: scope
             ).run()
+            await notifyIfFailed(
+                outcome,
+                destinationID: "mqtt",
+                destinationLabel: "MQTT destination"
+            )
             lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
         }
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
@@ -1700,6 +1750,11 @@ enum HarnessExport {
                 ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
                 scope: scope
             ).run()
+            await notifyIfFailed(
+                outcome,
+                destinationID: "https",
+                destinationLabel: "HTTPS destination"
+            )
             lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
         }
         if emission.autoDisabled {

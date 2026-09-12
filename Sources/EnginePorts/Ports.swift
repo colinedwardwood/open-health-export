@@ -511,23 +511,27 @@ public struct UserNotice: Sendable, Equatable {
         case destinationTrustLost
         case queueEvicted
         case queueExpired
+        case exportFailed
         case exportOverdue
         case healthAccessRevoked
         case anchorInvalidated
     }
 
     public var kind: Kind
+    public var destinationID: String
     public var destination: String
     public var fingerprint: String?
     public var previousFingerprint: String?
 
     public init(
         kind: Kind,
+        destinationID: String? = nil,
         destination: String,
         fingerprint: String? = nil,
         previousFingerprint: String? = nil
     ) {
         self.kind = kind
+        self.destinationID = destinationID ?? destination
         self.destination = destination
         self.fingerprint = fingerprint
         self.previousFingerprint = previousFingerprint
@@ -538,6 +542,7 @@ public struct UserNotice: Sendable, Equatable {
 public enum NoticeDelivery: Sendable, Equatable {
     case posted
     case skippedAuthorizationDenied
+    case skippedRateLimited
     case notRequired
 }
 

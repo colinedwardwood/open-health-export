@@ -83,6 +83,7 @@ public enum Escalation {
                 inAppCopy: EscalationCopy.overdue,
                 notification: UserNotice(
                     kind: .exportOverdue,
+                    destinationID: snapshot.destinationID,
                     destination: snapshot.destinationLabel
                 ),
                 widgetEntries: entries,

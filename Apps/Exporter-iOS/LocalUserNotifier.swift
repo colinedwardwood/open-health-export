@@ -3,8 +3,33 @@
 
 import DestinationTrust
 import EnginePorts
+import Foundation
 import UserNotifications
 import Watchdog
+
+private actor NotificationCooldowns {
+    static let shared = NotificationCooldowns()
+    private let defaultsKey = "ohe.notificationCooldown.v1"
+
+    func claim(_ notice: UserNotice, nowEpoch: TimeInterval) -> Bool {
+        var state = UserDefaults.standard.data(forKey: defaultsKey)
+            .flatMap { try? JSONDecoder().decode(NotificationRateLimitState.self, from: $0) }
+            ?? NotificationRateLimitState()
+        let allowed = NotificationRateLimit.claim(
+            kind: notice.kind,
+            destinationID: notice.destinationID,
+            nowEpoch: nowEpoch,
+            state: &state
+        )
+        if allowed,
+           NotificationRateLimit.isFailureKind(notice.kind),
+           let encoded = try? JSONEncoder().encode(state)
+        {
+            UserDefaults.standard.set(encoded, forKey: defaultsKey)
+        }
+        return allowed
+    }
+}
 
 /// Platform R-40 notifier. Copy is resolved from `NoticeCopy`, never composed here.
 final class LocalUserNotifier: UserNotifier, Sendable {
@@ -18,12 +43,25 @@ final class LocalUserNotifier: UserNotifier, Sendable {
         let center = UNUserNotificationCenter.current()
         let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge])
         guard granted else { return .skippedAuthorizationDenied }
+        guard await NotificationCooldowns.shared.claim(
+            notice,
+            nowEpoch: Date().timeIntervalSince1970
+        ) else {
+            return .skippedRateLimited
+        }
         let content = UNMutableNotificationContent()
         content.title = copy.title
         content.body = copy.body
-        content.threadIdentifier = notice.kind.rawValue
+        content.threadIdentifier = "dest.\(notice.destinationID)"
+        content.userInfo = [
+            "notification_policy_version": 1,
+            "destination_id": notice.destinationID,
+        ]
+        let identifier = NotificationRateLimit.isFailureKind(notice.kind)
+            ? "failure.\(notice.destinationID)"
+            : "\(notice.kind.rawValue).\(notice.destinationID)"
         let request = UNNotificationRequest(
-            identifier: "\(notice.kind.rawValue).\(notice.destination)",
+            identifier: identifier,
             content: content,
             trigger: nil
         )
@@ -51,13 +89,18 @@ final class LocalUserNotifier: UserNotifier, Sendable {
         let copy = NoticeCopy.render(
             UserNotice(
                 kind: .exportOverdue,
+                destinationID: snapshot.destinationID,
                 destination: snapshot.destinationLabel
             )
         )
         let content = UNMutableNotificationContent()
         content.title = copy.title
         content.body = copy.body
-        content.threadIdentifier = UserNotice.Kind.exportOverdue.rawValue
+        content.threadIdentifier = "dest.\(snapshot.destinationID)"
+        content.userInfo = [
+            "notification_policy_version": 1,
+            "destination_id": snapshot.destinationID,
+        ]
         let delay = max(1, fireEpoch - now.timeIntervalSince1970)
         try await center.add(
             UNNotificationRequest(

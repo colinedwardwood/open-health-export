@@ -169,6 +169,10 @@ enum BackgroundTaskCoordinator {
                 }
                 task.setTaskCompleted(success: true)
             } catch {
+                await HarnessExport.notifyDestinationFailure(
+                    destinationID: "local-file",
+                    destinationLabel: "Archive folder"
+                )
                 task.setTaskCompleted(success: false)
             }
             submit()

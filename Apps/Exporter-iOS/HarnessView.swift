@@ -1705,6 +1705,10 @@ struct HarnessView: View {
             await refreshQueueGaps()
             status = "Ready. Local export finished. Outcome kinds are engine-derived, not assigned by this screen."
         } catch {
+            await HarnessExport.notifyDestinationFailure(
+                destinationID: "local-file",
+                destinationLabel: "Archive folder"
+            )
             status = "Failed: \(error.localizedDescription)"
         }
         phase = .ready
@@ -1721,6 +1725,10 @@ struct HarnessView: View {
             await refreshLedgerIntegrity()
             status = "Ready. Full reconciliation finished without advancing anchored cursors."
         } catch {
+            await HarnessExport.notifyDestinationFailure(
+                destinationID: "local-file",
+                destinationLabel: "Archive folder"
+            )
             status = "Failed: \(error.localizedDescription)"
         }
         phase = .ready
@@ -1746,6 +1754,10 @@ struct HarnessView: View {
             await refreshLedgerIntegrity()
             status = "Ready. Foreground backfill completed."
         } catch {
+            await HarnessExport.notifyDestinationFailure(
+                destinationID: "local-file",
+                destinationLabel: "Archive folder"
+            )
             status = "Failed: \(error.localizedDescription)"
         }
         phase = .ready
@@ -2094,6 +2106,10 @@ struct HarnessView: View {
             await refreshWakeAttribution()
             status = "Ready. MQTT export finished."
         } catch {
+            await HarnessExport.notifyDestinationFailure(
+                destinationID: "mqtt",
+                destinationLabel: "MQTT destination"
+            )
             status = "Failed: \(error.localizedDescription)"
         }
         phase = .ready
@@ -2110,6 +2126,10 @@ struct HarnessView: View {
             await refreshWakeAttribution()
             status = "Ready. HTTPS export finished."
         } catch {
+            await HarnessExport.notifyDestinationFailure(
+                destinationID: "https",
+                destinationLabel: "HTTPS destination"
+            )
             status = "Failed: \(error.localizedDescription)"
         }
         phase = .ready
@@ -2179,6 +2199,8 @@ struct HarnessView: View {
                 status = "Ready. The copy came from NoticeCopy, not this screen."
             case .skippedAuthorizationDenied:
                 status = "Ready. Notifications are off — the widget still escalates when export is overdue."
+            case .skippedRateLimited:
+                status = "Ready. A recent failure notification already covers this destination."
             case .notRequired:
                 status = "Ready."
             }
@@ -2225,6 +2247,10 @@ struct HarnessView: View {
             refreshDestinationSurfaces()
             status = "Ready. Companion export finished. Compare confirmation \(sas) with the Mac."
         } catch {
+            await HarnessExport.notifyDestinationFailure(
+                destinationID: "companion",
+                destinationLabel: "Mac companion"
+            )
             status = "Failed: \(error.localizedDescription)"
         }
         phase = .ready
