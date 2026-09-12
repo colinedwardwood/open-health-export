@@ -20,7 +20,19 @@ public struct KeychainSecretStore: SecretStore, Sendable {
         guard !handle.rawValue.isEmpty else { throw SecretStoreError.emptyHandle }
         guard !bytes.isEmpty else { throw SecretStoreError.emptySecret }
         try deleteIgnoringNotFound(handle)
-        let query: [String: Any] = [
+        let query = Self.storeQuery(bytes: bytes, handle: handle, service: service)
+        let status = SecItemAdd(query as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            throw SecretStoreError.notFound
+        }
+    }
+
+    static func storeQuery(
+        bytes: [UInt8],
+        handle: SecretHandle,
+        service: String
+    ) -> [String: Any] {
+        [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: handle.rawValue,
@@ -29,10 +41,6 @@ public struct KeychainSecretStore: SecretStore, Sendable {
             kSecUseDataProtectionKeychain as String: true,
             kSecValueData as String: Data(bytes),
         ]
-        let status = SecItemAdd(query as CFDictionary, nil)
-        guard status == errSecSuccess else {
-            throw SecretStoreError.notFound
-        }
     }
 
     public func load(_ handle: SecretHandle) async throws -> [UInt8] {

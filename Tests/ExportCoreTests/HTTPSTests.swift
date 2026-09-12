@@ -83,12 +83,12 @@ import WireFormat
         allowedHosts: ["ha.example"]
     )
     let sink = HTTPSSink(destination: destination, transport: receiver)
-    let first = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
-    let second = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
-    #expect(first.accepted == 1)
-    #expect(second.accepted == 1)
+    for replay in 1 ... 10 {
+        let receipt = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
+        #expect(receipt.accepted == 1, "replay \(replay)")
+    }
     #expect(await receiver.storedRows == 1)
-    #expect(await receiver.deliveries == 2)
+    #expect(await receiver.deliveries == 10)
 }
 
 private actor ConvergingHTTPReceiver: HTTPTransport {
