@@ -453,39 +453,31 @@ enum HarnessExport {
                 await rescheduleOverdueNotification(snapshotURL: snapshotURL)
             }
 
-            let reconcile = ReconcileSweep(
-                observations: observations,
-                destination: verified,
-                store: store,
-                metric: metric,
-                scratchDirectory: scratch,
-                destinationName: "local-file",
-                envelope: WireEnvelope(
-                    exporterId: exporterId,
-                    seq: 1,
-                    emittedAt: now,
-                    observedAt: now
-                ),
-                temporal: context,
-                statistics: statistics,
-                trigger: trigger,
-                snapshotURL: snapshotURL,
-                externalStatusURL: dest.appendingPathComponent("status.json"),
-                ledgerHeadSeal: ledgerSeal,
-                ledgerSealURL: ledgerSealURL,
-                scope: scope
+            lines.append(
+                try await trailingReconcileAfterDelta(
+                    observations: observations,
+                    destination: verified,
+                    store: store,
+                    metric: metric,
+                    scratchDirectory: scratch,
+                    destinationID: "local-file",
+                    destinationLabel: "Archive folder",
+                    envelope: WireEnvelope(
+                        exporterId: exporterId,
+                        seq: 1,
+                        emittedAt: now,
+                        observedAt: now
+                    ),
+                    temporal: context,
+                    statistics: statistics,
+                    trigger: trigger,
+                    snapshotURL: snapshotURL,
+                    externalStatusURL: dest.appendingPathComponent("status.json"),
+                    ledgerHeadSeal: ledgerSeal,
+                    ledgerSealURL: ledgerSealURL,
+                    scope: scope
+                )
             )
-            let reconciled = try await reconcile.run(throughDay: String(now.prefix(10)))
-            await notifyIfFailed(
-                reconciled,
-                destinationID: "local-file",
-                destinationLabel: "Archive folder"
-            )
-            lines.append("\(metric.rawValue) reconcile: \(reconciled.kind.rawValue)")
-            if (reconciled.kind == .success || reconciled.kind == .successNothingDue),
-               let snapshotURL {
-                await rescheduleOverdueNotification(snapshotURL: snapshotURL)
-            }
         }
         let newQueueGap = try await store.transact {
             try $0.loadGaps().contains {
@@ -500,6 +492,56 @@ enum HarnessExport {
         }
         lines.append("Files: \(dest.path)")
         return lines
+    }
+
+    /// R-08: every live destination run also applies the trailing seven-day sweep.
+    /// Delta ExportRun does not itself reconcile; leaving this only on the archive
+    /// folder would skip repair for HTTPS, MQTT, and the Mac companion.
+    private static func trailingReconcileAfterDelta(
+        observations: any DayObservationSource,
+        destination: VerifiedDestination,
+        store: any StateStore,
+        metric: MetricID,
+        scratchDirectory: URL,
+        destinationID: String,
+        destinationLabel: String,
+        envelope: WireEnvelope,
+        temporal: TemporalContext,
+        statistics: (any StatisticsSource)?,
+        trigger: RunTrigger,
+        snapshotURL: URL?,
+        externalStatusURL: URL? = nil,
+        ledgerHeadSeal: (any LedgerHeadSeal)?,
+        ledgerSealURL: URL?,
+        scope: DestinationExportScope?
+    ) async throws -> String {
+        let reconciled = try await ReconcileSweep(
+            observations: observations,
+            destination: destination,
+            store: store,
+            metric: metric,
+            scratchDirectory: scratchDirectory,
+            destinationName: destinationID,
+            envelope: envelope,
+            temporal: temporal,
+            statistics: statistics,
+            trigger: trigger,
+            snapshotURL: snapshotURL,
+            externalStatusURL: externalStatusURL,
+            ledgerHeadSeal: ledgerHeadSeal,
+            ledgerSealURL: ledgerSealURL,
+            scope: scope
+        ).run(throughDay: String(envelope.emittedAt.prefix(10)))
+        await notifyIfFailed(
+            reconciled,
+            destinationID: destinationID,
+            destinationLabel: destinationLabel
+        )
+        if (reconciled.kind == .success || reconciled.kind == .successNothingDue),
+           let snapshotURL {
+            await rescheduleOverdueNotification(snapshotURL: snapshotURL)
+        }
+        return "\(metric.rawValue) reconcile: \(reconciled.kind.rawValue)"
     }
 
     private static func rescheduleOverdueNotification(snapshotURL: URL) async {
@@ -936,6 +978,30 @@ enum HarnessExport {
             )
             WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
             lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
+            lines.append(
+                try await trailingReconcileAfterDelta(
+                    observations: observations,
+                    destination: verified,
+                    store: store,
+                    metric: metric,
+                    scratchDirectory: scratch,
+                    destinationID: "companion",
+                    destinationLabel: "Mac companion",
+                    envelope: WireEnvelope(
+                        exporterId: session.localInstallationID,
+                        seq: 1,
+                        emittedAt: now,
+                        observedAt: now
+                    ),
+                    temporal: context,
+                    statistics: statistics,
+                    trigger: .manual,
+                    snapshotURL: StatusSnapshotLocation.url(destinationID: "companion"),
+                    ledgerHeadSeal: ledgerSeal,
+                    ledgerSealURL: ledgerSealURL,
+                    scope: scope
+                )
+            )
         }
         if emission.autoDisabled {
             try setCompanionTraceparent(false)
@@ -1644,7 +1710,18 @@ enum HarnessExport {
             limit: 1000,
             window: HealthKitQueryWindow(scope: scope)
         )
+        let observations = HealthKitDayObservationSource(context: context)
+        let statistics = HealthKitStatisticsSource(context: context)
+        let snapshotURL = StatusSnapshotLocation.url(destinationID: "mqtt")
+        let ledgerSeal = ledgerHeadSeal()
+        let ledgerSealURL = root.appendingPathComponent("ledger-head-seal.json")
         for metric in scope.metrics.sorted(by: { $0.rawValue < $1.rawValue }) {
+            let envelope = WireEnvelope(
+                exporterId: exporterID,
+                seq: 1,
+                emittedAt: now,
+                observedAt: now
+            )
             let outcome = try await ExportRun(
                 source: source,
                 destination: verified,
@@ -1652,19 +1729,14 @@ enum HarnessExport {
                 metric: metric,
                 scratchDirectory: scratch,
                 destinationName: "mqtt",
-                envelope: WireEnvelope(
-                    exporterId: exporterID,
-                    seq: 1,
-                    emittedAt: now,
-                    observedAt: now
-                ),
+                envelope: envelope,
                 temporal: context,
-                statistics: HealthKitStatisticsSource(context: context),
-                observations: HealthKitDayObservationSource(context: context),
+                statistics: statistics,
+                observations: observations,
                 trigger: .manual,
-                snapshotURL: StatusSnapshotLocation.url(destinationID: "mqtt"),
-                ledgerHeadSeal: ledgerHeadSeal(),
-                ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
+                snapshotURL: snapshotURL,
+                ledgerHeadSeal: ledgerSeal,
+                ledgerSealURL: ledgerSealURL,
                 scope: scope
             ).run()
             await notifyIfFailed(
@@ -1673,6 +1745,25 @@ enum HarnessExport {
                 destinationLabel: "MQTT destination"
             )
             lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
+            lines.append(
+                try await trailingReconcileAfterDelta(
+                    observations: observations,
+                    destination: verified,
+                    store: store,
+                    metric: metric,
+                    scratchDirectory: scratch,
+                    destinationID: "mqtt",
+                    destinationLabel: "MQTT destination",
+                    envelope: envelope,
+                    temporal: context,
+                    statistics: statistics,
+                    trigger: .manual,
+                    snapshotURL: snapshotURL,
+                    ledgerHeadSeal: ledgerSeal,
+                    ledgerSealURL: ledgerSealURL,
+                    scope: scope
+                )
+            )
         }
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
         return lines
@@ -1746,7 +1837,18 @@ enum HarnessExport {
             limit: 1000,
             window: HealthKitQueryWindow(scope: scope)
         )
+        let observations = HealthKitDayObservationSource(context: context)
+        let statistics = HealthKitStatisticsSource(context: context)
+        let snapshotURL = StatusSnapshotLocation.url(destinationID: "https")
+        let ledgerSeal = ledgerHeadSeal()
+        let ledgerSealURL = root.appendingPathComponent("ledger-head-seal.json")
         for metric in scope.metrics.sorted(by: { $0.rawValue < $1.rawValue }) {
+            let envelope = WireEnvelope(
+                exporterId: exporterID,
+                seq: 1,
+                emittedAt: now,
+                observedAt: now
+            )
             let outcome = try await ExportRun(
                 source: source,
                 destination: verified,
@@ -1754,19 +1856,14 @@ enum HarnessExport {
                 metric: metric,
                 scratchDirectory: scratch,
                 destinationName: "https",
-                envelope: WireEnvelope(
-                    exporterId: exporterID,
-                    seq: 1,
-                    emittedAt: now,
-                    observedAt: now
-                ),
+                envelope: envelope,
                 temporal: context,
-                statistics: HealthKitStatisticsSource(context: context),
-                observations: HealthKitDayObservationSource(context: context),
+                statistics: statistics,
+                observations: observations,
                 trigger: .manual,
-                snapshotURL: StatusSnapshotLocation.url(destinationID: "https"),
-                ledgerHeadSeal: ledgerHeadSeal(),
-                ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
+                snapshotURL: snapshotURL,
+                ledgerHeadSeal: ledgerSeal,
+                ledgerSealURL: ledgerSealURL,
                 scope: scope
             ).run()
             await notifyIfFailed(
@@ -1775,6 +1872,25 @@ enum HarnessExport {
                 destinationLabel: "HTTPS destination"
             )
             lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
+            lines.append(
+                try await trailingReconcileAfterDelta(
+                    observations: observations,
+                    destination: verified,
+                    store: store,
+                    metric: metric,
+                    scratchDirectory: scratch,
+                    destinationID: "https",
+                    destinationLabel: "HTTPS destination",
+                    envelope: envelope,
+                    temporal: context,
+                    statistics: statistics,
+                    trigger: .manual,
+                    snapshotURL: snapshotURL,
+                    ledgerHeadSeal: ledgerSeal,
+                    ledgerSealURL: ledgerSealURL,
+                    scope: scope
+                )
+            )
         }
         if emission.autoDisabled {
             try setHTTPSTraceparent(false)

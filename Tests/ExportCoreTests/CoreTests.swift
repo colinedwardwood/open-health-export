@@ -3890,6 +3890,26 @@ private func anchorHoldFixture(
     #expect(harness.contains("try removeIfPresent(directory)"))
 }
 
+@Test func r08TrailingReconcileRunsOnEveryHealthDestination() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let harness = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift"),
+        encoding: .utf8
+    )
+    let calls = harness.components(separatedBy: "try await trailingReconcileAfterDelta(").count - 1
+    let destinationIDs = ["local-file", "https", "mqtt", "companion"]
+    #expect(calls == destinationIDs.count)
+    for destinationID in destinationIDs {
+        #expect(
+            harness.contains("destinationID: \"\(destinationID)\""),
+            "missing trailing reconcile destination \(destinationID)"
+        )
+    }
+}
+
 @Test func privacyGateCannotEnterBackgroundExportOrDeliveryPaths() throws {
     let root = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
