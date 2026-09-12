@@ -44,6 +44,10 @@ import Testing
         ErrorClassManifest.userFacingReason(forRaw: ErrorClass.destinationUnreachable.rawValue)
             == ErrorClassManifest.record(for: .destinationUnreachable).userFacingCopy
     )
+    #expect(
+        DestinationSendError.healthDataRestricted.errorDescription
+            == ErrorClassManifest.record(for: .healthDataRestricted).userFacingCopy
+    )
 }
 
 @Test func harnessImportSurfacesLocalizedConfigurationErrors() throws {

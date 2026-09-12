@@ -90,6 +90,16 @@ public enum ErrorClassManifest {
                 scheduleFailure: false,
                 r88P1: true
             )
+        case .healthDataRestricted:
+            return ErrorClassRecord(
+                userCopyKey: "error.healthDataRestricted",
+                userFacingCopy: "Health data is restricted on this device by a policy such as MDM or Guest User. That is different from a Health permission in Settings.",
+                retryable: false,
+                blocksEnablement: false,
+                ledgerKind: "execute",
+                scheduleFailure: false,
+                r88P1: false
+            )
         }
     }
 

@@ -434,6 +434,7 @@ public enum ErrorClass: String, Sendable, Codable, CaseIterable {
     case budgetExhausted
     case cancelledBySystem
     case internalFault
+    case healthDataRestricted
 }
 
 public struct RunTally: Sendable, Equatable {
@@ -516,7 +517,9 @@ public struct RunOutcome: Sendable, Equatable, CustomStringConvertible {
         if tally.terminalError == .cancelledBySystem {
             return RunOutcome(kind: .cancelledBySystem)
         }
-        if tally.terminalError == .destinationUnreachable || tally.terminalError == .internalFault {
+        if tally.terminalError == .destinationUnreachable
+            || tally.terminalError == .internalFault
+            || tally.terminalError == .healthDataRestricted {
             return RunOutcome(kind: .failed, partialCause: tally.partialCause)
         }
         if tally.nothingDue, tally.read == 0 {

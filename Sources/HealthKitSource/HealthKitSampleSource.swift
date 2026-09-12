@@ -578,9 +578,15 @@ public enum HealthKitSourceError: Error, Sendable {
 
     static func classifiedQueryError(_ error: Error) -> any Error {
         let nsError = error as NSError
-        if nsError.domain == HKErrorDomain,
-           nsError.code == HKError.Code.errorDatabaseInaccessible.rawValue {
-            return DestinationSendError.deviceLocked
+        if nsError.domain == HKErrorDomain {
+            switch HKError.Code(rawValue: nsError.code) {
+            case .errorDatabaseInaccessible:
+                return DestinationSendError.deviceLocked
+            case .errorHealthDataRestricted, .errorNotPermissibleForGuestUserMode:
+                return DestinationSendError.healthDataRestricted
+            default:
+                break
+            }
         }
         return queryFailed(error.localizedDescription)
     }

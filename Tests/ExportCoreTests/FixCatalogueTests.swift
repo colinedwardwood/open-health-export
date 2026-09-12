@@ -663,6 +663,24 @@ enum FixWitness {
 
     static func a06() throws {
         #expect(TypeDisableReason.mdmRestricted != TypeDisableReason.authorizationRevoked)
+        #expect(ErrorClass.healthDataRestricted != ErrorClass.deviceLocked)
+        #expect(ErrorClass.healthDataRestricted != ErrorClass.internalFault)
+        let copy = ErrorClassManifest.record(for: .healthDataRestricted).userFacingCopy
+        #expect(copy.contains("MDM"))
+        #expect(copy.contains("Guest User"))
+        #expect(!copy.contains("permission again"))
+        #expect(
+            RunOutcome.derive(from: RunTally(terminalError: .healthDataRestricted)).kind
+                == .failed
+        )
+        let source = try String(
+            contentsOf: FixCatalogue.sourcesRoot()
+                .appendingPathComponent("HealthKitSource/HealthKitSampleSource.swift"),
+            encoding: .utf8
+        )
+        #expect(source.contains("errorHealthDataRestricted"))
+        #expect(source.contains("errorNotPermissibleForGuestUserMode"))
+        #expect(source.contains("DestinationSendError.healthDataRestricted"))
     }
 
     static func a07() throws {

@@ -437,4 +437,31 @@ import WireFormat
     // macOS CI: unavailable. iOS device: available. Either is a valid observation.
     _ = HKHealthStore.isHealthDataAvailable()
 }
+
+@Test func classifiedQueryErrorMapsLockAndDevicePolicyCodes() {
+    let locked = NSError(
+        domain: HKErrorDomain,
+        code: HKError.Code.errorDatabaseInaccessible.rawValue
+    )
+    #expect(
+        HealthKitSourceError.classifiedQueryError(locked) as? DestinationSendError
+            == .deviceLocked
+    )
+    let restricted = NSError(
+        domain: HKErrorDomain,
+        code: HKError.Code.errorHealthDataRestricted.rawValue
+    )
+    #expect(
+        HealthKitSourceError.classifiedQueryError(restricted) as? DestinationSendError
+            == .healthDataRestricted
+    )
+    let guest = NSError(
+        domain: HKErrorDomain,
+        code: HKError.Code.errorNotPermissibleForGuestUserMode.rawValue
+    )
+    #expect(
+        HealthKitSourceError.classifiedQueryError(guest) as? DestinationSendError
+            == .healthDataRestricted
+    )
+}
 #endif

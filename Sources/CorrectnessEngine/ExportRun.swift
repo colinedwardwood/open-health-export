@@ -143,7 +143,7 @@ public struct ExportRun: Sendable {
             )
             let outcome = RunOutcome.derive(from: tally)
             try await record(outcome: outcome, tally: tally, receipt: nil)
-            if errorClass == .deviceLocked {
+            if errorClass == .deviceLocked || errorClass == .healthDataRestricted {
                 return outcome
             }
             throw error

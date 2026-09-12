@@ -482,6 +482,7 @@ public enum DestinationSendError: Error, Sendable, Equatable, LocalizedError {
     case cancelledBySystem
     case budgetExhausted
     case deviceLocked
+    case healthDataRestricted
     case internalFault(String)
 
     public var errorClass: ErrorClass {
@@ -491,6 +492,7 @@ public enum DestinationSendError: Error, Sendable, Equatable, LocalizedError {
         case .cancelledBySystem: .cancelledBySystem
         case .budgetExhausted: .budgetExhausted
         case .deviceLocked: .deviceLocked
+        case .healthDataRestricted: .healthDataRestricted
         case .internalFault: .internalFault
         }
     }

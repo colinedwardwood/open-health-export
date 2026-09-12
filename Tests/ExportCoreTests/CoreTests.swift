@@ -75,6 +75,33 @@ private struct DeviceLockedSource: SampleSource {
     #expect(store.transaction.pending.isEmpty)
 }
 
+private struct HealthDataRestrictedSource: SampleSource {
+    func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage {
+        throw DestinationSendError.healthDataRestricted
+    }
+}
+
+@Test func restrictedStoreReadRecordsFailedPolicyOutcome() async throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-store-restricted-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = MemoryStateStore()
+    let run = ExportRun(
+        source: HealthDataRestrictedSource(),
+        destination: .testing(LocalFileSink(directory: root)),
+        store: store,
+        metric: MetricCatalog.heartRate.id,
+        scratchDirectory: root,
+        envelope: testEnvelope(),
+        trigger: .bgProcessing
+    )
+    let outcome = try await run.run()
+    #expect(outcome.kind == .failed)
+    let event = try #require(store.transaction.journal.last)
+    #expect(event.errorClass == ErrorClass.healthDataRestricted.rawValue)
+    #expect(store.transaction.pending.isEmpty)
+}
+
 @Test func diagnosticBundleIsBoundedManifestDerivedAndRedacted() throws {
     let canaries = RedactionCanary.tokens
     let canary = canaries.joined(separator: " ")
