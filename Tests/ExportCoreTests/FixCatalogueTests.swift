@@ -33,6 +33,36 @@ struct FixCatalogueCase: Codable, Sendable {
     var summary: String
 }
 
+private actor PinMismatchByteCounter: HTTPTransport {
+    private var executions = 0
+
+    func execute(_ request: OutboundHTTPRequest) -> OutboundHTTPResponse {
+        _ = request
+        executions += 1
+        return OutboundHTTPResponse(status: 204, body: Data())
+    }
+
+    func identityProbe() -> TLSIdentity? {
+        TLSIdentity(
+            leafSPKISha256: String(repeating: "aa", count: 32),
+            issuerSPKISha256: String(repeating: "bb", count: 32),
+            tlsVersion: "TLS1.3",
+            cipherSuite: "TLS_AES_128_GCM_SHA256",
+            leafSubject: "CN=test",
+            leafIssuer: "CN=test-ca",
+            notBefore: "2024-01-01T00:00:00Z",
+            notAfter: "2034-01-01T00:00:00Z",
+            resolvedAddress: "127.0.0.1",
+            addressClass: .loopback,
+            trustAnchorKind: "test"
+        )
+    }
+
+    func count() -> Int {
+        executions
+    }
+}
+
 enum FixCatalogue {
     static let expectedIDs: [String] = [
         "T01", "T02", "T03", "T04", "T05", "T06", "T07", "T08", "T09", "T10",
@@ -65,12 +95,12 @@ enum FixCatalogue {
     }
 }
 
-@Test func committedFixCatalogueHasAWitnessForEveryID() throws {
+@Test func committedFixCatalogueHasAWitnessForEveryID() async throws {
     let cases = try FixCatalogue.load()
     #expect(cases.map(\.id) == FixCatalogue.expectedIDs)
     #expect(Set(cases.map(\.id)).count == cases.count)
     for item in cases {
-        try FixWitness.run(item.id)
+        try await FixWitness.run(item.id)
     }
 }
 
@@ -81,7 +111,7 @@ enum FixCatalogue {
 }
 
 enum FixWitness {
-    static func run(_ id: String) throws {
+    static func run(_ id: String) async throws {
         switch id {
         case "T01": try t01()
         case "T02": try t02()
@@ -150,7 +180,7 @@ enum FixWitness {
         case "V11": try v11()
         case "P01": try p01()
         case "P02": try p02()
-        case "P03": try p03()
+        case "P03": try await p03()
         case "P04": try p04()
         case "P05": try p05()
         case "P06": try p06()
@@ -386,10 +416,20 @@ enum FixWitness {
     }
 
     static func s06() throws {
-        _ = try NativeWire.encode(
-            heartSample("ffffffff-ffff-ffff-ffff-fffffffffff6"),
+        let uuid = "ffffffff-ffff-4fff-8fff-fffffffffff6"
+        var sample = heartSample(uuid)
+        sample.source = nil
+        sample.device = nil
+        let encoded = try NativeWire.encode(
+            samples: [sample],
+            tombstones: [],
+            metric: sample.metric,
+            batchID: NativeWire.batchID(metric: sample.metric, anchorBlob: Data([6])),
             envelope: testEnvelope()
         )
+        var receiver = ReferenceReceiver()
+        try receiver.ingest(ndjson: String(decoding: encoded, as: UTF8.self))
+        #expect(receiver.quantities[uuid] != nil)
     }
 
     static func s07() throws {
@@ -549,7 +589,11 @@ enum FixWitness {
 
     static func m07() throws {
         #expect(SamplePaging.defaultPageLimit == 1000)
-        #expect(SamplePaging.defaultPageLimit * 500 < 500_000 || SamplePaging.defaultPageLimit > 0)
+        let pages = 500_000 / SamplePaging.defaultPageLimit
+        #expect(pages == 500)
+        let first = DemoCorpus.sample(at: 0, seed: 7, declaration: MetricCatalog.heartRate)
+        let last = DemoCorpus.sample(at: 499_999, seed: 7, declaration: MetricCatalog.heartRate)
+        #expect(first.key != last.key)
     }
 
     static func m08() throws {
@@ -776,6 +820,15 @@ enum FixWitness {
 
     static func f07() throws {
         #expect(QueuePolicy.production.cap == 256 * 1024 * 1024)
+        let workflow = try String(
+            contentsOf: FixCatalogue.sourcesRoot()
+                .deletingLastPathComponent()
+                .appendingPathComponent(".github/workflows/nightly-volume.yml"),
+            encoding: .utf8
+        )
+        #expect(workflow.contains("records=50000000"))
+        #expect(workflow.contains(".build/release/exportruncheck"))
+        #expect(workflow.contains("limit_mib=100"))
     }
 
     static func f08() throws {
@@ -807,20 +860,46 @@ enum FixWitness {
     }
 
     static func v05() throws {
-        #expect(MetricCatalog.heartRate.id != MetricCatalog.stepCount.id)
+        let anchor = Data([5])
+        let heart = NativeWire.batchID(metric: MetricCatalog.heartRate.id, anchorBlob: anchor)
+        let steps = NativeWire.batchID(metric: MetricCatalog.stepCount.id, anchorBlob: anchor)
+        #expect(heart != steps)
+        #expect(heart == NativeWire.batchID(metric: MetricCatalog.heartRate.id, anchorBlob: anchor))
     }
 
     static func v06() throws {
         #if DEBUG
         #expect(ExportFaultLocation.allCases.count == 6)
         #else
-        #expect(Bool(true))
+        let source = try String(
+            contentsOf: FixCatalogue.sourcesRoot()
+                .appendingPathComponent("CorrectnessEngine/FaultInjection.swift"),
+            encoding: .utf8
+        )
+        let debugGate = try #require(source.range(of: "#if DEBUG"))
+        let declaration = try #require(source.range(of: "public enum ExportFaultLocation"))
+        let gateEnd = try #require(source.range(of: "#endif"))
+        #expect(debugGate.lowerBound < declaration.lowerBound)
+        #expect(declaration.lowerBound < gateEnd.lowerBound)
         #endif
     }
 
     static func v07() throws {
-        let key = NativeWire.batchID(metric: MetricCatalog.heartRate.id, anchorBlob: Data([9]))
-        #expect(key == NativeWire.batchID(metric: MetricCatalog.heartRate.id, anchorBlob: Data([9])))
+        let sample = heartSample("77777777-7777-4777-8777-777777777777")
+        let key = NativeWire.batchID(metric: sample.metric, anchorBlob: Data([9]))
+        let bytes = try NativeWire.encode(
+            samples: [sample],
+            tombstones: [],
+            metric: sample.metric,
+            batchID: key,
+            envelope: testEnvelope()
+        )
+        let payload = String(decoding: bytes, as: UTF8.self)
+        var receiver = ReferenceReceiver()
+        try receiver.ingest(ndjson: payload)
+        try receiver.ingest(ndjson: payload)
+        #expect(receiver.quantities.count == 1)
+        #expect(receiver.quantities[sample.key.uuid] == sample.value)
     }
 
     static func v08() throws {
@@ -859,8 +938,30 @@ enum FixWitness {
         #expect(sampleIdentity(leaf: "aaaa", issuer: "bbbb").leafSPKISha256 != "Same Name")
     }
 
-    static func p03() throws {
-        #expect(StreamError.pinMismatch == .pinMismatch)
+    static func p03() async throws {
+        let counter = PinMismatchByteCounter()
+        let stored = PinRecord(
+            leafSPKISha256: String(repeating: "cc", count: 32),
+            issuerSPKISha256: String(repeating: "dd", count: 32),
+            firstSeen: "2024-01-01T00:00:00Z",
+            policy: .leaf
+        )
+        let body = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ohe-p03-\(UUID().uuidString)")
+        try Data("private-health-payload".utf8).write(to: body)
+        defer { try? FileManager.default.removeItem(at: body) }
+        let transport = PinningHTTPTransport(inner: counter, pin: stored)
+        await #expect(throws: EgressError.pinMismatch) {
+            _ = try await transport.execute(
+                OutboundHTTPRequest(
+                    method: "POST",
+                    url: URL(string: "https://127.0.0.1/export")!,
+                    headers: [:],
+                    bodyFile: body
+                )
+            )
+        }
+        #expect(await counter.count() == 0)
     }
 
     static func p04() throws {
