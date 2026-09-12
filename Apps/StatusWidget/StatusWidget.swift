@@ -256,6 +256,7 @@ private extension DestinationDisplayState {
         case .failing: "exclamationmark.triangle.fill"
         case .blocked: "exclamationmark.octagon.fill"
         case .waiting: "pause.circle.fill"
+        case .deferred: "lock.circle"
         case .limitedByIOS: "bolt.slash.fill"
         case .paused: "pause.fill"
         case .overdue: "clock.badge.exclamationmark.fill"
@@ -275,6 +276,7 @@ private extension DestinationDisplayState {
         case .failing: "Failing"
         case .blocked: "Waiting for you"
         case .waiting: "Waiting"
+        case .deferred: "Deferred"
         case .limitedByIOS: "Limited by iOS"
         case .paused: "Paused"
         case .overdue: "Overdue"
@@ -284,7 +286,7 @@ private extension DestinationDisplayState {
     var severity: Int {
         switch self {
         case .healthy, .manualOnly, .paused: 0
-        case .notSetUp, .noExportsYet, .waiting: 1
+        case .notSetUp, .noExportsYet, .waiting, .deferred: 1
         case .quiet, .sentUnconfirmed: 2
         case .partial, .limitedByIOS, .stale: 3
         case .failing, .blocked, .overdue: 4

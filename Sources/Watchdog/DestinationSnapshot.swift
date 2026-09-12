@@ -16,6 +16,7 @@ public enum DestinationDisplayState: String, Sendable, Equatable, Codable, CaseI
     case failing
     case blocked
     case waiting
+    case deferred
     case limitedByIOS = "limited_by_ios"
     case paused
     case overdue
@@ -161,16 +162,20 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
         switch lastOutcome {
         case nil:
             return .noExportsYet
-        case "success", "success_nothing_due":
+        case "success", "success_nothing_due", "successNothingDue":
             return .healthy
-        case "unknown_ack":
+        case "unknown_ack", "unknownAck":
             return .sentUnconfirmed
         case "partial":
             return .partial
         case "failed":
             return .failing
+        case "blockedDeviceLocked", "abandonedNoBudget", "cancelledBySystem":
+            return .deferred
+        case "localNetworkDenied":
+            return .blocked
         case "abandoned_no_budget", "cancelled_by_system":
-            return .waiting
+            return .deferred
         default:
             return .waiting
         }

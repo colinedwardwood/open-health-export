@@ -282,6 +282,14 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(failed.contains("last success"), failed)
     }
 
+    func testDeferredLockedDestinationIsNonActionableAndNotFailing() {
+        let deferred = destinationLine(seeding: "deferred")
+        XCTAssertTrue(deferred.contains("deferred"), deferred)
+        XCTAssertTrue(deferred.contains("non-actionable"), deferred)
+        XCTAssertFalse(deferred.contains("failing"), deferred)
+        XCTAssertTrue(deferred.contains("last success"), deferred)
+    }
+
     func testWidgetURLOpensDestinationStatusAfterDisclosure() {
         app.terminate()
         app.launchArguments = [

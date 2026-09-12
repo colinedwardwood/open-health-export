@@ -1285,6 +1285,18 @@ enum HarnessExport {
                 errorClass: ErrorClass.destinationUnreachable.rawValue,
                 writtenAtEpoch: now
             )
+        case "deferred":
+            snapshot = DestinationStatusSnapshot(
+                destinationID: "home-assistant",
+                destinationLabel: "Home Assistant",
+                enabled: true,
+                lastOutcome: "blockedDeviceLocked",
+                lastSuccessEpoch: now - 60,
+                errorClass: ErrorClass.deviceLocked.rawValue,
+                staleThresholdSeconds: day,
+                overdueThresholdSeconds: 7 * day,
+                writtenAtEpoch: now
+            )
         case "changed":
             snapshot = DestinationStatusSnapshot(
                 destinationID: "home-assistant",

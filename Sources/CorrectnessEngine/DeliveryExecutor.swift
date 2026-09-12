@@ -141,11 +141,11 @@ enum DeliveryExecutor {
             return .transientNetwork
         }
         switch send {
-        case .destinationUnreachable, .localNetworkDenied, .cancelledBySystem:
+        case .destinationUnreachable:
             return .transientNetwork
-        case .budgetExhausted:
-            return .transientServer
-        case .deviceLocked:
+        case .localNetworkDenied:
+            return .auth
+        case .cancelledBySystem, .budgetExhausted, .deviceLocked:
             return .storeLocked
         case .healthDataRestricted:
             return .auth

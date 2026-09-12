@@ -21,6 +21,9 @@ public enum DestinationStatusLine {
         let state = snapshot.state(at: nowEpoch)
         let last = snapshot.lastSuccessEpoch.map(lastSuccess) ?? "never"
         var line = "\(snapshot.destinationLabel): \(state.rawValue) · last success \(last)"
+        if state == .deferred {
+            line += " · non-actionable"
+        }
         if let reason = reasonCode(snapshot) {
             line += " · \(reason)"
             if let phrase = ErrorClassManifest.userFacingReason(forRaw: snapshot.errorClass),

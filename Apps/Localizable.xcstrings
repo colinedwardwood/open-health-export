@@ -838,6 +838,17 @@
         }
       }
     },
+    "Deferred": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deferred"
+          }
+        }
+      }
+    },
     "Fetch security advisories": {
       "extractionState": "manual",
       "localizations": {

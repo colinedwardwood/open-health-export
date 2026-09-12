@@ -1409,6 +1409,50 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     #expect(server.nextEarliestAttempt == now.addingTimeInterval(RetryPolicy.maximumRetryAfter))
 }
 
+@Test func ux21DeferredOutcomesSkipTheFailureBreakerAndStillAgeIntoStale() {
+    let now = Date(timeIntervalSince1970: 4_000)
+    let prior = BreakerSnapshot(consecutiveFailures: 4)
+    let locked = RetryPolicy.record(
+        .failed(.storeLocked),
+        snapshot: prior,
+        now: now,
+        jitter: 0
+    )
+    #expect(locked.consecutiveFailures == 4)
+    #expect(locked.state == .closed)
+
+    let snapshot = DestinationStatusSnapshot(
+        destinationID: "archive",
+        destinationLabel: "Archive folder",
+        enabled: true,
+        lastOutcome: "blockedDeviceLocked",
+        lastSuccessEpoch: 100,
+        errorClass: ErrorClass.deviceLocked.rawValue,
+        staleThresholdSeconds: 60,
+        overdueThresholdSeconds: 200,
+        writtenAtEpoch: 160
+    )
+    #expect(snapshot.state == .deferred)
+    let line = DestinationStatusLine.render(snapshot, nowEpoch: 120) { _ in "earlier" }
+    #expect(line.contains("deferred"))
+    #expect(line.contains("non-actionable"))
+    #expect(!line.contains("failing"))
+    #expect(snapshot.state(at: 170) == .stale)
+    #expect(snapshot.state(at: 310) == .overdue)
+    let notYetOverdue = Escalation.plan(
+        snapshot: snapshot,
+        now: Date(timeIntervalSince1970: 120),
+        notificationsAuthorized: true
+    )
+    #expect(!notYetOverdue.overdue)
+    let aged = Escalation.plan(
+        snapshot: snapshot,
+        now: Date(timeIntervalSince1970: 310),
+        notificationsAuthorized: true
+    )
+    #expect(aged.overdue)
+}
+
 @Test func retryPolicyPersistentBreakerProbesAtMostEverySixHours() {
     let opened = Date(timeIntervalSince1970: 3_000)
     let snapshot = BreakerSnapshot(
