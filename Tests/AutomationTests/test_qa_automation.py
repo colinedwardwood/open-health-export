@@ -162,6 +162,7 @@ class MutationAndQuarantineTests(unittest.TestCase):
         self.assertTrue(mutation.host_matches({"host": "darwin"}, "darwin"))
         self.assertTrue(mutation.host_matches({}, "linux"))
         self.assertTrue(mutation.ran_zero_tests("Test run with 0 tests in 0 suites passed"))
+        self.assertTrue(callable(mutation.apply_mutant))
 
     def test_unmarked_skip_is_rejected(self):
         quarantine = load("quarantine_check", "quarantine-check.py")

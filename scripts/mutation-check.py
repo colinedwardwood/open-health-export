@@ -59,6 +59,9 @@ def ran_zero_tests(output: str) -> bool:
         "Test run with 0 tests" in output
         or "No matching test cases were run" in output
     )
+
+
+def apply_mutant(path: Path, needle: str, replacement: str) -> str:
     original = path.read_text()
     path.write_text(original.replace(needle, replacement, 1))
     return original
