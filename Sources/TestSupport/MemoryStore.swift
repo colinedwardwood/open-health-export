@@ -23,6 +23,7 @@ public final class MemoryTransaction: StateTransaction {
     public var typeStatus: [MetricID: TypeStatus] = [:]
     public var anchorHolds: [MetricID: AnchorHold] = [:]
     public var destinationScopes: [String: DestinationExportScope] = [:]
+    public var destinationBreakers: [String: Data] = [:]
     public var freshnessLatencies: [RunFreshnessLatency] = []
     private var pendingOrder: [BatchID] = []
 
@@ -310,6 +311,14 @@ public final class MemoryTransaction: StateTransaction {
         destinationScopes[scope.destinationID] = scope
     }
 
+    public func loadDestinationBreaker(destinationID: String) throws -> Data? {
+        destinationBreakers[destinationID]
+    }
+
+    public func upsertDestinationBreaker(destinationID: String, bytes: Data) throws {
+        destinationBreakers[destinationID] = bytes
+    }
+
     public func purgeMetricState(metric: MetricID) throws {
         cursors.removeValue(forKey: metric)
         census = census.filter { $0.value.metric != metric }
@@ -339,6 +348,7 @@ public final class MemoryTransaction: StateTransaction {
         typeStatus = [:]
         anchorHolds = [:]
         destinationScopes = [:]
+        destinationBreakers = [:]
         try appendLedger(
             EgressEntry(
                 destination: "local-device",

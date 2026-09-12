@@ -471,6 +471,10 @@ public protocol StateTransaction: AnyObject {
     /// to tell apart from a stored scope that happens to grant nothing.
     func loadDestinationScope(destinationID: String) throws -> DestinationExportScope?
     func upsertDestinationScope(_ scope: DestinationExportScope) throws
+    /// Per-sink breaker blob (`BreakerSnapshot` JSON). Catch-up reads this so a
+    /// one-tap re-export into a still-broken destination cannot evict live data.
+    func loadDestinationBreaker(destinationID: String) throws -> Data?
+    func upsertDestinationBreaker(destinationID: String, bytes: Data) throws
     func purgeMetricState(metric: MetricID) throws
     /// Clears every table. Returns pending payload paths to unlink after COMMIT (R-43).
     func wipe(atEpoch: TimeInterval) throws -> [String]

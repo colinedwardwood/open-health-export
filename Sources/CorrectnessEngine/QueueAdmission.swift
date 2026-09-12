@@ -33,6 +33,8 @@ public struct QueuePolicy: Sendable, Equatable {
 /// reconcile/backfill instead of calling `makeRoom`.
 public enum CatchUpAdmission {
     public static let parkedJournalDetail = "catch_up_parked"
+    /// I6: destination still broken; catch-up waits instead of occupying the live queue.
+    public static let destinationParkedJournalDetail = "breaker_open"
 
     public static func allows(
         queuedBytes: Int,
@@ -40,6 +42,15 @@ public enum CatchUpAdmission {
         policy: QueuePolicy = .production
     ) -> Bool {
         queuedBytes + incomingBytes < policy.catchUpLimit
+    }
+
+    public static func allows(breaker: BreakerSnapshot) -> Bool {
+        switch breaker.state {
+        case .closed, .halfOpen:
+            return true
+        case .open, .blockedNeedsUser, .halted, .failingPersistently:
+            return false
+        }
     }
 }
 

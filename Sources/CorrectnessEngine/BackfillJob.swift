@@ -259,6 +259,26 @@ public struct BackfillJob: Sendable {
                         try await persist(&checkpoint)
                         return checkpoint
                     }
+                    let breakerBlocked = try await store.transact { tx -> Bool in
+                        for destinationID in checkpoint.plan.destinations {
+                            let snapshot = RetryPolicy.age(
+                                snapshot: try DestinationBreaker.load(
+                                    from: tx,
+                                    destinationID: destinationID
+                                ),
+                                now: clock.now()
+                            )
+                            if !CatchUpAdmission.allows(breaker: snapshot) {
+                                return true
+                            }
+                        }
+                        return false
+                    }
+                    if breakerBlocked {
+                        checkpoint.progress.pausedReason = CatchUpAdmission.destinationParkedJournalDetail
+                        try await persist(&checkpoint)
+                        return checkpoint
+                    }
                 }
                 checkpoint.progress.cursor = BackfillCursor(
                     metricIndex: metricIndex,

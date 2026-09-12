@@ -123,6 +123,31 @@ private func backfillCheckpoint(
     }
 }
 
+@Test func backfillParksWhenDestinationBreakerIsOpen() async throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-backfill-breaker-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: url) }
+    let store = MemoryStateStore()
+    try await store.transact { tx in
+        try DestinationBreaker.save(
+            BreakerSnapshot(state: .open, consecutiveFailures: 5),
+            to: tx,
+            destinationID: "local-file"
+        )
+    }
+    let processor = RecordingBackfillProcessor()
+    let job = BackfillJob(
+        checkpointURL: url,
+        processor: processor,
+        clock: FrozenClock(instant: Date(timeIntervalSince1970: 1)),
+        store: store
+    )
+    try await job.create(try backfillCheckpoint())
+    let paused = try await job.run()
+    #expect(paused.progress.pausedReason == CatchUpAdmission.destinationParkedJournalDetail)
+    #expect(await processor.recordedDays().isEmpty)
+}
+
 @Test func firstRunBackfillDefaultsToAggregateOnlyAndRawIsExplicit() throws {
     #expect(try backfillCheckpoint().plan.mode == .aggregateOnly)
     #expect(try backfillCheckpoint(mode: .raw).plan.mode == .raw)

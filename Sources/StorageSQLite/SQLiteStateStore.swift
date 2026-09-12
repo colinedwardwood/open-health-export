@@ -1120,6 +1120,15 @@ private final class SQLiteTransaction: StateTransaction {
         try stepDone(stmt)
     }
 
+    func loadDestinationBreaker(destinationID: String) throws -> Data? {
+        guard let text = try loadStateMeta("breaker:\(destinationID)") else { return nil }
+        return Data(text.utf8)
+    }
+
+    func upsertDestinationBreaker(destinationID: String, bytes: Data) throws {
+        try upsertStateMeta("breaker:\(destinationID)", value: String(decoding: bytes, as: UTF8.self))
+    }
+
     func purgeMetricState(metric: MetricID) throws {
         for table in ["cursors", "census", "dirty", "emitted_index", "anchor_holds"] {
             let stmt = try store.prepare("DELETE FROM \(table) WHERE metric = ?;")

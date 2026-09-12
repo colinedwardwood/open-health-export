@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import EnginePorts
 import Foundation
 
 public enum RetryClass: String, Sendable, Codable {
@@ -191,5 +192,38 @@ public enum RetryPolicy {
             delay = ceiling * jitter
         }
         snapshot.nextEarliestAttempt = now.addingTimeInterval(delay)
+    }
+}
+
+public enum DestinationBreaker {
+    public static func encode(_ snapshot: BreakerSnapshot) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        return try encoder.encode(snapshot)
+    }
+
+    public static func decode(_ data: Data) throws -> BreakerSnapshot {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(BreakerSnapshot.self, from: data)
+    }
+
+    public static func load(
+        from tx: any StateTransaction,
+        destinationID: String
+    ) throws -> BreakerSnapshot {
+        guard let data = try tx.loadDestinationBreaker(destinationID: destinationID) else {
+            return BreakerSnapshot()
+        }
+        return try decode(data)
+    }
+
+    public static func save(
+        _ snapshot: BreakerSnapshot,
+        to tx: any StateTransaction,
+        destinationID: String
+    ) throws {
+        try tx.upsertDestinationBreaker(destinationID: destinationID, bytes: try encode(snapshot))
     }
 }

@@ -268,6 +268,23 @@ public struct ReconcileSweep: Sendable {
             rangeEndDay: days.last
         )
         let queued = try await store.transact { try $0.queuedBytes() }
+        let breaker = try await store.transact { tx in
+            RetryPolicy.age(
+                snapshot: try DestinationBreaker.load(from: tx, destinationID: destinationName),
+                now: clock.now()
+            )
+        }
+        if !CatchUpAdmission.allows(breaker: breaker) {
+            try? FileManager.default.removeItem(at: payloadURL)
+            let tally = RunTally(
+                read: recordCount,
+                acked: 0,
+                partialCause: CatchUpAdmission.destinationParkedJournalDetail
+            )
+            let outcome = RunOutcome.derive(from: tally)
+            try await record(outcome: outcome, tally: tally, receipt: nil)
+            return outcome
+        }
         if !CatchUpAdmission.allows(queuedBytes: queued, incomingBytes: pending.byteCount) {
             try? FileManager.default.removeItem(at: payloadURL)
             let tally = RunTally(

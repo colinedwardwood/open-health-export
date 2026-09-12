@@ -2764,6 +2764,25 @@ private func anchorHoldFixture(
     #expect(try await store.transact { try $0.deliveredAccepted() } == 0)
 }
 
+@Test func sqlitePersistsDestinationBreakerSnapshot() async throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-breaker-\(UUID().uuidString).sqlite")
+    let store = try SQLiteStateStore(path: url.path)
+    let snapshot = BreakerSnapshot(
+        state: .open,
+        consecutiveFailures: 5,
+        openedAt: Date(timeIntervalSince1970: 1)
+    )
+    try await store.transact {
+        try DestinationBreaker.save(snapshot, to: $0, destinationID: "https")
+    }
+    let restored = try await store.transact {
+        try DestinationBreaker.load(from: $0, destinationID: "https")
+    }
+    #expect(restored.state == .open)
+    #expect(restored.consecutiveFailures == 5)
+}
+
 @Test func sqlitePersistsEmittedIndexOnCommit() async throws {
     let path = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-index-\(UUID().uuidString).sqlite")
@@ -3499,6 +3518,69 @@ private func anchorHoldFixture(
     ).runFullHistory(throughDay: "2024-01-01")
     #expect(outcome.kind == .partial)
     #expect(outcome.partialCause == CatchUpAdmission.parkedJournalDetail)
+    let pending = try store.transaction.pendingBatches()
+    #expect(pending.map(\.id.rawValue) == ["live-delta"])
+}
+
+@Test func catchUpAdmissionParksOpenHaltedAndBlockedBreakers() {
+    #expect(CatchUpAdmission.allows(breaker: BreakerSnapshot()))
+    #expect(CatchUpAdmission.allows(breaker: BreakerSnapshot(state: .halfOpen)))
+    #expect(!CatchUpAdmission.allows(breaker: BreakerSnapshot(state: .open)))
+    #expect(!CatchUpAdmission.allows(breaker: BreakerSnapshot(state: .blockedNeedsUser)))
+    #expect(!CatchUpAdmission.allows(breaker: BreakerSnapshot(state: .halted)))
+    #expect(!CatchUpAdmission.allows(breaker: BreakerSnapshot(state: .failingPersistently)))
+}
+
+@Test func queueGapReExportParksWhenDestinationStillBroken() async throws {
+    let metric = MetricCatalog.heartRate.id
+    var sample = heartSample("dddddddd-dddd-dddd-dddd-dddddddddddd")
+    sample.start = "2024-01-15T10:00:00Z"
+    sample.end = sample.start
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-gap-reexport-broken-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let store = MemoryStateStore()
+    try await store.transact { tx in
+        try tx.enqueuePending(
+            PendingBatch(
+                id: BatchID(rawValue: "live-delta"),
+                payloadURL: "/tmp/live-delta",
+                expectedRecords: 1,
+                byteCount: 8,
+                metric: metric
+            )
+        )
+        try DestinationBreaker.save(
+            BreakerSnapshot(
+                state: .open,
+                consecutiveFailures: 5,
+                openedAt: Date(timeIntervalSince1970: 1)
+            ),
+            to: tx,
+            destinationID: "local-file"
+        )
+    }
+    let outcome = try await ReconcileSweep(
+        observations: FixtureDays(byDay: ["2024-01-15": [sample]]),
+        destination: .testing(
+            ThrowingSink(error: .destinationUnreachable)
+        ),
+        store: store,
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    ).run(
+        gap: GapRecord(
+            batchID: BatchID(rawValue: "evicted"),
+            rangeDescription: "queue_eviction:2024-01-15:2024-01-15",
+            metric: metric,
+            rangeStartDay: "2024-01-15",
+            rangeEndDay: "2024-01-15"
+        )
+    )
+    #expect(outcome.kind == .partial)
+    #expect(outcome.partialCause == CatchUpAdmission.destinationParkedJournalDetail)
     let pending = try store.transaction.pendingBatches()
     #expect(pending.map(\.id.rawValue) == ["live-delta"])
 }

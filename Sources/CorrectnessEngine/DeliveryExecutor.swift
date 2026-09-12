@@ -96,12 +96,16 @@ enum DeliveryExecutor {
             }
             try beforeAckObservation()
             let phase: String
+            let result: DeliveryAttemptResult
             if receipt.unconfirmed > 0 {
                 phase = "unknown_ack"
+                result = .unknownAck
             } else if receipt.accepted < batch.expectedRecords {
                 phase = "partial"
+                result = .failed(.transientServer)
             } else {
                 phase = "acknowledged"
+                result = .acknowledged
             }
             try await append(
                 phase: phase,
@@ -111,6 +115,7 @@ enum DeliveryExecutor {
                 store: store,
                 atEpoch: clock.now().timeIntervalSince1970
             )
+            try await recordBreaker(result, destinationName: destinationName, store: store, clock: clock)
             return receipt
         } catch {
             try await append(
@@ -121,7 +126,48 @@ enum DeliveryExecutor {
                 store: store,
                 atEpoch: clock.now().timeIntervalSince1970
             )
+            try await recordBreaker(
+                .failed(retryClass(from: error)),
+                destinationName: destinationName,
+                store: store,
+                clock: clock
+            )
             throw error
+        }
+    }
+
+    private static func retryClass(from error: Error) -> RetryClass {
+        guard let send = error as? DestinationSendError else {
+            return .transientNetwork
+        }
+        switch send {
+        case .destinationUnreachable, .localNetworkDenied, .cancelledBySystem:
+            return .transientNetwork
+        case .budgetExhausted:
+            return .transientServer
+        case .deviceLocked:
+            return .storeLocked
+        case .healthDataRestricted:
+            return .auth
+        case .internalFault:
+            return .protocol
+        }
+    }
+
+    private static func recordBreaker(
+        _ result: DeliveryAttemptResult,
+        destinationName: String,
+        store: any StateStore,
+        clock: any Clock
+    ) async throws {
+        let now = clock.now()
+        try await store.transact { tx in
+            let current = RetryPolicy.age(
+                snapshot: try DestinationBreaker.load(from: tx, destinationID: destinationName),
+                now: now
+            )
+            let next = RetryPolicy.record(result, snapshot: current, now: now, jitter: 1)
+            try DestinationBreaker.save(next, to: tx, destinationID: destinationName)
         }
     }
 
