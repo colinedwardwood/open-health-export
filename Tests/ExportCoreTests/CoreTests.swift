@@ -4581,6 +4581,84 @@ private func anchorHoldFixture(
     #expect(reenabled?.generation == 2)
 }
 
+@Test func typePurgeAtProductionCapFinishesInsideObservationSLAAndBlocksLaterSends() async throws {
+    let heart = MetricCatalog.heartRate.id
+    let steps = MetricCatalog.stepCount.id
+    let store = MemoryStateStore()
+    let chunk = 1024 * 1024
+    let cap = QueuePolicy.production.cap
+    try await store.transact { tx in
+        var remaining = cap
+        var index = 0
+        while remaining > 0 {
+            let bytes = min(chunk, remaining)
+            try tx.enqueuePending(
+                PendingBatch(
+                    id: BatchID(rawValue: "heart-\(index)"),
+                    payloadURL: "/tmp/ohe-r44-\(index)",
+                    expectedRecords: 1,
+                    byteCount: bytes,
+                    metric: heart,
+                    rangeStartDay: "2026-01-01",
+                    rangeEndDay: "2026-01-01"
+                )
+            )
+            remaining -= bytes
+            index += 1
+        }
+        try tx.enqueuePending(
+            PendingBatch(
+                id: BatchID(rawValue: "steps-live"),
+                payloadURL: "/tmp/ohe-r44-steps",
+                expectedRecords: 1,
+                byteCount: 8,
+                metric: steps
+            )
+        )
+    }
+    #expect(try await store.transact { try $0.queuedBytes() } == cap + 8)
+    let started = ContinuousClock.now
+    try await store.purgeType(
+        metric: heart,
+        reason: TypeDisableReason.authorizationRevoked,
+        destination: "local-file",
+        atEpoch: 1
+    )
+    #expect(ContinuousClock.now - started < .seconds(Int64(TypePurge.observationSLA)))
+    #expect(
+        try await store.transact { try $0.pendingBatches().map(\.id.rawValue) } == ["steps-live"]
+    )
+    let dest = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-r44-cap-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: dest) }
+    let source = ReadCountingSource(
+        page: SamplePage(
+            samples: [heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")],
+            tombstones: [],
+            metric: heart,
+            anchorBlob: Data([0x44]),
+            observedThrough: Date(timeIntervalSince1970: 0)
+        )
+    )
+    let outcome = try await ExportRun(
+        source: source,
+        destination: .testing(LocalFileSink(directory: dest)),
+        store: store,
+        metric: heart,
+        scratchDirectory: dest.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    ).run()
+    #expect(outcome.kind == .failed)
+    #expect(outcome.partialCause == "types_purged")
+    #expect(source.reads == 0)
+    let sent = try FileManager.default.contentsOfDirectory(
+        at: dest,
+        includingPropertiesForKeys: nil
+    ).filter { $0.pathExtension == "ndjson" }
+    #expect(sent.isEmpty)
+}
+
 private actor ResettableTestLedgerSeal: ResettableLedgerHeadSeal {
     private var generation = 0
     private(set) var destroyedCount = 0
