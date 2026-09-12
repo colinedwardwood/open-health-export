@@ -96,7 +96,7 @@ jobs:
         run: |
           swift run corpusgen --seed 1 --count 200 > /tmp/tier0.ndjson
           cmp spec/v1.0.0/fixtures/tier0.ndjson /tmp/tier0.ndjson
-          echo "2ebb58f7a3232661d95249b180be794030946277384057d74e9e555252caf4d3  /tmp/tier0.ndjson" | sha256sum --check -
+          echo "fc8d94a44c31d785078bd06572709f78789ed4cc17877080e1ff081e6baf1b66  /tmp/tier0.ndjson" | sha256sum --check -
       - name: Exercise FIX-M07 500k-sample backfill
         run: |
           swift build -c release --product corpusgen

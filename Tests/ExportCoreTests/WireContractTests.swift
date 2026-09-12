@@ -80,7 +80,8 @@ private func sleepCategory(value: Int = 3) -> CategoryRecord {
     let kinds = Set(records.compactMap { $0["kind"] as? String })
     #expect(kinds.isSuperset(of: [
         "sample.quantity", "sample.category", "sample.correlation", "workout",
-        "sample.stateOfMind", "series.ecgVoltage", "sample.audiogram", "medicationDose",
+        "sample.stateOfMind", "sample.ecg", "series.ecgVoltage", "series.heartbeat",
+        "series.workoutRoute", "series.workoutMetric", "sample.audiogram", "medicationDose",
     ]))
     let sourceBundles = Set(records.compactMap {
         ($0["source"] as? [String: Any])?["bundleId"] as? String

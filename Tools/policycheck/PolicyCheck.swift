@@ -1904,7 +1904,8 @@ struct PolicyCheck {
         let corpusKinds = Set(corpusObjects.compactMap { $0?["kind"] as? String })
         let requiredKinds: Set<String> = [
             "sample.quantity", "sample.category", "sample.correlation", "workout",
-            "sample.stateOfMind", "series.ecgVoltage", "sample.audiogram", "medicationDose",
+            "sample.stateOfMind", "sample.ecg", "series.ecgVoltage", "series.heartbeat",
+            "series.workoutRoute", "series.workoutMetric", "sample.audiogram", "medicationDose",
         ]
         let sourceBundles = Set(corpusObjects.compactMap {
             ($0?["source"] as? [String: Any])?["bundleId"] as? String
