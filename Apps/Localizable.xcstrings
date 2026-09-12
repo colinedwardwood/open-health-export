@@ -816,6 +816,50 @@
         }
       }
     },
+    "Export now": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export now"
+          }
+        }
+      }
+    },
+    "Export type for window": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export type for window"
+          }
+        }
+      }
+    },
+    "Run one export page to the local archive.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run one export page to the local archive."
+          }
+        }
+      }
+    },
+    "Runs one anchored page of one type using the owned export window. Outcomes are kinds, not health values.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runs one anchored page of one type using the owned export window. Outcomes are kinds, not health values."
+          }
+        }
+      }
+    },
     "Exported to": {
       "extractionState": "manual",
       "localizations": {

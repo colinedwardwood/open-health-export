@@ -1083,6 +1083,44 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     )
     #expect(WidgetStatusRoute(url: URL(string: "https://example.com/status")!) == nil)
     #expect(WidgetStatusRoute(url: URL(string: "openhealthexporter://other")!) == nil)
+    #expect(ExportNowRoute(url: URL(string: "openhealthexporter://export-now")!) != nil)
+    #expect(ExportNowRoute(url: URL(string: "openhealthexporter://status")!) == nil)
+    #expect(ExportNowRoute().url.host == "export-now")
+}
+
+@Test func ux38ControlCentreExportNowUsesWidgetControlTrigger() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let control = try String(
+        contentsOf: root.appendingPathComponent("Apps/StatusWidget/ExportNowControl.swift"),
+        encoding: .utf8
+    )
+    #expect(control.contains("struct ExportNowControl: ControlWidget"))
+    #expect(control.contains("OpenURLIntent(ExportNowRoute().url)"))
+    #expect(control.contains("Label(\"Export now\""))
+    let bundle = try String(
+        contentsOf: root.appendingPathComponent("Apps/StatusWidget/StatusWidgetBundle.swift"),
+        encoding: .utf8
+    )
+    #expect(bundle.contains("ExportNowControl()"))
+    let view = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
+        encoding: .utf8
+    )
+    #expect(view.contains("ExportNowRoute(url: url)"))
+    #expect(view.contains("trigger: .widgetControl"))
+    let intents = try String(
+        contentsOf: root.appendingPathComponent(
+            "Apps/Exporter-iOS/LastSuccessfulExportIntent.swift"
+        ),
+        encoding: .utf8
+    )
+    #expect(intents.contains("struct ExportTypeWindowIntent"))
+    #expect(intents.contains("ReturnsValue<ShortcutExportKind>"))
+    #expect(intents.contains("ohe.exportWindowHours"))
+    #expect(intents.contains("\"Export now with \\(.applicationName)\""))
 }
 
 @Test func failureNotificationAndStatusRowReachFivePartErrorWithinTwoTaps() {

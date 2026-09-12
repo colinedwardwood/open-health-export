@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import AppIntents
+import CoreDomain
+import EnginePorts
 import Foundation
 import Watchdog
 
@@ -81,6 +83,50 @@ struct DestinationStatusEntityQuery: EntityQuery {
     }
 }
 
+enum ShortcutExportKind: String, AppEnum {
+    case success
+    case partial
+    case failed
+    case deferred
+    case blocked
+    case nothingDue
+    case sentUnconfirmed
+
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Export outcome")
+
+    static let caseDisplayRepresentations: [ShortcutExportKind: DisplayRepresentation] = [
+        .success: "Success",
+        .partial: "Partial",
+        .failed: "Failed",
+        .deferred: "Deferred",
+        .blocked: "Blocked",
+        .nothingDue: "Nothing due",
+        .sentUnconfirmed: "Sent, unconfirmed",
+    ]
+
+    static func summarizing(_ outcomes: [RunOutcome.Kind]) -> ShortcutExportKind {
+        switch CombinedExportSummary.kind(outcomes) {
+        case .success: .success
+        case .successNothingDue: .nothingDue
+        case .partial: .partial
+        case .failed: .failed
+        case .unknownAck: .sentUnconfirmed
+        case .localNetworkDenied: .blocked
+        case .blockedDeviceLocked, .abandonedNoBudget, .cancelledBySystem, .blockedLowPower:
+            .deferred
+        }
+    }
+
+    static func kinds(fromExportLines lines: [String]) -> [RunOutcome.Kind] {
+        lines.compactMap { line in
+            guard let separator = line.lastIndex(of: ":") else { return nil }
+            let raw = String(line[line.index(after: separator)...])
+                .trimmingCharacters(in: .whitespaces)
+            return RunOutcome.Kind(rawValue: raw)
+        }
+    }
+}
+
 struct LastSuccessfulExportIntent: AppIntent {
     static let title: LocalizedStringResource = "Last successful export"
     static let description = IntentDescription(
@@ -120,7 +166,7 @@ struct ExportOnePageIntent: AppIntent {
     )
     static let openAppWhenRun = false
 
-    func perform() async throws -> some IntentResult & ReturnsValue<String> {
+    func perform() async throws -> some IntentResult & ReturnsValue<ShortcutExportKind> {
         if let reason = ShortcutExportAuthorization.denyReason(
             disclosureAcknowledged: UserDefaults.standard.bool(forKey: "ohe.disclosureAcknowledged"),
             localFileEnabled: HarnessExport.isLocalFileEnabled()
@@ -131,7 +177,43 @@ struct ExportOnePageIntent: AppIntent {
             throw ShortcutExportError.destinationDisabled
         }
         let lines = try await HarnessExport.runOnePageEachMetric(trigger: .shortcut)
-        return .result(value: lines.joined(separator: "\n"))
+        return .result(
+            value: ShortcutExportKind.summarizing(ShortcutExportKind.kinds(fromExportLines: lines))
+        )
+    }
+}
+
+struct ExportTypeWindowIntent: AppIntent {
+    static let title: LocalizedStringResource = "Export type for window"
+    static let description = IntentDescription(
+        "Runs one anchored page of one type using the owned export window. Outcomes are kinds, not health values."
+    )
+    static let openAppWhenRun = false
+
+    @Parameter(title: "Type identifier")
+    var metricIdentifier: String
+
+    @Parameter(title: "Window hours")
+    var windowHours: Int
+
+    func perform() async throws -> some IntentResult & ReturnsValue<ShortcutExportKind> {
+        if let reason = ShortcutExportAuthorization.denyReason(
+            disclosureAcknowledged: UserDefaults.standard.bool(forKey: "ohe.disclosureAcknowledged"),
+            localFileEnabled: HarnessExport.isLocalFileEnabled()
+        ) {
+            if reason.contains("disclosure") {
+                throw ShortcutExportError.disclosureRequired
+            }
+            throw ShortcutExportError.destinationDisabled
+        }
+        UserDefaults.standard.set(max(1, windowHours), forKey: "ohe.exportWindowHours")
+        let lines = try await HarnessExport.runOnePageEachMetric(
+            metrics: [MetricID(rawValue: metricIdentifier)],
+            trigger: .shortcut
+        )
+        return .result(
+            value: ShortcutExportKind.summarizing(ShortcutExportKind.kinds(fromExportLines: lines))
+        )
     }
 }
 
@@ -150,10 +232,19 @@ struct ExporterShortcuts: AppShortcutsProvider {
             intent: ExportOnePageIntent(),
             phrases: [
                 "Export one page with \(.applicationName)",
+                "Export now with \(.applicationName)",
                 "Run a local export with \(.applicationName)",
             ],
-            shortTitle: "Export one page",
+            shortTitle: "Export now",
             systemImageName: "square.and.arrow.up"
+        )
+        AppShortcut(
+            intent: ExportTypeWindowIntent(),
+            phrases: [
+                "Export a type for a window with \(.applicationName)",
+            ],
+            shortTitle: "Export type for window",
+            systemImageName: "calendar"
         )
     }
 }

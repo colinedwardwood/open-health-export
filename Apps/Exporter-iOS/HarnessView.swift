@@ -2291,6 +2291,10 @@ struct HarnessView: View {
             applyErrorRoute(route)
             return
         }
+        if ExportNowRoute(url: url) != nil {
+            applyExportNowRoute()
+            return
+        }
         applyWidgetStatusURL(url)
     }
 
@@ -2328,6 +2332,16 @@ struct HarnessView: View {
             return
         }
         status = "Ready. Opened destination status for \(snapshot.destinationID)."
+    }
+
+    private func applyExportNowRoute() {
+        guard disclosureAcknowledged, HarnessExport.isLocalFileEnabled() else {
+            status = disclosureAcknowledged
+                ? "Enable the local archive folder before exporting from Control Centre."
+                : "Review the disclosure before exporting from Control Centre."
+            return
+        }
+        Task { await runLocalExport(trigger: .widgetControl) }
     }
 
     private func applyWidgetStatusURL(_ url: URL) {

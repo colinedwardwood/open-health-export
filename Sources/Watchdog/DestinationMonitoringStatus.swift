@@ -71,3 +71,22 @@ public struct WidgetStatusRoute: Sendable, Equatable {
         return components.url!
     }
 }
+
+/// UX-38: Control Centre "Export now" opens the app on this route and runs one page.
+public struct ExportNowRoute: Sendable, Equatable {
+    public static let scheme = WidgetStatusRoute.scheme
+    public static let host = "export-now"
+
+    public init() {}
+
+    public init?(url: URL) {
+        guard url.scheme == Self.scheme, url.host == Self.host else { return nil }
+    }
+
+    public var url: URL {
+        var components = URLComponents()
+        components.scheme = Self.scheme
+        components.host = Self.host
+        return components.url!
+    }
+}

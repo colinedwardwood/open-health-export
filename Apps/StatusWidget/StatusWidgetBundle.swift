@@ -8,5 +8,6 @@ import WidgetKit
 struct StatusWidgetBundle: WidgetBundle {
     var body: some Widget {
         ExportStatusWidget()
+        ExportNowControl()
     }
 }
