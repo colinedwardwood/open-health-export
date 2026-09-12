@@ -43,6 +43,16 @@ def check_issue(body: str, policy: dict, tag: str | None) -> list[str]:
         value = sections.get(heading, "")
         if not value or value.lower() in {"_no response_", "n/a", "none"}:
             problems.append(f"release issue section is empty: {heading}")
+    for heading, terms in policy.get("requiredEvidenceTerms", {}).items():
+        value = sections.get(heading, "")
+        for term in terms:
+            matching_lines = [
+                line for line in value.splitlines() if term.casefold() in line.casefold()
+            ]
+            if not matching_lines:
+                problems.append(f"{heading} lacks required evidence: {term}")
+            elif not any(evidence_reference(line) for line in matching_lines):
+                problems.append(f"{heading} evidence is not linked: {term}")
     unchecked = re.findall(r"^- \[ \] (.+)$", body, re.MULTILINE)
     if unchecked:
         problems.append(f"release issue has {len(unchecked)} unchecked gate(s)")
@@ -54,6 +64,14 @@ def check_issue(body: str, policy: dict, tag: str | None) -> list[str]:
         if version != tag:
             problems.append(f"release tag {tag!r} does not match issue app version {version!r}")
     return problems
+
+
+def evidence_reference(line: str) -> bool:
+    return bool(
+        re.search(r"https://\S+", line)
+        or re.search(r"\[[^\]]+\]\([^)]+\)", line)
+        or re.search(r"`[^`/]+/[^`]+`", line)
+    )
 
 
 def check_runs(payload: dict, required: list[str]) -> list[str]:

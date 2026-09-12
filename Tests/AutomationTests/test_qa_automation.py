@@ -86,6 +86,30 @@ class ReleaseTests(unittest.TestCase):
             release.check_issue(body, policy, "v1.0.0"),
         )
 
+    def test_release_evidence_terms_must_each_be_linked(self):
+        policy = {
+            "requiredIssueSections": ["QA evidence"],
+            "requiredEvidenceTerms": {"QA evidence": ["device pass", "soak"]},
+        }
+        body = (
+            "### QA evidence\n\n"
+            "- [device pass](https://example.invalid/device)\n"
+            "- soak completed without an artifact\n"
+            "\n- [x] Required gate\n"
+        )
+        self.assertEqual(
+            release.check_issue(body, policy, None),
+            ["QA evidence evidence is not linked: soak"],
+        )
+
+    def test_repository_paths_are_accepted_as_evidence(self):
+        policy = {
+            "requiredIssueSections": ["QA evidence"],
+            "requiredEvidenceTerms": {"QA evidence": ["migration"]},
+        }
+        body = "### QA evidence\n\n- migration: `qa/migrations/v1.json`\n\n- [x] Gate\n"
+        self.assertEqual(release.check_issue(body, policy, None), [])
+
     def test_all_required_checks_must_succeed(self):
         payload = {
             "check_runs": [

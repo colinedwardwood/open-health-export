@@ -32,21 +32,21 @@ body:
     id: qa-evidence
     attributes:
       label: QA evidence
-      description: Link device pass, soak, canary, energy, accessibility, performance, migration, P0/P1, and flake evidence.
+      description: Put device pass, soak, canary, energy, accessibility, performance, migration, P0/P1, and flake evidence on separate linked lines.
     validations:
       required: true
   - type: textarea
     id: compliance-evidence
     attributes:
       label: Compliance evidence
-      description: Name the reviewers and link the R-109/R-111 sign-offs.
+      description: Put the named reviewers and linked R-109 and R-111 sign-offs on separate lines.
     validations:
       required: true
   - type: textarea
     id: provenance-evidence
     attributes:
       label: Provenance and stranger-test evidence
-      description: Link BUILDINFO, SBOM, attestations, clean build-from-source result, and last-good tag.
+      description: Put BUILDINFO, SBOM, attestations, clean build-from-source result, and last-good tag on separate linked lines.
     validations:
       required: true
   - type: checkboxes

@@ -13,6 +13,26 @@
     "Compliance evidence",
     "Provenance and stranger-test evidence"
   ],
+  "requiredEvidenceTerms": {
+    "QA evidence": [
+      "device pass",
+      "soak",
+      "canary",
+      "energy",
+      "accessibility",
+      "performance",
+      "migration",
+      "flake"
+    ],
+    "Compliance evidence": ["reviewer", "R-109", "R-111"],
+    "Provenance and stranger-test evidence": [
+      "BUILDINFO",
+      "SBOM",
+      "attestation",
+      "build-from-source",
+      "last-good"
+    ]
+  },
   "requiredChecks": [
     "licence-headers",
     "export-core",

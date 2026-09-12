@@ -3,3 +3,7 @@ machine-readable release evidence validation, critical-module and patch
 coverage thresholds, a last-20-nightly flake report, and release-artifact
 sponsor-gating scans. Repository rules still must require the validation
 workflow before a tag or release is published.
+
+Release validation now also requires individually linked device, soak, canary,
+energy, accessibility, performance, migration, flake, compliance, provenance,
+and stranger-build evidence rather than accepting a non-empty evidence section.
