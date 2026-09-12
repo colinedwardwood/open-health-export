@@ -700,10 +700,17 @@ enum HarnessExport {
     }
 
     static func recordNotificationSuppressionIfNeeded() async throws {
-        let denied = await LocalUserNotifier().authorizationDenied()
+        #if DEBUG
+        let forcedDenied = ProcessInfo.processInfo
+            .environment["OHE_SEED_NOTIFICATION_AUTHORIZATION"] == "denied"
+        #else
+        let forcedDenied = false
+        #endif
+        let systemDenied = await LocalUserNotifier().authorizationDenied()
+        let denied = forcedDenied || systemDenied
         let defaults = UserDefaults.standard
         let key = "ohe.notificationsPreviouslyDenied"
-        let previouslyDenied = defaults.bool(forKey: key)
+        let previouslyDenied = forcedDenied ? false : defaults.bool(forKey: key)
         defer { defaults.set(denied, forKey: key) }
         guard NotificationSuppression.shouldRecord(
             previouslyDenied: previouslyDenied,

@@ -274,18 +274,20 @@ struct HarnessView: View {
                 } catch {
                     status = "Failed to enforce queue expiry: \(error.localizedDescription)"
                 }
+                #if DEBUG
+                if let scenario = ProcessInfo.processInfo
+                    .environment["OHE_SEED_DESTINATION_STATUS"]
+                {
+                    try? HarnessExport.seedDestinationStatusForUITests(scenario: scenario)
+                }
+                #endif
                 try? await HarnessExport.recordNotificationSuppressionIfNeeded()
                 await restorePairing()
                 await refreshLedgerIntegrity()
                 await refreshWakeAttribution()
                 await refreshSecurityAdvisory()
                 #if DEBUG
-                if let scenario = ProcessInfo.processInfo
-                    .environment["OHE_SEED_DESTINATION_STATUS"]
-                {
-                    try? HarnessExport.seedDestinationStatusForUITests(scenario: scenario)
-                    refreshDestinationSurfaces()
-                }
+                refreshDestinationSurfaces()
                 if let held = ProcessInfo.processInfo.environment["OHE_SEED_ANCHOR_HOLD"] {
                     try? await HarnessExport.seedAnchorHoldForUITests(
                         metric: MetricID(rawValue: held)

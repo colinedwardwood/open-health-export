@@ -697,6 +697,23 @@ final class ExporterUITests: XCTestCase {
         }
     }
 
+    func testDestinationChangeStillEscalatesWhenNotificationsAreDenied() throws {
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_DESTINATION_STATUS"] = "changed"
+        app.launchEnvironment["OHE_SEED_NOTIFICATION_AUTHORIZATION"] = "denied"
+        app.launch()
+        enterControls()
+        let refresh = scrollToHittable(app.buttons["destination-refresh"])
+        refresh.tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["destination-change-banner"]
+                .waitForExistence(timeout: uiWait)
+        )
+        XCTAssertTrue(
+            app.staticTexts["destination-status-0"].waitForExistence(timeout: uiWait)
+        )
+    }
+
     /// QA-17's paused type is the other half of permission-limited: the type is enabled
     /// but not flowing, and the banner saying so is on the first screen.
     func testPausedAnchorBannerPassesAccessibilityAudit() throws {
