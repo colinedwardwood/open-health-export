@@ -223,7 +223,10 @@ enum HarnessExport {
     /// pages follow that owned setting so the next batch is smaller.
     static func samplePageLimit() -> Int {
         let stored = UserDefaults.standard.object(forKey: "ohe.exportWindowHours") as? Int
-        return SamplePaging.pageLimit(windowHours: stored ?? 24)
+        return SamplePaging.pageLimit(
+            windowHours: stored ?? 24,
+            thermalHalved: isThermalDeferred()
+        )
     }
 
     static func freshnessCadenceSeconds() -> TimeInterval {

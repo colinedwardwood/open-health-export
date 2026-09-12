@@ -1,0 +1,1 @@
+Data-browser search finds types by HealthKit identifier, display name, and curated synonyms such as weight, steps, HRV, SpO2, VO2, and BP. Timeouts now say the destination settings look correct, matching 5xx copy. Live HealthKit pages shrink by half while the iPhone is thermally serious.

@@ -111,6 +111,19 @@ import Testing
         SamplePaging.pageLimit(windowHours: 6)
             < SamplePaging.pageLimit(windowHours: 24)
     )
+    #expect(
+        SamplePaging.pageLimit(windowHours: 24, thermalHalved: true)
+            == SamplePaging.defaultPageLimit / 2
+    )
+    #expect(
+        SamplePaging.pageLimit(windowHours: 1, thermalHalved: true)
+            == SamplePaging.minimumPageLimit
+    )
+
+    let timeout = UserFacingErrorObject.make(archetype: .timeout, destinationLabel: "nas")
+    let http5xx = UserFacingErrorObject.make(archetype: .http5xx, destinationLabel: "nas")
+    #expect(timeout.cause.contains("Your settings here look correct."))
+    #expect(http5xx.cause.contains("Your settings here look correct."))
 }
 
 @Test func errorClassManifestCopyAvoidsUX28Phrases() {

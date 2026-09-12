@@ -238,7 +238,7 @@ public struct UserFacingErrorObject: Sendable, Equatable {
         case .timeout:
             return (
                 "\(label) didn't respond in time",
-                "The host may be asleep, or the connection may be slow.",
+                "The host may be asleep, or the connection may be slow. Your settings here look correct.",
                 "Try again on Wi-Fi. If the server sleeps, wake it or increase its timeout.",
                 [.testAgain]
             )

@@ -143,9 +143,12 @@ public enum SamplePaging {
 
     /// UX-29: shortening the owned export window reduces the next HealthKit page,
     /// which is what a 413 response is asking for. Older undelivered samples stay queued.
-    public static func pageLimit(windowHours: Int) -> Int {
+    /// Thermal ≥ serious also halves the page (reliability thermal policy).
+    public static func pageLimit(windowHours: Int, thermalHalved: Bool = false) -> Int {
         let hours = max(1, windowHours)
-        return max(minimumPageLimit, defaultPageLimit * hours / 24)
+        let base = max(minimumPageLimit, defaultPageLimit * hours / 24)
+        guard thermalHalved else { return base }
+        return max(minimumPageLimit, base / 2)
     }
 }
 

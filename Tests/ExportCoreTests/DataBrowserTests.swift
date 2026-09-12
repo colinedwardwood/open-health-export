@@ -165,6 +165,27 @@ private func browserSample(
     )
 }
 
+@Test func ux17SearchMatchesIdentifierDisplayNameAndSynonyms() {
+    func ids(_ needle: String) -> Set<MetricID> {
+        Set(DataBrowser.rows(latest: [:], search: needle).map(\.metric))
+    }
+
+    #expect(ids("HKQuantityTypeIdentifierStepCount") == [MetricCatalog.stepCount.id])
+    #expect(ids("steps") == [MetricCatalog.stepCount.id])
+    #expect(ids("step count") == [MetricCatalog.stepCount.id])
+    #expect(ids("weight") == [MetricCatalog.bodyMass.id])
+    #expect(ids("HRV") == [MetricCatalog.heartRateVariabilitySDNN.id])
+    #expect(ids("SpO2") == [MetricCatalog.oxygenSaturation.id])
+    #expect(ids("VO2") == [MetricCatalog.vo2Max.id])
+    #expect(ids("glucose") == [MetricCatalog.bloodGlucose.id])
+    #expect(
+        ids("BP") == [
+            MetricCatalog.bloodPressureSystolic.id,
+            MetricCatalog.bloodPressureDiastolic.id,
+        ]
+    )
+}
+
 @Test func ux20SchedulingCopyNamesIOSTimingLockAndChosenTimeControls() {
     #expect(SchedulingHonesty.body.contains("iOS decides when background export runs"))
     #expect(SchedulingHonesty.body.contains("locked"))

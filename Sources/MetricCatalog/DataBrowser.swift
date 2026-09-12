@@ -239,7 +239,6 @@ public enum DataBrowser {
         displayUnits: UnitDisplayPolicy = .canonical,
         coverage: [MetricID: CoverageObservation] = [:]
     ) -> [DataBrowserRow] {
-        let needle = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return MetricCatalog.selectable.compactMap { declaration in
             let title = declaration.wireId.replacingOccurrences(of: "_", with: " ")
             let sample = latest[declaration.id]
@@ -279,14 +278,7 @@ public enum DataBrowser {
                 coverage: state
             )
             if onlyWithData, !row.hasData { return nil }
-            if needle.isEmpty { return row }
-            let haystack = [
-                title,
-                declaration.wireId,
-                declaration.hkIdentifier,
-                declaration.id.rawValue,
-            ].joined(separator: " ").lowercased()
-            return haystack.contains(needle) ? row : nil
+            return MetricSearch.matches(declaration, needle: search) ? row : nil
         }
     }
 
