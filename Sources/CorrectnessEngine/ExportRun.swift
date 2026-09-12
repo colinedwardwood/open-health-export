@@ -296,8 +296,11 @@ public struct ExportRun: Sendable {
         try FileWriteKit.writeAtomically(payload, to: payloadURL)
         mark("transform")
 
-        let recordCount = page.censusKeys.count + page.tombstones.count + aggregates.count
+        let recordCount = page.encodedRecordCount + aggregates.count
         var rangeDays = page.censusKeys.map(\.day)
+        rangeDays.append(
+            contentsOf: page.correlations.map { String($0.start.prefix(10)) }
+        )
         rangeDays.append(
             contentsOf: aggregates.map { String($0.record.bucketStart.prefix(10)) }
         )

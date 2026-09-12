@@ -262,6 +262,11 @@ enum CategoryConversion {
 enum CorrelationConversion {
     static let bloodPressureMetric = MetricID(rawValue: "blood_pressure")
 
+    static func isBloodPressureComponent(_ metric: MetricID) -> Bool {
+        metric == MetricCatalog.bloodPressureSystolic.id
+            || metric == MetricCatalog.bloodPressureDiastolic.id
+    }
+
     static func correlationType(for metric: MetricID) -> HKCorrelationType? {
         guard metric == bloodPressureMetric else { return nil }
         return HKCorrelationType.correlationType(forIdentifier: .bloodPressure)
@@ -622,7 +627,13 @@ public enum HealthKitAuthorization {
     }
 
     public static func readTypes(for metrics: [MetricID]) -> Set<HKObjectType> {
-        Set(metrics.compactMap(objectType(for:)))
+        var types = Set(metrics.compactMap(objectType(for:)))
+        if metrics.contains(where: CorrelationConversion.isBloodPressureComponent),
+           let pairing = HKCorrelationType.correlationType(forIdentifier: .bloodPressure)
+        {
+            types.insert(pairing)
+        }
+        return types
     }
 
     /// UX-05: limited history is the only positively detectable HealthKit read
@@ -890,6 +901,33 @@ public final class HealthKitSampleSource: SampleSource, @unchecked Sendable {
         guard let type = SampleConversion.quantityType(for: metric) else {
             throw HealthKitSourceError.unknownMetric(metric)
         }
+        let page = try await anchoredQuantityPage(
+            metric: metric,
+            type: type,
+            afterAnchor: afterAnchor
+        )
+        guard CorrelationConversion.isBloodPressureComponent(metric) else {
+            return page
+        }
+        let pairings = try await bloodPressurePairings(
+            covering: page.samples,
+            quantityType: type
+        )
+        return SamplePage(
+            samples: page.samples,
+            correlations: pairings,
+            tombstones: page.tombstones,
+            metric: page.metric,
+            anchorBlob: page.anchorBlob,
+            observedThrough: page.observedThrough
+        )
+    }
+
+    private func anchoredQuantityPage(
+        metric: MetricID,
+        type: HKQuantityType,
+        afterAnchor: Data?
+    ) async throws -> SamplePage {
         let anchor = try afterAnchor.flatMap(AnchorCoding.decode)
         return try await withCheckedThrowingContinuation { continuation in
             let query = HKAnchoredObjectQuery(
@@ -927,6 +965,50 @@ public final class HealthKitSampleSource: SampleSource, @unchecked Sendable {
                         anchorBlob: blob,
                         observedThrough: latest
                     )
+                )
+            }
+            self.store.execute(query)
+        }
+    }
+
+    /// ADR-6: pairing is a date-bounded lookup of correlations that contain this
+    /// page's component samples. Anchoring `HKCorrelationType.bloodPressure` as
+    /// well would double-deliver the same component `HKSample`s.
+    private func bloodPressurePairings(
+        covering samples: [SampleRecord],
+        quantityType: HKQuantityType
+    ) async throws -> [CorrelationRecord] {
+        let uuids = Set(samples.compactMap { UUID(uuidString: $0.key.uuid) })
+        guard !uuids.isEmpty,
+              let correlationType = HKCorrelationType.correlationType(forIdentifier: .bloodPressure)
+        else {
+            return []
+        }
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKCorrelationQuery(
+                type: correlationType,
+                predicate: window.samplePredicate,
+                samplePredicates: [
+                    quantityType: HKQuery.predicateForObjects(with: uuids)
+                ]
+            ) { _, correlations, error in
+                if let error {
+                    continuation.resume(
+                        throwing: HealthKitSourceError.classifiedQueryError(error)
+                    )
+                    return
+                }
+                var unique: [String: CorrelationRecord] = [:]
+                for correlation in correlations ?? [] {
+                    let record = CorrelationConversion.records(
+                        from: correlation,
+                        metric: CorrelationConversion.bloodPressureMetric,
+                        context: self.context
+                    ).correlation
+                    unique[record.key.uuid] = record
+                }
+                continuation.resume(
+                    returning: unique.values.sorted { $0.key.uuid < $1.key.uuid }
                 )
             }
             self.store.execute(query)
@@ -1010,6 +1092,9 @@ public final class HealthKitCategorySource: SampleSource, @unchecked Sendable {
     }
 }
 
+/// Unused by selectable metrics. Blood pressure pairing rides on component
+/// quantity pages via `HKCorrelationQuery` so the correlation type is never
+/// an anchored export cursor (ADR-6).
 public final class HealthKitCorrelationSource: SampleSource, @unchecked Sendable {
     private let store: HKHealthStore
     private let context: TemporalContext

@@ -274,7 +274,7 @@
     },
     {
       "identifier": "HKCorrelationTypeIdentifierBloodPressure",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
+      "reason": "Not a selectable metric. Pairing is emitted as sample.correlation on systolic and diastolic quantity pages via a date-bounded HKCorrelationQuery (ADR-6), not a second anchored cursor."
     },
     {
       "identifier": "HKCorrelationTypeIdentifierFood",

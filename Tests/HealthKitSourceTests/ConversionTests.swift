@@ -149,6 +149,37 @@ import WireFormat
     #expect(converted.correlation.correlationType == "bloodPressure")
 }
 
+@Test func bloodPressurePairingAuthorizesTheCorrelationTypeOnComponentReads() throws {
+    let source = try String(
+        contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/HealthKitSource/HealthKitSampleSource.swift"),
+        encoding: .utf8
+    )
+    #expect(source.contains("HKCorrelationQuery"))
+    #expect(source.contains("isBloodPressureComponent"))
+    #expect(source.contains("bloodPressurePairings"))
+    let systolicReads = HealthKitAuthorization.readTypes(
+        for: [MetricCatalog.bloodPressureSystolic.id]
+    )
+    let diastolicReads = HealthKitAuthorization.readTypes(
+        for: [MetricCatalog.bloodPressureDiastolic.id]
+    )
+    let pairing = HKCorrelationType(.bloodPressure)
+    #expect(systolicReads.contains(pairing))
+    #expect(diastolicReads.contains(pairing))
+    #expect(
+        !HealthKitAuthorization.readTypes(for: [MetricCatalog.heartRate.id]).contains(pairing)
+    )
+    #expect(
+        !MetricCatalog.selectable.contains {
+            $0.hkIdentifier == "HKCorrelationTypeIdentifierBloodPressure"
+        }
+    )
+}
+
 @Test func workoutConversionKeepsHealthKitDurationAndRawActivityType() {
     let start = Date(timeIntervalSince1970: 1_704_067_200)
     let workout = HKWorkout(

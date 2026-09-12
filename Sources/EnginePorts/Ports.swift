@@ -59,13 +59,25 @@ public struct SamplePage: Sendable {
     public var censusKeys: [(uuid: String, day: String)] {
         samples.map { ($0.key.uuid, String($0.start.prefix(10))) }
             + categories.map { ($0.key.uuid, String($0.start.prefix(10))) }
-            + correlations.map { ($0.key.uuid, String($0.start.prefix(10))) }
+            + correlations.compactMap { record in
+                guard record.metric == metric else { return nil }
+                return (record.key.uuid, String(record.start.prefix(10)))
+            }
             + workouts.map { ($0.key.uuid, String($0.start.prefix(10))) }
             + minds.map { ($0.key.uuid, String($0.start.prefix(10))) }
             + electrocardiograms.map { ($0.key.uuid, String($0.start.prefix(10))) }
             + audiograms.map { ($0.key.uuid, String($0.start.prefix(10))) }
             + medicationDoses.map { ($0.key.uuid, String($0.start.prefix(10))) }
             + series.map { ($0.uuid, String($0.parentStart.prefix(10))) }
+    }
+
+    /// Wire identities on this page, including pairing records that do not belong
+    /// to the anchored metric's census.
+    public var encodedRecordCount: Int {
+        samples.count + categories.count + correlations.count
+            + workouts.count + minds.count + electrocardiograms.count
+            + audiograms.count + medicationDoses.count + series.count
+            + tombstones.count
     }
 }
 

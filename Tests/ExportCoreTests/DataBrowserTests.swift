@@ -270,6 +270,12 @@ private func browserSample(
     #expect(Set(MetricCatalog.selectable.map(\.id)).count == MetricCatalog.selectable.count)
     #expect(MetricCatalog.selectable.contains { $0.kind == "sample.category" })
     #expect(MetricCatalog.all.allSatisfy { $0.kind == "sample.quantity" })
+    #expect(
+        !MetricCatalog.selectable.contains {
+            $0.hkIdentifier == "HKCorrelationTypeIdentifierBloodPressure"
+        }
+    )
+    #expect(!MetricCatalog.selectable.contains { $0.id.rawValue == "blood_pressure" })
 }
 
 @Test func hk30CharacteristicsStayOffByDefaultAndAreFlaggedReidentifying() throws {
