@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import CoreDomain
 import Foundation
 
 public enum DestinationDisplayState: String, Sendable, Equatable, Codable, CaseIterable {
@@ -37,6 +38,7 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
     public var overdueThresholdSeconds: TimeInterval?
     public var nextAttemptEarliestEpoch: TimeInterval?
     public var nextAttemptLatestEpoch: TimeInterval?
+    public var freshnessEstimates: [FreshnessClass: LocalFreshnessEstimate]
     public var unacknowledgedSecurityEventCount: Int
     public var writtenAtEpoch: TimeInterval
 
@@ -55,10 +57,11 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
         overdueThresholdSeconds: TimeInterval? = nil,
         nextAttemptEarliestEpoch: TimeInterval? = nil,
         nextAttemptLatestEpoch: TimeInterval? = nil,
+        freshnessEstimates: [FreshnessClass: LocalFreshnessEstimate] = [:],
         unacknowledgedSecurityEventCount: Int = 0,
         writtenAtEpoch: TimeInterval
     ) {
-        self.schemaVersion = 1
+        self.schemaVersion = 2
         self.destinationID = destinationID
         self.destinationLabel = destinationLabel ?? destinationID
         self.enabled = enabled
@@ -73,6 +76,7 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
         self.overdueThresholdSeconds = overdueThresholdSeconds
         self.nextAttemptEarliestEpoch = nextAttemptEarliestEpoch
         self.nextAttemptLatestEpoch = nextAttemptLatestEpoch
+        self.freshnessEstimates = freshnessEstimates
         self.unacknowledgedSecurityEventCount = max(0, unacknowledgedSecurityEventCount)
         self.writtenAtEpoch = writtenAtEpoch
     }
@@ -93,6 +97,7 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
         case overdueThresholdSeconds
         case nextAttemptEarliestEpoch
         case nextAttemptLatestEpoch
+        case freshnessEstimates
         case unacknowledgedSecurityEventCount
         case writtenAtEpoch
     }
@@ -122,6 +127,11 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
         overdueThresholdSeconds = try values.decodeIfPresent(TimeInterval.self, forKey: .overdueThresholdSeconds)
         nextAttemptEarliestEpoch = try values.decodeIfPresent(TimeInterval.self, forKey: .nextAttemptEarliestEpoch)
         nextAttemptLatestEpoch = try values.decodeIfPresent(TimeInterval.self, forKey: .nextAttemptLatestEpoch)
+        freshnessEstimates =
+            try values.decodeIfPresent(
+                [FreshnessClass: LocalFreshnessEstimate].self,
+                forKey: .freshnessEstimates
+            ) ?? [:]
         unacknowledgedSecurityEventCount =
             try values.decodeIfPresent(Int.self, forKey: .unacknowledgedSecurityEventCount) ?? 0
         writtenAtEpoch = try values.decode(TimeInterval.self, forKey: .writtenAtEpoch)

@@ -188,7 +188,19 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 destination_id TEXT PRIMARY KEY,
                 payload BLOB NOT NULL
             );
-            PRAGMA user_version = 13;
+            CREATE TABLE IF NOT EXISTS freshness_latencies (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
+                destination_id TEXT NOT NULL,
+                freshness_class TEXT NOT NULL,
+                first_observed_at_epoch REAL NOT NULL,
+                observation_latency_seconds REAL NOT NULL,
+                delivery_latency_seconds REAL NOT NULL,
+                recorded_at_epoch REAL NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_freshness_destination_class
+                ON freshness_latencies (destination_id, freshness_class, recorded_at_epoch);
+            PRAGMA user_version = 14;
             """)
     }
 
@@ -464,6 +476,78 @@ private final class SQLiteTransaction: StateTransaction {
             sinceEpoch: newestJournalEpoch() - JournalRetention.seconds,
             maximumRuns: JournalRetention.runs
         )
+    }
+
+    func appendFreshnessLatency(_ observation: RunFreshnessLatency) throws {
+        let stmt = try store.prepare(
+            """
+            INSERT INTO freshness_latencies (
+                run_id, destination_id, freshness_class, first_observed_at_epoch,
+                observation_latency_seconds, delivery_latency_seconds, recorded_at_epoch
+            ) VALUES (?, ?, ?, ?, ?, ?, ?);
+            """
+        )
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, observation.runID.rawValue)
+        bindText(stmt, 2, observation.destinationID)
+        bindText(stmt, 3, observation.freshnessClass.rawValue)
+        sqlite3_bind_double(stmt, 4, observation.firstObservedAtEpoch)
+        sqlite3_bind_double(stmt, 5, observation.observationLatencySeconds)
+        sqlite3_bind_double(stmt, 6, observation.deliveryLatencySeconds)
+        sqlite3_bind_double(stmt, 7, observation.recordedAtEpoch)
+        try stepDone(stmt)
+
+        let prune = try store.prepare(
+            """
+            DELETE FROM freshness_latencies
+            WHERE destination_id = ? AND freshness_class = ?
+              AND id NOT IN (
+                SELECT id FROM freshness_latencies
+                WHERE destination_id = ? AND freshness_class = ?
+                ORDER BY id DESC LIMIT 10000
+              );
+            """
+        )
+        defer { sqlite3_finalize(prune) }
+        bindText(prune, 1, observation.destinationID)
+        bindText(prune, 2, observation.freshnessClass.rawValue)
+        bindText(prune, 3, observation.destinationID)
+        bindText(prune, 4, observation.freshnessClass.rawValue)
+        try stepDone(prune)
+    }
+
+    func loadFreshnessLatencies(
+        destinationID: String,
+        freshnessClass: FreshnessClass
+    ) throws -> [RunFreshnessLatency] {
+        let stmt = try store.prepare(
+            """
+            SELECT run_id, first_observed_at_epoch, observation_latency_seconds,
+                   delivery_latency_seconds, recorded_at_epoch
+            FROM freshness_latencies
+            WHERE destination_id = ? AND freshness_class = ?
+            ORDER BY recorded_at_epoch, id;
+            """
+        )
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, destinationID)
+        bindText(stmt, 2, freshnessClass.rawValue)
+        var observations: [RunFreshnessLatency] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let observation = RunFreshnessLatency(
+                runID: RunID(rawValue: text(stmt, 0)),
+                destinationID: destinationID,
+                freshnessClass: freshnessClass,
+                firstObservedAtEpoch: sqlite3_column_double(stmt, 1),
+                observationLatencySeconds: sqlite3_column_double(stmt, 2),
+                deliveryLatencySeconds: sqlite3_column_double(stmt, 3),
+                recordedAtEpoch: sqlite3_column_double(stmt, 4)
+            ) else {
+                continue
+            }
+            observations.append(observation)
+        }
+        return observations
     }
 
     /// The table's own newest row rather than the wall clock: retention then stays
@@ -904,6 +988,7 @@ private final class SQLiteTransaction: StateTransaction {
             "journal", "ledger", "cursors", "census", "dirty", "pending_batches",
             "deliveries", "gaps", "emitted_index", "aggregate_emit", "type_status",
             "backfill_checkpoints", "anchor_holds", "destination_scopes",
+            "freshness_latencies",
         ] {
             try store.exec("DELETE FROM \(table);")
         }

@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import CoreDomain
 import Foundation
 
 /// Typed, value-free R-27 result shared by App Intents and tests.
@@ -15,6 +16,7 @@ public struct DestinationMonitoringStatus: Sendable, Equatable, Codable {
     public var attribution: String?
     public var attributionConfidence: String?
     public var errorClass: String?
+    public var freshnessEstimates: [FreshnessClass: LocalFreshnessEstimate]
 
     public init(snapshot: DestinationStatusSnapshot, nowEpoch: TimeInterval) {
         destinationID = snapshot.destinationID
@@ -33,6 +35,7 @@ public struct DestinationMonitoringStatus: Sendable, Equatable, Codable {
         attribution = snapshot.attribution
         attributionConfidence = snapshot.attributionConfidence
         errorClass = snapshot.errorClass
+        freshnessEstimates = snapshot.freshnessEstimates
     }
 }
 

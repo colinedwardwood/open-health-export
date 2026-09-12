@@ -404,6 +404,11 @@ public protocol StateTransaction: AnyObject {
     func evict(_ batchID: BatchID, recording: GapRecord) throws
     func recordDelivery(_ receipt: DeliveryReceipt) throws
     func appendJournal(_ event: RunEvent) throws
+    func appendFreshnessLatency(_ observation: RunFreshnessLatency) throws
+    func loadFreshnessLatencies(
+        destinationID: String,
+        freshnessClass: FreshnessClass
+    ) throws -> [RunFreshnessLatency]
     /// OBS-02: drop runs older than `sinceEpoch`, then anything beyond the most recent
     /// `maximumRuns`. Returns how many rows went, so a caller can assert it happened.
     func pruneJournal(sinceEpoch: TimeInterval, maximumRuns: Int) throws -> Int

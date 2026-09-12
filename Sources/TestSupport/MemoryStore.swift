@@ -21,6 +21,7 @@ public final class MemoryTransaction: StateTransaction {
     public var typeStatus: [MetricID: TypeStatus] = [:]
     public var anchorHolds: [MetricID: AnchorHold] = [:]
     public var destinationScopes: [String: DestinationExportScope] = [:]
+    public var freshnessLatencies: [RunFreshnessLatency] = []
     private var pendingOrder: [BatchID] = []
 
     public init() {}
@@ -101,6 +102,19 @@ public final class MemoryTransaction: StateTransaction {
             sinceEpoch: newest - JournalRetention.seconds,
             maximumRuns: JournalRetention.runs
         )
+    }
+
+    public func appendFreshnessLatency(_ observation: RunFreshnessLatency) throws {
+        freshnessLatencies.append(observation)
+    }
+
+    public func loadFreshnessLatencies(
+        destinationID: String,
+        freshnessClass: FreshnessClass
+    ) throws -> [RunFreshnessLatency] {
+        freshnessLatencies.filter {
+            $0.destinationID == destinationID && $0.freshnessClass == freshnessClass
+        }
     }
 
     public func pruneJournal(sinceEpoch: TimeInterval, maximumRuns: Int) throws -> Int {

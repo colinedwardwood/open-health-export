@@ -151,6 +151,7 @@ public struct ExportRun: Sendable {
         #if DEBUG
         try faults.hit(.afterRead)
         #endif
+        let freshnessTiming = freshnessTiming(for: page)
         let returned = page.censusKeys.count + page.tombstones.count
         if !authorizedReexport,
            AnchorGuard.replayIsSuspected(
@@ -314,7 +315,12 @@ public struct ExportRun: Sendable {
             tally.partialCause = "receipt_short"
         }
         let outcome = RunOutcome.derive(from: tally)
-        try await record(outcome: outcome, tally: tally, receipt: receipt)
+        try await record(
+            outcome: outcome,
+            tally: tally,
+            receipt: receipt,
+            freshnessTiming: freshnessTiming
+        )
         return outcome
     }
 
@@ -382,15 +388,45 @@ public struct ExportRun: Sendable {
         return outcome
     }
 
-    private func record(outcome: RunOutcome, tally: RunTally, receipt: DeliveryReceipt?) async throws {
+    private func record(
+        outcome: RunOutcome,
+        tally: RunTally,
+        receipt: DeliveryReceipt?,
+        freshnessTiming: (
+            freshnessClass: FreshnessClass,
+            firstObservedAtEpoch: TimeInterval,
+            observationLatencySeconds: TimeInterval
+        )? = nil
+    ) async throws {
         let nowEpoch = clock.now().timeIntervalSince1970
+        let runID = RunID(rawValue: "run-\(metric.rawValue)")
+        let freshnessLatency: RunFreshnessLatency?
+        if !envelope.demo,
+           outcome.kind == .success,
+           receipt != nil,
+           let freshnessTiming {
+            freshnessLatency = RunFreshnessLatency(
+                runID: runID,
+                destinationID: destinationName,
+                freshnessClass: freshnessTiming.freshnessClass,
+                firstObservedAtEpoch: freshnessTiming.firstObservedAtEpoch,
+                observationLatencySeconds: freshnessTiming.observationLatencySeconds,
+                deliveryLatencySeconds: nowEpoch - freshnessTiming.firstObservedAtEpoch,
+                recordedAtEpoch: nowEpoch
+            )
+        } else {
+            freshnessLatency = nil
+        }
         try await store.transact { tx in
             if let receipt {
                 try tx.recordDelivery(receipt)
             }
+            if let freshnessLatency {
+                try tx.appendFreshnessLatency(freshnessLatency)
+            }
             try tx.appendJournal(
                 RunEvent(
-                    runID: RunID(rawValue: "run-\(metric.rawValue)"),
+                    runID: runID,
                     outcomeKind: outcome.kind.rawValue,
                     detail: envelope.demo
                         ? "demo"
@@ -416,12 +452,35 @@ public struct ExportRun: Sendable {
                 )
             )
         }
-        try writeSnapshot(outcome: outcome, tally: tally)
+        var freshnessEstimates: [FreshnessClass: LocalFreshnessEstimate] = [:]
+        if snapshotURL != nil {
+            for freshnessClass in FreshnessClass.allCases {
+                let observations = try await store.transact {
+                    try $0.loadFreshnessLatencies(
+                        destinationID: destinationName,
+                        freshnessClass: freshnessClass
+                    )
+                }
+                if !observations.isEmpty {
+                    freshnessEstimates[freshnessClass] =
+                        FreshnessTarget.localEstimate(observations: observations)
+                }
+            }
+        }
+        try writeSnapshot(
+            outcome: outcome,
+            tally: tally,
+            freshnessEstimates: freshnessEstimates
+        )
         try writeExternalStatus(outcome: outcome, tally: tally)
         try await writeLedgerHeadSeal()
     }
 
-    private func writeSnapshot(outcome: RunOutcome, tally: RunTally) throws {
+    private func writeSnapshot(
+        outcome: RunOutcome,
+        tally: RunTally,
+        freshnessEstimates: [FreshnessClass: LocalFreshnessEstimate]
+    ) throws {
         guard let snapshotURL else { return }
         let now = clock.now().timeIntervalSince1970
         let prior = try? DestinationSnapshotFile.read(from: snapshotURL)
@@ -442,12 +501,56 @@ public struct ExportRun: Sendable {
                 overdueThresholdSeconds: prior?.overdueThresholdSeconds,
                 nextAttemptEarliestEpoch: prior?.nextAttemptEarliestEpoch,
                 nextAttemptLatestEpoch: prior?.nextAttemptLatestEpoch,
+                freshnessEstimates: freshnessEstimates.isEmpty
+                    ? (prior?.freshnessEstimates ?? [:])
+                    : freshnessEstimates,
                 unacknowledgedSecurityEventCount:
                     prior?.unacknowledgedSecurityEventCount ?? 0,
                 writtenAtEpoch: now
             ),
             to: snapshotURL
         )
+    }
+
+    private func freshnessTiming(
+        for page: SamplePage
+    ) -> (
+        freshnessClass: FreshnessClass,
+        firstObservedAtEpoch: TimeInterval,
+        observationLatencySeconds: TimeInterval
+    )? {
+        guard let freshnessClass = FreshnessClass.knownClass(for: metric) else { return nil }
+        var pairs: [(observedAt: String, end: String)] = []
+        pairs += page.samples.map { ($0.observedAt, $0.end) }
+        pairs += page.categories.map { ($0.observedAt, $0.end) }
+        pairs += page.correlations.map { ($0.observedAt, $0.end) }
+        pairs += page.workouts.map { ($0.observedAt, $0.end) }
+        pairs += page.minds.map { ($0.observedAt, $0.end) }
+        pairs += page.electrocardiograms.map { ($0.observedAt, $0.end) }
+        pairs += page.audiograms.map { ($0.observedAt, $0.end) }
+        pairs += page.medicationDoses.map { ($0.observedAt, $0.end) }
+
+        let timings: [(firstObservedAtEpoch: TimeInterval, latency: TimeInterval)] =
+            pairs.compactMap { pair in
+                guard let observedAt = Self.parseISO8601(pair.observedAt),
+                      let end = Self.parseISO8601(pair.end) else {
+                    return nil
+                }
+                let latency = observedAt.timeIntervalSince(end)
+                guard latency.isFinite, latency >= 0 else { return nil }
+                return (observedAt.timeIntervalSince1970, latency)
+            }
+        return timings.max { $0.latency < $1.latency }
+            .map { (freshnessClass, $0.0, $0.1) }
+    }
+
+    private static func parseISO8601(_ value: String) -> Date? {
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = fractional.date(from: value) {
+            return date
+        }
+        return ISO8601DateFormatter().date(from: value)
     }
 
     private func writeLedgerHeadSeal() async throws {
