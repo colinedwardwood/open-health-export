@@ -58,9 +58,10 @@ public enum ReconcilePlanner {
         switch outcome {
         case .identical:
             break
-        case .countGreater, .digestMismatch:
-            repairs.append(.reemitDay)
-        case .countSmaller:
+        case .countGreater, .countSmaller, .digestMismatch:
+            // Equal counts with a new UUID set is FIX-M05 / restore-from-backup:
+            // skip would leave the destination on the old identities; re-emit
+            // without absence tombstones would duplicate census and live UUIDs.
             let tombs = ReconcileCompare.tombstonesForAbsence(
                 indexed: indexed,
                 observedUUIDs: Set(observedUUIDs),
@@ -69,7 +70,6 @@ public enum ReconcilePlanner {
             if !tombs.isEmpty {
                 repairs.append(.emitAbsenceTombstones(tombs))
             }
-            // Also re-emit so aggregates catch up after the deletion set-diff.
             repairs.append(.reemitDay)
         }
         return ReconcileDayPlan(metric: metric, day: day, outcome: outcome, repairs: repairs)

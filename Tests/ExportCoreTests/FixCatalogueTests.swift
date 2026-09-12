@@ -501,9 +501,44 @@ enum FixWitness {
     }
 
     static func m05() throws {
-        let before = ReconcileCompare.fold(uuids: ["old-uuid-1"])
-        let after = ReconcileCompare.fold(uuids: ["new-uuid-1"])
+        let old = "old-uuid-1"
+        let new = "new-uuid-1"
+        let before = ReconcileCompare.fold(uuids: [old])
+        let after = ReconcileCompare.fold(uuids: [new])
+        #expect(before.count == after.count)
         #expect(before.digestXor != after.digestXor)
+        let metric = MetricID(rawValue: "heartRate")
+        let stored = CensusRow(
+            metric: metric,
+            day: "2024-01-01",
+            sampleCount: before.count,
+            digest: String(before.digestXor, radix: 16)
+        )
+        let plan = ReconcilePlanner.planDay(
+            metric: metric,
+            day: "2024-01-01",
+            stored: stored,
+            indexed: [
+                EmittedIndexRow(
+                    uuid: old,
+                    metric: metric,
+                    day: "2024-01-01",
+                    digest: "x",
+                    batchID: BatchID(rawValue: "b")
+                )
+            ],
+            observed: [heartSample(new)]
+        )
+        #expect(plan.outcome == .digestMismatch)
+        #expect(plan.repairs.contains(.reemitDay))
+        guard case .emitAbsenceTombstones(let tombs) = plan.repairs.first(where: {
+            if case .emitAbsenceTombstones = $0 { return true }
+            return false
+        }) else {
+            Issue.record("FIX-M05 restore must tombstone the pre-restore UUID")
+            return
+        }
+        #expect(tombs.map(\.key.uuid) == [old])
     }
 
     static func m06() throws {
