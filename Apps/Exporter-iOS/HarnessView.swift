@@ -642,6 +642,7 @@ struct HarnessView: View {
             }
             Text("Your health data is sent only to destinations listed here. This is what the app records about its own use, not independent proof.")
                 .font(.footnote)
+            ConfigurationImportView()
             Button("Enable local archive folder (R-25 test)") {
                 Task { await enableLocalFile() }
             }
