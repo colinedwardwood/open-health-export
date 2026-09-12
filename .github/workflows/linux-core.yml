@@ -57,6 +57,7 @@ jobs:
           grep -F 'exportruncheck outcome=success' /tmp/t0-exportrun.out
           grep -F 'declared_records=200' /tmp/t0-exportrun.out
           grep -F 'limit_mib=100' /tmp/t0-exportrun.out
+          grep -F 'formats=native-ndjson,native-json,native-json-pretty,csv,hae' /tmp/t0-exportrun.out
       - name: Import policy
         run: swift run policycheck
       - name: Validate NFR-to-evidence mapping

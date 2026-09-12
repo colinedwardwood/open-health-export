@@ -193,6 +193,7 @@ struct ExportRunCheck {
                 + " input_lines=\(inputLines)"
                 + " peak_rss_mib=\(memoryResult)"
                 + " limit_mib=\(memoryLimitMiB)"
+                + " formats=native-ndjson,native-json,native-json-pretty,csv,hae"
         )
     }
 
@@ -224,7 +225,8 @@ struct ExportRunCheck {
         samples: [SampleRecord],
         metric: MetricID,
         sequence: Int,
-        scratchRoot: URL
+        scratchRoot: URL,
+        exerciseSidecars: Bool
     ) async throws -> (read: Int, acked: Int) {
         let pageScratch = scratchRoot.appendingPathComponent("page-\(sequence)")
         try FileManager.default.createDirectory(at: pageScratch, withIntermediateDirectories: true)
@@ -232,7 +234,12 @@ struct ExportRunCheck {
         let store = MemoryStateStore()
         let run = ExportRun(
             source: CorpusSliceSource(samples: samples, sequence: sequence),
-            destination: .testing(AuditingSink(expectedQuantityRecords: samples.count)),
+            destination: .testing(
+                AuditingSink(
+                    expectedQuantityRecords: samples.count,
+                    exerciseSidecars: exerciseSidecars
+                )
+            ),
             store: store,
             metric: metric,
             scratchDirectory: pageScratch,
@@ -281,7 +288,8 @@ struct ExportRunCheck {
                 samples: samples,
                 metric: work.metric,
                 sequence: (work.ordinal + 1) * 1_000_000 + pageNumber,
-                scratchRoot: scratchRoot
+                scratchRoot: scratchRoot,
+                exerciseSidecars: pageNumber == 1
             )
             return (counts.read, counts.acked)
         }
@@ -369,9 +377,11 @@ private struct CorpusSliceSource: SampleSource {
 
 private struct AuditingSink: DestinationSink {
     let expectedQuantityRecords: Int
+    let exerciseSidecars: Bool
 
     func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt {
-        let data = try Data(contentsOf: URL(fileURLWithPath: fileHandle))
+        let payloadURL = URL(fileURLWithPath: fileHandle)
+        let data = try Data(contentsOf: payloadURL)
         let text = String(decoding: data, as: UTF8.self)
         let quantityRecords = text.split(whereSeparator: \.isNewline)
             .filter { $0.contains("\"kind\":\"sample.quantity\"") }
@@ -381,6 +391,24 @@ private struct AuditingSink: DestinationSink {
                 expected: expectedQuantityRecords,
                 emitted: quantityRecords
             )
+        }
+        if exerciseSidecars {
+            try NativeSidecars.write(fromNDJSON: data, beside: payloadURL)
+            let encodings = payloadURL.deletingPathExtension().appendingPathExtension("encodings")
+            let names = Set(
+                try FileManager.default.contentsOfDirectory(atPath: encodings.path)
+            )
+            let required = Set([
+                "_meta.json",
+                "batch.hae.json",
+                "batch.json",
+                "batch.pretty.json",
+            ])
+            guard required.isSubset(of: names),
+                  names.contains(where: { $0.hasSuffix(".csv") })
+            else {
+                throw CheckError.missingSidecars(names.sorted())
+            }
         }
         return DeliveryReceipt(
             batchID: idempotencyKey,
@@ -397,6 +425,7 @@ private enum CheckError: Error, CustomStringConvertible {
     case declaredCountMismatch(declared: Int, accounted: Int)
     case skippedExportable(parsed: Int, submitted: Int)
     case payloadQuantityMismatch(expected: Int, emitted: Int)
+    case missingSidecars([String])
     case invalidPageSize(maximum: Int)
     case noSamples
     case outcome(metric: String, outcome: String)
@@ -420,6 +449,8 @@ private enum CheckError: Error, CustomStringConvertible {
             "parsed \(parsed) exportable records but submitted \(submitted) to ExportRun"
         case .payloadQuantityMismatch(let expected, let emitted):
             "ExportRun payload contains \(emitted) quantity records, expected \(expected)"
+        case .missingSidecars(let names):
+            "bounded page did not produce every sidecar format: \(names)"
         case .invalidPageSize(let maximum):
             "--page-size must be an integer from 1 through \(maximum)"
         case .noSamples:

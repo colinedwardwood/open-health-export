@@ -64,6 +64,7 @@ jobs:
           grep -F 'exportruncheck outcome=success' /tmp/t1-exportrun.out
           grep -F 'declared_records=10000000' /tmp/t1-exportrun.out
           grep -F 'limit_mib=100' /tmp/t1-exportrun.out
+          grep -F 'formats=native-ndjson,native-json,native-json-pretty,csv,hae' /tmp/t1-exportrun.out
   tier-two-pathologies:
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 4 * * 0'
     runs-on: ubuntu-latest
@@ -104,4 +105,5 @@ jobs:
           grep -F 'exportruncheck outcome=success' /tmp/t2-exportrun.out
           grep -F 'declared_records=50000000' /tmp/t2-exportrun.out
           grep -F 'limit_mib=100' /tmp/t2-exportrun.out
+          grep -F 'formats=native-ndjson,native-json,native-json-pretty,csv,hae' /tmp/t2-exportrun.out
           printf 'tier=T2 records=50000000 sha256=%s\n' "$digest"
