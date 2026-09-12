@@ -13,10 +13,15 @@ import Security
 public final class URLSessionHTTPTransport: HTTPTransport, @unchecked Sendable {
     private let session: URLSession
     private let delegate: HTTPSessionDelegate
+    private let resolver: any AddressResolver
 
-    public init(pin: PinRecord? = nil) {
-        let delegate = HTTPSessionDelegate(pin: pin)
+    public init(
+        pin: PinRecord? = nil,
+        resolver: any AddressResolver = SystemAddressResolver()
+    ) {
+        let delegate = HTTPSessionDelegate(pin: pin, resolver: resolver)
         self.delegate = delegate
+        self.resolver = resolver
         let configuration = URLSessionConfiguration.ephemeral
         session = URLSession(
             configuration: configuration,
@@ -27,11 +32,19 @@ public final class URLSessionHTTPTransport: HTTPTransport, @unchecked Sendable {
 
     public func execute(_ request: OutboundHTTPRequest) async throws -> OutboundHTTPResponse {
         EgressAttemptLog.record(kind: .http, host: request.url.host ?? request.url.absoluteString)
-        var urlRequest = URLRequest(url: request.url)
+        let connectionURL = try await connectTimeURL(for: request.url)
+        var urlRequest = URLRequest(url: connectionURL)
         urlRequest.timeoutInterval = 30
         urlRequest.httpMethod = request.method
         for (name, value) in request.headers {
             urlRequest.setValue(value, forHTTPHeaderField: name)
+        }
+        if connectionURL != request.url, let host = request.url.host {
+            let defaultPort = request.url.port == nil || request.url.port == 80
+            urlRequest.setValue(
+                defaultPort ? host : "\(host):\(request.url.port!)",
+                forHTTPHeaderField: "Host"
+            )
         }
         urlRequest.httpBody = try Data(contentsOf: request.bodyFile)
         let (data, response) = try await session.data(for: urlRequest)
@@ -48,7 +61,36 @@ public final class URLSessionHTTPTransport: HTTPTransport, @unchecked Sendable {
     }
 
     public func applyingPin(_ pin: PinRecord) -> any HTTPTransport {
-        URLSessionHTTPTransport(pin: pin)
+        URLSessionHTTPTransport(pin: pin, resolver: resolver)
+    }
+
+    /// Plain HTTP is a local-network-only opt-in. Resolve and pin its numeric address before
+    /// constructing the task, so URLSession cannot perform a second DNS lookup after the gate.
+    /// Private-approved HTTPS is re-checked but remains hostname-based for SNI and PKI/ATS.
+    private func connectTimeURL(for url: URL) async throws -> URL {
+        guard let scheme = url.scheme?.lowercased(), let host = url.host else { return url }
+        let hostClass = AddressClassifying.classify(host)
+        let privateApproved = scheme == "http"
+            || AddressClassifying.hostnameLooksLikeMDNS(host)
+            || hostClass == .loopback
+            || hostClass == .privateRFC1918
+            || hostClass == .linkLocal
+        guard privateApproved else { return url }
+        let resolver = self.resolver
+        let address = try await Task.detached {
+            try ConnectTimeAddressGate.connectionAddress(
+                host: host,
+                policy: .requireLocal,
+                resolver: resolver
+            )
+        }.value
+        guard scheme == "http" else { return url }
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            throw EgressError.invalidURL
+        }
+        components.host = address
+        guard let resolved = components.url else { throw EgressError.invalidURL }
+        return resolved
     }
 }
 
@@ -56,9 +98,11 @@ public final class URLSessionHTTPTransport: HTTPTransport, @unchecked Sendable {
 /// Server trust follows the pin when one exists, otherwise R-31 TOFU.
 final class HTTPSessionDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate, @unchecked Sendable {
     let pin: PinRecord?
+    let resolver: any AddressResolver
 
-    init(pin: PinRecord?) {
+    init(pin: PinRecord?, resolver: any AddressResolver) {
         self.pin = pin
+        self.resolver = resolver
     }
 
     func urlSession(
@@ -77,6 +121,25 @@ final class HTTPSessionDelegate: NSObject, URLSessionDelegate, URLSessionTaskDel
         completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) {
         #if canImport(Security)
+        let host = challenge.protectionSpace.host
+        let hostClass = AddressClassifying.classify(host)
+        if AddressClassifying.hostnameLooksLikeMDNS(host)
+            || hostClass == .loopback
+            || hostClass == .privateRFC1918
+            || hostClass == .linkLocal
+        {
+            do {
+                _ = try ConnectTimeAddressGate.connectionAddress(
+                    host: host,
+                    policy: .requireLocal,
+                    resolver: resolver
+                )
+            } catch {
+                // TLS trust challenges happen before URLSession releases request body bytes.
+                completionHandler(.cancelAuthenticationChallenge, nil)
+                return
+            }
+        }
         guard
             challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
             let trust = challenge.protectionSpace.serverTrust,

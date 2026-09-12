@@ -15,10 +15,12 @@ import Glibc
 /// cooperative thread pool (Linux CI `swift test` otherwise deadlocks).
 public actor POSIXByteStream: ByteStream {
     private let endpoint: StreamEndpoint
+    private let resolver: any AddressResolver
     private var fd: Int32 = -1
 
-    public init(endpoint: StreamEndpoint) {
+    public init(endpoint: StreamEndpoint, resolver: any AddressResolver = SystemAddressResolver()) {
         self.endpoint = endpoint
+        self.resolver = resolver
     }
 
     public func identity() async -> TLSIdentity? { nil }
@@ -28,7 +30,16 @@ public actor POSIXByteStream: ByteStream {
         if endpoint.usesTLS { throw StreamError.unsupportedPlatform }
         let host = endpoint.host
         let port = endpoint.port
-        fd = try await Self.offPool { try Self.connect(host: host, port: port) }
+        let policy = endpoint.addressPolicy
+        let resolver = self.resolver
+        fd = try await Self.offPool {
+            let address = try ConnectTimeAddressGate.connectionAddress(
+                host: host,
+                policy: policy,
+                resolver: resolver
+            )
+            return try Self.connect(host: address, port: port, numericHost: policy == .requireLocal)
+        }
     }
 
     public func send(_ data: Data) async throws {
@@ -94,7 +105,7 @@ public actor POSIXByteStream: ByteStream {
         if ready < 0 { throw StreamError.transport("poll") }
     }
 
-    private static func connect(host: String, port: UInt16) throws -> Int32 {
+    private static func connect(host: String, port: UInt16, numericHost: Bool) throws -> Int32 {
         var hints = addrinfo()
         hints.ai_family = AF_UNSPEC
         #if os(Linux)
@@ -102,6 +113,9 @@ public actor POSIXByteStream: ByteStream {
         #else
         hints.ai_socktype = SOCK_STREAM
         #endif
+        if numericHost {
+            hints.ai_flags = AI_NUMERICHOST
+        }
         var info: UnsafeMutablePointer<addrinfo>?
         let portString = String(port)
         let err = host.withCString { hostC in

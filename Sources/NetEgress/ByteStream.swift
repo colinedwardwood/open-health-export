@@ -17,6 +17,8 @@ public enum StreamError: Error, Equatable {
     case badPreSharedKey
     case serviceNotFound
     case unsupportedPlatform
+    /// SEC-15: a destination approved for local/private egress resolved outside that class.
+    case addressClassViolation(host: String, address: String, addressClass: AddressClass)
 }
 
 /// A duplex byte stream. `MQTTSink` and `CompanionSink` both ride one of these, so the only
@@ -74,12 +76,19 @@ public struct StreamEndpoint: Sendable, Equatable {
     public var host: String
     public var port: UInt16
     public var usesTLS: Bool
+    public var addressPolicy: ConnectTimeAddressPolicy
 
-    public init(host: String, port: UInt16, usesTLS: Bool) throws {
+    public init(
+        host: String,
+        port: UInt16,
+        usesTLS: Bool,
+        addressPolicy: ConnectTimeAddressPolicy? = nil
+    ) throws {
         guard port != 0 else { throw StreamError.badPort }
         self.host = host.lowercased()
         self.port = port
         self.usesTLS = usesTLS
+        self.addressPolicy = addressPolicy ?? Self.inferredPolicy(host: host, usesTLS: usesTLS)
     }
 
     /// Parses, authorizes against the allowlist, and only then yields something connectable
@@ -119,5 +128,19 @@ public struct StreamEndpoint: Sendable, Equatable {
             port = defaultPort
         }
         return try StreamEndpoint(host: host, port: port, usesTLS: usesTLS)
+    }
+
+    /// Plaintext is a local-network exception, never a route to public unicast. A `.local`
+    /// name or local-address literal carries the same private approval across TLS.
+    private static func inferredPolicy(host: String, usesTLS: Bool) -> ConnectTimeAddressPolicy {
+        if !usesTLS || AddressClassifying.hostnameLooksLikeMDNS(host) {
+            return .requireLocal
+        }
+        switch AddressClassifying.classify(host) {
+        case .loopback, .privateRFC1918, .linkLocal:
+            return .requireLocal
+        case .publicUnicast, .unknown:
+            return .unrestricted
+        }
     }
 }

@@ -3,6 +3,12 @@
 
 import Foundation
 
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
+
 public enum AddressClass: String, Sendable, Equatable {
     case loopback
     case privateRFC1918
@@ -74,13 +80,28 @@ public enum AddressClassifying {
     }
 
     public static func classify(_ address: String) -> AddressClass {
-        let parts = address.split(separator: ".").compactMap { UInt8($0) }
-        guard parts.count == 4 else { return .unknown }
-        if parts[0] == 127 { return .loopback }
-        if parts[0] == 10 { return .privateRFC1918 }
-        if parts[0] == 192, parts[1] == 168 { return .privateRFC1918 }
-        if parts[0] == 172, parts[1] >= 16, parts[1] <= 31 { return .privateRFC1918 }
-        if parts[0] == 169, parts[1] == 254 { return .linkLocal }
-        return .publicUnicast
+        let fields = address.split(separator: ".")
+        if fields.count == 4, fields.allSatisfy({ UInt8($0) != nil }) {
+            let parts = fields.map { UInt8($0)! }
+            if parts[0] == 127 { return .loopback }
+            if parts[0] == 10 { return .privateRFC1918 }
+            if parts[0] == 192, parts[1] == 168 { return .privateRFC1918 }
+            if parts[0] == 172, parts[1] >= 16, parts[1] <= 31 { return .privateRFC1918 }
+            if parts[0] == 169, parts[1] == 254 { return .linkLocal }
+            return .publicUnicast
+        }
+
+        var ipv6 = in6_addr()
+        let parsed = address.withCString { inet_pton(AF_INET6, $0, &ipv6) }
+        guard parsed == 1 else { return .unknown }
+        return withUnsafeBytes(of: ipv6) { bytes in
+            let octets = bytes.bindMemory(to: UInt8.self)
+            if octets.dropLast().allSatisfy({ $0 == 0 }), octets[15] == 1 {
+                return .loopback
+            }
+            if octets[0] & 0xFE == 0xFC { return .privateRFC1918 }
+            if octets[0] == 0xFE, octets[1] & 0xC0 == 0x80 { return .linkLocal }
+            return .publicUnicast
+        }
     }
 }

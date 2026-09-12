@@ -68,6 +68,7 @@ public actor NWByteStream: ByteStream {
 
     private let target: Target
     private let options: Options
+    private let resolver: any AddressResolver
     private let queue: DispatchQueue
     private let observation = TLSObservation()
     private var connection: NWConnection?
@@ -80,9 +81,14 @@ public actor NWByteStream: ByteStream {
     private var resolvedAddress: String?
     private var lastWaitingError: StreamError?
 
-    public init(endpoint: StreamEndpoint, options: Options = Options()) {
+    public init(
+        endpoint: StreamEndpoint,
+        options: Options = Options(),
+        resolver: any AddressResolver = SystemAddressResolver()
+    ) {
         self.target = .hostPort(endpoint)
         self.options = options
+        self.resolver = resolver
         self.queue = DispatchQueue(label: "app.openhealthexporter.egress.\(endpoint.host)")
     }
 
@@ -90,6 +96,7 @@ public actor NWByteStream: ByteStream {
     public init(service: BonjourService, options: Options) {
         self.target = .bonjour(service)
         self.options = options
+        self.resolver = SystemAddressResolver()
         self.queue = DispatchQueue(label: "app.openhealthexporter.egress.\(service.name)")
     }
 
@@ -114,8 +121,18 @@ public actor NWByteStream: ByteStream {
         switch target {
         case .hostPort(let endpoint):
             guard let port = NWEndpoint.Port(rawValue: endpoint.port) else { throw StreamError.badPort }
+            let resolver = self.resolver
+            let connectionHost = try await Task.detached {
+                try ConnectTimeAddressGate.connectionAddress(
+                    host: endpoint.host,
+                    policy: endpoint.addressPolicy,
+                    resolver: resolver
+                )
+            }.value
             connection = NWConnection(
-                host: NWEndpoint.Host(endpoint.host),
+                // For local-only policy this is numeric, binding the checked resolution to
+                // the connection and eliminating a second, rebindable DNS lookup.
+                host: NWEndpoint.Host(connectionHost),
                 port: port,
                 using: parameters()
             )
