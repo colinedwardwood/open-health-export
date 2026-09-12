@@ -517,6 +517,36 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(export.isEnabled)
     }
 
+    func testR114DemoQuickstartCompletesAFullExportWithinTenMinutes() {
+        let started = Date()
+        addUIInterruptionMonitor(withDescription: "Notification permission") { alert in
+            let allow = alert.buttons["Allow"]
+            guard allow.exists else { return false }
+            allow.tap()
+            return true
+        }
+        enterControls()
+        let field = app.textFields["demo-confirm"]
+        XCTAssertTrue(field.waitForExistence(timeout: uiWait))
+        type("local-file", into: field)
+        app.keyboards.buttons["return"].tap()
+        let export = scrollToHittable(app.buttons["demo-export"])
+        XCTAssertTrue(export.isEnabled)
+        export.tap()
+        app.tap()
+        let finished = NSPredicate(
+            format: "label CONTAINS %@",
+            "Demo export finished. Files are DEMO- prefixed."
+        )
+        expectation(for: finished, evaluatedWith: app.staticTexts["status-line"])
+        waitForExpectations(timeout: 600)
+        XCTAssertLessThan(
+            Date().timeIntervalSince(started),
+            600,
+            "R-114 demo quickstart exceeded ten minutes"
+        )
+    }
+
     func testDisclosureAndControlsInPseudoLocale() throws {
         try auditLocalizedDisclosureAndControls(Self.pseudoLocaleArguments, "pseudo")
     }
