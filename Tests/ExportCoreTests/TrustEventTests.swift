@@ -116,6 +116,7 @@ private let everyTrustEvent: [TrustEvent] = [
             UserNotice.Kind.allCases.filter {
                 $0 != .queueEvicted
                     && $0 != .queueExpired
+                    && $0 != .queueApproachingLoss
                     && $0 != .exportFailed
                     && $0 != .exportOverdue
                     && $0 != .healthAccessRevoked

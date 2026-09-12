@@ -493,6 +493,11 @@ enum HarnessExport {
         if trigger == .appForeground || trigger == .launch {
             lines.append(contentsOf: try await maybeScheduledFullReconcile(store: store))
         }
+        try await applyQueueRedIfNeeded(
+            store: store,
+            root: root,
+            destinationLabel: "Archive folder"
+        )
         lines.append("Files: \(dest.path)")
         return lines
     }
@@ -516,6 +521,32 @@ enum HarnessExport {
         let lines = try await runFullReconcile()
         defaults.set(nowEpoch, forKey: lastScheduledFullReconcileEpochKey)
         return ["scheduled full reconcile"] + lines
+    }
+
+    /// I6 Red: drop derived attempt bodies, truncate the WAL, and raise the
+    /// approaching-loss notice. Live pending batches stay queued.
+    private static func applyQueueRedIfNeeded(
+        store: SQLiteStateStore,
+        root: URL,
+        destinationLabel: String
+    ) async throws {
+        let queued = try await store.transact { try $0.queuedBytes() }
+        guard QueueRed.occupancy(queuedBytes: queued) >= .red else { return }
+        _ = try QueueRed.purgeAttemptCaches(root: root)
+        try store.checkpointWAL()
+        try await store.transact { tx in
+            try tx.appendJournal(
+                RunEvent(
+                    runID: RunID(rawValue: "queue-red"),
+                    outcomeKind: "partial",
+                    detail: QueueRed.journalDetail,
+                    wallTimeEpoch: Date().timeIntervalSince1970
+                )
+            )
+        }
+        _ = try await LocalUserNotifier().notify(
+            UserNotice(kind: .queueApproachingLoss, destination: destinationLabel)
+        )
     }
 
     /// R-08: every live destination run also applies the trailing seven-day sweep.
@@ -1032,6 +1063,11 @@ enum HarnessExport {
             lines.append("traceparent auto-disabled after a header-plausible failure")
         }
         lines.append("Companion: \(session.serviceName)")
+        try await applyQueueRedIfNeeded(
+            store: store,
+            root: root,
+            destinationLabel: "Mac companion"
+        )
         return lines
     }
 
@@ -1798,6 +1834,11 @@ enum HarnessExport {
             )
         }
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+        try await applyQueueRedIfNeeded(
+            store: store,
+            root: root,
+            destinationLabel: "MQTT destination"
+        )
         return lines
     }
 
@@ -1929,6 +1970,11 @@ enum HarnessExport {
             lines.append("traceparent auto-disabled after a header-plausible failure")
         }
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+        try await applyQueueRedIfNeeded(
+            store: store,
+            root: root,
+            destinationLabel: "HTTPS destination"
+        )
         return lines
     }
 

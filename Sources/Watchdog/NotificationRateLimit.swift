@@ -19,7 +19,7 @@ public enum NotificationRateLimit {
     public static let failureWindowSeconds: TimeInterval = 24 * 60 * 60
 
     public static func isFailureKind(_ kind: UserNotice.Kind) -> Bool {
-        kind == .exportFailed || kind == .exportOverdue
+        kind == .exportFailed || kind == .exportOverdue || kind == .queueApproachingLoss
     }
 
     /// Atomically model "check then reserve" at the caller's clock. Export failures

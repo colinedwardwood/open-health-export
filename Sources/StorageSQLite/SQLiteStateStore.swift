@@ -223,6 +223,11 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
         }
     }
 
+    /// I6 Red: reclaim WAL pages without dropping live pending batches.
+    public func checkpointWAL() throws {
+        try exec("PRAGMA wal_checkpoint(TRUNCATE);")
+    }
+
     public func wipe(atEpoch: TimeInterval) async throws {
         let urls = try await transact { try $0.wipe(atEpoch: atEpoch) }
         for path in urls {

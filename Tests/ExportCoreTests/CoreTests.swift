@@ -3366,6 +3366,32 @@ private func anchorHoldFixture(
     #expect(!CatchUpAdmission.allows(queuedBytes: policy.catchUpLimit - 10, incomingBytes: 10))
 }
 
+@Test func queueRedStartsAtEightyPercentAndPurgesAttemptCaches() throws {
+    let policy = QueuePolicy.production
+    #expect(policy.redLimit == policy.cap * 4 / 5)
+    #expect(QueueRed.occupancy(queuedBytes: policy.catchUpLimit - 1) == .green)
+    #expect(QueueRed.occupancy(queuedBytes: policy.catchUpLimit) == .amber)
+    #expect(QueueRed.occupancy(queuedBytes: policy.redLimit) == .red)
+    #expect(QueueRed.occupancy(queuedBytes: policy.cap) == .overCap)
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-queue-red-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let attempts = root.appendingPathComponent(QueueRed.attemptsDirectoryName, isDirectory: true)
+    try FileManager.default.createDirectory(at: attempts, withIntermediateDirectories: true)
+    let body = attempts.appendingPathComponent("delivery.body")
+    try Data("payload".utf8).write(to: body)
+    #expect(try QueueRed.purgeAttemptCaches(root: root) == 1)
+    #expect(!FileManager.default.fileExists(atPath: body.path))
+}
+
+@Test func sqliteWalCheckpointTruncateDoesNotThrow() throws {
+    let path = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-wal-red-\(UUID().uuidString).sqlite")
+        .path
+    let store = try SQLiteStateStore(path: path)
+    try store.checkpointWAL()
+}
+
 @Test func scheduledReconcileIsDueOnFirstRunAndAfterTheInterval() {
     #expect(ScheduledReconcile.due(lastEpoch: nil, nowEpoch: 100))
     #expect(!ScheduledReconcile.due(lastEpoch: 100, nowEpoch: 100 + 86_399))
@@ -4223,6 +4249,8 @@ private func anchorHoldFixture(
     #expect(harness.contains("CatchUpAdmission.allows"))
     #expect(harness.contains("ScheduledReconcile.due"))
     #expect(harness.contains("trigger == .appForeground || trigger == .launch"))
+    #expect(harness.contains("applyQueueRedIfNeeded"))
+    #expect(harness.components(separatedBy: "try await applyQueueRedIfNeeded(").count - 1 == 4)
 }
 
 @Test func privacyGateCannotEnterBackgroundExportOrDeliveryPaths() throws {

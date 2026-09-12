@@ -529,6 +529,7 @@ public struct UserNotice: Sendable, Equatable {
         case destinationTrustLost
         case queueEvicted
         case queueExpired
+        case queueApproachingLoss
         case exportFailed
         case exportOverdue
         case healthAccessRevoked

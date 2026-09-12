@@ -25,6 +25,8 @@ public struct QueuePolicy: Sendable, Equatable {
 
     /// I6 Amber: catch-up (reconcile, backfill, re-export) stops at 60% of cap.
     public var catchUpLimit: Int { cap * 3 / 5 }
+    /// I6 Red: derived caches purge and the WAL truncates at 80% of cap. Still no eviction.
+    public var redLimit: Int { cap * 4 / 5 }
 }
 
 /// I6: catch-up work never evicts live delta batches. Amber occupancy parks
@@ -38,6 +40,47 @@ public enum CatchUpAdmission {
         policy: QueuePolicy = .production
     ) -> Bool {
         queuedBytes + incomingBytes < policy.catchUpLimit
+    }
+}
+
+public enum QueueOccupancy: Int, Sendable, Comparable {
+    case green
+    case amber
+    case red
+    case overCap
+
+    public static func < (lhs: QueueOccupancy, rhs: QueueOccupancy) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
+}
+
+/// I6 Red: Amber still holds, plus derived attempt-body caches are dropped and
+/// SQLite's WAL is truncated so occupancy can fall without evicting live batches.
+public enum QueueRed {
+    public static let attemptsDirectoryName = "attempts"
+    public static let journalDetail = "queue_red"
+
+    public static func occupancy(
+        queuedBytes: Int,
+        policy: QueuePolicy = .production
+    ) -> QueueOccupancy {
+        if queuedBytes >= policy.cap { return .overCap }
+        if queuedBytes >= policy.redLimit { return .red }
+        if queuedBytes >= policy.catchUpLimit { return .amber }
+        return .green
+    }
+
+    public static func purgeAttemptCaches(root: URL) throws -> Int {
+        let directory = root.appendingPathComponent(attemptsDirectoryName, isDirectory: true)
+        guard FileManager.default.fileExists(atPath: directory.path) else { return 0 }
+        let items = try FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: nil
+        )
+        for item in items {
+            try FileManager.default.removeItem(at: item)
+        }
+        return items.count
     }
 }
 

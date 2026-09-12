@@ -978,6 +978,8 @@ enum FixWitness {
         #expect(QueuePolicy.production.cap == 256 * 1024 * 1024)
         #expect(QueuePolicy.production.lowWatermark < QueuePolicy.production.cap)
         #expect(QueuePolicy.production.catchUpLimit == QueuePolicy.production.cap * 3 / 5)
+        #expect(QueuePolicy.production.redLimit == QueuePolicy.production.cap * 4 / 5)
+        #expect(QueuePolicy.production.catchUpLimit < QueuePolicy.production.redLimit)
         #expect(QueuePolicy.production.catchUpLimit < QueuePolicy.production.lowWatermark)
     }
 

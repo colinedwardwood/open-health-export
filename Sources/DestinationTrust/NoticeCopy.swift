@@ -76,6 +76,11 @@ public enum NoticeCopy {
                 title: "Queued exports expired",
                 body: "\(label) had queued data older than seven days. It was deleted instead of being sent late."
             )
+        case .queueApproachingLoss:
+            return LocalizedNotice(
+                title: "Queued export storage is filling",
+                body: "\(label) has been unreachable long enough that data loss is approaching."
+            )
         case .exportFailed:
             return LocalizedNotice(
                 title: "Export needs attention",
