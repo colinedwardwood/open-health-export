@@ -1,0 +1,57 @@
+# SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+name: r84-determinism
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  # Each commit on main gets its own concurrency group, so runs never contend and
+  # none is left marked cancelled. Grouping by ref is not enough: with
+  # cancel-in-progress false GitHub still cancels the *pending* run when a newer
+  # one queues, so a run could only ever be superseded rather than completed.
+  # Off main, superseding is exactly what we want.
+  group: r84-determinism-${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+jobs:
+  utc-fixed-offset:
+    # Hosted runners that GitHub currently provides for this gate. Linux x86_64,
+    # Linux arm64, and macOS arm64. Darwin x86_64 is omitted because GitHub no
+    # longer hosts Intel macOS images.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            setup_swift: true
+          - os: ubuntu-24.04-arm
+            setup_swift: true
+          - os: macos-26
+            setup_swift: false
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc # v3
+        if: matrix.setup_swift
+        with:
+          swift-version: "6.3.3"
+      - name: Install Linux headers the package graph may probe
+        if: runner.os == 'Linux'
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/google-chrome*.list \
+            /etc/apt/sources.list.d/google-chrome*.sources
+          sudo apt-get update
+          sudo apt-get install -y zlib1g-dev libsqlite3-dev
+      - name: Record hosted architecture honestly
+        run: |
+          printf 'runner=%s os=%s arch=%s\n' \
+            '${{ matrix.os }}' "$(uname -s)" "$(uname -m)"
+      - name: R-84/QA-07 100-run UTC/fixed-offset digest gate
+        env:
+          OHE_DETERMINISM_RUNS: "100"
+          OHE_DETERMINISM_TZ: Etc/GMT+5
+          OHE_DETERMINISM_LC_ALL: C
+        run: bash scripts/check-r84-determinism.sh

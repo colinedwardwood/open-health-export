@@ -10,7 +10,8 @@
     },
     "g1": {
       "role": "R-84/G1 frozen encoder triple: logical-input.json plus expected.ndjson/json/csv",
-      "injectedTzDatabase": "fixtures/tz-database-version.txt"
+      "injectedTzDatabase": "fixtures/tz-database-version.txt",
+      "sha256": "833dbb4776d3f05ce6d7f95fa7b0657e3a3d90c13c4f5a9637128814ea505163"
     },
     "ha-ci": {
       "role": "R-89 Home Assistant and R-53 OTLP container pins; QA-22 canary pins",
