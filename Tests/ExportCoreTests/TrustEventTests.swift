@@ -134,7 +134,9 @@ private let everyTrustEvent: [TrustEvent] = [
         destination: destination
     )
     let stored = Mirror(reflecting: notice).children.compactMap { $0.value as? String }
-    #expect(stored.count == 3)
+    // `destinationID` and the user-visible label intentionally default to the
+    // same value, so the destination appears twice in storage but adds no prose.
+    #expect(stored.count == 4)
     #expect(Set(stored) == [destination, previous, observed])
 
     for event in everyTrustEvent {
