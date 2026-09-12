@@ -99,6 +99,8 @@ struct HarnessView: View {
     @State private var dataFlowHops: [DataFlowHop] = []
     @State private var dataFlowTypeCount = 0
     @State private var ledgerLines: [String] = []
+    @State private var networkActivityLines: [String] = []
+    @State private var provenanceLines: [String] = []
     @State private var historyLines: [String] = []
     @State private var ledgerWarning = ""
     @State private var wakeAttribution = ""
@@ -314,6 +316,8 @@ struct HarnessView: View {
             #endif
             propagateTraceparent = HarnessExport.storedHTTPSTraceparent()
             companionTraceparent = HarnessExport.storedCompanionTraceparent()
+            provenanceLines = HarnessExport.buildProvenanceLines()
+            networkActivityLines = HarnessExport.networkActivityLines()
             if disclosureAcknowledged {
                 phase = .ready
                 status = "Ready."
@@ -1074,6 +1078,22 @@ struct HarnessView: View {
                     .font(.system(.footnote, design: .monospaced))
                     .textSelection(.enabled)
             }
+            Text(EgressAttemptLog.sectionTitle)
+                .font(.headline)
+                .accessibilityIdentifier("network-activity-title")
+            ForEach(Array(networkActivityLines.enumerated()), id: \.offset) { index, line in
+                Text(line)
+                    .font(.footnote)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("network-activity-\(index)")
+            }
+            ForEach(Array(provenanceLines.enumerated()), id: \.offset) { index, line in
+                Text(line)
+                    .font(.footnote)
+                    .textSelection(.enabled)
+                    .accessibilityIdentifier("build-provenance-\(index)")
+            }
             Text("Acknowledgements")
                 .font(.headline)
                 .foregroundStyle(.primary)
@@ -1385,6 +1405,8 @@ struct HarnessView: View {
         do {
             ledgerLines = try await HarnessExport.ledgerLines()
             ledgerWarning = ledgerLines.first ?? ""
+            networkActivityLines = HarnessExport.networkActivityLines()
+            provenanceLines = HarnessExport.buildProvenanceLines()
             status = "Ready. The ledger includes attempts and failures; it contains counts, not health values."
         } catch {
             ledgerLines = []

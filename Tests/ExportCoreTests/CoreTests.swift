@@ -704,6 +704,49 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     }
 }
 
+@Test func networkActivityLedgerKeepsHostsCountsBytesAndSelfReportedCaveat() throws {
+    final class Epoch: @unchecked Sendable {
+        var value: TimeInterval = 1_000
+    }
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-ux49-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: url) }
+    let epoch = Epoch()
+    let store = EgressAttemptLog.PersistentStore(url: url, nowEpoch: { epoch.value })
+    EgressAttemptLog.attachPersistent(store)
+    defer { EgressAttemptLog.wipePersistent() }
+
+    EgressAttemptLog.record(kind: .http, host: "ha.example", bytes: 40)
+    epoch.value = 1_100
+    EgressAttemptLog.record(kind: .http, host: "ha.example", bytes: 60)
+    EgressAttemptLog.record(kind: .byteStream, host: "broker.example", bytes: 12)
+    EgressAttemptLog.record(kind: .discovery, host: "_ohe-companion._tcp")
+
+    let rows = EgressAttemptLog.persistentSnapshot()
+    #expect(rows.map(\.host) == ["_ohe-companion._tcp", "broker.example", "ha.example"])
+    let ha = try #require(rows.first { $0.host == "ha.example" })
+    #expect(ha.count == 2)
+    #expect(ha.bytes == 100)
+    #expect(ha.firstSeenEpoch == 1_000)
+    #expect(ha.lastSeenEpoch == 1_100)
+    let caveat = EgressAttemptLog.selfReportedCaveat(sourceCommit: "abc1234")
+    #expect(caveat.contains("own network use"))
+    #expect(caveat.contains("abc1234"))
+    #expect(caveat.contains("proxy"))
+
+    let reloaded = EgressAttemptLog.PersistentStore(url: url, nowEpoch: { 2_000 }).snapshot()
+    #expect(reloaded.map(\.host) == rows.map(\.host))
+}
+
+@Test func buildProvenanceNamesVersionCommitAndSourceLink() {
+    #expect(BuildIdentity.versionLine(version: "0.1.0", commit: "deadbeef") == "Version 0.1.0 · deadbeef")
+    #expect(
+        BuildIdentity.sourceLink(commit: "c0ffee1234567890")
+            == "https://github.com/colinedwardwood/open-health-export/commit/c0ffee1234567890"
+    )
+    #expect(BuildIdentity.sourceLink(commit: "unspecified") == nil)
+}
+
 @Test func hkStatisticsExceptionListIsNonEmpty() {
     #expect(MetricCatalog.hkStatisticsExceptions.contains(MetricCatalog.stepCount.id))
 }
@@ -4834,6 +4877,7 @@ private func anchorHoldFixture(
         "otlp-destination.json",
         "wake-ledger.log",
         "health-authorization.json",
+        "network-activity.json",
     ] {
         #expect(harness.contains("\"\(artifact)\""))
     }

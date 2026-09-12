@@ -252,6 +252,50 @@ enum HarnessExport {
         NetworkPathMonitorCache.conditions()
     }
 
+    static func attachNetworkActivityLedger() {
+        guard let root = try? applicationSupportRoot() else { return }
+        EgressAttemptLog.attachPersistent(
+            EgressAttemptLog.PersistentStore(
+                url: root.appendingPathComponent("network-activity.json"),
+                nowEpoch: { Date().timeIntervalSince1970 }
+            )
+        )
+    }
+
+    static func networkActivityLines() -> [String] {
+        attachNetworkActivityLedger()
+        let rows = EgressAttemptLog.persistentSnapshot()
+        var lines = [
+            EgressAttemptLog.selfReportedCaveat(sourceCommit: BuildIdentity.current.sourceCommit)
+        ]
+        if rows.isEmpty {
+            lines.append(EgressAttemptLog.emptyCopy)
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .short
+            formatter.timeStyle = .short
+            for row in rows {
+                let first = formatter.string(from: Date(timeIntervalSince1970: row.firstSeenEpoch))
+                let last = formatter.string(from: Date(timeIntervalSince1970: row.lastSeenEpoch))
+                lines.append(
+                    "\(row.host) · \(row.count) · \(row.bytes) bytes · \(first) → \(last)"
+                )
+            }
+        }
+        return lines
+    }
+
+    static func buildProvenanceLines() -> [String] {
+        let identity = BuildIdentity.current
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+            ?? "0.1.0"
+        var lines = [BuildIdentity.versionLine(version: version, commit: identity.sourceCommit)]
+        if let link = BuildIdentity.sourceLink(commit: identity.sourceCommit) {
+            lines.append(link)
+        }
+        return lines
+    }
+
     static func destinationScope(_ destinationID: String) async throws -> DestinationExportScope {
         let root = try applicationSupportRoot()
         let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
@@ -2583,6 +2627,7 @@ enum HarnessExport {
             atEpoch: Date().timeIntervalSince1970
         )
         try await vault().forget()
+        EgressAttemptLog.wipePersistent()
         for name in [
             "exports",
             "scratch",
@@ -2605,6 +2650,7 @@ enum HarnessExport {
             "exporter-id",
             "wake-ledger.log",
             "health-authorization.json",
+            "network-activity.json",
         ] {
             try removeIfPresent(root.appendingPathComponent(name))
         }

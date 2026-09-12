@@ -69,6 +69,7 @@ final class ExporterAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
         AppLifecycleCoordinator.shared.recordWake(.launch)
+        HarnessExport.attachNetworkActivityLedger()
         BackgroundTaskCoordinator.register()
         ContinuedBackfillCoordinator.register()
         Task {

@@ -14,6 +14,16 @@ public struct BuildIdentity: Sendable, Equatable {
         self.buildHash = buildHash
     }
 
+    public static func versionLine(version: String, commit: String) -> String {
+        "Version \(version) · \(commit)"
+    }
+
+    public static func sourceLink(commit: String) -> String? {
+        let trimmed = commit.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 7, trimmed != "unspecified" else { return nil }
+        return "https://github.com/colinedwardwood/open-health-export/commit/\(trimmed)"
+    }
+
     public static var current: BuildIdentity {
         let commit = bundleValue("OHESourceCommit") ?? repositoryCommit() ?? "unspecified"
         let version = bundleValue("CFBundleShortVersionString") ?? "0.1.0"

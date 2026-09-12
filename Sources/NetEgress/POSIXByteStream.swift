@@ -27,6 +27,7 @@ public actor POSIXByteStream: ByteStream {
 
     public func open() async throws {
         if fd >= 0 { return }
+        EgressAttemptLog.record(kind: .byteStream, host: endpoint.host)
         if endpoint.usesTLS { throw StreamError.unsupportedPlatform }
         let host = endpoint.host
         let port = endpoint.port
@@ -44,6 +45,7 @@ public actor POSIXByteStream: ByteStream {
 
     public func send(_ data: Data) async throws {
         try await open()
+        EgressAttemptLog.record(kind: .byteStream, host: endpoint.host, bytes: data.count)
         let socket = fd
         try await Self.offPool {
             try data.withUnsafeBytes { raw in

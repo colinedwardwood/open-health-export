@@ -31,7 +31,14 @@ public final class URLSessionHTTPTransport: HTTPTransport, @unchecked Sendable {
     }
 
     public func execute(_ request: OutboundHTTPRequest) async throws -> OutboundHTTPResponse {
-        EgressAttemptLog.record(kind: .http, host: request.url.host ?? request.url.absoluteString)
+        let bodyBytes = (try? FileManager.default.attributesOfItem(
+            atPath: request.bodyFile.path
+        )[.size] as? NSNumber)?.intValue ?? 0
+        EgressAttemptLog.record(
+            kind: .http,
+            host: request.url.host ?? request.url.absoluteString,
+            bytes: bodyBytes
+        )
         let connectionURL = try await connectTimeURL(for: request.url)
         var urlRequest = URLRequest(url: connectionURL)
         urlRequest.timeoutInterval = 30

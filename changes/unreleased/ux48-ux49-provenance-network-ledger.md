@@ -1,0 +1,1 @@
+Settings show the running version and source commit. A self-reported network activity ledger lists every host, with counts, bytes, and first/last seen, and states that a proxy is the independent check.

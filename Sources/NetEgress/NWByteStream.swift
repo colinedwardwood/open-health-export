@@ -100,6 +100,15 @@ public actor NWByteStream: ByteStream {
         self.queue = DispatchQueue(label: "app.openhealthexporter.egress.\(service.name)")
     }
 
+    private func recordedHost() -> String {
+        switch target {
+        case .hostPort(let endpoint):
+            endpoint.host
+        case .bonjour(let service):
+            service.name
+        }
+    }
+
     public func identity() async -> TLSIdentity? {
         guard let observed = observation.current else { return nil }
         guard let resolvedAddress else { return observed }
@@ -157,6 +166,7 @@ public actor NWByteStream: ByteStream {
 
     public func send(_ data: Data) async throws {
         try await open()
+        EgressAttemptLog.record(kind: .byteStream, host: recordedHost(), bytes: data.count)
         guard let connection else { throw StreamError.notOpen }
         sendToken += 1
         let token = sendToken
