@@ -7,3 +7,4 @@ type: changed
 - Remove the dedicated telemetry background task so telemetry never consumes an export wake budget.
 - Keep runtime telemetry attributes inside explicit cardinality limits and map unknown values to `other`.
 - Preserve useful diagnostic bundles when network, authorization, configuration, database, or journal subsystems are degraded.
+- Gate telemetry serializer isolation and prove unprojected journal entries survive a process-level store reopen before delivery.

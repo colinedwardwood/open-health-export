@@ -376,6 +376,37 @@ import Testing
     #expect(exporter.contains("\"Content-Type\": \"application/x-protobuf\""))
 }
 
+@Test func telemetrySerializerIsIsolatedAndItsOwnEgressCannotCreateSpans() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let directory = root.appendingPathComponent("Sources/OTLPExport")
+    let files = try FileManager.default.contentsOfDirectory(
+        at: directory,
+        includingPropertiesForKeys: nil
+    ).filter { $0.pathExtension == "swift" }
+    let sources = try files.map {
+        try String(contentsOf: $0, encoding: .utf8)
+    }.joined(separator: "\n")
+    for forbidden in [
+        "NativeWire.",
+        "NativeSidecars.",
+        "SampleRecord",
+        "DestinationSink",
+        "appendJournal",
+        "RunEvent(",
+    ] {
+        #expect(!sources.contains(forbidden), "OTLP pipeline references \(forbidden)")
+    }
+    let exporter = try String(
+        contentsOf: directory.appendingPathComponent("OTLPExporter.swift"),
+        encoding: .utf8
+    )
+    #expect(!exporter.contains("OTLPProjector.traces(events: ["))
+    #expect(!exporter.contains("span("))
+}
+
 @Test func otlpSettingsStayDisabledUntilPreviewCompletes() {
     #expect(throws: OTLPExportError.previewRequired) {
         _ = try OTLPSettingsGate.enabledSettings(
@@ -454,6 +485,36 @@ import Testing
     let ledger = try await store.transact { try $0.loadLedger() }
     #expect(ledger.last?.destination == "otlp")
     #expect(ledger.last?.sampleCount == 0)
+}
+
+@Test func unprojectedOTLPJournalSurvivesStoreRelaunch() async throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-otlp-relaunch-\(UUID().uuidString).sqlite")
+    defer {
+        try? FileManager.default.removeItem(at: url)
+        try? FileManager.default.removeItem(
+            at: URL(fileURLWithPath: url.path + "-wal")
+        )
+        try? FileManager.default.removeItem(
+            at: URL(fileURLWithPath: url.path + "-shm")
+        )
+    }
+    let event = otlpRunEvent(id: "survives-relaunch")
+    do {
+        let store = try SQLiteStateStore(path: url.path)
+        try await store.transact { try $0.appendJournal(event) }
+    }
+    do {
+        let reopened = try SQLiteStateStore(path: url.path)
+        #expect(try await reopened.transact { try $0.unprojectedJournal(limit: 10) } == [event])
+        try await reopened.transact {
+            try $0.markJournalProjected(runIDs: [event.runID], atEpoch: 100)
+        }
+    }
+    do {
+        let reopened = try SQLiteStateStore(path: url.path)
+        #expect(try await reopened.transact { try $0.unprojectedJournal(limit: 10) }.isEmpty)
+    }
 }
 
 @Test func memoryStoreProjectionMarksSurviveALaterAppend() async throws {
