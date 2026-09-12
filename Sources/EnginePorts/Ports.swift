@@ -131,6 +131,14 @@ public enum TypeDisableReason {
 
 public enum SamplePaging {
     public static let defaultPageLimit = 1000
+    public static let minimumPageLimit = 50
+
+    /// UX-29: shortening the owned export window reduces the next HealthKit page,
+    /// which is what a 413 response is asking for. Older undelivered samples stay queued.
+    public static func pageLimit(windowHours: Int) -> Int {
+        let hours = max(1, windowHours)
+        return max(minimumPageLimit, defaultPageLimit * hours / 24)
+    }
 }
 
 public struct TypeStatus: Sendable, Equatable {

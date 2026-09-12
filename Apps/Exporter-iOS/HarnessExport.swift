@@ -217,6 +217,13 @@ private actor ObserverExportGate {
 enum HarnessExport {
     static let healthDestinationIDs = ["local-file", "https", "mqtt", "companion"]
 
+    /// UX-29: the 413 shorten-window action writes `ohe.exportWindowHours`; HealthKit
+    /// pages follow that owned setting so the next batch is smaller.
+    static func samplePageLimit() -> Int {
+        let stored = UserDefaults.standard.object(forKey: "ohe.exportWindowHours") as? Int
+        return SamplePaging.pageLimit(windowHours: stored ?? 24)
+    }
+
     static func destinationScope(_ destinationID: String) async throws -> DestinationExportScope {
         let root = try applicationSupportRoot()
         let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
@@ -405,10 +412,10 @@ enum HarnessExport {
         let context = TemporalContext.utcHost
         let source = HealthKitAnchoredSource(
             context: context,
-            limit: 1000,
+            limit: samplePageLimit(),
             window: HealthKitQueryWindow(scope: scope)
         )
-        let observations = HealthKitDayObservationSource(context: context, limit: 1000)
+        let observations = HealthKitDayObservationSource(context: context, limit: samplePageLimit())
         let statistics = HealthKitStatisticsSource(context: context)
         let now = Date().ISO8601Format()
         let exporterId = try installationID()
@@ -673,7 +680,7 @@ enum HarnessExport {
         let context = TemporalContext.utcHost
         let observations = HealthKitDayObservationSource(
             context: context,
-            limit: 1000
+            limit: samplePageLimit()
         )
         let statistics = HealthKitStatisticsSource(context: context)
         let now = Date().ISO8601Format()
@@ -732,7 +739,7 @@ enum HarnessExport {
         )
         try await emitTrustNotices(events)
         let context = TemporalContext.utcHost
-        let observations = HealthKitDayObservationSource(context: context, limit: 1000)
+        let observations = HealthKitDayObservationSource(context: context, limit: samplePageLimit())
         let scope = try await destinationScope("local-file")
         try ExportScopeGate.requireConfigured(scope)
         let scopeStartDay = String(
@@ -886,7 +893,7 @@ enum HarnessExport {
         let outcome = try await ReconcileSweep(
             observations: HealthKitDayObservationSource(
                 context: context,
-                limit: 1000
+                limit: samplePageLimit()
             ),
             destination: verified,
             store: store,
@@ -1017,10 +1024,10 @@ enum HarnessExport {
         let context = TemporalContext.utcHost
         let source = HealthKitAnchoredSource(
             context: context,
-            limit: 1000,
+            limit: samplePageLimit(),
             window: HealthKitQueryWindow(scope: scope)
         )
-        let observations = HealthKitDayObservationSource(context: context, limit: 1000)
+        let observations = HealthKitDayObservationSource(context: context, limit: samplePageLimit())
         let statistics = HealthKitStatisticsSource(context: context)
         let now = Date().ISO8601Format()
         let ledgerSeal = ledgerHeadSeal()
@@ -1801,7 +1808,7 @@ enum HarnessExport {
         try ExportScopeGate.requireConfigured(scope)
         let source = HealthKitAnchoredSource(
             context: context,
-            limit: 1000,
+            limit: samplePageLimit(),
             window: HealthKitQueryWindow(scope: scope)
         )
         let observations = HealthKitDayObservationSource(context: context)
@@ -1933,7 +1940,7 @@ enum HarnessExport {
         try ExportScopeGate.requireConfigured(scope)
         let source = HealthKitAnchoredSource(
             context: context,
-            limit: 1000,
+            limit: samplePageLimit(),
             window: HealthKitQueryWindow(scope: scope)
         )
         let observations = HealthKitDayObservationSource(context: context)

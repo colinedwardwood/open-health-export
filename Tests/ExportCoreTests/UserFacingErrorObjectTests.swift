@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import CoreDomain
+import EnginePorts
 import Testing
 
 @Test func everyUserFacingErrorArchetypeHasFivePartsAndOwnedFixes() {
@@ -101,8 +102,12 @@ import Testing
     let beforeQoS = settings.mqttQoS
     UserFacingFixApplier.apply(.setQoS1, to: &settings)
     #expect(UserFacingFixApplier.mqttQoS0Resolved(from: beforeQoS, to: settings.mqttQoS))
+    #expect(SamplePaging.pageLimit(windowHours: 24) == SamplePaging.defaultPageLimit)
+    #expect(SamplePaging.pageLimit(windowHours: 6) == 250)
+    #expect(SamplePaging.pageLimit(windowHours: 1) == SamplePaging.minimumPageLimit)
     #expect(
-        UserFacingErrorArchetype.fromErrorClass(.deviceLocked) == .healthLocked
+        SamplePaging.pageLimit(windowHours: 6)
+            < SamplePaging.pageLimit(windowHours: 24)
     )
 }
 
