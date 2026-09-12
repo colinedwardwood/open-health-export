@@ -1782,6 +1782,75 @@ private struct OneExportFault: ExportFaultInjector {
     )
 }
 
+/// C-04 / AR-12: force-quit after the destination write and before ack leaves
+/// the batch in our SQLite pending table. Relaunch reconstructs from that
+/// store. CorrectnessEngine never consults URLSession for queue membership.
+@Test func forceQuitMidTransferReconstructsQueueFromSQLiteNotURLSession() async throws {
+    let uuid = "c0400000-0000-4000-8000-000000000004"
+    let metric = MetricID(rawValue: "heartRate")
+    let page = SamplePage(
+        samples: [heartSample(uuid)],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0xC0]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-c04-\(UUID().uuidString)")
+    let sqlitePath = root.appendingPathComponent("state.sqlite").path
+    let destinationURL = root.appendingPathComponent("destination")
+    try FileManager.default.createDirectory(
+        at: destinationURL,
+        withIntermediateDirectories: true
+    )
+    let pendingID: BatchID
+    do {
+        let store = try SQLiteStateStore(path: sqlitePath)
+        var run = ExportRun(
+            source: FixtureSource(pages: [page]),
+            destination: .testing(LocalFileSink(directory: destinationURL)),
+            store: store,
+            metric: metric,
+            scratchDirectory: root.appendingPathComponent("scratch"),
+            envelope: testEnvelope()
+        )
+        run.faults = OneExportFault(location: .afterDestinationWriteBeforeAck)
+        await #expect(throws: InjectedExportFault.stop) {
+            _ = try await run.run()
+        }
+        let pending = try await store.transact { try $0.pendingBatches() }
+        #expect(pending.count == 1)
+        pendingID = try #require(pending.first?.id)
+    }
+
+    let reopened = try SQLiteStateStore(path: sqlitePath)
+    let restored = try await reopened.transact { try $0.pendingBatches() }
+    #expect(restored.map(\.id) == [pendingID])
+
+    _ = try await PendingDeliveryRunner(
+        destination: .testing(LocalFileSink(directory: destinationURL)),
+        store: reopened
+    ).runOnce()
+    #expect(try await reopened.transact { try $0.pendingBatches() }.isEmpty)
+
+    let engineRoot = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .appendingPathComponent("Sources/CorrectnessEngine")
+    let engineFiles = try FileManager.default.contentsOfDirectory(
+        at: engineRoot,
+        includingPropertiesForKeys: nil
+    ).filter { $0.pathExtension == "swift" }
+    for file in engineFiles {
+        let text = try String(contentsOf: file, encoding: .utf8)
+        #expect(
+            !text.contains("URLSession"),
+            "\(file.lastPathComponent) must not reconstruct the queue from URLSession"
+        )
+    }
+}
+
 func replayP4KillResumeCounterexample(
     seed: UInt64,
     faultSchedule: [ExportFaultLocation]
