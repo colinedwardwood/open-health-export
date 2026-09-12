@@ -8,3 +8,4 @@ type: changed
 - Keep runtime telemetry attributes inside explicit cardinality limits and map unknown values to `other`.
 - Preserve useful diagnostic bundles when network, authorization, configuration, database, or journal subsystems are degraded.
 - Gate telemetry serializer isolation and prove unprojected journal entries survive a process-level store reopen before delivery.
+- Lint app and core sources so logging stays behind the reviewed `os.Logger` boundary, unreviewed public interpolation fails, and release plists cannot enable private log data.

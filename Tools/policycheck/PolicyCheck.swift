@@ -41,6 +41,14 @@ struct PolicyCheck {
             if text.contains("import Logging") {
                 violations.append("\(file.path): import Logging")
             }
+            if (text.contains("Logger(") || text.contains("os_log(")),
+               target != "Redaction" {
+                violations.append("\(file.path): OBS-29 logging outside Redaction")
+            }
+            if text.contains("privacy: .public"),
+               file.lastPathComponent != "OHELog.swift" {
+                violations.append("\(file.path): OBS-29 unreviewed public log value")
+            }
             if text.contains(platformSecurity), !allowedNetwork.contains(target) {
                 violations.append("\(file.path): \(platformSecurity)")
             }
@@ -57,6 +65,7 @@ struct PolicyCheck {
         let apps = root.appendingPathComponent("Apps")
         var appNetworkBypasses: [String] = []
         var pasteboardBypasses: [String] = []
+        var loggingBypasses: [String] = []
         if let appFiles = FileManager.default.enumerator(at: apps, includingPropertiesForKeys: nil) {
             for case let file as URL in appFiles where file.pathExtension == "swift" {
                 let text = try String(contentsOf: file, encoding: .utf8)
@@ -66,6 +75,10 @@ struct PolicyCheck {
                 }
                 for token in ["UIPasteboard", "NSPasteboard"] where text.contains(token) {
                     pasteboardBypasses.append("\(file.path): \(token)")
+                }
+                for token in ["import Logging", "Logger(", "os_log(", "privacy: .public"]
+                    where text.contains(token) {
+                    loggingBypasses.append("\(file.path): \(token)")
                 }
             }
         }
@@ -89,6 +102,45 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck general pasteboard use is prohibited: ok")
+        if !loggingBypasses.isEmpty {
+            FileHandle.standardError.write(
+                Data(
+                    (
+                        "OBS-29: app logging must use the reviewed OHELog boundary:\n"
+                            + loggingBypasses.joined(separator: "\n")
+                            + "\n"
+                    ).utf8
+                )
+            )
+            exit(1)
+        }
+        print("policycheck app logging uses the privacy-reviewed boundary: ok")
+
+        var privateDataPreferences: [String] = []
+        if let appFiles = FileManager.default.enumerator(
+            at: apps,
+            includingPropertiesForKeys: nil
+        ) {
+            for case let file as URL in appFiles where file.pathExtension == "plist" {
+                let text = try String(contentsOf: file, encoding: .utf8)
+                if text.contains("Enable-Private-Data") {
+                    privateDataPreferences.append(file.path)
+                }
+            }
+        }
+        if !privateDataPreferences.isEmpty {
+            FileHandle.standardError.write(
+                Data(
+                    (
+                        "OBS-29: release app plists enable private OSLog data:\n"
+                            + privateDataPreferences.joined(separator: "\n")
+                            + "\n"
+                    ).utf8
+                )
+            )
+            exit(1)
+        }
+        print("policycheck release plists never enable private OSLog data: ok")
 
         let projectText = try String(
             contentsOf: root.appendingPathComponent("project.yml"),

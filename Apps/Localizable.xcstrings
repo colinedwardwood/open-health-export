@@ -2,6 +2,61 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
+    "Configuration portability": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configuration portability"
+          }
+        }
+      }
+    },
+    "Create disabled destination drafts": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create disabled destination drafts"
+          }
+        }
+      }
+    },
+    "Imports never contain credentials and cannot replace or enable an existing destination.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Imports never contain credentials and cannot replace or enable an existing destination."
+          }
+        }
+      }
+    },
+    "Review a .tributary configuration": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review a .tributary configuration"
+          }
+        }
+      }
+    },
+    "Review before importing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review before importing"
+          }
+        }
+      }
+    },
     "0.0.0": {
       "extractionState": "manual",
       "localizations": {
