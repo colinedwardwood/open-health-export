@@ -795,6 +795,8 @@ enum HarnessExport {
     }
 
     static func runCompanion(session: PairingSession) async throws -> [String] {
+        let scope = try await destinationScope("companion")
+        try ExportScopeGate.requireConfigured(scope)
         let fm = FileManager.default
         let root = try applicationSupportRoot()
         let sqliteURL = root.appendingPathComponent("state.sqlite")
@@ -856,8 +858,6 @@ enum HarnessExport {
             try await emitTrustNotices(completed.events, destination: session.serviceName)
         }
         try await requestScopeAuthorizationIfConfigured("companion")
-        let scope = try await destinationScope("companion")
-        try ExportScopeGate.requireConfigured(scope)
         let context = TemporalContext.utcHost
         let source = HealthKitAnchoredSource(
             context: context,
@@ -964,6 +964,29 @@ enum HarnessExport {
         return snapshots.map { snapshot in
             DestinationStatusLine.render(snapshot, nowEpoch: now) {
                 Date(timeIntervalSince1970: $0).formatted(date: .abbreviated, time: .shortened)
+            }
+        }
+    }
+
+    static func freshnessDisclosureLines() -> [(id: String, text: String)] {
+        let snapshots = StatusSnapshotLocation.readAll()
+        return FreshnessClass.allCases.flatMap { freshnessClass in
+            let measured = snapshots.compactMap { snapshot -> (String, LocalFreshnessEstimate)? in
+                snapshot.freshnessEstimates[freshnessClass].map {
+                    (snapshot.destinationLabel, $0)
+                }
+            }
+            guard !measured.isEmpty else {
+                return [(
+                    "freshness-class-\(freshnessClass.rawValue)",
+                    FreshnessTarget.classDisclosure(freshnessClass)
+                )]
+            }
+            return measured.map { label, estimate in
+                (
+                    "freshness-\(freshnessClass.rawValue)-\(label)",
+                    "\(label) — \(FreshnessTarget.classDisclosure(freshnessClass, estimate: estimate))"
+                )
             }
         }
     }
@@ -1249,6 +1272,7 @@ enum HarnessExport {
     }
 
     static func confirmPendingHTTPSDestination(propagateTraceparent: Bool = false) async throws -> [String] {
+        try ExportScopeGate.requireConfigured(try await destinationScope("https"))
         guard let pending = await PendingDestination.shared.takeHTTPS() else {
             throw SetupError.verificationRequired
         }
@@ -1341,7 +1365,7 @@ enum HarnessExport {
             allowInsecure: allowInsecure,
             clientID: clientID,
             topic: topic,
-            qos: qos == 0 ? .atMostOnce : .atLeastOnce,
+            qos: try MQTTDestination.qos(configurationValue: qos),
             username: username,
             password: password,
             clientPKCS12: clientPKCS12,
@@ -1379,6 +1403,7 @@ enum HarnessExport {
     }
 
     static func confirmPendingMQTTDestination() async throws -> [String] {
+        try ExportScopeGate.requireConfigured(try await destinationScope("mqtt"))
         guard let pending = await PendingDestination.shared.takeMQTT() else {
             throw SetupError.verificationRequired
         }
@@ -1486,7 +1511,7 @@ enum HarnessExport {
             allowInsecure: saved.allowInsecure,
             clientID: saved.clientID,
             topic: saved.topic,
-            qos: saved.qos == 0 ? .atMostOnce : .atLeastOnce,
+            qos: try MQTTDestination.qos(configurationValue: saved.qos ?? 1),
             username: saved.username,
             password: password,
             clientPKCS12: pkcs12,
@@ -1662,6 +1687,7 @@ enum HarnessExport {
     }
 
     static func enableLocalFileDestination() async throws -> [String] {
+        try ExportScopeGate.requireConfigured(try await destinationScope("local-file"))
         let root = try applicationSupportRoot()
         let dest = root.appendingPathComponent("exports", isDirectory: true)
         try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
@@ -2092,9 +2118,11 @@ enum HarnessExport {
     @discardableResult
     static func observeAuthorizationChanges() async throws -> Bool {
         let root = try applicationSupportRoot()
+        let metrics = try await selectedMetrics()
+        guard !metrics.isEmpty else { return false }
         let grant = HealthAuthorizationGrant(
             id: "core-activity",
-            metrics: try await selectedMetrics()
+            metrics: metrics
         )
         let observer = HealthAuthorizationObserver(
             recordURL: root.appendingPathComponent("health-authorization.json")
@@ -2142,8 +2170,10 @@ enum HarnessExport {
         let coordinator = HealthKitObserverCoordinator(
             wakeLedger: try wakeLedger()
         )
+        let metrics = try await selectedMetrics()
+        guard !metrics.isEmpty else { return coordinator }
         try await coordinator.start(
-            metrics: try await selectedMetrics()
+            metrics: metrics
         ) { metric in
             try? await observeAuthorizationChanges()
             await ObserverExportGate.shared.enqueue(metric)

@@ -10,7 +10,7 @@ struct ExporterApp: App {
 
     var body: some Scene {
         WindowGroup {
-            HarnessView()
+            HarnessView(authenticator: UserPresenceAuthenticatorFactory.make())
         }
     }
 }

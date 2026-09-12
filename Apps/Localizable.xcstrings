@@ -1927,6 +1927,171 @@
         }
       }
     },
+    "Asks Apple for read permission only for types currently selected in Data.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Asks Apple for read permission only for types currently selected in Data."
+          }
+        }
+      }
+    },
+    "Asks for notification permission and posts one R-40 notice with copy from the registry.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Asks for notification permission and posts one R-40 notice with copy from the registry."
+          }
+        }
+      }
+    },
+    "Assembles a redacted ohe.diagnostic/1 JSON preview. Sharing exists only below the bundle's last line.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assembles a redacted ohe.diagnostic/1 JSON preview. Sharing exists only below the bundle's last line."
+          }
+        }
+      }
+    },
+    "Browses for the paired Mac name and pushes one page over TLS 1.3 PSK.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Browses for the paired Mac name and pushes one page over TLS 1.3 PSK."
+          }
+        }
+      }
+    },
+    "Compares every available day without advancing HealthKit anchors.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compares every available day without advancing HealthKit anchors."
+          }
+        }
+      }
+    },
+    "Demo values. This is what App Review sees without HealthKit history.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demo values. This is what App Review sees without HealthKit history."
+          }
+        }
+      }
+    },
+    "Exports synthetic samples marked demo:true into a DEMO- prefixed local folder.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exports synthetic samples marked demo:true into a DEMO- prefixed local folder."
+          }
+        }
+      }
+    },
+    "Health values read on this iPhone.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Health values read on this iPhone."
+          }
+        }
+      }
+    },
+    "Last successful export": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last successful export"
+          }
+        }
+      }
+    },
+    "Returns value-free freshness and delivery status for every export destination.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Returns value-free freshness and delivery status for every export destination."
+          }
+        }
+      }
+    },
+    "Runs one anchored page per selected type to the enabled local archive. Outcomes are kinds, not health values.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runs one anchored page per selected type to the enabled local archive. Outcomes are kinds, not health values."
+          }
+        }
+      }
+    },
+    "Shows Health permission and measurement controls.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows Health permission and measurement controls."
+          }
+        }
+      }
+    },
+    "Verifies the append-only hash chain and shows up to 50 recent transmission records.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verifies the append-only hash chain and shows up to 50 recent transmission records."
+          }
+        }
+      }
+    },
+    "Writes a canary file, reads it back, then enables the local-file destination.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Writes a canary file, reads it back, then enables the local-file destination."
+          }
+        }
+      }
+    },
+    "Writes NDJSON under Application Support using the engine and local-file sink.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Writes NDJSON under Application Support using the engine and local-file sink."
+          }
+        }
+      }
+    },
     "iOS can hide this app. We cannot prevent that, and we do not offer stealth mode, alternate icons, or a second name. Check Settings → Apps → Hidden Apps, Screen Time, Battery, and App Store purchase history. Apple's Personal Safety guide: https://support.apple.com/guide/personal-safety/lock-or-hide-apps-on-your-iphone-ipsd0be4c185/web": {
       "extractionState": "manual",
       "localizations": {
@@ -1934,6 +2099,94 @@
           "stringUnit": {
             "state": "translated",
             "value": "iOS can hide this app. We cannot prevent that, and we do not offer stealth mode, alternate icons, or a second name. Check Settings → Apps → Hidden Apps, Screen Time, Battery, and App Store purchase history. Apple's Personal Safety guide: https://support.apple.com/guide/personal-safety/lock-or-hide-apps-on-your-iphone-ipsd0be4c185/web"
+          }
+        }
+      }
+    },
+    "App privacy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App privacy"
+          }
+        }
+      }
+    },
+    "Authentication was not completed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Authentication was not completed."
+          }
+        }
+      }
+    },
+    "Authenticating…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Authenticating…"
+          }
+        }
+      }
+    },
+    "Open Health Exporter is locked": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Health Exporter is locked"
+          }
+        }
+      }
+    },
+    "Require Face ID, Touch ID, or device passcode to open the app": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Require Face ID, Touch ID, or device passcode to open the app"
+          }
+        }
+      }
+    },
+    "This protects the foreground screen only. It never gates background tasks or destination delivery.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This protects the foreground screen only. It never gates background tasks or destination delivery."
+          }
+        }
+      }
+    },
+    "Unlock": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlock"
+          }
+        }
+      }
+    },
+    "Unlocking protects this screen only. Background exports and destination delivery continue without a prompt.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlocking protects this screen only. Background exports and destination delivery continue without a prompt."
           }
         }
       }

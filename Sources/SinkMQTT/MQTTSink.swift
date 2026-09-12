@@ -66,6 +66,14 @@ public struct MQTTDestination: Sendable {
         self.exporterID = exporterID
     }
 
+    public static func qos(configurationValue: Int) throws -> MQTTQoS {
+        try MQTTQoS(configurationValue: configurationValue)
+    }
+
+    public static func qos(configurationValue: UInt8) throws -> MQTTQoS {
+        try MQTTQoS(configurationValue: configurationValue)
+    }
+
     public func resolvedTopic(batchID: String) throws -> String {
         try MQTTTopicTemplate.render(
             topic,

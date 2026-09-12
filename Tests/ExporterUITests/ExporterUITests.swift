@@ -21,6 +21,7 @@ final class ExporterUITests: XCTestCase {
             "-ohe.advisoryEnabled", "false",
             "-ohe.browserDemoMode", "true",
             "-ohe.browserOnlyWithData", "true",
+            "-ohe.appPrivacyGateEnabled", "false",
             // SEC-45's warning is one-time and gates the share control. Cases that are
             // about something else start past it; the SEC-45 case turns it back on.
             "-ohe.shareProtectionAcknowledged", "true",
@@ -48,6 +49,56 @@ final class ExporterUITests: XCTestCase {
             app.staticTexts["shortcut-export"].label,
             "Shortcuts can run one page to the local archive after you enable it."
         )
+    }
+
+    /// SEC-29: failed owner authentication covers the entire UI. The production
+    /// gate is optional and remains off in the common/default launch above.
+    func testOptionalPrivacyGateFailsClosedAndUsesInjectedAuthenticator() {
+        app.terminate()
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "true",
+        ]
+        app.launchEnvironment["OHE_TEST_USER_PRESENCE"] = "deny"
+        app.launch()
+
+        XCTAssertTrue(app.buttons["privacy-gate-unlock"].waitForExistence(timeout: uiWait))
+        XCTAssertFalse(app.buttons["health-request"].exists)
+
+        app.buttons["privacy-gate-unlock"].tap()
+        XCTAssertTrue(app.staticTexts["privacy-gate-failure"].waitForExistence(timeout: uiWait))
+        XCTAssertFalse(app.buttons["health-request"].exists)
+    }
+
+    /// SEC-29: leaving the foreground immediately relocks presentation. The
+    /// adapter's second result is denied so activation cannot silently reopen it.
+    func testPrivacyGateRelocksAfterLeavingForeground() {
+        app.terminate()
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "true",
+        ]
+        app.launchEnvironment["OHE_TEST_USER_PRESENCE"] = "allow-then-deny"
+        app.launch()
+
+        XCTAssertTrue(app.buttons["health-request"].waitForExistence(timeout: uiWait))
+        XCUIDevice.shared.press(.home)
+        app.activate()
+
+        XCTAssertTrue(app.buttons["privacy-gate-unlock"].waitForExistence(timeout: uiWait))
+        XCTAssertFalse(app.buttons["health-request"].exists)
+    }
+
+    /// SEC-65: there is intentionally no stored-secret reveal affordance. Owner
+    /// authentication protects the app screen but never makes credentials legible.
+    func testStoredCredentialsHaveNoRevealControl() {
+        enterControls()
+        let policy = scrollToHittable(app.staticTexts["credential-no-reveal-policy"])
+        XCTAssertTrue(policy.label.contains("never shown"), policy.label)
+        XCTAssertFalse(app.buttons["credential-reveal-https"].exists)
+        XCTAssertFalse(app.buttons["credential-reveal-mqtt"].exists)
     }
 
     func testDisclosureAndMainControlsPassAccessibilityAudit() throws {
@@ -401,17 +452,36 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(export.isEnabled)
     }
 
-    func testDisclosurePassesAccessibilityAuditInPseudoLocaleAndRTL() throws {
-        app.terminate()
-        app.launchArguments += [
-            "-NSDoubleLocalizedStrings", "YES",
-            "-NSForceRightToLeftWritingDirection", "YES",
-        ]
-        app.launch()
-        XCTAssertTrue(app.buttons["disclosure-continue"].waitForExistence(timeout: uiWait))
-        try performAccessibilityAudit()
-        enterControls()
-        try performAccessibilityAudit()
+    func testDisclosureAndControlsInPseudoLocale() throws {
+        try auditLocalizedDisclosureAndControls(Self.pseudoLocaleArguments, "pseudo")
+    }
+
+    func testBrowserEmptyStateInPseudoLocale() throws {
+        try auditLocalizedBrowserEmpty(Self.pseudoLocaleArguments, "pseudo")
+    }
+
+    func testBrowserDetailInPseudoLocale() throws {
+        try auditLocalizedBrowserDetail(Self.pseudoLocaleArguments, "pseudo")
+    }
+
+    func testDestinationsAndHistoryInPseudoLocale() throws {
+        try auditLocalizedDestinationsAndHistory(Self.pseudoLocaleArguments, "pseudo")
+    }
+
+    func testDisclosureAndControlsInRTL() throws {
+        try auditLocalizedDisclosureAndControls(Self.rtlArguments, "rtl")
+    }
+
+    func testBrowserEmptyStateInRTL() throws {
+        try auditLocalizedBrowserEmpty(Self.rtlArguments, "rtl")
+    }
+
+    func testBrowserDetailInRTL() throws {
+        try auditLocalizedBrowserDetail(Self.rtlArguments, "rtl")
+    }
+
+    func testDestinationsAndHistoryInRTL() throws {
+        try auditLocalizedDestinationsAndHistory(Self.rtlArguments, "rtl")
     }
 
     /// QA-15: silence itself is visible. A destination that succeeded and then stopped
@@ -555,6 +625,75 @@ final class ExporterUITests: XCTestCase {
         let disclosure = app.buttons["disclosure-continue"]
         XCTAssertTrue(disclosure.waitForExistence(timeout: uiWait))
         disclosure.tap()
+    }
+
+    /// QA-27 exercises structure and accessibility under localization expansion and
+    /// mirrored layout. It intentionally avoids pixel snapshots: identifiers and
+    /// accessibility audits remain stable across SDK font/rasterization changes while
+    /// still catching clipped, unreachable, unlabeled and incorrectly ordered UI.
+    private static let pseudoLocaleArguments = ["-NSDoubleLocalizedStrings", "YES"]
+    private static let rtlArguments = [
+        "-AppleLanguages", "(ar)",
+        "-NSForceRightToLeftWritingDirection", "YES",
+    ]
+
+    private func launchLocalized(_ arguments: [String]) {
+        app.terminate()
+        app.launchArguments += arguments
+        app.launch()
+    }
+
+    private func auditLocalizedDisclosureAndControls(
+        _ arguments: [String],
+        _ configuration: String
+    ) throws {
+        launchLocalized(arguments)
+        XCTAssertTrue(app.buttons["disclosure-continue"].waitForExistence(timeout: uiWait))
+        try performAccessibilityAudit("\(configuration)-disclosure")
+        enterControls()
+        XCTAssertTrue(app.staticTexts["browser-title"].waitForExistence(timeout: uiWait))
+        try performAccessibilityAudit("\(configuration)-controls")
+    }
+
+    private func auditLocalizedBrowserEmpty(
+        _ arguments: [String],
+        _ configuration: String
+    ) throws {
+        launchLocalized(arguments)
+        enterControls()
+        let search = scrollToHittable(app.textFields["browser-search"])
+        type("no-such-health-type", into: search)
+        XCTAssertTrue(app.staticTexts["browser-empty"].waitForExistence(timeout: uiWait))
+        app.keyboards.buttons["return"].tap()
+        try performAccessibilityAudit("\(configuration)-browser-empty")
+    }
+
+    private func auditLocalizedDestinationsAndHistory(
+        _ arguments: [String],
+        _ configuration: String
+    ) throws {
+        launchLocalized(arguments)
+        enterControls()
+        XCTAssertTrue(scrollToHittable(app.staticTexts["destination-title"]).exists)
+        XCTAssertTrue(app.buttons["destination-refresh"].exists)
+        try performAccessibilityAudit("\(configuration)-destinations")
+        XCTAssertTrue(scrollToHittable(app.buttons["history-load"]).exists)
+        app.buttons["history-load"].tap()
+        try performAccessibilityAudit("\(configuration)-history")
+    }
+
+    private func auditLocalizedBrowserDetail(
+        _ arguments: [String],
+        _ configuration: String
+    ) throws {
+        launchLocalized(arguments)
+        enterControls()
+        filterBrowserToHeartRate()
+        let row = app.descendants(matching: .any)["browser-row-heartRate"]
+        XCTAssertTrue(row.waitForExistence(timeout: uiWait))
+        row.tap()
+        XCTAssertTrue(app.buttons["browser-back"].waitForExistence(timeout: uiWait))
+        try performAccessibilityAudit("\(configuration)-browser-detail")
     }
 
     private func performAccessibilityAudit(_ state: String = #function) throws {

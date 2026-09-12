@@ -19,6 +19,10 @@ import WireFormat
 
 struct HarnessView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("ohe.appPrivacyGateEnabled")
+    private var appPrivacyGateEnabled = false
+    @State private var appPrivacyGate: AppPrivacyGate
+
     private enum Phase {
         case disclosure
         case ready
@@ -134,45 +138,59 @@ struct HarnessView: View {
     @State private var confirmationKind: PendingConfirmationKind?
     @State private var publicAddressConfirmation = ""
 
+    init(authenticator: any UserPresenceAuthenticating = LocalAuthenticationAdapter()) {
+        _appPrivacyGate = State(initialValue: AppPrivacyGate(authenticator: authenticator))
+    }
+
+    private var isPrivacyLocked: Bool {
+        appPrivacyGateEnabled && appPrivacyGate.state != .unlocked
+    }
+
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text(status)
-                        .font(.body)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityLabel("Status: \(status)")
-                        .accessibilityIdentifier("status-line")
-
-                    Text("Time to first screen: \(timeToFirstFrameMS, specifier: "%.0f") ms (foreground; R-73 is a background-launch budget).")
-                        .font(.footnote)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    if phase == .disclosure {
-                        disclosure
-                    } else {
-                        dataBrowser
-                        controls
-                    }
-
-                    if !results.isEmpty {
-                        Text("Measurements")
-                            .font(.headline)
-                        ForEach(Array(results.enumerated()), id: \.offset) { _, line in
-                            Text(line)
+        ZStack {
+            if isPrivacyLocked {
+                privacyLock
+            } else {
+                NavigationStack {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text(status)
                                 .font(.body)
-                                .textSelection(.enabled)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityLabel("Status: \(status)")
+                                .accessibilityIdentifier("status-line")
+
+                            Text("Time to first screen: \(timeToFirstFrameMS, specifier: "%.0f") ms (foreground; R-73 is a background-launch budget).")
+                                .font(.footnote)
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            if phase == .disclosure {
+                                disclosure
+                            } else {
+                                dataBrowser
+                                controls
+                            }
+
+                            if !results.isEmpty {
+                                Text("Measurements")
+                                    .font(.headline)
+                                ForEach(Array(results.enumerated()), id: \.offset) { _, line in
+                                    Text(line)
+                                        .font(.body)
+                                        .textSelection(.enabled)
+                                }
+                            }
                         }
+                        .padding()
                     }
+                    .navigationTitle("M0 harness")
                 }
-                .padding()
             }
-            .navigationTitle("M0 harness")
         }
         .tint(.primary)
         .safeAreaInset(edge: .top) {
-            if let overdueBanner {
+            if !isPrivacyLocked, let overdueBanner {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Export overdue")
                         .font(.headline)
@@ -186,7 +204,7 @@ struct HarnessView: View {
             }
         }
         .safeAreaInset(edge: .top) {
-            if let destinationChangeBanner {
+            if !isPrivacyLocked, let destinationChangeBanner {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Unacknowledged destination change")
                         .font(.headline)
@@ -200,7 +218,7 @@ struct HarnessView: View {
             }
         }
         .safeAreaInset(edge: .top) {
-            if AnchorHoldBanner.isVisible(anchorHolds) {
+            if !isPrivacyLocked, AnchorHoldBanner.isVisible(anchorHolds) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(AnchorHoldBanner.title)
                         .font(.headline)
@@ -226,6 +244,7 @@ struct HarnessView: View {
             }
         }
         .onAppear {
+            appPrivacyGate.prepare(enabled: appPrivacyGateEnabled)
             timeToFirstFrameMS = LaunchMark.millisecondsToNow()
             refreshDestinationSurfaces()
             if otlpURL.isEmpty {
@@ -238,6 +257,7 @@ struct HarnessView: View {
                 status = "Ready."
             }
             Task {
+                await appPrivacyGate.authenticateIfNeeded(enabled: appPrivacyGateEnabled)
                 await loadDestinationScope(scopeDestinationID)
                 do {
                     let expired = try await HarnessExport.expireQueuesAndNotify()
@@ -311,9 +331,18 @@ struct HarnessView: View {
             applyWidgetStatusURL(url)
         }
         .onChange(of: scenePhase) { _, next in
-            guard next == .active else { return }
+            guard next == .active else {
+                appPrivacyGate.lockIfEnabled(appPrivacyGateEnabled)
+                showScanner = false
+                pickingMQTTPKCS12 = false
+                if confirmationCard != nil {
+                    cancelDestinationConfirmation()
+                }
+                return
+            }
             AppLifecycleCoordinator.shared.recordWake(.appForeground)
             Task {
+                await appPrivacyGate.authenticateIfNeeded(enabled: appPrivacyGateEnabled)
                 try? await HarnessExport.recordNotificationSuppressionIfNeeded()
                 await startHealthObserversIfEligible()
                 await refreshSecurityAdvisory()
@@ -355,6 +384,39 @@ struct HarnessView: View {
         }
     }
 
+    private var privacyLock: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "lock.fill")
+                .font(.largeTitle)
+                .accessibilityHidden(true)
+            Text("Open Health Exporter is locked")
+                .font(.headline)
+            Text("Unlocking protects this screen only. Background exports and destination delivery continue without a prompt.")
+                .font(.footnote)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            if appPrivacyGate.authenticationFailed {
+                Text("Authentication was not completed.")
+                    .font(.footnote)
+                    .accessibilityIdentifier("privacy-gate-failure")
+            }
+            Button(
+                appPrivacyGate.state == .authenticating ? "Authenticating…" : "Unlock"
+            ) {
+                Task {
+                    await appPrivacyGate.authenticateIfNeeded(enabled: appPrivacyGateEnabled)
+                }
+            }
+            .disabled(appPrivacyGate.state == .authenticating)
+            .accessibilityIdentifier("privacy-gate-unlock")
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
+        .background(Color(uiColor: .systemBackground))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("privacy-gate")
+    }
+
     private var mqttPKCS12Types: [UTType] {
         ["p12", "pfx"].compactMap { UTType(filenameExtension: $0) } + [.data]
     }
@@ -393,6 +455,41 @@ struct HarnessView: View {
                 .font(.footnote)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("about-disclaimer")
+
+            Text("App privacy")
+                .font(.headline)
+            Toggle(
+                "Require Face ID, Touch ID, or device passcode to open the app",
+                isOn: Binding(
+                    get: { appPrivacyGateEnabled },
+                    set: { enabled in
+                        if enabled {
+                            Task {
+                                if await appPrivacyGate.authenticateIfNeeded(enabled: true) {
+                                    appPrivacyGateEnabled = true
+                                    status = "Ready. The app screen will lock whenever you leave it."
+                                } else {
+                                    status = "App privacy was not enabled because authentication did not complete."
+                                }
+                            }
+                        } else {
+                            appPrivacyGateEnabled = false
+                            appPrivacyGate.prepare(enabled: false)
+                            status = "Ready. The optional app privacy gate is off."
+                        }
+                    }
+                )
+            )
+            .frame(minHeight: 44)
+            .accessibilityIdentifier("privacy-gate-enabled")
+            Text("This protects the foreground screen only. It never gates background tasks or destination delivery.")
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("privacy-gate-scope")
+            Text(CredentialPresentationPolicy.copy)
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("credential-no-reveal-policy")
 
             Text("HealthKit provides no deletion callback. Tombstones are best-effort when iOS next reports a deletion; a full reconcile repairs deletions that were not reported.")
                 .font(.footnote)
@@ -525,10 +622,10 @@ struct HarnessView: View {
             Text(FreshnessTarget.provisionalDisclosure)
                 .font(.footnote)
                 .accessibilityIdentifier("freshness-target")
-            ForEach(FreshnessClass.allCases, id: \.self) { freshnessClass in
-                Text(FreshnessTarget.classDisclosure(freshnessClass))
+            ForEach(HarnessExport.freshnessDisclosureLines(), id: \.id) { disclosure in
+                Text(disclosure.text)
                     .font(.footnote)
-                    .accessibilityIdentifier("freshness-class-\(freshnessClass.rawValue)")
+                    .accessibilityIdentifier(disclosure.id)
             }
             if !wakeAttribution.isEmpty {
                 Text(wakeAttribution)
@@ -995,7 +1092,6 @@ struct HarnessView: View {
                 previewPayload: preview
             )
             refreshDestinationSurfaces()
-            OTLPBackgroundCoordinator.submit()
             status = "Ready. OTLP collector is enabled and off the health export path."
         } catch {
             status = "Failed: \(error.localizedDescription)"
@@ -1011,7 +1107,6 @@ struct HarnessView: View {
             otlpLines = [result]
             refreshDestinationSurfaces()
             await refreshLedgerIntegrity()
-            OTLPBackgroundCoordinator.submit()
             status = "Ready. \(result)"
         } catch {
             status = "Failed: \(error.localizedDescription)"
@@ -1026,7 +1121,6 @@ struct HarnessView: View {
             otlpPreview = ""
             otlpPayload = nil
             refreshDestinationSurfaces()
-            OTLPBackgroundCoordinator.submit()
             status = "Ready. OTLP collector is disabled."
         } catch {
             status = "Failed: \(error.localizedDescription)"

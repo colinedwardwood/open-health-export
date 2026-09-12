@@ -194,6 +194,15 @@ enum LeakMutant: String, CaseIterable {
     #expect(exportHarness.contains("guard isDestinationEnabled($1.destinationID)"))
     #expect(exportHarness.contains("window: HealthKitQueryWindow(scope: scope)"))
     #expect(exportHarness.contains("try ExportScopeGate.requireConfigured(scope)"))
+    #expect(exportHarness.contains(
+        #"try ExportScopeGate.requireConfigured(try await destinationScope("https"))"#
+    ))
+    #expect(exportHarness.contains(
+        #"try ExportScopeGate.requireConfigured(try await destinationScope("mqtt"))"#
+    ))
+    #expect(exportHarness.contains(
+        #"try ExportScopeGate.requireConfigured(try await destinationScope("local-file"))"#
+    ))
     #expect(!exportHarness.contains(
         "for metric in [MetricCatalog.heartRate.id, MetricCatalog.stepCount.id]"
     ))
