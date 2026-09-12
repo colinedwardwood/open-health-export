@@ -76,6 +76,19 @@ public enum NativeWire {
 
     public static let demoFilePrefix = "DEMO-"
 
+    /// Kinds `exportruncheck` counts as structural T1/T2 input (not paged as quantities).
+    public static let volumeStructuralKinds: Set<String> = [
+        "sample.category",
+        "sample.correlation",
+        "workout",
+        "sample.stateOfMind",
+        "sample.ecg",
+        "series.ecgVoltage",
+        "sample.audiogram",
+        "medicationDose",
+        "tombstone",
+    ]
+
     public static func outputFileName(batchID: BatchID, demo: Bool) -> String {
         "\(demo ? demoFilePrefix : "")\(batchID.rawValue).ndjson"
     }

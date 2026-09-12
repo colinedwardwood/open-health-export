@@ -15,16 +15,7 @@ private let defaultPageSize = 500
 private let maximumPageSize = 10_000
 private let maximumConcurrentMetrics = 4
 private let newline = Data([0x0A])
-private let volumeStructuralKinds: Set<String> = [
-    "sample.category",
-    "sample.correlation",
-    "workout",
-    "sample.stateOfMind",
-    "series.ecgVoltage",
-    "sample.audiogram",
-    "medicationDose",
-    "tombstone",
-]
+private let volumeStructuralKinds = NativeWire.volumeStructuralKinds
 
 @main
 struct ExportRunCheck {

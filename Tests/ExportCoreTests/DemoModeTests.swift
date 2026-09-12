@@ -121,3 +121,55 @@ import WireFormat
     #expect(years.last == "2024")
     #expect(Set(years).count == 15)
 }
+
+@Test func volumeCorpusPairsECGParentsWithVoltageSeries() throws {
+    let accounted = NativeWire.volumeStructuralKinds.union(["sample.quantity"])
+    var kinds = Set<String>()
+    for index in 0 ..< 200 {
+        kinds.insert(try volumeKind(at: index, tier: .t0))
+    }
+    #expect(kinds.isSubset(of: accounted))
+    #expect(kinds.contains("sample.ecg"))
+    #expect(kinds.contains("series.ecgVoltage"))
+
+    let parent = try volumeObject(at: 4, tier: .t0)
+    let chunk = try volumeObject(at: 104, tier: .t0)
+    #expect(parent["kind"] as? String == "sample.ecg")
+    #expect(chunk["kind"] as? String == "series.ecgVoltage")
+    #expect(chunk["parentUuid"] as? String == parent["uuid"] as? String)
+
+    let t2Parent = try volumeKind(at: 20_000_004, tier: .t2)
+    let t2Chunk = try volumeKind(at: 20_000_104, tier: .t2)
+    #expect(t2Parent == "sample.ecg")
+    #expect(t2Chunk == "series.ecgVoltage")
+}
+
+private func volumeKind(at index: Int, tier: SyntheticCorpusTier) throws -> String {
+    try #require(try volumeObject(at: index, tier: tier)["kind"] as? String)
+}
+
+private func volumeObject(at index: Int, tier: SyntheticCorpusTier) throws -> [String: Any] {
+    let declaration = DemoCorpus.declaration(at: index, tier: tier)
+    let sample = DemoCorpus.sample(
+        at: index,
+        seed: 1,
+        declaration: declaration,
+        tier: tier
+    )
+    let envelope = WireEnvelope(
+        exporterId: "00000000-0000-4000-8000-000000000082",
+        seq: index + 1,
+        emittedAt: sample.observedAt,
+        observedAt: sample.observedAt
+    )
+    let line = try DemoCorpus.encodeRecord(
+        index: index,
+        sample: sample,
+        envelope: envelope,
+        tier: tier,
+        seed: 1
+    )
+    return try #require(
+        JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
+    )
+}
