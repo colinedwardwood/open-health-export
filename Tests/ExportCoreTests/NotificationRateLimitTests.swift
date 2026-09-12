@@ -112,3 +112,27 @@ import Watchdog
         )
     }
 }
+
+@Test func ux35NotificationAuthorizationIsProvisionalUntilARealFailure() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let notifier = try String(
+        contentsOf: root.appendingPathComponent(
+            "Apps/Exporter-iOS/LocalUserNotifier.swift"
+        ),
+        encoding: .utf8
+    )
+    #expect(notifier.contains("notice.kind == .exportFailed"))
+    #expect(notifier.contains("[.alert, .sound, .badge, .provisional]"))
+
+    let lifecycle = try String(
+        contentsOf: root.appendingPathComponent(
+            "Apps/Exporter-iOS/AppLifecycleCoordinator.swift"
+        ),
+        encoding: .utf8
+    )
+    #expect(!lifecycle.contains("requestAuthorization"))
+    #expect(!lifecycle.contains("LocalUserNotifier"))
+}
