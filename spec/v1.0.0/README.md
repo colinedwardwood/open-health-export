@@ -21,7 +21,7 @@
       "otelCollectorTag": "0.160.0"
     },
     "fix-catalogue.json": {
-      "cases": 72,
+      "cases": 73,
       "role": "Stage 4 FIX-* meta-test input; every t0 ID has a Linux witness"
     },
     "receiver-sequence.ndjson": {

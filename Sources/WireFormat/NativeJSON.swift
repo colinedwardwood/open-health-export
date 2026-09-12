@@ -4,7 +4,12 @@
 import Foundation
 
 enum NativeJSON {
-    static func document(fromNDJSON data: Data) throws -> (canonical: Data, pretty: Data) {
+    static let maxDocumentBytes = 2 * 1024 * 1024 * 1024
+
+    static func document(
+        fromNDJSON data: Data,
+        maxBytes: Int = maxDocumentBytes
+    ) throws -> (canonical: Data, pretty: Data) {
         let text = String(decoding: data, as: UTF8.self)
         let lines = text.split(omittingEmptySubsequences: true, whereSeparator: \.isNewline)
             .map(String.init)
@@ -29,6 +34,11 @@ enum NativeJSON {
         guard let headerLine, let footerLine else { throw WireError.utf8 }
         let canonical = "{\"footer\":\(footerLine),\"header\":\(headerLine),\"records\":[\(recordLines.joined(separator: ","))]}\n"
         let pretty = CanonicalJSON.prettyPrint(canonical)
-        return (Data(canonical.utf8), Data(pretty.utf8))
+        let canonicalData = Data(canonical.utf8)
+        let prettyData = Data(pretty.utf8)
+        guard canonicalData.count <= maxBytes, prettyData.count <= maxBytes else {
+            throw WireError.documentExceedsByteLimit
+        }
+        return (canonicalData, prettyData)
     }
 }

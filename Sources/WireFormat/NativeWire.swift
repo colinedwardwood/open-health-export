@@ -302,6 +302,7 @@ public enum WireError: Error, Equatable {
     case utf8
     case nonFiniteNumber
     case invertedInterval
+    case documentExceedsByteLimit
 }
 
 private extension NativeWire {

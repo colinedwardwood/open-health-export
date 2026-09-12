@@ -13,7 +13,7 @@ import MetricCatalog
 import NetEgress
 import RequestTemplate
 import Testing
-import WireFormat
+@testable import WireFormat
 
 #if canImport(Darwin)
 import Darwin
@@ -71,7 +71,7 @@ enum FixCatalogue {
         "M01", "M02", "M03", "M04", "M05", "M06", "M07", "M08",
         "A01", "A02", "A03", "A04", "A05", "A06", "A07",
         "U01", "U02", "U03", "U04", "U05", "U06", "U07", "U08",
-        "F01", "F02", "F03", "F04", "F05", "F06", "F07", "F08",
+        "F01", "F02", "F03", "F04", "F05", "F06", "F07", "F08", "F09",
         "V01", "V02", "V03", "V04", "V05", "V06", "V07", "V08", "V09", "V10", "V11",
         "P01", "P02", "P03", "P04", "P05", "P06", "P07",
     ]
@@ -167,6 +167,7 @@ enum FixWitness {
         case "F06": try f06()
         case "F07": try f07()
         case "F08": try f08()
+        case "F09": try f09()
         case "V01": try v01()
         case "V02": try v02()
         case "V03": try v03()
@@ -837,6 +838,39 @@ enum FixWitness {
                 context: TemplateContext(values: ["token": "ok\r\nX-Injected: 1"])
             )
         }
+    }
+
+    static func f09() throws {
+        #expect(NativeJSON.maxDocumentBytes == 2 * 1024 * 1024 * 1024)
+        #expect(NativeCSV.spreadsheetDataRowLimit == 1_048_576)
+        let batch = try NativeWire.encode(
+            samples: [heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaf09")],
+            tombstones: [],
+            metric: MetricCatalog.heartRate.id,
+            batchID: BatchID(rawValue: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaf09"),
+            envelope: testEnvelope()
+        )
+        #expect(throws: WireError.documentExceedsByteLimit) {
+            _ = try NativeJSON.document(fromNDJSON: batch, maxBytes: 64)
+        }
+        let samples = (1 ... 3).map { index in
+            heartSample(String(format: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaf%02d", index))
+        }
+        let chunks = try NativeCSV.quantityChunks(
+            samples: samples,
+            envelope: testEnvelope(),
+            rowLimit: 2
+        )
+        #expect(chunks.count == 2)
+        #expect(chunks[0].fileName.contains("part01"))
+        #expect(chunks[1].fileName.contains("part02"))
+        let single = try NativeCSV.quantityChunks(
+            samples: [samples[0]],
+            envelope: testEnvelope(),
+            rowLimit: 2
+        )
+        #expect(single.count == 1)
+        #expect(!single[0].fileName.contains("part"))
     }
 
     static func v01() throws {

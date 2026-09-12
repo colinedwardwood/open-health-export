@@ -69,6 +69,9 @@ public enum NativeSidecars {
             ndjson: data
         )
         try csv.quantity.write(to: encodings.appendingPathComponent(csv.fileName), options: .atomic)
+        for extra in csv.extra {
+            try extra.0.write(to: encodings.appendingPathComponent(extra.1), options: .atomic)
+        }
         try csv.meta.write(to: encodings.appendingPathComponent("_meta.json"), options: .atomic)
         guard parsed.haeEligible, let metric = parsed.metric else { return }
         let hae = try HAEWire.encode(

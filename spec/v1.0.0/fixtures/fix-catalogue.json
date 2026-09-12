@@ -326,6 +326,12 @@
       "summary": "Request templates reject injection"
     },
     {
+      "id": "F09",
+      "family": "F",
+      "ciTier": "t0",
+      "summary": "JSON sidecar refuses a 2 GiB document; CSV splits at spreadsheet row limits"
+    },
+    {
       "id": "V01",
       "family": "V",
       "ciTier": "nightly",
