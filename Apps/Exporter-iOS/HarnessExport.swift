@@ -2660,6 +2660,40 @@ enum HarnessExport {
         return host
     }
 
+    static func wipeInventory() async -> WipeInventory {
+        let hops = dataFlowHops()
+        let destinations = hops.filter { $0.id != "otlp" }
+        let credentials = hops.filter {
+            $0.credential != DataFlowHop.noNetwork
+                && $0.credential != DataFlowHop.noCredential
+        }
+        guard let root = try? applicationSupportRoot() else {
+            return WipeInventory(
+                destinationCount: destinations.count,
+                credentialCount: credentials.count
+            )
+        }
+        let store: SQLiteStateStore
+        do {
+            store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+        } catch {
+            return WipeInventory(
+                destinationCount: destinations.count,
+                credentialCount: credentials.count
+            )
+        }
+        let pending = (try? await store.transact { try $0.pendingBatches() }) ?? []
+        let journal = (try? await store.transact { try $0.loadJournal() }) ?? []
+        let ledger = (try? await store.transact { try $0.loadLedger() }) ?? []
+        return WipeInventory.build(
+            destinationCount: destinations.count,
+            credentialCount: credentials.count,
+            pending: pending,
+            journal: journal,
+            ledger: ledger
+        )
+    }
+
     static func wakeLedger() throws -> WakeLedger {
         let root = try applicationSupportRoot()
         return WakeLedger(path: root.appendingPathComponent("wake-ledger.log").path)

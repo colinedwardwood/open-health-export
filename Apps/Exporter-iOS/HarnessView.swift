@@ -90,6 +90,7 @@ struct HarnessView: View {
     @State private var wakeAttribution = ""
     @State private var queueEvictionGaps: [GapRecord] = []
     @State private var wipeArmed = false
+    @State private var wipeInventory = WipeInventory()
     @State private var stopHeartRateArmed = false
     @State private var demoConfirmName = ""
     @State private var browserSearch = ""
@@ -1001,6 +1002,36 @@ struct HarnessView: View {
 
             Text("Stop and delete")
                 .font(.headline)
+            Text(WipeCopy.counts(wipeInventory))
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("wipe-counts")
+            Text(WipeCopy.receivedLimit)
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("wipe-received-limit")
+            if wipeInventory.received.isEmpty {
+                Text(WipeCopy.noneReceived)
+                    .font(.footnote)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                ForEach(Array(wipeInventory.received.enumerated()), id: \.offset) { index, range in
+                    Text(WipeCopy.receivedLine(range))
+                        .font(.footnote)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("wipe-received-\(index)")
+                }
+            }
+            Text(WipeCopy.healthLimit)
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("wipe-health-limit")
+            Text(WipeCopy.healthPath)
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(WipeCopy.macLimit)
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
             Button(stopHeartRateArmed ? "Confirm: stop exporting heart rate" : "Stop exporting heart rate") {
                 if stopHeartRateArmed {
                     Task { await stopHeartRate() }
@@ -1011,7 +1042,7 @@ struct HarnessView: View {
             }
             .accessibilityIdentifier("stop-heart-rate")
             .disabled(phase == .working)
-            Button(wipeArmed ? "Confirm: delete credentials and ledger identity" : "Delete everything on this device") {
+            Button(wipeArmed ? WipeCopy.confirmTitle : WipeCopy.title) {
                 if wipeArmed {
                     Task { await wipeDevice() }
                 } else {
@@ -1019,6 +1050,7 @@ struct HarnessView: View {
                     status = "Ready. Tap again to destroy credentials, pairing, and the ledger signing identity."
                 }
             }
+            .accessibilityIdentifier("wipe-everything")
             .disabled(phase == .working)
 
             Text("Diagnostics")
@@ -2160,6 +2192,7 @@ struct HarnessView: View {
         dataFlowHops = HarnessExport.dataFlowHops()
         Task {
             dataFlowTypeCount = await HarnessExport.dataFlowTypeCount()
+            wipeInventory = await HarnessExport.wipeInventory()
         }
     }
 

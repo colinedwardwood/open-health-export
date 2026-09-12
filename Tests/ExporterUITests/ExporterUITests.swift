@@ -84,6 +84,39 @@ final class ExporterUITests: XCTestCase {
         try performAccessibilityAudit("healthkit-unavailable")
     }
 
+    /// UX-46: Delete everything is two taps from Settings, with counts and the
+    /// two limits we do not honour.
+    func testDeleteEverythingShowsHonestLimitsWithinTwoTaps() {
+        enterControls()
+        XCTAssertTrue(app.buttons["health-request"].waitForExistence(timeout: uiWait))
+        let wipe = scrollToHittable(app.buttons["wipe-everything"])
+        XCTAssertEqual(wipe.label, "Delete everything on this device")
+        XCTAssertTrue(scrollToHittable(app.staticTexts["wipe-received-limit"]).exists)
+        XCTAssertEqual(
+            app.staticTexts["wipe-received-limit"].label,
+            "We cannot delete data your destinations already received."
+        )
+        XCTAssertEqual(
+            app.staticTexts["wipe-health-limit"].label,
+            "We cannot turn off our own Health access."
+        )
+        XCTAssertTrue(
+            app.staticTexts.containing(
+                NSPredicate(
+                    format: "label CONTAINS %@",
+                    "Health → your profile picture → Privacy → Apps"
+                )
+            ).firstMatch.exists
+        )
+        wipe.tap()
+        XCTAssertTrue(app.buttons["health-request"].exists)
+        XCTAssertEqual(
+            app.buttons["wipe-everything"].label,
+            "Confirm: delete credentials and ledger identity"
+        )
+        XCTAssertFalse(app.buttons["disclosure-continue"].exists)
+    }
+
     /// SEC-29: failed owner authentication covers the entire UI. The production
     /// gate is optional and remains off in the common/default launch above.
     func testOptionalPrivacyGateFailsClosedAndUsesInjectedAuthenticator() throws {
