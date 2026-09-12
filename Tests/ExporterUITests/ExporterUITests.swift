@@ -51,6 +51,30 @@ final class ExporterUITests: XCTestCase {
         )
     }
 
+    /// UX-07 / HK-01: no Health store means one terminal screen, not onboarding
+    /// or the empty dashboard.
+    func testHealthKitUnavailableShowsTerminalScreen() throws {
+        app.terminate()
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "false",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launchEnvironment["OHE_HEALTHKIT_UNAVAILABLE"] = "1"
+        app.launch()
+
+        XCTAssertTrue(app.otherElements["healthkit-unavailable"].waitForExistence(timeout: uiWait))
+        XCTAssertEqual(
+            app.staticTexts["Apple Health is not on this device"].label,
+            "Apple Health is not on this device"
+        )
+        XCTAssertFalse(app.buttons["disclosure-continue"].exists)
+        XCTAssertFalse(app.buttons["health-request"].exists)
+        XCTAssertFalse(app.activityIndicators.firstMatch.exists)
+        XCTAssertFalse(app.buttons["Retry"].exists)
+        try performAccessibilityAudit("healthkit-unavailable")
+    }
+
     /// SEC-29: failed owner authentication covers the entire UI. The production
     /// gate is optional and remains off in the common/default launch above.
     func testOptionalPrivacyGateFailsClosedAndUsesInjectedAuthenticator() throws {

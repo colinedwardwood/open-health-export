@@ -450,9 +450,12 @@ import WireFormat
     )
 }
 
-@Test func healthKitIsUnavailableOnThisHostOrNot() {
-    // macOS CI: unavailable. iOS device: available. Either is a valid observation.
-    _ = HKHealthStore.isHealthDataAvailable()
+@Test func healthKitAvailabilityOverrideForcesUnavailableWithoutMutatingProcessEnv() {
+    #expect(
+        HealthKitAvailability.isAvailable(
+            environment: [HealthAvailability.unavailableEnvironmentKey: "1"]
+        ) == false
+    )
 }
 
 @Test func classifiedQueryErrorMapsLockAndDevicePolicyCodes() {

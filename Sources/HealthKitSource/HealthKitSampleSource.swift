@@ -631,7 +631,7 @@ public enum HealthKitAuthorization {
         store: HKHealthStore = HKHealthStore(),
         context: TemporalContext = .utc
     ) async throws -> [MetricID: String] {
-        guard HKHealthStore.isHealthDataAvailable() else { return [:] }
+        guard HealthKitAvailability.isAvailable() else { return [:] }
         // Documented HealthKit API: earliestAuthorizedSampleDate(for:). This
         // SDK does not declare it yet; mapped types stay ready for the call.
         _ = (store, context, metrics.compactMap(objectType(for:)))
@@ -642,7 +642,7 @@ public enum HealthKitAuthorization {
         metrics: [MetricID],
         store: HKHealthStore = HKHealthStore()
     ) async throws {
-        guard HKHealthStore.isHealthDataAvailable() else {
+        guard HealthKitAvailability.isAvailable() else {
             throw HealthKitSourceError.unavailable
         }
         try await store.requestAuthorization(
@@ -768,7 +768,7 @@ public final class HealthKitStructuredSource: SampleSource, @unchecked Sendable 
     }
 
     public func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage {
-        guard HKHealthStore.isHealthDataAvailable() else {
+        guard HealthKitAvailability.isAvailable() else {
             throw HealthKitSourceError.unavailable
         }
         let type: HKSampleType
@@ -872,7 +872,7 @@ public final class HealthKitSampleSource: SampleSource, @unchecked Sendable {
     }
 
     public func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage {
-        guard HKHealthStore.isHealthDataAvailable() else {
+        guard HealthKitAvailability.isAvailable() else {
             throw HealthKitSourceError.unavailable
         }
         guard let type = SampleConversion.quantityType(for: metric) else {
@@ -941,7 +941,7 @@ public final class HealthKitCategorySource: SampleSource, @unchecked Sendable {
     }
 
     public func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage {
-        guard HKHealthStore.isHealthDataAvailable() else {
+        guard HealthKitAvailability.isAvailable() else {
             throw HealthKitSourceError.unavailable
         }
         guard let type = CategoryConversion.categoryType(for: metric) else {
@@ -1017,7 +1017,7 @@ public final class HealthKitCorrelationSource: SampleSource, @unchecked Sendable
     }
 
     public func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage {
-        guard HKHealthStore.isHealthDataAvailable() else {
+        guard HealthKitAvailability.isAvailable() else {
             throw HealthKitSourceError.unavailable
         }
         guard let type = CorrelationConversion.correlationType(for: metric) else {
@@ -1089,7 +1089,7 @@ public final class HealthKitDayObservationSource: BoundedDayObservationSource, @
     }
 
     public func availableDayRange(metric: MetricID) async throws -> ClosedRange<String>? {
-        guard HKHealthStore.isHealthDataAvailable() else {
+        guard HealthKitAvailability.isAvailable() else {
             throw HealthKitSourceError.unavailable
         }
         guard let type = SampleConversion.quantityType(for: metric) else {
@@ -1104,7 +1104,7 @@ public final class HealthKitDayObservationSource: BoundedDayObservationSource, @
     }
 
     public func samples(metric: MetricID, day: String) async throws -> [SampleRecord] {
-        guard HKHealthStore.isHealthDataAvailable() else {
+        guard HealthKitAvailability.isAvailable() else {
             throw HealthKitSourceError.unavailable
         }
         guard let type = SampleConversion.quantityType(for: metric) else {
@@ -1257,7 +1257,7 @@ public final class HealthKitStatisticsSource: StatisticsSource, @unchecked Senda
     }
 
     public func dailyBucket(metric: MetricID, day: String) async throws -> AggregateRecord? {
-        guard HKHealthStore.isHealthDataAvailable() else {
+        guard HealthKitAvailability.isAvailable() else {
             throw HealthKitSourceError.unavailable
         }
         guard let declaration = MetricCatalog.declaration(for: metric),

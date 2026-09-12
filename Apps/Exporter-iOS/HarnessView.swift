@@ -153,9 +153,15 @@ struct HarnessView: View {
         appPrivacyGateEnabled && appPrivacyGate.state != .unlocked
     }
 
+    private var healthKitAvailable: Bool {
+        HealthKitAvailability.isAvailable()
+    }
+
     var body: some View {
         ZStack {
-            if isPrivacyLocked {
+            if !healthKitAvailable {
+                healthKitUnavailable
+            } else if isPrivacyLocked {
                 privacyLock
             } else {
                 NavigationStack {
@@ -398,6 +404,24 @@ struct HarnessView: View {
                 status = "Failed: \(error.localizedDescription)"
             }
         }
+    }
+
+    private var healthKitUnavailable: some View {
+        VStack(spacing: 16) {
+            Text(HealthAvailability.unavailableTitle)
+                .font(.headline)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(HealthAvailability.unavailableBody)
+                .font(.body)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
+        .background(Color(uiColor: .systemBackground))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("healthkit-unavailable")
     }
 
     private var privacyLock: some View {

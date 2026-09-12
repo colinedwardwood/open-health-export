@@ -25,6 +25,7 @@ final class AppLifecycleCoordinator {
     }
 
     func startObserversIfEligible() async throws {
+        guard HealthKitAvailability.isAvailable() else { return }
         guard UserDefaults.standard.bool(forKey: "ohe.disclosureAcknowledged") else {
             return
         }

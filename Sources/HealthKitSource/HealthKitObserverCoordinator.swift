@@ -42,7 +42,7 @@ public final class HealthKitObserverCoordinator: @unchecked Sendable {
         metrics: [MetricID],
         onWake: @escaping WakeHandler
     ) async throws {
-        guard HKHealthStore.isHealthDataAvailable() else {
+        guard HealthKitAvailability.isAvailable() else {
             throw HealthKitObserverError.unavailable
         }
         guard beginStart() else { return }

@@ -165,6 +165,18 @@ private func browserSample(
     )
 }
 
+@Test func ux07UnavailableCopyNamesThePlatformLimitWithoutRetryOrDashboard() {
+    #expect(HealthAvailability.unavailableTitle == "Apple Health is not on this device")
+    #expect(
+        HealthAvailability.unavailableBody
+            == "This hardware has no Health store. Destinations and pairing still work. Export of Health samples stays off."
+    )
+    let combined = HealthAvailability.unavailableTitle + " " + HealthAvailability.unavailableBody
+    for banned in ["cannot", "can't", "treat", "retry", "spinner"] {
+        #expect(!combined.lowercased().contains(banned))
+    }
+}
+
 @Test func selectionReviewRequiresSensitiveIndividualConfirmation() throws {
     var draft = DataSelectionDraft(baseline: [MetricCatalog.stepCount.id])
     #expect(throws: DataSelectionError.sensitiveConfirmationRequired) {
