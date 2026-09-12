@@ -185,6 +185,17 @@ public struct ExportRun: Sendable {
         )
         var wireEnvelope = envelope
         wireEnvelope.completeThrough = page.observedThrough.ISO8601Format()
+        let horizonBound = try await store.transact { tx -> String? in
+            let stored = try tx.loadVerifiedThroughDay(metric: metric)
+            let horizon = try tx.loadIndexHorizonDay()
+            return [stored, horizon].compactMap { $0 }.min()
+        }
+        if let horizonBound {
+            wireEnvelope.verifiedThrough = EmittedIndexPolicy.verifiedThrough(
+                completeThrough: wireEnvelope.completeThrough,
+                horizonDay: horizonBound
+            )
+        }
         if wireEnvelope.tzDatabaseVersion == nil,
            temporal.tzDatabaseVersion != "unknown",
            !temporal.tzDatabaseVersion.isEmpty
@@ -253,7 +264,12 @@ public struct ExportRun: Sendable {
                 to: tx,
                 atEpoch: applyEpoch
             )
-            try EmittedIndex.record(page: page, batchID: pending.id, on: tx)
+            try EmittedIndex.record(
+                page: page,
+                batchID: pending.id,
+                on: tx,
+                atEpoch: applyEpoch
+            )
             for plan in aggregates {
                 try tx.upsertAggregateEmitSeq(
                     bucketKey: plan.record.bucketKey,

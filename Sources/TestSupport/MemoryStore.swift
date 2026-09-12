@@ -17,6 +17,8 @@ public final class MemoryTransaction: StateTransaction {
     public var deliveries: [BatchID: DeliveryReceipt] = [:]
     public var pending: [BatchID: PendingBatch] = [:]
     public var emittedIndex: [String: EmittedIndexRow] = [:]
+    public var indexHorizonDay: String?
+    public var verifiedThroughDays: [MetricID: String] = [:]
     public var aggregateEmitSeq: [String: Int] = [:]
     public var typeStatus: [MetricID: TypeStatus] = [:]
     public var anchorHolds: [MetricID: AnchorHold] = [:]
@@ -208,6 +210,58 @@ public final class MemoryTransaction: StateTransaction {
             .max()
     }
 
+    public func emittedIndexRowCount() throws -> Int {
+        emittedIndex.count
+    }
+
+    public func oldestEvictableEmittedDay(excluding metrics: Set<MetricID>) throws -> String? {
+        emittedIndex.values
+            .filter { !metrics.contains($0.metric) }
+            .map(\.day)
+            .min()
+    }
+
+    public func emittedIndexMetrics(day: String, excluding metrics: Set<MetricID>) throws -> [MetricID] {
+        Array(
+            Set(
+                emittedIndex.values
+                    .filter { $0.day == day && !metrics.contains($0.metric) }
+                    .map(\.metric)
+            )
+        )
+        .sorted { $0.rawValue < $1.rawValue }
+    }
+
+    public func removeEmittedIndex(day: String, excluding metrics: Set<MetricID>) throws {
+        emittedIndex = emittedIndex.filter {
+            !($0.value.day == day && !metrics.contains($0.value.metric))
+        }
+    }
+
+    public func emittedIndexHorizonDay(excluding metrics: Set<MetricID>) throws -> String? {
+        try oldestEvictableEmittedDay(excluding: metrics)
+    }
+
+    public func loadIndexHorizonDay() throws -> String? {
+        indexHorizonDay
+    }
+
+    public func upsertIndexHorizonDay(_ day: String) throws {
+        indexHorizonDay = day
+    }
+
+    public func loadVerifiedThroughDay(metric: MetricID) throws -> String? {
+        verifiedThroughDays[metric]
+    }
+
+    public func clampVerifiedThroughDay(metric: MetricID, horizonDay: String) throws {
+        if let current = verifiedThroughDays[metric] {
+            verifiedThroughDays[metric] = current < horizonDay ? current : horizonDay
+        } else {
+            verifiedThroughDays[metric] = horizonDay
+        }
+    }
+
     public func loadAggregateEmitSeq(bucketKey: String) throws -> Int? {
         aggregateEmitSeq[bucketKey]
     }
@@ -275,6 +329,8 @@ public final class MemoryTransaction: StateTransaction {
         pending = [:]
         pendingOrder = []
         emittedIndex = [:]
+        indexHorizonDay = nil
+        verifiedThroughDays = [:]
         aggregateEmitSeq = [:]
         typeStatus = [:]
         anchorHolds = [:]

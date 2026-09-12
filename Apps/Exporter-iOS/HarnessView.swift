@@ -104,6 +104,7 @@ struct HarnessView: View {
     @State private var sensitiveDestinationConfirmation = ""
     @State private var liveBrowserSamples: [MetricID: [SampleRecord]] = [:]
     @State private var browserSentThroughDay: [MetricID: String] = [:]
+    @State private var browserIndexHorizonDay: String?
     @State private var browserLoadingHealth = false
     @State private var foregroundCatchUpStarted = false
     @AppStorage("ohe.browserOnlyWithData")
@@ -1356,7 +1357,8 @@ struct HarnessView: View {
                     [DataBrowserDestination(name: "Archive folder", sentThroughDay: $0)]
                 } ?? [],
                 displayUnits: displayUnitPolicy,
-                now: detailNow
+                now: detailNow,
+                indexHorizonDay: browserIndexHorizonDay
             )
         }
         return VStack(alignment: .leading, spacing: 8) {
@@ -1600,6 +1602,11 @@ struct HarnessView: View {
             }
         }
         Text("Export unit: \(detail.exportUnit)").font(.footnote)
+        if let horizon = detail.indexHorizonDay {
+            Text(DataBrowser.horizonCopy(day: horizon))
+                .font(.footnote)
+                .accessibilityIdentifier("browser-index-horizon")
+        }
         if let explanation = detail.aggregationExplanation {
             Text("Daily buckets (this is what we export)").font(.caption)
             Text("Computed as: \(explanation)").font(.footnote)
@@ -1808,9 +1815,11 @@ struct HarnessView: View {
     private func refreshSentThroughDay(_ metric: MetricID) async {
         guard let day = try? await HarnessExport.sentThroughDay(metric: metric) else {
             browserSentThroughDay[metric] = nil
+            browserIndexHorizonDay = try? await HarnessExport.indexHorizonDay()
             return
         }
         browserSentThroughDay[metric] = day
+        browserIndexHorizonDay = try? await HarnessExport.indexHorizonDay()
     }
 
     @MainActor

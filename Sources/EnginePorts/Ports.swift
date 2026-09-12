@@ -429,6 +429,16 @@ public protocol StateTransaction: AnyObject {
     /// R-69: the latest day this metric has actually been emitted for, so the browser
     /// can say what was sent from the export's own record rather than from a guess.
     func latestEmittedDay(metric: MetricID) throws -> String?
+    /// ADR-HK-7: row count for the 48 MB oldest-day cap (counted at ~40 bytes/row).
+    func emittedIndexRowCount() throws -> Int
+    func oldestEvictableEmittedDay(excluding metrics: Set<MetricID>) throws -> String?
+    func emittedIndexMetrics(day: String, excluding metrics: Set<MetricID>) throws -> [MetricID]
+    func removeEmittedIndex(day: String, excluding metrics: Set<MetricID>) throws
+    func emittedIndexHorizonDay(excluding metrics: Set<MetricID>) throws -> String?
+    func loadIndexHorizonDay() throws -> String?
+    func upsertIndexHorizonDay(_ day: String) throws
+    func loadVerifiedThroughDay(metric: MetricID) throws -> String?
+    func clampVerifiedThroughDay(metric: MetricID, horizonDay: String) throws
     func loadAggregateEmitSeq(bucketKey: String) throws -> Int?
     func upsertAggregateEmitSeq(bucketKey: String, emitSeq: Int) throws
     func loadJournal() throws -> [RunEvent]

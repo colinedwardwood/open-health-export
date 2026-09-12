@@ -2784,6 +2784,143 @@ private func anchorHoldFixture(
     #expect(try await store.transact { try $0.loadEmittedIndex(uuid: first.uuid) } == updated)
 }
 
+@Test func emittedIndexEvictsOldestDayWhenOverCapAndKeepsPinnedMetrics() async throws {
+    let store = MemoryStateStore()
+    let heart = MetricID(rawValue: "heartRate")
+    let mass = MetricCatalog.bodyMass.id
+    func page(metric: MetricID, uuid: String, start: String) -> SamplePage {
+        let sample = SampleRecord(
+            key: RecordKey(uuid: uuid),
+            metric: metric,
+            start: start,
+            end: start,
+            timeZoneOffsetMinutes: 0,
+            timeZoneSource: .unknown,
+            value: 1,
+            unit: CanonicalUnit(symbol: "count"),
+            observedAt: start
+        )
+        return SamplePage(
+            samples: [sample],
+            tombstones: [],
+            metric: metric,
+            anchorBlob: Data([1]),
+            observedThrough: Date(timeIntervalSince1970: 0)
+        )
+    }
+    try await store.transact { tx in
+        try EmittedIndex.record(
+            page: page(
+                metric: mass,
+                uuid: "00000000-0000-4000-8000-000000000099",
+                start: "2023-06-01T00:00:00Z"
+            ),
+            batchID: BatchID(rawValue: "pinned"),
+            on: tx,
+            capBytes: 200,
+            bytesPerRow: 40
+        )
+        for (offset, day) in ["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05"].enumerated() {
+            try EmittedIndex.record(
+                page: page(
+                    metric: heart,
+                    uuid: "11111111-1111-4000-8000-00000000000\(offset)",
+                    start: "\(day)T00:00:00Z"
+                ),
+                batchID: BatchID(rawValue: "b\(offset)"),
+                on: tx,
+                capBytes: 200,
+                bytesPerRow: 40
+            )
+        }
+    }
+    #expect(try await store.transact { try $0.emittedIndexRowCount() } == 5)
+    #expect(
+        try await store.transact {
+            try $0.loadEmittedIndex(uuid: "11111111-1111-4000-8000-000000000000")
+        } == nil
+    )
+    #expect(
+        try await store.transact {
+            try $0.loadEmittedIndex(uuid: "00000000-0000-4000-8000-000000000099")
+        } != nil
+    )
+    #expect(try await store.transact { try $0.loadIndexHorizonDay() } == "2024-01-02")
+    #expect(
+        try await store.transact { try $0.loadVerifiedThroughDay(metric: heart) } == "2024-01-02"
+    )
+    let journal = try await store.transact { try $0.loadJournal() }
+    #expect(journal.contains { $0.detail.contains(EmittedIndexPolicy.horizonJournalToken) })
+}
+
+@Test func sqliteEmittedIndexCapEvictsOldestDay() async throws {
+    let path = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-index-cap-\(UUID().uuidString).sqlite")
+        .path
+    let store = try SQLiteStateStore(path: path)
+    let heart = MetricID(rawValue: "heartRate")
+    try await store.transact { tx in
+        for (offset, day) in ["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05", "2024-01-06"].enumerated() {
+            try tx.upsertEmittedIndex(
+                EmittedIndexRow(
+                    uuid: "22222222-2222-4000-8000-00000000000\(offset)",
+                    metric: heart,
+                    day: day,
+                    digest: "d\(offset)",
+                    batchID: BatchID(rawValue: "c\(offset)")
+                )
+            )
+        }
+        try EmittedIndex.enforceCap(on: tx, capBytes: 200, bytesPerRow: 40)
+    }
+    #expect(try await store.transact { try $0.emittedIndexRowCount() } == 5)
+    #expect(try await store.transact { try $0.loadIndexHorizonDay() } == "2024-01-02")
+    #expect(
+        try await store.transact {
+            try $0.loadEmittedIndex(uuid: "22222222-2222-4000-8000-000000000000")
+        } == nil
+    )
+}
+
+@Test func verifiedThroughClampsToIndexHorizon() {
+    #expect(
+        EmittedIndexPolicy.verifiedThrough(
+            completeThrough: "2024-06-01T12:00:00Z",
+            horizonDay: "2024-01-15"
+        ) == "2024-01-15"
+    )
+    #expect(
+        EmittedIndexPolicy.verifiedThrough(
+            completeThrough: "2024-01-01T00:00:00Z",
+            horizonDay: "2024-06-01"
+        ) == "2024-01-01"
+    )
+}
+
+@Test func censusUndatableClampsVerifiedThroughToHorizon() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let store = MemoryStateStore()
+    try await store.transact { tx in
+        try tx.upsertIndexHorizonDay("2024-03-01")
+        let page = SamplePage(
+            samples: [],
+            tombstones: [
+                TombstoneRecord(
+                    key: RecordKey(uuid: "deadbeef-0000-4000-8000-000000000001"),
+                    metric: metric
+                )
+            ],
+            metric: metric,
+            anchorBlob: Data([1]),
+            observedThrough: Date(timeIntervalSince1970: 0)
+        )
+        try Census.apply(page: page, to: tx, atEpoch: 1)
+    }
+    #expect(
+        try await store.transact { try $0.loadVerifiedThroughDay(metric: metric) } == "2024-03-01"
+    )
+}
+
 @Test func censusAccumulatesAcrossTwoPagesSameDay() async throws {
     let metric = MetricID(rawValue: "heartRate")
     let store = MemoryStateStore()

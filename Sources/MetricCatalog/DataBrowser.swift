@@ -98,6 +98,8 @@ public struct DataBrowserDetail: Sendable, Equatable {
     public var aggregates: [AggregateRecord]
     public var destinations: [DataBrowserDestination]
     public var aggregationExplanation: String?
+    /// ADR-HK-7: oldest remaining high-cardinality emitted-index day, if published.
+    public var indexHorizonDay: String?
 
     public init(
         metric: MetricID,
@@ -109,7 +111,8 @@ public struct DataBrowserDetail: Sendable, Equatable {
         samples: [SampleRecord],
         aggregates: [AggregateRecord],
         destinations: [DataBrowserDestination],
-        aggregationExplanation: String?
+        aggregationExplanation: String?,
+        indexHorizonDay: String? = nil
     ) {
         self.metric = metric
         self.title = title
@@ -121,6 +124,7 @@ public struct DataBrowserDetail: Sendable, Equatable {
         self.aggregates = aggregates
         self.destinations = destinations
         self.aggregationExplanation = aggregationExplanation
+        self.indexHorizonDay = indexHorizonDay
     }
 }
 
@@ -216,6 +220,10 @@ public enum DataBrowser {
         "No samples for this type on this iPhone. Either there aren't any, or access is off in Health. "
             + healthPathCopy
 
+    public static func horizonCopy(day: String) -> String {
+        "Deletions older than \(day) are not attributed to a day until a full reconcile."
+    }
+
     public static func rows(
         latest: [MetricID: SampleRecord],
         exported: Set<MetricID> = [],
@@ -266,7 +274,8 @@ public enum DataBrowser {
         destinations: [DataBrowserDestination] = [],
         period: DataBrowserPeriod = .month,
         displayUnits: UnitDisplayPolicy = .canonical,
-        now: Date
+        now: Date,
+        indexHorizonDay: String? = nil
     ) -> DataBrowserDetail? {
         guard let declaration = MetricCatalog.declaration(for: metric) else { return nil }
         let cutoff = now.addingTimeInterval(-Double(period.rawValue) * 24 * 60 * 60)
@@ -302,7 +311,8 @@ public enum DataBrowser {
             samples: visibleSamples,
             aggregates: visibleAggregates,
             destinations: destinations,
-            aggregationExplanation: explanation
+            aggregationExplanation: explanation,
+            indexHorizonDay: indexHorizonDay
         )
     }
 

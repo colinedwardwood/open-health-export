@@ -63,6 +63,10 @@ private func browserSample(
     #expect(detail.latest?.value == 72)
     #expect(detail.exportUnit == "bpm")
     #expect(detail.destinations.map(\.name) == ["Archive folder"])
+    #expect(
+        DataBrowser.horizonCopy(day: "2025-11-02")
+            == "Deletions older than 2025-11-02 are not attributed to a day until a full reconcile."
+    )
 }
 
 @Test func aggregateDetailNamesTheExportComputation() throws {

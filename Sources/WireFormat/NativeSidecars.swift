@@ -112,6 +112,7 @@ public enum NativeSidecars {
                     emittedAt: object["emittedAt"] as? String ?? "",
                     observedAt: object["emittedAt"] as? String ?? "",
                     completeThrough: object["completeThrough"] as? String,
+                    verifiedThrough: object["verifiedThrough"] as? String,
                     tzDatabaseVersion: object["tzDatabaseVersion"] as? String
                 )
             case "sample.quantity":

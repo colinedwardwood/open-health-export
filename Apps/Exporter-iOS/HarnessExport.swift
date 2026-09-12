@@ -1378,6 +1378,14 @@ enum HarnessExport {
         return try await BrowserSendState.sentThroughDay(metric: metric, store: store)
     }
 
+    static func indexHorizonDay() async throws -> String? {
+        let root = try applicationSupportRoot()
+        let store = try SQLiteStateStore(
+            path: root.appendingPathComponent("state.sqlite").path
+        )
+        return try await BrowserSendState.indexHorizonDay(store: store)
+    }
+
     static func wakeAttributionLine() async throws -> String {
         let snapshots = StatusSnapshotLocation.readAll()
         guard let expected = snapshots.compactMap(\.nextAttemptLatestEpoch).min() else {

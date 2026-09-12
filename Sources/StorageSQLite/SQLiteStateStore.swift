@@ -200,7 +200,11 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
             );
             CREATE INDEX IF NOT EXISTS idx_freshness_destination_class
                 ON freshness_latencies (destination_id, freshness_class, recorded_at_epoch);
-            PRAGMA user_version = 14;
+            CREATE TABLE IF NOT EXISTS state_meta (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+            PRAGMA user_version = 15;
             """)
     }
 
@@ -810,6 +814,120 @@ private final class SQLiteTransaction: StateTransaction {
         return text(stmt, 0)
     }
 
+    func emittedIndexRowCount() throws -> Int {
+        let stmt = try store.prepare("SELECT COUNT(*) FROM emitted_index;")
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
+        return Int(sqlite3_column_int64(stmt, 0))
+    }
+
+    func oldestEvictableEmittedDay(excluding metrics: Set<MetricID>) throws -> String? {
+        try emittedIndexMinDay(excluding: metrics)
+    }
+
+    func emittedIndexMetrics(day: String, excluding metrics: Set<MetricID>) throws -> [MetricID] {
+        let listed = metrics.sorted { $0.rawValue < $1.rawValue }
+        let sql: String
+        if listed.isEmpty {
+            sql = "SELECT DISTINCT metric FROM emitted_index WHERE day = ? ORDER BY metric;"
+        } else {
+            let placeholders = Array(repeating: "?", count: listed.count).joined(separator: ",")
+            sql = "SELECT DISTINCT metric FROM emitted_index WHERE day = ? AND metric NOT IN (\(placeholders)) ORDER BY metric;"
+        }
+        let stmt = try store.prepare(sql)
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, day)
+        for (offset, metric) in listed.enumerated() {
+            bindText(stmt, Int32(offset + 2), metric.rawValue)
+        }
+        var ids: [MetricID] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            ids.append(MetricID(rawValue: text(stmt, 0)))
+        }
+        return ids
+    }
+
+    func removeEmittedIndex(day: String, excluding metrics: Set<MetricID>) throws {
+        let listed = metrics.sorted { $0.rawValue < $1.rawValue }
+        let sql: String
+        if listed.isEmpty {
+            sql = "DELETE FROM emitted_index WHERE day = ?;"
+        } else {
+            let placeholders = Array(repeating: "?", count: listed.count).joined(separator: ",")
+            sql = "DELETE FROM emitted_index WHERE day = ? AND metric NOT IN (\(placeholders));"
+        }
+        let stmt = try store.prepare(sql)
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, day)
+        for (offset, metric) in listed.enumerated() {
+            bindText(stmt, Int32(offset + 2), metric.rawValue)
+        }
+        try stepDone(stmt)
+    }
+
+    func emittedIndexHorizonDay(excluding metrics: Set<MetricID>) throws -> String? {
+        try emittedIndexMinDay(excluding: metrics)
+    }
+
+    func loadIndexHorizonDay() throws -> String? {
+        try loadStateMeta("indexHorizonDay")
+    }
+
+    func upsertIndexHorizonDay(_ day: String) throws {
+        try upsertStateMeta("indexHorizonDay", value: day)
+    }
+
+    func loadVerifiedThroughDay(metric: MetricID) throws -> String? {
+        try loadStateMeta("verifiedThrough:\(metric.rawValue)")
+    }
+
+    func clampVerifiedThroughDay(metric: MetricID, horizonDay: String) throws {
+        let key = "verifiedThrough:\(metric.rawValue)"
+        if let current = try loadStateMeta(key) {
+            try upsertStateMeta(key, value: current < horizonDay ? current : horizonDay)
+        } else {
+            try upsertStateMeta(key, value: horizonDay)
+        }
+    }
+
+    private func emittedIndexMinDay(excluding metrics: Set<MetricID>) throws -> String? {
+        let listed = metrics.sorted { $0.rawValue < $1.rawValue }
+        let sql: String
+        if listed.isEmpty {
+            sql = "SELECT MIN(day) FROM emitted_index;"
+        } else {
+            let placeholders = Array(repeating: "?", count: listed.count).joined(separator: ",")
+            sql = "SELECT MIN(day) FROM emitted_index WHERE metric NOT IN (\(placeholders));"
+        }
+        let stmt = try store.prepare(sql)
+        defer { sqlite3_finalize(stmt) }
+        for (offset, metric) in listed.enumerated() {
+            bindText(stmt, Int32(offset + 1), metric.rawValue)
+        }
+        guard sqlite3_step(stmt) == SQLITE_ROW, sqlite3_column_type(stmt, 0) != SQLITE_NULL else {
+            return nil
+        }
+        return text(stmt, 0)
+    }
+
+    private func loadStateMeta(_ key: String) throws -> String? {
+        let stmt = try store.prepare("SELECT value FROM state_meta WHERE key = ? LIMIT 1;")
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, key)
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
+        return text(stmt, 0)
+    }
+
+    private func upsertStateMeta(_ key: String, value: String) throws {
+        let stmt = try store.prepare(
+            "INSERT INTO state_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, key)
+        bindText(stmt, 2, value)
+        try stepDone(stmt)
+    }
+
     func loadAggregateEmitSeq(bucketKey: String) throws -> Int? {
         let stmt = try store.prepare(
             "SELECT emit_seq FROM aggregate_emit WHERE bucket_key = ? LIMIT 1;"
@@ -1009,7 +1127,7 @@ private final class SQLiteTransaction: StateTransaction {
             "journal", "ledger", "cursors", "census", "dirty", "pending_batches",
             "deliveries", "gaps", "emitted_index", "aggregate_emit", "type_status",
             "backfill_checkpoints", "anchor_holds", "destination_scopes",
-            "freshness_latencies",
+            "freshness_latencies", "state_meta",
         ] {
             try store.exec("DELETE FROM \(table);")
         }

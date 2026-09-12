@@ -18,6 +18,7 @@ public struct WireEnvelope: Sendable, Equatable {
     public var specVersion: String
     public var demo: Bool
     public var completeThrough: String?
+    public var verifiedThrough: String?
     public var tzDatabaseVersion: String?
 
     public init(
@@ -33,6 +34,7 @@ public struct WireEnvelope: Sendable, Equatable {
         specVersion: String = "1.0",
         demo: Bool = false,
         completeThrough: String? = nil,
+        verifiedThrough: String? = nil,
         tzDatabaseVersion: String? = nil
     ) {
         self.exporterId = exporterId
@@ -47,6 +49,7 @@ public struct WireEnvelope: Sendable, Equatable {
         self.specVersion = specVersion
         self.demo = demo
         self.completeThrough = completeThrough
+        self.verifiedThrough = verifiedThrough
         self.tzDatabaseVersion = tzDatabaseVersion
     }
 }
@@ -350,6 +353,9 @@ private extension NativeWire {
         }
         if let completeThrough = envelope.completeThrough {
             object["completeThrough"] = .string(completeThrough)
+        }
+        if let verifiedThrough = envelope.verifiedThrough {
+            object["verifiedThrough"] = .string(verifiedThrough)
         }
         if let tzDatabaseVersion = envelope.tzDatabaseVersion, !tzDatabaseVersion.isEmpty {
             object["tzDatabaseVersion"] = .string(tzDatabaseVersion)

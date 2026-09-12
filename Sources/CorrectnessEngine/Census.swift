@@ -73,6 +73,13 @@ enum Census {
                         wallTimeEpoch: atEpoch
                     )
                 )
+                if let horizon = try tx.loadIndexHorizonDay()
+                    ?? tx.emittedIndexHorizonDay(
+                        excluding: EmittedIndexPolicy.unboundedRetentionMetrics
+                    )
+                {
+                    try tx.clampVerifiedThroughDay(metric: page.metric, horizonDay: horizon)
+                }
             }
         }
 

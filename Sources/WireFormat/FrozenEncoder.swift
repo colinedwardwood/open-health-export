@@ -58,7 +58,8 @@ public enum FrozenEncoder {
             seq: (object["seq"] as? NSNumber)?.intValue ?? 1,
             emittedAt: object["emittedAt"] as? String ?? "",
             observedAt: object["observedAt"] as? String ?? "",
-            completeThrough: object["completeThrough"] as? String
+            completeThrough: object["completeThrough"] as? String,
+            verifiedThrough: object["verifiedThrough"] as? String
         )
         let batchID = BatchID(rawValue: object["batchId"] as? String ?? "")
         let sampleObjects = object["samples"] as? [[String: Any]] ?? []

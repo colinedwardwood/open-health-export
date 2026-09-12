@@ -19,6 +19,10 @@ public enum BrowserSendState {
         try await store.transact { try $0.latestEmittedDay(metric: metric) }
     }
 
+    public static func indexHorizonDay(store: any StateStore) async throws -> String? {
+        try await store.transact { try $0.loadIndexHorizonDay() }
+    }
+
     public static func sentThroughDays(
         metrics: [MetricID],
         store: any StateStore

@@ -234,6 +234,17 @@ public struct ReconcileSweep: Sendable {
 
         var wire = envelope
         wire.reason = reason
+        let horizonBound = try await store.transact { tx -> String? in
+            let stored = try tx.loadVerifiedThroughDay(metric: metric)
+            let horizon = try tx.loadIndexHorizonDay()
+            return [stored, horizon].compactMap { $0 }.min()
+        }
+        if let horizonBound {
+            wire.verifiedThrough = EmittedIndexPolicy.verifiedThrough(
+                completeThrough: wire.completeThrough,
+                horizonDay: horizonBound
+            )
+        }
         let batchID = NativeWire.batchID(metric: metric, anchorBlob: page.anchorBlob)
         let payload = try NativeWire.encode(
             samples: page.samples,
@@ -272,7 +283,12 @@ public struct ReconcileSweep: Sendable {
             let evicted = try QueueAdmission.makeRoom(for: pending.byteCount, on: tx)
             try tx.enqueuePending(pending)
             try Census.replaceObserved(page: censusPage, days: permittedDays, to: tx)
-            try EmittedIndex.record(page: page, batchID: pending.id, on: tx)
+            try EmittedIndex.record(
+                page: page,
+                batchID: pending.id,
+                on: tx,
+                atEpoch: pending.createdAtEpoch ?? 0
+            )
             for plan in aggregates {
                 try tx.upsertAggregateEmitSeq(
                     bucketKey: plan.record.bucketKey,
