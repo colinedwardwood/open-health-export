@@ -129,6 +129,14 @@ cat "$scratch/fault-seams" "$scratch/canaries" > "$scratch/forbidden"
 found=0
 for binary in "${binaries[@]}"; do
   echo "Scanning release binary: $binary"
+  if otool -L "$binary" | grep -F "StoreKit.framework"; then
+    echo "R-110: release binary links StoreKit: $binary" >&2
+    found=1
+  fi
+  if nm -u "$binary" | grep -E 'StoreKit|SK(Product|Payment|Receipt|Transaction)'; then
+    echo "R-110: release binary imports StoreKit symbols: $binary" >&2
+    found=1
+  fi
   strings "$binary" > "$scratch/strings"
   # A gate that reads nothing passes everything. Any real Mach-O carries far more
   # than this, so an empty or truncated read is a broken scan, not a clean binary.

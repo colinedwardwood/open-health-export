@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "reviewRequirements": {
+    "changeTriggers": [
+      "new or changed network endpoint",
+      "new destination type",
+      "new data sent by an existing flow",
+      "new SDK or package with network behavior",
+      "privacy manifest change",
+      "App Store privacy answer change"
+    ],
+    "releaseGate": "policycheck"
+  },
+  "firstPartyNetworkEndpoints": [
+    "https://advisories.openhealthexporter.org/advisories/v1.json"
+  ],
+  "flows": [
+    {
+      "id": "security-advisory-feed",
+      "sourceTargets": ["NetEgress", "WireFormat"],
+      "network": true,
+      "destination": "https://advisories.openhealthexporter.org/advisories/v1.json",
+      "destinationControl": "project",
+      "trigger": "At most once per 24 hours on a user-visible foreground launch; user-disableable",
+      "data": [
+        "HTTP GET with empty body",
+        "coarse app major.minor in User-Agent",
+        "IP address and ordinary connection metadata necessarily visible to the server and network"
+      ],
+      "healthData": false,
+      "telemetry": false,
+      "purpose": "Deliver signed security advisories"
+    },
+    {
+      "id": "user-https-export",
+      "sourceTargets": ["SinkHTTP"],
+      "network": true,
+      "destination": "user-configured allowlisted HTTP or HTTPS URL",
+      "destinationControl": "user",
+      "trigger": "Only after destination confirmation and explicit Health-type/date-range selection",
+      "data": ["selected ohe.wire/1 export records", "configured headers and credentials"],
+      "healthData": true,
+      "telemetry": false,
+      "purpose": "Export to the user's chosen receiver"
+    },
+    {
+      "id": "user-mqtt-export",
+      "sourceTargets": ["SinkMQTT"],
+      "network": true,
+      "destination": "user-configured allowlisted MQTT or MQTTS broker and topic",
+      "destinationControl": "user",
+      "trigger": "Only after destination confirmation and explicit Health-type/date-range selection",
+      "data": ["selected ohe.wire/1 export records", "configured broker credentials"],
+      "healthData": true,
+      "telemetry": false,
+      "purpose": "Export to the user's chosen broker"
+    },
+    {
+      "id": "user-otlp-export",
+      "sourceTargets": ["OTLPExport"],
+      "network": true,
+      "destination": "user-configured allowlisted OTLP/HTTP endpoint; TLS except an explicitly acknowledged local-network endpoint",
+      "destinationControl": "user",
+      "trigger": "Disabled by default; requires an endpoint and explicit enablement",
+      "data": [
+        "redacted export-run events projected as OTLP traces",
+        "last-success timestamp and staleness gauges keyed by bounded opaque local destination IDs"
+      ],
+      "healthData": false,
+      "telemetry": true,
+      "purpose": "Send operational telemetry to the user's own observability destination"
+    },
+    {
+      "id": "paired-companion-discovery",
+      "sourceTargets": ["NetEgress"],
+      "network": true,
+      "destination": "_ohx-recv._tcp Bonjour service on the local network",
+      "destinationControl": "user",
+      "trigger": "While locating a previously paired Mac companion",
+      "data": ["Bonjour discovery query and service names"],
+      "healthData": false,
+      "telemetry": false,
+      "purpose": "Locate the user's paired companion"
+    },
+    {
+      "id": "paired-companion-export",
+      "sourceTargets": ["SinkCompanion", "NetEgress"],
+      "network": true,
+      "destination": "previously paired Mac companion on the local network",
+      "destinationControl": "user",
+      "trigger": "Only after pairing, destination confirmation, and explicit Health-type/date-range selection",
+      "data": ["selected ohe.wire/1 export records", "installation identifier and transfer metadata"],
+      "healthData": true,
+      "telemetry": false,
+      "purpose": "Export to the user's Mac"
+    },
+    {
+      "id": "user-local-file-export",
+      "sourceTargets": ["SinkLocalFile"],
+      "network": false,
+      "destination": "user-selected local directory",
+      "destinationControl": "user",
+      "trigger": "Only after explicit Health-type/date-range selection",
+      "data": ["selected ohe.wire/1 export records and optional sidecars"],
+      "healthData": true,
+      "telemetry": false,
+      "purpose": "Write an export under the user's control"
+    }
+  ],
+  "applePrivacyMapping": {
+    "privacyManifests": [
+      "Apps/Companion-macOS/PrivacyInfo.xcprivacy",
+      "Apps/Exporter-iOS/PrivacyInfo.xcprivacy",
+      "Apps/StatusWidget/PrivacyInfo.xcprivacy"
+    ],
+    "tracking": false,
+    "trackingDomains": [],
+    "collectedDataTypes": [],
+    "appPrivacyLabelAssessment": {
+      "dataCollected": [],
+      "basis": "Source-level candidate: Data Not Collected only if the advisory host does not retain or expose transport metadata to the project. User-directed destinations are controlled by the user, and the advisory GET contains no Health data, stable app identifier, or request body.",
+      "submissionReadiness": "blocked pending verification of the built privacy report, live advisory-host logging, and current App Store questions",
+      "status": "repository assessment only; not an App Store Connect declaration"
+    }
+  }
+}

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
+  >
+  <title>Open Health Exporter — project status and capabilities</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      line-height: 1.6;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 52rem;
+      padding: 1rem;
+    }
+    header, main, footer { display: block; }
+    h1, h2 { line-height: 1.2; }
+    a { text-underline-offset: 0.18em; }
+    .skip-link {
+      left: -10000px;
+      position: absolute;
+    }
+    .skip-link:focus {
+      left: 1rem;
+      position: static;
+    }
+    .notice {
+      border: 0.15rem solid currentColor;
+      padding: 0.75rem 1rem;
+    }
+    dl {
+      display: grid;
+      gap: 0.4rem 1rem;
+      grid-template-columns: max-content 1fr;
+    }
+    dt { font-weight: 700; }
+    dd { margin: 0; }
+    pre {
+      border: 1px solid currentColor;
+      overflow-x: auto;
+      padding: 1rem;
+      white-space: pre;
+    }
+    code { font-family: ui-monospace, monospace; }
+    @media (max-width: 35rem) {
+      dl { display: block; }
+      dd { margin: 0 0 0.75rem; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header>
+    <h1>Open Health Exporter</h1>
+    <p>An open-source Apple Health exporter that reports what it sent and whether it worked.</p>
+    <p class="notice"><strong>Not a medical device.</strong> This is not a medical device. It does not diagnose or treat anything.</p>
+  </header>
+
+  <main id="main">
+    <section aria-labelledby="status">
+      <h2 id="status">Status and availability</h2>
+      <dl>
+        <dt>Project</dt>
+        <dd><code>seeking-maintainers</code>; Stage 3 implementation; v1 is not released.</dd>
+        <dt>iPhone and iPad</dt>
+        <dd>Minimum iOS/iPadOS 18.0. Full-history backfill needs foreground time on versions 18–25; on version 26 or later it can finish unattended.</dd>
+        <dt>Mac</dt>
+        <dd>Minimum macOS 15.0. The companion receives exports; it cannot read Apple Health. Its planned distribution is a notarised Developer ID download, outside the Mac App Store.</dd>
+      </dl>
+      <p>There is no App Store release and no prebuilt download today. The in-repo App Store copy has not been submitted.</p>
+    </section>
+
+    <section aria-labelledby="exports">
+      <h2 id="exports">What it exports</h2>
+      <p>Every destination starts with zero Apple Health types. You explicitly choose its types and date range before it can export. The optional Core Daily preset contains 27 named routine families, including activity, energy, distance, heart-rate, sleep, mindful-session, body, respiratory, oxygen and workout data. Blood glucose and sensitive types are available only through the picker, not that preset.</p>
+      <p>The native archive is versioned <code>ohe.wire/1</code> NDJSON. A local-file export can also write JSON, CSV and Health Auto Export compatibility sidecars. See the <a href="../docs/02-design/03-wire-format-spec.md">wire-format specification</a> and <a href="../spec/v1.0.0/schema/ohe.wire.1.json">machine-readable schema</a>.</p>
+    </section>
+
+    <section aria-labelledby="destinations">
+      <h2 id="destinations">Where the data goes</h2>
+      <p>Health data goes only to destinations you configure and enable:</p>
+      <ul>
+        <li>a local folder;</li>
+        <li>an HTTPS endpoint;</li>
+        <li>an MQTT broker; or</li>
+        <li>the paired Mac companion.</li>
+      </ul>
+      <p>There is no maintainer-bound telemetry, install counter, crash reporter or project account. A separate, disableable security-advisory request runs only on a visible foreground launch and sends no Health data.</p>
+    </section>
+
+    <section aria-labelledby="build">
+      <h2 id="build">Build it now</h2>
+      <p>The current way to try the project is to build from source:</p>
+      <pre><code>./scripts/build-from-source.sh</code></pre>
+      <p>This generates the Xcode project and builds the simulator app and Mac companion. Running with Health data on a physical device requires Xcode and a free Personal Team. Follow the <a href="../README.md#build">build instructions</a>; do not expect an App Store install or release download yet.</p>
+    </section>
+
+    <section aria-labelledby="sample">
+      <h2 id="sample">Synthetic sample output</h2>
+      <p>This committed sample is generated demo data, not anyone’s Health record:</p>
+      <pre aria-label="Synthetic NDJSON export sample"><code>{"batchSeq":1,"end":"2024-01-01T12:00:00Z","hkIdentifier":"HKQuantityTypeIdentifierHeartRate","kind":"sample.quantity","metricId":"heart_rate","observedAt":"2024-01-01T12:00:00Z","semantics":"curated","start":"2024-01-01T12:00:00Z","tzOffsetMinutes":0,"tzSource":"unknown","unit":"bpm","uuid":"a1000000-0000-4000-8000-000000000002","v":1,"value":60}</code></pre>
+      <p><a href="../spec/v1.0.0/fixtures/g1/expected.ndjson">Open the complete three-record fixture</a> or the <a href="../spec/v1.0.0/fixtures/tier0.ndjson">larger synthetic demo corpus</a>.</p>
+    </section>
+
+    <section aria-labelledby="funding">
+      <h2 id="funding">Funding</h2>
+      <p>The planned model is a free binary funded by optional donations and named sponsorship outside the app. No functionality, update or source-build access is conditioned on payment or sponsorship.</p>
+    </section>
+  </main>
+
+  <footer>
+    <p>Source, licence, support limits and current project detail are in the <a href="../README.md">repository README</a>.</p>
+  </footer>
+</body>
+</html>

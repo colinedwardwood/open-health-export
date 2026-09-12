@@ -4,3 +4,4 @@
 diagnostic	in-app observability artifact, not a medical diagnosis
 diagnostics	in-app screen name for that artifact
 diagnosing	salvage reader describing a corrupt store, not a person
+compliance/hipaa-context.md	governance document path, not a claim of HIPAA status

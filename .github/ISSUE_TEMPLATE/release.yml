@@ -56,11 +56,17 @@ body:
       options:
         - label: All three version streams and compatibility metadata are correct.
           required: true
+        - label: README maintenance status and supported-OS matrix are current.
+          required: true
         - label: T0–T3 CI is green (linux-core, macos-build including from-source, container-contracts, secrets, spec-freeze, DCO).
           required: true
         - label: No QA-22 upstream canary has been red for more than 24 hours without an accepted tracking issue.
           required: true
         - label: Device, soak, accessibility, localisation, performance, energy, migration, and flake evidence is attached.
+          required: true
+        - label: The published last-20-nightly flake-rate proxy is at or below 1%.
+          required: true
+        - label: Critical modules meet 90% line coverage, changed executable lines meet 80%, and the anchor/checkpoint transition assertion reports 100%.
           required: true
         - label: Upgrade-from-previous-release was exercised against a migrated store, or this is the first release.
           required: true
@@ -69,6 +75,8 @@ body:
         - label: Privacy manifests, licences, store copy, disclaimers, SBOM, and attestations were reviewed.
           required: true
         - label: Both named compliance reviewers approved the release.
+          required: true
+        - label: No feature, update, artifact, or beta seat is sponsor-gated; any TestFlight public link was checked manually.
           required: true
         - label: A different maintainer completed the clean build-from-source stranger test.
           required: true

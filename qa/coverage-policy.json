@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "patchLineMinimum": 80.0,
+  "criticalModules": {
+    "CorrectnessEngine": 90.0,
+    "CoreDomain": 90.0,
+    "RunJournal": 90.0,
+    "StorageSQLite": 90.0,
+    "WireFormat": 90.0
+  },
+  "transitionCoverage": {
+    "minimum": 100.0,
+    "evidence": null
+  }
+}

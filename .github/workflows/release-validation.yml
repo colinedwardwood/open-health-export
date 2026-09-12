@@ -1,0 +1,89 @@
+# SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+name: release-validation
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing annotated release tag to validate
+        required: true
+        type: string
+      issue_number:
+        description: Open release-checklist issue number
+        required: true
+        type: number
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+      issue_number:
+        required: true
+        type: number
+permissions:
+  actions: read
+  contents: read
+  issues: read
+jobs:
+  evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag }}
+      - uses: swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc # v3
+        with:
+          swift-version: "6.3.3"
+      - name: Resolve an annotated tag on the default branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          git rev-parse --verify "refs/tags/${RELEASE_TAG}^{tag}" >/dev/null
+          tag_sha="$(git rev-list -n 1 "${RELEASE_TAG}")"
+          default_branch="$(gh api "repos/${GITHUB_REPOSITORY}" --jq .default_branch)"
+          git merge-base --is-ancestor "${tag_sha}" "origin/${default_branch}"
+          printf '%s' "${tag_sha}" > release-sha.txt
+      - name: Collect repository evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+        run: |
+          set -euo pipefail
+          issue="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}")"
+          test "$(jq -r .state <<<"${issue}")" = open
+          jq -e '[.labels[].name] | index("release") != null' <<<"${issue}" >/dev/null
+          jq -r .body <<<"${issue}" > release-issue.md
+          sha="$(cat release-sha.txt)"
+          gh api "repos/${GITHUB_REPOSITORY}/commits/${sha}/check-runs?per_page=100" \
+            > release-checks.json
+          python3 scripts/nightly-flake-rate.py \
+            --repository "${GITHUB_REPOSITORY}" \
+            --json-output nightly-flake-rate.json \
+            --markdown nightly-flake-rate.md
+      - name: Enforce QA, status, OS, and compliance gates
+        run: |
+          swift run policycheck
+          python3 scripts/validate-release.py \
+            --tag "${{ inputs.tag }}" \
+            --issue-body release-issue.md \
+            --checks release-checks.json \
+            --flake-report nightly-flake-rate.json
+          cat nightly-flake-rate.md >> "${GITHUB_STEP_SUMMARY}"
+      - name: Keep validation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-validation-evidence
+          path: |
+            release-sha.txt
+            release-issue.md
+            release-checks.json
+            nightly-flake-rate.json
+            nightly-flake-rate.md
+          if-no-files-found: warn
+          retention-days: 90

@@ -30,3 +30,20 @@ or a GitHub issue:
 Fixtures in `spec/` must stay synthetic. A missing `"synthetic": true` provenance header
 fails `policycheck`.
 
+## Security and compliance governance
+
+The secure-development, vulnerability-handling, incident-assessment, and authority-cooperation
+policy is in [`CYBERSECURITY.md`](CYBERSECURITY.md). It adopts CRA Article 24-style controls as
+good practice; it does not claim a CRA classification, conformity assessment, certification, or
+legal review.
+
+The privacy policy is [`PRIVACY.md`](PRIVACY.md). Its claims are checked against the
+authoritative [`compliance/egress-inventory.json`](compliance/egress-inventory.json), the
+committed Apple privacy manifests, and the repository's privacy-label assessment.
+
+The project is not a HIPAA covered entity and is not claiming business-associate status. Do not contract
+with, provide the app to, or operate it for a covered entity to perform its covered functions
+without fresh, fact-specific legal review. The explicit stop condition and required review scope
+are in [`compliance/HIPAA-CONTEXT.md`](compliance/HIPAA-CONTEXT.md). No such legal review or
+arrangement is recorded in this repository.
+

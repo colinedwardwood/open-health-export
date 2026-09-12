@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "maintenanceStatuses": [
+    "maintained",
+    "seeking-maintainers",
+    "archived"
+  ],
+  "requiredIssueSections": [
+    "App version",
+    "Wire specification version",
+    "Home Assistant integration version",
+    "QA evidence",
+    "Compliance evidence",
+    "Provenance and stranger-test evidence"
+  ],
+  "requiredChecks": [
+    "licence-headers",
+    "export-core",
+    "darwin-package",
+    "ios-build",
+    "ios-ui",
+    "from-source",
+    "mac-companion",
+    "release-artifact-scan",
+    "focused-coverage",
+    "mosquitto",
+    "home-assistant-current",
+    "home-assistant-oldest",
+    "otlp-http",
+    "gitleaks",
+    "signed-off-by"
+  ],
+  "requiredMatrix": {
+    "iOS": "18.0",
+    "macOS companion": "15.0",
+    "Linux core": "Swift 6.3.3"
+  },
+  "flakeRateMaximum": 1.0,
+  "flakeWindow": 20
+}

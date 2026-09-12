@@ -92,8 +92,9 @@ resolver if you do not want the fetch.
 Plain HTTP on the LAN is allowed only through `NSAllowsLocalNetworking`. Any
 `NSAllowsArbitraryLoads` key in an app Info.plist fails `policycheck`.
 
-First-run type selection is the Core Daily preset (27 named routine families:
-quantities plus sleep, mindful sessions, and workouts).
+Every new destination starts with zero Health types and cannot export until you choose its
+types and date range. **Use Core Daily** explicitly applies the 27 named routine families
+(quantities plus sleep, mindful sessions, and workouts) to the destination being edited.
 Sensitive types and blood glucose are in the picker, not in that preset. The data browser
 filter **Only types with data** is on by default.
 
@@ -114,12 +115,22 @@ The overdue alarm floor is **6 hours**; this is not a delivery promise.
 ## Status
 
 `seeking-maintainers` — v1 is not yet released and the project currently has one maintainer.
-Minimum iOS 18.0. Mac companion is a notarised Developer ID app, not Mac App Store.
+<!-- maintenance-status: seeking-maintainers -->
+
+| Supported platform | Minimum / toolchain | Release support |
+|---|---|---|
+| iOS | 18.0 | Planned v1; no App Store release yet |
+| macOS companion | 15.0 | Notarised Developer ID app; not Mac App Store |
+| Linux core | Swift 6.3.3 | Package build and tests only |
 
 How to contribute: `CONTRIBUTING.md`. Vulnerabilities: `SECURITY.md`. Support limits:
 `SUPPORT.md`. Conduct: `CODE_OF_CONDUCT.md`. Continuity: `CONTINUITY.md`.
 Version streams: `VERSIONING.md`. What R-108 claims: `PROVENANCE.md`. Runtime licences:
 `dependencies/policy.md`. App Store listing copy (not submitted): `store/en/`.
+Privacy and outward data flows: `PRIVACY.md` and `compliance/egress-inventory.json`.
+Secure-development and vulnerability governance: `CYBERSECURITY.md`. The project's explicit
+covered-entity stop condition—not a claim of HIPAA status or legal review—is documented in
+`compliance/HIPAA-CONTEXT.md`.
 Monitoring signal and failure taxonomy: `docs/03-implementation/r27-failure-taxonomy.md`.
 Volunteer device runs: `qa/community-device-matrix/CHECKLIST.md`. Energy measurement
 (not a CI gate): `qa/energy-protocol.md`.
