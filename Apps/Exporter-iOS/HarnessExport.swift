@@ -1262,7 +1262,19 @@ enum HarnessExport {
         return RunHistory.problemsFirst(events).map { event in
             let date = Date(timeIntervalSince1970: event.wallTimeEpoch)
                 .formatted(date: .abbreviated, time: .shortened)
-            let error = event.errorClass.map { " · \($0)" } ?? ""
+            let errorClass = event.errorClass
+            let errorCode = errorClass.flatMap { raw -> String? in
+                guard raw != ErrorClass.none.rawValue, !raw.isEmpty else { return nil }
+                return raw
+            }
+            let errorPhrase = ErrorClassManifest.userFacingReason(forRaw: errorClass)
+            var error = ""
+            if let errorCode {
+                error += " · \(errorCode)"
+                if let errorPhrase, errorPhrase != errorCode {
+                    error += " · \(errorPhrase)"
+                }
+            }
             return "\(date) · \(event.outcomeKind)\(error) · "
                 + "\(event.samplesAcked)/\(event.samplesCommitted) acknowledged"
         }

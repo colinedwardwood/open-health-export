@@ -92,4 +92,17 @@ public enum ErrorClassManifest {
             )
         }
     }
+
+    /// Closed user-facing reason for a stored error-class token. Unknown tokens stay as
+    /// the raw code so a bug report still has something to paste.
+    public static func userFacingReason(forRaw errorClass: String?) -> String? {
+        guard let errorClass, !errorClass.isEmpty, errorClass != ErrorClass.none.rawValue else {
+            return nil
+        }
+        guard let classified = ErrorClass(rawValue: errorClass) else {
+            return errorClass
+        }
+        let copy = record(for: classified).userFacingCopy
+        return copy.isEmpty ? errorClass : copy
+    }
 }

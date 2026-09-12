@@ -2554,6 +2554,11 @@ private func anchorHoldFixture(
     let failedLine = line(failed, at: 1_000_060)
     #expect(failedLine.contains("failing"))
     #expect(failedLine.contains(ErrorClass.destinationUnreachable.rawValue))
+    #expect(
+        failedLine.contains(
+            ErrorClassManifest.record(for: .destinationUnreachable).userFacingCopy
+        )
+    )
     #expect(failedLine.contains("last success"))
 }
 

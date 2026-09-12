@@ -38,6 +38,12 @@ import Testing
         DestinationSendError.internalFault("clinic.example/secret").errorDescription?
             .contains("clinic.example") == false
     )
+    #expect(ErrorClassManifest.userFacingReason(forRaw: "none") == nil)
+    #expect(ErrorClassManifest.userFacingReason(forRaw: "mystery") == "mystery")
+    #expect(
+        ErrorClassManifest.userFacingReason(forRaw: ErrorClass.destinationUnreachable.rawValue)
+            == ErrorClassManifest.record(for: .destinationUnreachable).userFacingCopy
+    )
 }
 
 @Test func harnessImportSurfacesLocalizedConfigurationErrors() throws {

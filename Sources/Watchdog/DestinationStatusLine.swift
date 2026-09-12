@@ -23,6 +23,10 @@ public enum DestinationStatusLine {
         var line = "\(snapshot.destinationLabel): \(state.rawValue) · last success \(last)"
         if let reason = reasonCode(snapshot) {
             line += " · \(reason)"
+            if let phrase = ErrorClassManifest.userFacingReason(forRaw: snapshot.errorClass),
+               phrase != reason {
+                line += " · \(phrase)"
+            }
         }
         let changes = snapshot.unacknowledgedSecurityEventCount
         if changes > 0 {
