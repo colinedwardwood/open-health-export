@@ -30,6 +30,9 @@
     "receiver-expected-state.json": {
       "role": "G4 expected final state"
     },
+    "hk-statistics-reference-vectors.json": {
+      "role": "R-80 Linux pipeline vectors for every hkStatistics exception; not Apple capture evidence"
+    },
     "t2-tombstone-slice.ndjson": {
       "role": "T2 ExportRun accounting regression: one quantity plus one tombstone"
     }
