@@ -44,17 +44,17 @@ jobs:
       - uses: swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc
         with:
           swift-version: "6.3.3"
-      - name: Start Home Assistant 2026.8.3
+      - name: Start Home Assistant 2026.9.2
         run: |
           for attempt in $(seq 1 5); do
-            docker pull ghcr.io/home-assistant/home-assistant:2026.8.3 && break
+            docker pull ghcr.io/home-assistant/home-assistant:2026.9.2 && break
             test "$attempt" -lt 5 || exit 1
             sleep $((attempt * 10))
           done
           docker run -d --name ohe-ha \
             -p 8123:8123 \
             -v "$PWD/spec/v1.0.0/fixtures/ha-ci:/config" \
-            ghcr.io/home-assistant/home-assistant:2026.8.3
+            ghcr.io/home-assistant/home-assistant:2026.9.2
           for _ in $(seq 1 90); do
             curl -fsS http://127.0.0.1:8123/api/onboarding >/dev/null && exit 0
             sleep 2

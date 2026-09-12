@@ -88,7 +88,9 @@ oldest="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["oldes
 mosquitto_pin="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["mosquittoTag"])' "${pins_file}")"
 
 ha_latest="$(normalize "$(latest_non_prerelease home-assistant/core)")"
-mqtt_latest="$(normalize "$(latest_non_prerelease eclipse/mosquitto)")"
+# GitHub Mosquitto tags can exist before Docker Hub publishes a matching
+# debian/openssl tag. The contract image is `eclipse-mosquitto:x.y.z`.
+mqtt_latest="$(python3 "${root}/Tools/upstream-canary/publishable.py" mosquitto)"
 
 if [ "${simulate}" = "1" ]; then
   current="0.0.0-simulated-pin"

@@ -92,11 +92,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          latest="$(
-            gh api 'repos/eclipse/mosquitto/tags?per_page=30' \
-              --jq '[.[].name | select(test("(?i)rc|beta|alpha") | not)][0]'
-          )"
-          latest="${latest#v}"
+          latest="$(python3 Tools/upstream-canary/publishable.py mosquitto)"
           test -n "${latest}"
           echo "OHE_CANARY_VERSION=${latest}" >> "${GITHUB_ENV}"
           docker pull "eclipse-mosquitto:${latest}"

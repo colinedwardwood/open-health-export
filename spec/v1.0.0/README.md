@@ -15,7 +15,7 @@
     },
     "ha-ci": {
       "role": "R-89 Home Assistant and R-53 OTLP container pins; QA-22 canary pins",
-      "currentStable": "2026.8.3",
+      "currentStable": "2026.9.2",
       "oldestInWindow": "2025.9.4",
       "mosquittoTag": "2.0.22",
       "otelCollectorTag": "0.160.0"

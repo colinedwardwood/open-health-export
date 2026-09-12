@@ -15,6 +15,15 @@ def load(name, filename):
     return module
 
 
+def load_tool(name, filename):
+    spec = importlib.util.spec_from_file_location(
+        name, ROOT / "Tools" / "upstream-canary" / filename
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 coverage = load("coverage_report", "coverage-report.py")
 flakes = load("nightly_flake_rate", "nightly-flake-rate.py")
 release = load("validate_release", "validate-release.py")
@@ -119,6 +128,22 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(
             release.check_runs(payload, ["export-core"]),
             ["required check is not successful: export-core"],
+        )
+
+
+class UpstreamPublishableTests(unittest.TestCase):
+    def test_mosquitto_ignores_alpine_and_moving_tags(self):
+        publishable = load_tool("publishable", "publishable.py")
+        latest = publishable.latest_plain_semver(
+            ["latest", "2.1.2-alpine", "2.1-alpine", "2.0.22", "2.0.21", "2"]
+        )
+        self.assertEqual(latest, "2.0.22")
+
+    def test_mosquitto_prefers_newer_plain_semver(self):
+        publishable = load_tool("publishable", "publishable.py")
+        self.assertEqual(
+            publishable.latest_plain_semver(["2.0.22", "2.1.2"]),
+            "2.1.2",
         )
 
 
