@@ -530,6 +530,10 @@ public struct ExportRun: Sendable {
         let now = clock.now().timeIntervalSince1970
         let prior = try? DestinationSnapshotFile.read(from: snapshotURL)
         let succeeded = outcome.kind == .success || outcome.kind == .successNothingDue
+        let estimates = freshnessEstimates.isEmpty
+            ? (prior?.freshnessEstimates ?? [:])
+            : freshnessEstimates
+        let thresholds = FreshnessTarget.snapshotThresholds(estimates: estimates)
         try DestinationSnapshotFile.write(
             DestinationStatusSnapshot(
                 destinationID: destinationName,
@@ -542,13 +546,11 @@ public struct ExportRun: Sendable {
                 attribution: ExternalStatusRecord.attribution(for: trigger),
                 attributionConfidence: "evidenced",
                 errorClass: tally.terminalError.rawValue,
-                staleThresholdSeconds: prior?.staleThresholdSeconds,
-                overdueThresholdSeconds: prior?.overdueThresholdSeconds,
+                staleThresholdSeconds: thresholds.stale,
+                overdueThresholdSeconds: thresholds.overdue,
                 nextAttemptEarliestEpoch: prior?.nextAttemptEarliestEpoch,
                 nextAttemptLatestEpoch: prior?.nextAttemptLatestEpoch,
-                freshnessEstimates: freshnessEstimates.isEmpty
-                    ? (prior?.freshnessEstimates ?? [:])
-                    : freshnessEstimates,
+                freshnessEstimates: estimates,
                 unacknowledgedSecurityEventCount:
                     prior?.unacknowledgedSecurityEventCount ?? 0,
                 writtenAtEpoch: now

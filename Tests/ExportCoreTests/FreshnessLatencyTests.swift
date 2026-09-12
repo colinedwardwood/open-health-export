@@ -88,6 +88,25 @@ private func latency(
     #expect(estimate.totalP95Seconds == 285)
 }
 
+@Test func snapshotThresholdsUseAlarmFloorUntilLocalP95Qualifies() {
+    let empty = FreshnessTarget.snapshotThresholds(estimates: [:])
+    #expect(empty.overdue == FreshnessTarget.alarmFloor)
+    #expect(empty.stale == FreshnessTarget.alarmFloor / 2)
+    let unqualified = LocalFreshnessEstimate(sampleCount: 10, spanSeconds: 60)
+    let stillFloor = FreshnessTarget.snapshotThresholds(estimates: [.b: unqualified])
+    #expect(stillFloor.overdue == FreshnessTarget.alarmFloor)
+    let qualified = LocalFreshnessEstimate(
+        sampleCount: FreshnessTarget.minimumSamples,
+        spanSeconds: FreshnessTarget.minimumSpan,
+        observationP95Seconds: 1,
+        deliveryP95Seconds: 1,
+        totalP95Seconds: 100 * 60 * 60
+    )
+    let capped = FreshnessTarget.snapshotThresholds(estimates: [.a: qualified])
+    #expect(capped.overdue == FreshnessTarget.alarmCap)
+    #expect(capped.stale == FreshnessTarget.alarmCap / 2)
+}
+
 @Test func destinationSnapshotDecodesWithoutNewFreshnessField() throws {
     let data = Data(
         """

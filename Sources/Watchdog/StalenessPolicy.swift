@@ -153,6 +153,30 @@ public enum FreshnessTarget {
         min(alarmCap, max(alarmFloor, 2 * p95))
     }
 
+    /// R-23 overdue window: qualified local p95 when we have it, otherwise the 6-hour floor.
+    /// Several classes may be exporting to one destination; the slowest alarm wins.
+    public static func overdueThreshold(
+        estimates: [FreshnessClass: LocalFreshnessEstimate]
+    ) -> TimeInterval {
+        let alarms = estimates.values.compactMap { estimate -> TimeInterval? in
+            guard estimate.isQualified, let p95 = estimate.totalP95Seconds else { return nil }
+            return alarmThreshold(p95: p95)
+        }
+        return alarms.max() ?? alarmFloor
+    }
+
+    /// Stale is the earlier watchdog step, always strictly inside the overdue window.
+    public static func staleThreshold(overdue: TimeInterval) -> TimeInterval {
+        max(1, overdue / 2)
+    }
+
+    public static func snapshotThresholds(
+        estimates: [FreshnessClass: LocalFreshnessEstimate]
+    ) -> (stale: TimeInterval, overdue: TimeInterval) {
+        let overdue = overdueThreshold(estimates: estimates)
+        return (staleThreshold(overdue: overdue), overdue)
+    }
+
     private static func p95(_ values: [TimeInterval]) -> TimeInterval? {
         let ordered = values.filter { $0.isFinite && $0 >= 0 }.sorted()
         guard ordered.count >= minimumSamples else { return nil }

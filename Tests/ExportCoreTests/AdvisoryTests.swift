@@ -313,6 +313,7 @@ private actor ToggleDestinationSink: DestinationSink {
     defer { try? FileManager.default.removeItem(at: root) }
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     let snapshotURL = root.appendingPathComponent("status.json")
+    let overdue = FreshnessTarget.alarmFloor
     try DestinationSnapshotFile.write(
         DestinationStatusSnapshot(
             destinationID: "test",
@@ -320,7 +321,7 @@ private actor ToggleDestinationSink: DestinationSink {
             state: .healthy,
             lastOutcome: "success",
             lastSuccessEpoch: 1_000,
-            overdueThresholdSeconds: 100,
+            overdueThresholdSeconds: overdue,
             writtenAtEpoch: 1_000
         ),
         to: snapshotURL
@@ -329,7 +330,7 @@ private actor ToggleDestinationSink: DestinationSink {
     let initialDeadline = try #require(
         OverdueNotificationSchedule.fireEpoch(snapshot: initial)
     )
-    #expect(initialDeadline == 1_100)
+    #expect(initialDeadline == 1_000 + overdue)
 
     let metric = MetricCatalog.heartRate.id
     let pages = (1 ... 3).map { index in
@@ -356,7 +357,8 @@ private actor ToggleDestinationSink: DestinationSink {
     let store = MemoryStateStore()
     let sink = ToggleDestinationSink()
     var registeredDeadlines: Set<TimeInterval> = [initialDeadline]
-    for instant in [1_200.0, 1_250.0] {
+    let missed = [initialDeadline + 100, initialDeadline + 150]
+    for instant in missed {
         let outcome = try await ExportRun(
             source: FixtureSource(pages: pages),
             destination: .testing(sink),
@@ -374,10 +376,10 @@ private actor ToggleDestinationSink: DestinationSink {
             try #require(OverdueNotificationSchedule.fireEpoch(snapshot: snapshot))
         )
     }
-    #expect(registeredDeadlines == [1_100])
+    #expect(registeredDeadlines == [initialDeadline])
 
     await sink.allowDelivery()
-    let recoveredAt = 1_300.0
+    let recoveredAt = initialDeadline + 200
     let recovered = try await ExportRun(
         source: FixtureSource(pages: pages),
         destination: .testing(sink),
@@ -391,7 +393,7 @@ private actor ToggleDestinationSink: DestinationSink {
     #expect(recovered.kind == .success)
     let healthy = try DestinationSnapshotFile.read(from: snapshotURL)
     #expect(healthy.state(at: recoveredAt) == .healthy)
-    #expect(OverdueNotificationSchedule.fireEpoch(snapshot: healthy) == 1_400)
+    #expect(OverdueNotificationSchedule.fireEpoch(snapshot: healthy) == recoveredAt + overdue)
 }
 
 @Test func watchdogEscalatesOnWidgetWhenNotificationsAreDenied() async throws {

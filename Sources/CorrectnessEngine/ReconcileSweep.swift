@@ -393,6 +393,9 @@ public struct ReconcileSweep: Sendable {
         let now = clock.now().timeIntervalSince1970
         let prior = try? DestinationSnapshotFile.read(from: snapshotURL)
         let succeeded = outcome.kind == .success || outcome.kind == .successNothingDue
+        let thresholds = FreshnessTarget.snapshotThresholds(
+            estimates: prior?.freshnessEstimates ?? [:]
+        )
         try DestinationSnapshotFile.write(
             DestinationStatusSnapshot(
                 destinationID: destinationName,
@@ -405,8 +408,8 @@ public struct ReconcileSweep: Sendable {
                 attribution: ExternalStatusRecord.attribution(for: trigger),
                 attributionConfidence: "evidenced",
                 errorClass: tally.terminalError.rawValue,
-                staleThresholdSeconds: prior?.staleThresholdSeconds,
-                overdueThresholdSeconds: prior?.overdueThresholdSeconds,
+                staleThresholdSeconds: thresholds.stale,
+                overdueThresholdSeconds: thresholds.overdue,
                 nextAttemptEarliestEpoch: prior?.nextAttemptEarliestEpoch,
                 nextAttemptLatestEpoch: prior?.nextAttemptLatestEpoch,
                 unacknowledgedSecurityEventCount:

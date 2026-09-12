@@ -1185,6 +1185,8 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     #expect(snapshot.errorClass == "none")
     #expect(snapshot.unacknowledgedSecurityEventCount == 2)
     #expect(snapshot.writtenAtEpoch == 42)
+    #expect(snapshot.overdueThresholdSeconds == FreshnessTarget.alarmFloor)
+    #expect(snapshot.staleThresholdSeconds == FreshnessTarget.alarmFloor / 2)
     let external = try ExternalStatusRecordFile.read(from: externalStatusURL)
     #expect(external.schemaVersion == 1)
     #expect(external.destinationID == "local-file")
