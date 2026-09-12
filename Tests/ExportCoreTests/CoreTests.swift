@@ -1820,9 +1820,13 @@ private struct ProcessExitFault: ExportFaultInjector {
 }
 
 private func runUntilProcessExitSeam() async throws {
-    guard let rawRoot = getenv("OHE_PROCESS_EXIT_ROOT") else {
+    guard let rawRoot = getenv("OHE_PROCESS_EXIT_ROOT"),
+          let rawSeed = getenv("OHE_PROCESS_EXIT_SEED"),
+          let seed = Int(String(cString: rawSeed))
+    else {
         _exit(2)
     }
+    let uuid = String(format: "e0000000-0000-4000-8000-%012x", seed)
     let root = URL(fileURLWithPath: String(cString: rawRoot), isDirectory: true)
     let destinationURL = root.appendingPathComponent("destination")
     try FileManager.default.createDirectory(
@@ -1831,7 +1835,7 @@ private func runUntilProcessExitSeam() async throws {
     )
     let metric = MetricCatalog.heartRate.id
     let page = SamplePage(
-        samples: [heartSample("e0000000-0000-4000-8000-000000000001")],
+        samples: [heartSample(uuid)],
         tombstones: [],
         metric: metric,
         anchorBlob: Data([0xE0]),
@@ -1851,16 +1855,22 @@ private func runUntilProcessExitSeam() async throws {
 }
 
 @Test func p3ProcessExitAtEverySeamResumesWithoutLoss() async throws {
-    for location in ExportFaultLocation.allCases {
+    for seed in 1 ... 4 {
+        for location in ExportFaultLocation.allCases {
+        let uuid = String(format: "e0000000-0000-4000-8000-%012x", seed)
         let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("ohe-process-exit-\(location.rawValue)-\(UUID().uuidString)")
+            .appendingPathComponent(
+                "ohe-process-exit-\(seed)-\(location.rawValue)-\(UUID().uuidString)"
+            )
         setenv("OHE_PROCESS_EXIT_ROOT", root.path, 1)
         setenv("OHE_PROCESS_EXIT_SEAM", location.rawValue, 1)
+        setenv("OHE_PROCESS_EXIT_SEED", String(seed), 1)
         await #expect(processExitsWith: .exitCode(9)) {
             try await runUntilProcessExitSeam()
         }
         unsetenv("OHE_PROCESS_EXIT_ROOT")
         unsetenv("OHE_PROCESS_EXIT_SEAM")
+        unsetenv("OHE_PROCESS_EXIT_SEED")
 
         let destinationURL = root.appendingPathComponent("destination")
         let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
@@ -1873,7 +1883,7 @@ private func runUntilProcessExitSeam() async throws {
         }
         let metric = MetricCatalog.heartRate.id
         let page = SamplePage(
-            samples: [heartSample("e0000000-0000-4000-8000-000000000001")],
+            samples: [heartSample(uuid)],
             tombstones: [],
             metric: metric,
             anchorBlob: Data([0xE0]),
@@ -1892,22 +1902,23 @@ private func runUntilProcessExitSeam() async throws {
             at: destinationURL,
             includingPropertiesForKeys: nil
         ).filter { $0.pathExtension == "ndjson" }
-        #expect(delivered.count == 1, "delivery count at \(location.rawValue)")
+        #expect(delivered.count == 1, "seed \(seed) delivery count at \(location.rawValue)")
         var receiver = ReferenceReceiver()
         try receiver.ingest(
             ndjson: String(contentsOf: delivered[0], encoding: .utf8)
         )
         #expect(
-            receiver.quantities["e0000000-0000-4000-8000-000000000001"] != nil,
-            "sample lost at \(location.rawValue)"
+            receiver.quantities[uuid] != nil,
+            "seed \(seed) sample lost at \(location.rawValue)"
         )
         let journal = try await store.transact { try $0.loadJournal() }
         #expect(!journal.isEmpty, "journal missing after relaunch at \(location.rawValue)")
         #expect(
             [RunOutcome.Kind.success.rawValue, RunOutcome.Kind.successNothingDue.rawValue]
                 .contains(journal.last?.outcomeKind ?? ""),
-            "relaunch outcome missing at \(location.rawValue)"
+            "seed \(seed) relaunch outcome missing at \(location.rawValue)"
         )
+        }
     }
 }
 #endif
