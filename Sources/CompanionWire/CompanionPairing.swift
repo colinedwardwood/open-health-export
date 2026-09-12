@@ -13,7 +13,7 @@ public enum PairingError: Error, Equatable {
     case base64
 }
 
-/// Pre-shared 32-byte key material for the companion TLS 1.3 PSK.
+/// Pre-shared 32-byte key material for the companion TLS-PSK handshake.
 public struct PairingSecret: Sendable, Equatable, CustomStringConvertible, CustomDebugStringConvertible {
     public static let byteCount = 32
 
@@ -40,7 +40,7 @@ public struct PairingSecret: Sendable, Equatable, CustomStringConvertible, Custo
         ContentSHA256.hex(Data(key))
     }
 
-    /// Scoped access for the one caller that needs the raw key: building the TLS 1.3 PSK.
+    /// Scoped access for the one caller that needs the raw key: building the TLS-PSK.
     /// There is deliberately no stored-copy accessor and no string form of the key.
     public func withKeyBytes<T>(_ body: ([UInt8]) throws -> T) rethrows -> T {
         try body(key)

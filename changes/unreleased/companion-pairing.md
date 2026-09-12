@@ -3,7 +3,7 @@
 `PairingSecret` is 32 bytes of PSK with injected randomness (deterministic in tests), no
 `Codable`, no raw-bytes property, and a redacted `description` / `debugDescription`. The one way
 to reach the key is `withKeyBytes`, which `CompanionPSK.preSharedKey(from:identity:)` in
-`SinkCompanion` uses to build the TLS 1.3 PSK — that target is the only one depending on both
+`SinkCompanion` uses to build the TLS-PSK — that target is the only one depending on both
 `CompanionWire` and `NetEgress`, which is what keeps key material out of everything else.
 
 The QR payload is newline-delimited text (`ohe.pair/1`, Mac installation ID, base64url secret,

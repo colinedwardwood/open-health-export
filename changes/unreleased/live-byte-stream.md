@@ -20,7 +20,7 @@ answer instead of a spinner.
 `open()` lazily, which is idempotent. `LoopbackByteStream` exercises the adapters without a
 socket.
 
-For the companion, `NWByteStream` can also dial a Bonjour service name with TLS 1.3 PSK from
+For the companion, `NWByteStream` can also dial a Bonjour service name with TLS-PSK from
 pairing (no certificates, so no verify block and no trust store). `CompanionDiscovery` browses
 `_ohx-recv._tcp`, but discovery is not authorization: only a service name exactly equal to the
 one captured at pairing may be dialled.

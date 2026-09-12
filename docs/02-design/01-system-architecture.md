@@ -846,13 +846,13 @@ We reject it, for four reasons that compound:
 opt-in, which is precisely the friction the companion exists to remove. Retained as the documented
 fallback and as the reason the companion is cuttable.
 
-**Chosen: Bonjour discovery + Network framework TLS 1.3 with a pairing-established pre-shared key.**
+**Chosen: Bonjour discovery + Network framework TLS-PSK with a pairing-established pre-shared key.** Network.framework's PSK API is TLS 1.2 only (Apple TN3213).
 
 | Aspect | Design |
 |---|---|
 | **Who listens** | The **Mac** (`NWListener`). The iPhone connects outward. R-34 (no listening socket on iOS) holds by construction, and the security check is trivially satisfiable |
 | **Discovery** | `NWBrowser` on the phone for a functionally neutral service type (`_ohx-recv._tcp`), advertised by the Mac **only while the user has the receive window open** and **only after at least one pairing exists**. Manual IP entry as the fallback, as `health-md` also offers |
-| **Credential** | 256-bit PSK generated on the Mac at pairing, consumed by `sec_protocol_options_add_pre_shared_key`. TLS 1.3 PSK gives **mutual authentication** and forward secrecy with no CA, no certificate rotation and no pin-on-first-use ambiguity |
+| **Credential** | 256-bit PSK generated on the Mac at pairing, consumed by `sec_protocol_options_add_pre_shared_key`. The handshake is TLS 1.2 with `TLS_PSK_WITH_AES_128_GCM_SHA256` (mutual authentication, no CA). That ciphersuite is PSK-only: it does **not** provide forward secrecy. TLS 1.3 PSK-(EC)DHE is not available on `NWConnection` |
 | **Transfer** | QR code rendered by the Mac, scanned by the phone — reusing R-67's QR configuration path and UX's mandated review screen. Never over the network, never by copy-paste of a long secret |
 | **Confirmation** | A six-digit code derived from the TLS key exporter shown on **both** screens after the first handshake. Cheap, and it defeats a QR photographed over a shoulder |
 | **Storage** | PSK in the Keychain at `AfterFirstUnlockThisDeviceOnly`, `synchronizable = false`, referenced by `SecretHandle` (R-33, AR-18). Removed by R-43's delete-all |
@@ -883,7 +883,8 @@ unpaired ──(user opens receive window on Mac)──▶ pairing(nonce, PSK, Q
 ```
 
 A companion is a **destination**, so pairing and re-pointing fire R-40's local notification, appear
-in the R-30 ledger with `transportSecurity = .tls13PSK`, appear in the destination list, and can
+in the R-30 ledger with `transportSecurity = .tls13PSK` (the companion transport token; the
+bytes on the wire are TLS 1.2 PSK), appear in the destination list, and can
 never be hidden (R-41). Establishing trust is an egress event and is recorded as one.
 
 ### 8.4 Wire protocol, and why it is not a special case
@@ -1174,7 +1175,7 @@ Titles and one-line decisions. The PM commissions; I will write any of them.
 | **ADR-0006** | Transactions contain no suspension point, and storage owns a serial executor | The transaction closure is synchronous so actor reentrancy cannot tear an invariant, and `fsync` never runs on the cooperative thread pool. |
 | **ADR-0007** | The destination sink contract and its eighteen conformance obligations | Sinks hold no cursor, no retry state and no credentials; `SinkScratch` is the only durable surface and correctness must survive its destruction (AR-02, AR-18). |
 | **ADR-0008** | Payloads are file handles, not bytes | One decision delivers O(1) memory, background-session upload and a uniform contract across all five sinks (R-74, HK-18). |
-| **ADR-0009** | Mac companion transport | Bonjour discovery plus TLS 1.3 PSK established by QR pairing with a key-exporter confirmation code; Multipeer Connectivity rejected on durable peer identity and resumable-transfer grounds (R-31, R-34, RK-11). |
+| **ADR-0009** | Mac companion transport | Bonjour discovery plus TLS 1.2 PSK (`NWConnection`; TN3213) established by QR pairing with a key-exporter confirmation code; Multipeer Connectivity rejected on durable peer identity and resumable-transfer grounds (R-31, R-34, RK-11). |
 | **ADR-0010** | Determinism scope and the declared tz-database version | Byte-determinism is per-platform plus a declared tzdata version, with cross-platform equality asserted only for offset-stable fixtures (R-84 as amended). |
 | **ADR-0011** | The error-class registry, and outcomes as derived values | `ErrorClass` is a committed versioned registry in bijection with a manifest, and `RunOutcome` has no public initialiser (R-21, R-22, DP-6). |
 | **ADR-0012** | `os.Logger` only; OTLP isolated in its own target | No `swift-log` facade, preserving `%{private}`/`%{public}`; OTLP export lives in one leaf target so §6.4's "cut OTLP first" is a one-line package edit (R-50, R-53). |

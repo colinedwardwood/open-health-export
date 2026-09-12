@@ -1038,7 +1038,7 @@ struct HarnessView: View {
                 Task { await runCompanionExport() }
             }
             .disabled(phase == .working || pairing == nil)
-            .accessibilityHint("Browses for the paired Mac name and pushes one page over TLS 1.3 PSK.")
+            .accessibilityHint("Browses for the paired Mac name and pushes one page over TLS-PSK.")
             Button("Forget companion pairing") {
                 Task { await forgetPairing() }
             }

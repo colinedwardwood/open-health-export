@@ -100,7 +100,7 @@ Supported sinks in this tree:
 - **MQTT 3.1.1** (publish-only) — including Home Assistant discovery generated
   from the catalogue. HACS default-list publication is not part of this
   repository and is not claimed.
-- **Mac companion** — Bonjour discovery of a paired name, then TLS 1.3 PSK.
+- **Mac companion** — Bonjour discovery of a paired name, then TLS 1.2 PSK on Network.framework.
   Discovery is not authorization.
 
 HTTPS and MQTT destinations show a confirmation card with the grouped certificate

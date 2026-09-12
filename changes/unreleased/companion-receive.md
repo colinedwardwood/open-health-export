@@ -5,7 +5,7 @@ index so O1 (idempotent re-OFFER) survives a process restart. Batch IDs are reje
 look like path traversal. iCloud / Mobile Documents folders produce a warning and are not
 refused (O-10).
 
-`CompanionListener` (`NWListener` + TLS 1.3 PSK) lives in `NetEgress` under `#if os(macOS)` —
+`CompanionListener` (`NWListener` + TLS 1.2 PSK) lives in `NetEgress` under `#if os(macOS)` —
 the iOS app source never mentions a listener, and `policycheck` still fails `Apps/` on
 `NWListener` / `NWBrowser`. The Mac app (`Apps/Companion-macOS`) depends on `ExportCore` only
 and is CI-asserted not to mention HealthKit (AR-01). It advertises `_ohx-recv._tcp` only while
