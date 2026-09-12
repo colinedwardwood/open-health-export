@@ -17,6 +17,7 @@ public actor CompanionListener {
     public init(service: BonjourService, preSharedKey: PreSharedKey) {
         self.service = service
         self.parameters = TLSParameters.preSharedKey(preSharedKey)
+        self.parameters.includePeerToPeer = true
     }
 
     public func start() async throws {

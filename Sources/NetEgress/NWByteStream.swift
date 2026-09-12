@@ -349,7 +349,9 @@ public actor NWByteStream: ByteStream {
             host = service.name
         }
         if let psk = options.preSharedKey {
-            return TLSParameters.preSharedKey(psk)
+            let parameters = TLSParameters.preSharedKey(psk)
+            parameters.includePeerToPeer = true
+            return parameters
         }
         let tls = NWProtocolTLS.Options()
         let security = tls.securityProtocolOptions

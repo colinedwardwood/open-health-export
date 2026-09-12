@@ -42,7 +42,9 @@ public actor CompanionDiscovery {
         guard browser == nil else { return }
         EgressAttemptLog.record(kind: .discovery, host: BonjourService.companionType)
         let descriptor = NWBrowser.Descriptor.bonjour(type: BonjourService.companionType, domain: nil)
-        let browser = NWBrowser(for: descriptor, using: .tcp)
+        let parameters = NWParameters.tcp
+        parameters.includePeerToPeer = true
+        let browser = NWBrowser(for: descriptor, using: parameters)
         browser.browseResultsChangedHandler = { [weak self] results, _ in
             let names = results.compactMap { result -> String? in
                 guard case .service(let name, _, _, _) = result.endpoint else { return nil }
