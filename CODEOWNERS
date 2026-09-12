@@ -1,8 +1,44 @@
 # Every top-level path has an owner. One person until D-10.
 
 * @colinedwardwood
+/CODEOWNERS @colinedwardwood
+/.github/workflows/ @colinedwardwood
 /compliance/ @colinedwardwood
 /spec/ @colinedwardwood
+/Package.swift @colinedwardwood
+/project.yml @colinedwardwood
+/Brand.xcconfig @colinedwardwood
+
+# Egress chokepoint, protocol implementations, and destination configuration.
 /Sources/NetEgress/ @colinedwardwood
+/Sources/SinkHTTP/ @colinedwardwood
+/Sources/SinkMQTT/ @colinedwardwood
+/Sources/MQTTCodec/ @colinedwardwood
+/Sources/SinkCompanion/ @colinedwardwood
+/Sources/CompanionReceive/ @colinedwardwood
+/Sources/OTLPExport/ @colinedwardwood
+/Sources/DestinationTrust/ @colinedwardwood
+/Sources/RequestTemplate/ @colinedwardwood
+/Sources/CoreDomain/DestinationExportScope.swift @colinedwardwood
+/Sources/EnginePorts/Ports.swift @colinedwardwood
+
+# Credentials, Data Protection, and telemetry disclosure controls.
+/Sources/Redaction/ @colinedwardwood
+/Sources/FileWriteKit/ @colinedwardwood
+/Apps/Exporter-iOS/ @colinedwardwood
+/Apps/Companion-macOS/ @colinedwardwood
+/Apps/StatusWidget/*.entitlements @colinedwardwood
+/Apps/StatusWidget/Info.plist @colinedwardwood
+/spec/telemetry/ @colinedwardwood
+
+# Security gates and fixtures must change under the same review.
+/Tests/ExportCoreTests/R32EgressAcceptanceTests.swift @colinedwardwood
+/Tests/ExportCoreTests/RedactionCanaryTests.swift @colinedwardwood
+/Tests/ExportCoreTests/LedgerSealTests.swift @colinedwardwood
+/Tests/ExportCoreTests/TrustEventTests.swift @colinedwardwood
+/Tests/ExportCoreTests/HTTPSTests.swift @colinedwardwood
+/Tests/ExportCoreTests/MQTTTests.swift @colinedwardwood
+/Tests/ExportCoreTests/CompanionTests.swift @colinedwardwood
+/Tools/policycheck/ @colinedwardwood
 /Sources/WireFormat/AdvisoryFeed.swift @colinedwardwood
 /spec/v1.0.0/fixtures/advisory-golden-request.txt @colinedwardwood

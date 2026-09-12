@@ -1,0 +1,98 @@
+# SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+name: security-sensitive diff
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  detect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      sensitive: ${{ steps.detect.outputs.sensitive }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - name: Detect egress and security-sensitive changes
+        id: detect
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" > changed-files.txt
+          sensitive=0
+
+          path_pattern='^(CODEOWNERS|Package\.swift|project\.yml|Brand\.xcconfig|\.github/workflows/|Apps/(Exporter-iOS|Companion-macOS)/|Apps/StatusWidget/([^/]+\.entitlements|Info\.plist)|Sources/(NetEgress|SinkHTTP|SinkMQTT|MQTTCodec|SinkCompanion|CompanionReceive|OTLPExport|DestinationTrust|RequestTemplate|Redaction|FileWriteKit)/|Sources/CoreDomain/DestinationExportScope\.swift|Sources/EnginePorts/Ports\.swift|spec/telemetry/|spec/v1\.0\.0/fixtures/advisory-golden-request\.txt|Tests/ExportCoreTests/(R32EgressAcceptance|RedactionCanary|LedgerSeal|TrustEvent|HTTPS|MQTT|Companion)Tests\.swift|Tools/policycheck/)'
+          if grep -Eq "${path_pattern}" changed-files.txt; then
+            sensitive=1
+          fi
+
+          egress_pattern='^[+-].*(https?://|mqtts?://|wss?://|URLSession|URLRequest|NW(Connection|Browser|Listener)|socket\(|connect\(|listen\(|endpoint[[:space:]]*[:=]|host(Name)?[[:space:]]*[:=]|port[[:space:]]*[:=]|scheme[[:space:]]*[:=]|SecItem|kSecAttr|NSFileProtection|FileProtectionType|NSAppTransportSecurity|NSAllowsArbitraryLoads|telemetry|attribute.?allowlist)'
+          if git diff --unified=0 "${BASE_SHA}" "${HEAD_SHA}" -- . \
+            | grep -Ev '^(\+\+\+|---)' \
+            | grep -Ei "${egress_pattern}" >/dev/null; then
+            sensitive=1
+          fi
+
+          printf 'sensitive=%s\n' "${sensitive}" >> "${GITHUB_OUTPUT}"
+          {
+            printf '## Egress/security diff\n\n'
+            if test "${sensitive}" -eq 1; then
+              printf 'Security-sensitive changes detected; security-maintainer review is required.\n\n'
+              printf 'Changed files:\n'
+              while IFS= read -r path; do
+                printf -- '- %s\n' "${path}"
+              done < changed-files.txt
+            else
+              printf 'No egress or security-sensitive changes detected.\n'
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+  label:
+    needs: detect
+    if: needs.detect.outputs.sensitive == '1' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Apply security-review label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          if ! gh api "repos/${GITHUB_REPOSITORY}/labels/security-review" >/dev/null 2>&1; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/labels" \
+              -f name=security-review \
+              -f color=b60205 \
+              -f description='Requires security-maintainer review'
+          fi
+          printf '{"labels":["security-review"]}\n' \
+            | gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/labels" --input -
+
+  fork-summary:
+    needs: detect
+    if: needs.detect.outputs.sensitive == '1' && github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    steps:
+      - name: Record fork-safe review requirement
+        run: |
+          {
+            printf '## Fork PR security review\n\n'
+            printf 'This fork PR changes egress or security-sensitive code. '
+            printf 'The read-only detection job cannot label fork PRs; '
+            printf 'a maintainer must apply the security-review label before merge.\n'
+          } >> "${GITHUB_STEP_SUMMARY}"
