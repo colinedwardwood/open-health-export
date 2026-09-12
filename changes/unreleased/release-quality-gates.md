@@ -7,3 +7,7 @@ workflow before a tag or release is published.
 Release validation now also requires individually linked device, soak, canary,
 energy, accessibility, performance, migration, flake, compliance, provenance,
 and stranger-build evidence rather than accepting a non-empty evidence section.
+
+The weekly T2 job now streams all fifty million pathological records through
+both structural validation and bounded `ExportRun` processing while hashing
+the same stream, with the 100 MiB RSS ceiling enforced at the full tier.
