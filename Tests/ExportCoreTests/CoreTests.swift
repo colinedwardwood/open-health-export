@@ -1964,6 +1964,77 @@ private struct OneExportFault: ExportFaultInjector {
     )
 }
 
+@Test func interruptedExportSealsAsCancelledBySystemOnNextLaunch() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let page = SamplePage(
+        samples: [heartSample("26000000-0000-4000-8000-000000000026")],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0x26]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-ux26-\(UUID().uuidString)")
+    let destinationURL = root.appendingPathComponent("destination")
+    try FileManager.default.createDirectory(at: destinationURL, withIntermediateDirectories: true)
+    let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+    var run = ExportRun(
+        source: FixtureSource(pages: [page]),
+        destination: .testing(LocalFileSink(directory: destinationURL)),
+        store: store,
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    )
+    run.faults = OneExportFault(location: .afterRead)
+    await #expect(throws: InjectedExportFault.stop) {
+        _ = try await run.run()
+    }
+    let open = try await store.transact { try $0.loadOpenRuns() }
+    #expect(open.count == 1)
+    #expect(open[0].phase == "reading")
+    #expect(open[0].samplesRead == 1)
+    #expect(open[0].samplesCommitted == 0)
+
+    let sealed = try await InterruptedRunRecovery.seal(store: store, nowEpoch: 1_704_100_440)
+    #expect(sealed.count == 1)
+    #expect(try await store.transact { try $0.loadOpenRuns() }.isEmpty)
+    let event = try #require(try await store.transact { try $0.loadJournal().last })
+    #expect(event.outcomeKind == RunOutcome.Kind.cancelledBySystem.rawValue)
+    #expect(event.detail == "os_termination")
+    #expect(event.errorClass == ErrorClass.cancelledBySystem.rawValue)
+    #expect(event.samplesRead == 1)
+    #expect(RunHistoryDetail.listLine(event).hasPrefix("Interrupted"))
+    #expect(try await InterruptedRunRecovery.seal(store: store, nowEpoch: 1_704_100_441).isEmpty)
+}
+
+@Test func completedExportClosesTheOpenRunLease() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let page = SamplePage(
+        samples: [heartSample("26000000-0000-4000-8000-000000000027")],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0x27]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-ux26-ok-\(UUID().uuidString)")
+    let destinationURL = root.appendingPathComponent("destination")
+    try FileManager.default.createDirectory(at: destinationURL, withIntermediateDirectories: true)
+    let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+    let run = ExportRun(
+        source: FixtureSource(pages: [page]),
+        destination: .testing(LocalFileSink(directory: destinationURL)),
+        store: store,
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch"),
+        envelope: testEnvelope()
+    )
+    let outcome = try await run.run()
+    #expect(outcome.kind == .success)
+    #expect(try await store.transact { try $0.loadOpenRuns() }.isEmpty)
+}
+
 /// C-04 / AR-12: force-quit after the destination write and before ack leaves
 /// the batch in our SQLite pending table. Relaunch reconstructs from that
 /// store. CorrectnessEngine never consults URLSession for queue membership.

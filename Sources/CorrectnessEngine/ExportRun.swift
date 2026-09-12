@@ -169,6 +169,10 @@ public struct ExportRun: Sendable {
                 timings: timings
             )
         }
+        try await persistOpenRun(
+            phase: "reading",
+            startedAt: startedAt
+        )
         let page: SamplePage
         do {
             page = try await source.page(metric: metric, afterAnchor: prior?.anchorBlob)
@@ -191,6 +195,11 @@ public struct ExportRun: Sendable {
             throw error
         }
         mark("read")
+        try await persistOpenRun(
+            phase: "reading",
+            startedAt: startedAt,
+            samplesRead: page.censusKeys.count + page.tombstones.count
+        )
         #if DEBUG
         try faults.hit(.afterRead)
         #endif
@@ -337,6 +346,12 @@ public struct ExportRun: Sendable {
             return (evicted, census.undatableUUIDs)
         }
         mark("enqueue")
+        try await persistOpenRun(
+            phase: "delivering",
+            startedAt: startedAt,
+            samplesRead: recordCount,
+            samplesCommitted: recordCount
+        )
         for victim in enqueue.victims {
             try? FileManager.default.removeItem(atPath: victim.payloadURL)
         }
@@ -601,6 +616,7 @@ public struct ExportRun: Sendable {
                     facts: facts
                 )
             )
+            try tx.closeOpenRun(destinationID: destinationName, metric: metric)
             try tx.appendLedger(
                 EgressEntry(
                     destination: destinationName,
@@ -713,6 +729,29 @@ public struct ExportRun: Sendable {
             }
         return timings.max { $0.latency < $1.latency }
             .map { (freshnessClass, $0.0, $0.1) }
+    }
+
+    private func persistOpenRun(
+        phase: String,
+        startedAt: Date,
+        samplesRead: Int = 0,
+        samplesCommitted: Int = 0,
+        samplesAcked: Int = 0
+    ) async throws {
+        try await store.transact { tx in
+            try tx.upsertOpenRun(
+                OpenRun(
+                    destinationID: destinationName,
+                    metric: metric,
+                    phase: phase,
+                    trigger: trigger,
+                    startedAtEpoch: startedAt.timeIntervalSince1970,
+                    samplesRead: samplesRead,
+                    samplesCommitted: samplesCommitted,
+                    samplesAcked: samplesAcked
+                )
+            )
+        }
     }
 
     private static func parseISO8601(_ value: String) -> Date? {

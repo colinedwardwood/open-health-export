@@ -121,6 +121,7 @@ private let everyTrustEvent: [TrustEvent] = [
                     && $0 != .exportOverdue
                     && $0 != .healthAccessRevoked
                     && $0 != .anchorInvalidated
+                    && $0 != .exportInterrupted
             }
         )
     )

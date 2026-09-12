@@ -85,6 +85,22 @@ import Testing
     #expect(RunHistoryFacts.decode(nil) == .empty)
 }
 
+@Test func cancelledBySystemHistoryLineIsInterrupted() {
+    let event = RunEvent(
+        runID: RunID(rawValue: "run-heartRate"),
+        outcomeKind: "cancelledBySystem",
+        detail: "os_termination",
+        trigger: .manual,
+        samplesRead: 4,
+        samplesCommitted: 1,
+        samplesAcked: 0,
+        wallTimeEpoch: 100,
+        errorClass: "cancelledBySystem"
+    )
+    #expect(RunHistoryDetail.listLine(event).hasPrefix("Interrupted"))
+    #expect(RunHistoryDetail.listLine(event).contains("0/1 acknowledged"))
+}
+
 @Test func sqliteJournalPersistsHistoryFacts() async throws {
     let path = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-history-\(UUID().uuidString).sqlite")

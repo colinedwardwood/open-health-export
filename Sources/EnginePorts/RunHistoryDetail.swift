@@ -80,8 +80,9 @@ public enum RunHistoryDetail {
             guard !raw.isEmpty, raw != "none" else { return nil }
             return raw
         }
+        let kindLabel = event.outcomeKind == "cancelledBySystem" ? "Interrupted" : event.outcomeKind
         let suffix = error.map { " · \($0)" } ?? ""
-        return "\(event.outcomeKind)\(suffix) · \(event.trigger.rawValue) · "
+        return "\(kindLabel)\(suffix) · \(event.trigger.rawValue) · "
             + "\(event.samplesAcked)/\(event.samplesCommitted) acknowledged"
     }
 

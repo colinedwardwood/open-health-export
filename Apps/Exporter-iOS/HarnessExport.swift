@@ -2136,6 +2136,41 @@ enum HarnessExport {
         return result
     }
 
+    /// UX-26: seal leftover open runs after process death, then tell the person.
+    static func recoverInterruptedExports() async throws -> String? {
+        let root = try applicationSupportRoot()
+        let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+        let now = Date().timeIntervalSince1970
+        let sealed = try await InterruptedRunRecovery.seal(store: store, nowEpoch: now)
+        guard let first = sealed.min(by: { $0.startedAtEpoch < $1.startedAtEpoch }) else {
+            return nil
+        }
+        let snapshots = StatusSnapshotLocation.readAll()
+        let label = snapshots.first { $0.destinationID == first.destinationID }?.destinationLabel
+            ?? first.destinationID
+        let notice = UserNotice(
+            kind: .exportInterrupted,
+            destinationID: first.destinationID,
+            destination: label,
+            errorClass: ErrorClass.cancelledBySystem.rawValue,
+            startedAtEpoch: first.startedAtEpoch
+        )
+        _ = try await LocalUserNotifier().notify(notice)
+        for run in sealed {
+            guard let url = StatusSnapshotLocation.url(destinationID: run.destinationID),
+                  var snapshot = try? DestinationSnapshotFile.read(from: url)
+            else {
+                continue
+            }
+            snapshot.applyLastOutcome(RunOutcome.Kind.cancelledBySystem.rawValue)
+            snapshot.errorClass = ErrorClass.cancelledBySystem.rawValue
+            snapshot.writtenAtEpoch = now
+            try DestinationSnapshotFile.write(snapshot, to: url)
+        }
+        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+        return NoticeCopy.render(notice).body
+    }
+
     static func storedHTTPSTraceparent() -> Bool {
         guard let root = try? applicationSupportRoot(),
               let data = try? Data(contentsOf: root.appendingPathComponent("https-destination.json")),

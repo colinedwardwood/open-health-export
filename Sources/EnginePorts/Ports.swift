@@ -358,6 +358,39 @@ public struct RunHistoryFacts: Sendable, Equatable, Codable {
     }
 }
 
+/// A non-terminal export still on disk. Next launch infers interruption from this row
+/// (UX-26 / architecture run machine); the killed process cannot write the outcome.
+public struct OpenRun: Sendable, Equatable {
+    public var destinationID: String
+    public var metric: MetricID
+    public var phase: String
+    public var trigger: RunTrigger
+    public var startedAtEpoch: TimeInterval
+    public var samplesRead: Int
+    public var samplesCommitted: Int
+    public var samplesAcked: Int
+
+    public init(
+        destinationID: String,
+        metric: MetricID,
+        phase: String,
+        trigger: RunTrigger,
+        startedAtEpoch: TimeInterval,
+        samplesRead: Int = 0,
+        samplesCommitted: Int = 0,
+        samplesAcked: Int = 0
+    ) {
+        self.destinationID = destinationID
+        self.metric = metric
+        self.phase = phase
+        self.trigger = trigger
+        self.startedAtEpoch = startedAtEpoch
+        self.samplesRead = samplesRead
+        self.samplesCommitted = samplesCommitted
+        self.samplesAcked = samplesAcked
+    }
+}
+
 public struct RunEvent: Sendable, Equatable {
     public var runID: RunID
     public var outcomeKind: String
@@ -512,6 +545,9 @@ public protocol StateTransaction: AnyObject {
     /// `delivered ∪ gap ⊇ read`.
     func deliveredAccepted() throws -> Int
     func appendJournal(_ event: RunEvent) throws
+    func upsertOpenRun(_ run: OpenRun) throws
+    func loadOpenRuns() throws -> [OpenRun]
+    func closeOpenRun(destinationID: String, metric: MetricID) throws
     func appendFreshnessLatency(_ observation: RunFreshnessLatency) throws
     func loadFreshnessLatencies(
         destinationID: String,
@@ -650,6 +686,7 @@ public struct UserNotice: Sendable, Equatable {
         case exportOverdue
         case healthAccessRevoked
         case anchorInvalidated
+        case exportInterrupted
     }
 
     public var kind: Kind
@@ -659,6 +696,8 @@ public struct UserNotice: Sendable, Equatable {
     public var previousFingerprint: String?
     /// Closed error class for UX-32 deep links. Never interpolated into Lock Screen copy.
     public var errorClass: String?
+    /// Wall time the interrupted export started. Copy interpolates a clock; never a health value.
+    public var startedAtEpoch: TimeInterval?
 
     public init(
         kind: Kind,
@@ -666,7 +705,8 @@ public struct UserNotice: Sendable, Equatable {
         destination: String,
         fingerprint: String? = nil,
         previousFingerprint: String? = nil,
-        errorClass: String? = nil
+        errorClass: String? = nil,
+        startedAtEpoch: TimeInterval? = nil
     ) {
         self.kind = kind
         self.destinationID = destinationID ?? destination
@@ -674,6 +714,7 @@ public struct UserNotice: Sendable, Equatable {
         self.fingerprint = fingerprint
         self.previousFingerprint = previousFingerprint
         self.errorClass = errorClass
+        self.startedAtEpoch = startedAtEpoch
     }
 }
 

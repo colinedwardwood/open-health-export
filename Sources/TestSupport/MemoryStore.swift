@@ -25,6 +25,7 @@ public final class MemoryTransaction: StateTransaction {
     public var destinationScopes: [String: DestinationExportScope] = [:]
     public var destinationBreakers: [String: Data] = [:]
     public var freshnessLatencies: [RunFreshnessLatency] = []
+    public var openRuns: [String: OpenRun] = [:]
     private var pendingOrder: [BatchID] = []
 
     public init() {}
@@ -98,6 +99,30 @@ public final class MemoryTransaction: StateTransaction {
 
     public func deliveredAccepted() throws -> Int {
         deliveries.values.reduce(0) { $0 + $1.accepted }
+    }
+
+    private func openRunKey(destinationID: String, metric: MetricID) -> String {
+        "\(destinationID)|\(metric.rawValue)"
+    }
+
+    public func upsertOpenRun(_ run: OpenRun) throws {
+        openRuns[openRunKey(destinationID: run.destinationID, metric: run.metric)] = run
+    }
+
+    public func loadOpenRuns() throws -> [OpenRun] {
+        openRuns.values.sorted {
+            if $0.startedAtEpoch != $1.startedAtEpoch {
+                return $0.startedAtEpoch < $1.startedAtEpoch
+            }
+            if $0.destinationID != $1.destinationID {
+                return $0.destinationID < $1.destinationID
+            }
+            return $0.metric.rawValue < $1.metric.rawValue
+        }
+    }
+
+    public func closeOpenRun(destinationID: String, metric: MetricID) throws {
+        openRuns.removeValue(forKey: openRunKey(destinationID: destinationID, metric: metric))
     }
 
     public func appendJournal(_ event: RunEvent) throws {
@@ -349,6 +374,7 @@ public final class MemoryTransaction: StateTransaction {
         anchorHolds = [:]
         destinationScopes = [:]
         destinationBreakers = [:]
+        openRuns = [:]
         try appendLedger(
             EgressEntry(
                 destination: "local-device",

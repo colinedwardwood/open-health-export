@@ -96,6 +96,31 @@ public enum NoticeCopy {
                 title: "Health access changed",
                 body: "\(label) was disabled and its queued payloads were deleted after the app observed that Health access was revoked."
             )
+        case .exportInterrupted:
+            if let clock = startClock(notice.startedAtEpoch) {
+                return LocalizedNotice(
+                    title: "Export interrupted",
+                    body: "The export to \(label) started at \(clock) didn't finish."
+                )
+            }
+            return LocalizedNotice(
+                title: "Export interrupted",
+                body: "The export to \(label) didn't finish."
+            )
         }
+    }
+
+    /// HH:mm in the current time zone so next-launch copy matches the clock the person saw.
+    public static func startClock(
+        _ epoch: TimeInterval?,
+        timeZone: TimeZone = .current,
+        locale: Locale = Locale(identifier: "en_GB")
+    ) -> String? {
+        guard let epoch, epoch > 0 else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: Date(timeIntervalSince1970: epoch))
     }
 }

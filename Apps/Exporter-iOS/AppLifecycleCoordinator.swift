@@ -73,6 +73,7 @@ final class ExporterAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
         ContinuedBackfillCoordinator.register()
         Task {
             try? await AppLifecycleCoordinator.shared.startObserversIfEligible()
+            _ = try? await HarnessExport.recoverInterruptedExports()
         }
         return true
     }

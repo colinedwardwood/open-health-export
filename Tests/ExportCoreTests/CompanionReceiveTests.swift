@@ -128,6 +128,24 @@ import WireFormat
     #expect(kinds.count == UserNotice.Kind.allCases.count)
 }
 
+@Test func interruptedNoticeNamesTheStartClockAndDestinationLabel() {
+    let notice = UserNotice(
+        kind: .exportInterrupted,
+        destination: "Archive folder",
+        startedAtEpoch: 1_704_100_440
+    )
+    let copy = NoticeCopy.render(notice)
+    #expect(copy.title == "Export interrupted")
+    #expect(copy.body.contains("Archive folder"))
+    #expect(copy.body.contains("didn't finish"))
+    #expect(
+        NoticeCopy.startClock(
+            1_704_100_440,
+            timeZone: TimeZone(secondsFromGMT: 0)!
+        ) == "09:14"
+    )
+}
+
 @Test func memorySecretStoreRoundTripsAndDeleteAllIsR43() async throws {
     let store = MemorySecretStore()
     let handle = SecretHandle(rawValue: "companion-psk")

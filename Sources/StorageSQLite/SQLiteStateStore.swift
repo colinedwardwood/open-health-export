@@ -210,7 +210,18 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
             );
-            PRAGMA user_version = 17;
+            CREATE TABLE IF NOT EXISTS open_runs (
+                destination_id TEXT NOT NULL,
+                metric TEXT NOT NULL,
+                phase TEXT NOT NULL,
+                trigger TEXT NOT NULL,
+                started_at_epoch REAL NOT NULL,
+                samples_read INTEGER NOT NULL DEFAULT 0,
+                samples_committed INTEGER NOT NULL DEFAULT 0,
+                samples_acked INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (destination_id, metric)
+            );
+            PRAGMA user_version = 18;
             """)
     }
 
@@ -511,6 +522,72 @@ private final class SQLiteTransaction: StateTransaction {
             sinceEpoch: newestJournalEpoch() - JournalRetention.seconds,
             maximumRuns: JournalRetention.runs
         )
+    }
+
+    func upsertOpenRun(_ run: OpenRun) throws {
+        let stmt = try store.prepare(
+            """
+            INSERT INTO open_runs (
+                destination_id, metric, phase, trigger, started_at_epoch,
+                samples_read, samples_committed, samples_acked
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(destination_id, metric) DO UPDATE SET
+                phase = excluded.phase,
+                trigger = excluded.trigger,
+                started_at_epoch = excluded.started_at_epoch,
+                samples_read = excluded.samples_read,
+                samples_committed = excluded.samples_committed,
+                samples_acked = excluded.samples_acked;
+            """
+        )
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, run.destinationID)
+        bindText(stmt, 2, run.metric.rawValue)
+        bindText(stmt, 3, run.phase)
+        bindText(stmt, 4, run.trigger.rawValue)
+        sqlite3_bind_double(stmt, 5, run.startedAtEpoch)
+        sqlite3_bind_int64(stmt, 6, sqlite3_int64(run.samplesRead))
+        sqlite3_bind_int64(stmt, 7, sqlite3_int64(run.samplesCommitted))
+        sqlite3_bind_int64(stmt, 8, sqlite3_int64(run.samplesAcked))
+        try stepDone(stmt)
+    }
+
+    func loadOpenRuns() throws -> [OpenRun] {
+        let stmt = try store.prepare(
+            """
+            SELECT destination_id, metric, phase, trigger, started_at_epoch,
+                   samples_read, samples_committed, samples_acked
+            FROM open_runs
+            ORDER BY started_at_epoch, destination_id, metric;
+            """
+        )
+        defer { sqlite3_finalize(stmt) }
+        var rows: [OpenRun] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            rows.append(
+                OpenRun(
+                    destinationID: text(stmt, 0),
+                    metric: MetricID(rawValue: text(stmt, 1)),
+                    phase: text(stmt, 2),
+                    trigger: RunTrigger(rawValue: text(stmt, 3)) ?? .manual,
+                    startedAtEpoch: sqlite3_column_double(stmt, 4),
+                    samplesRead: Int(sqlite3_column_int64(stmt, 5)),
+                    samplesCommitted: Int(sqlite3_column_int64(stmt, 6)),
+                    samplesAcked: Int(sqlite3_column_int64(stmt, 7))
+                )
+            )
+        }
+        return rows
+    }
+
+    func closeOpenRun(destinationID: String, metric: MetricID) throws {
+        let stmt = try store.prepare(
+            "DELETE FROM open_runs WHERE destination_id = ? AND metric = ?;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, destinationID)
+        bindText(stmt, 2, metric.rawValue)
+        try stepDone(stmt)
     }
 
     func appendFreshnessLatency(_ observation: RunFreshnessLatency) throws {
@@ -1164,7 +1241,7 @@ private final class SQLiteTransaction: StateTransaction {
             "journal", "ledger", "cursors", "census", "dirty", "pending_batches",
             "deliveries", "gaps", "emitted_index", "aggregate_emit", "type_status",
             "backfill_checkpoints", "anchor_holds", "destination_scopes",
-            "freshness_latencies", "state_meta",
+            "freshness_latencies", "state_meta", "open_runs",
         ] {
             try store.exec("DELETE FROM \(table);")
         }

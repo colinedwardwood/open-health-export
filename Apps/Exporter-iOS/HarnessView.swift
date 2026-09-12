@@ -326,6 +326,9 @@ struct HarnessView: View {
                     if expired.expiredBatches > 0 {
                         status = "Ready. Deleted \(expired.expiredBatches) queued export(s) older than seven days."
                     }
+                    if let interrupted = try await HarnessExport.recoverInterruptedExports() {
+                        status = interrupted
+                    }
                 } catch {
                     status = "Failed to enforce queue expiry: \(error.localizedDescription)"
                 }
