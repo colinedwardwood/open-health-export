@@ -3,29 +3,62 @@
 
 import DestinationTrust
 import Foundation
+import NetEgress
 import WireFormat
 
-/// R-25 MQTT test: CONNECT/CONNACK, PUBLISH canary, PUBACK when QoS confirms delivery.
+/// R-25 MQTT test: TLS when mqtts, CONNECT/CONNACK, PUBLISH canary, PUBACK when QoS confirms delivery.
 /// Subscribe is intentionally absent (ADR-0003 publish-only).
 public enum MQTTDestinationTest {
     public static func run(
         destination: MQTTDestination,
         pipe: any MQTTBytePipe,
         canary: Data,
+        pin: PinRecord? = nil,
+        observedAt: String = "1970-01-01T00:00:00Z",
         onProgress: DestinationTestProgress? = nil
     ) async -> DestinationTestReport {
-        let total = destination.confirmsDelivery ? 3 : 2
+        let mqtts = destination.url.scheme?.lowercased() == "mqtts"
+        let extra = (mqtts ? 1 : 0) + (pin == nil ? 0 : 1)
+        let total = (destination.confirmsDelivery ? 3 : 2) + extra
         var steps: [DestinationTestStepReport] = []
+        var index = 0
+        if mqtts {
+            index += 1
+            onProgress?(index, total, .tlsHandshake)
+            let identity = await pipe.identity()
+            guard identity != nil else {
+                return .failed(at: .tlsHandshake)
+            }
+            steps.append(DestinationTestStepReport(name: .tlsHandshake, outcome: .passed))
+        }
+        if let pin {
+            index += 1
+            onProgress?(index, total, .confirmCertificate)
+            switch PinGate.evaluate(
+                observed: await pipe.identity(),
+                stored: pin,
+                policy: pin.policy,
+                observedAt: observedAt
+            ) {
+            case .matched, .noTLS:
+                steps.append(DestinationTestStepReport(name: .confirmCertificate, outcome: .passed))
+            default:
+                return .failed(at: .confirmCertificate, prior: steps)
+            }
+        }
+
         let session = MQTTSession(pipe: pipe)
-        onProgress?(1, total, .connect)
+        index += 1
+        onProgress?(index, total, .connect)
         do {
             try await session.connect(destination: destination)
         } catch {
-            return .failed(at: .connect)
+            return .failed(at: .connect, prior: steps)
         }
         steps.append(DestinationTestStepReport(name: .connect, outcome: .passed))
 
-        onProgress?(2, total, .publishCanary)
+        index += 1
+        onProgress?(index, total, .publishCanary)
         do {
             try await session.publish(
                 topic: try destination.resolvedTopic(batchID: "canary"),
@@ -39,7 +72,8 @@ public enum MQTTDestinationTest {
 
         if destination.confirmsDelivery {
             steps.append(DestinationTestStepReport(name: .publishCanary, outcome: .passed))
-            onProgress?(3, total, .receiveEcho)
+            index += 1
+            onProgress?(index, total, .receiveEcho)
             steps.append(DestinationTestStepReport(name: .receiveEcho, outcome: .passed))
             return DestinationTestReport(verdict: .passed, steps: steps)
         }

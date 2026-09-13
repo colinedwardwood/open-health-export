@@ -265,6 +265,36 @@ import Testing
 
     named.append(
         expectFailure(
+            await MQTTDestinationTest.run(
+                destination: try mqttsBroker(),
+                pipe: ConnackRefusedMQTTPipe(),
+                canary: Data("canary\n".utf8)
+            ),
+            at: .tlsHandshake,
+            id: "mqtts-tls-nil"
+        )
+    )
+
+    named.append(
+        expectFailure(
+            await MQTTDestinationTest.run(
+                destination: try mqttsBroker(),
+                pipe: IdentityMQTTPipe(tls: sampleIdentity(leaf: "eeeeffff00001111")),
+                canary: Data("canary\n".utf8),
+                pin: PinRecord(
+                    leafSPKISha256: "aaaabbbbccccdddd",
+                    issuerSPKISha256: "issuer00",
+                    firstSeen: "2024-01-01T00:00:00Z",
+                    policy: .leaf
+                )
+            ),
+            at: .confirmCertificate,
+            id: "mqtts-pin-mismatch"
+        )
+    )
+
+    named.append(
+        expectFailure(
             await CompanionDestinationTest.run(
                 pipe: ThrowingCompanionPipe(),
                 installationID: "phone",
@@ -307,6 +337,15 @@ private func httpsHook() throws -> HTTPSDestination {
     try HTTPSDestination(urlString: "https://ha.example/hook", allowedHosts: ["ha.example"])
 }
 
+private func mqttsBroker() throws -> MQTTDestination {
+    try MQTTDestination(
+        urlString: "mqtts://broker.example:8883",
+        allowedHosts: ["broker.example"],
+        clientID: "c1",
+        topic: "ohe/health"
+    )
+}
+
 private func mqttPlain() throws -> MQTTDestination {
     try MQTTDestination(
         urlString: "mqtt://broker.example:1883",
@@ -326,6 +365,24 @@ private func expectFailure(
     #expect(report.failingStep == step)
     #expect(report.failingStep?.progressLabel == step.progressLabel)
     return (id, step)
+}
+
+private actor IdentityMQTTPipe: MQTTBytePipe {
+    let tls: TLSIdentity?
+
+    init(tls: TLSIdentity?) {
+        self.tls = tls
+    }
+
+    func send(_ data: Data) async throws {}
+
+    func receive(max: Int) async throws -> Data {
+        Data([0x20, 0x02, 0x00, 0x00])
+    }
+
+    func identity() async -> TLSIdentity? {
+        tls
+    }
 }
 
 private actor ConnackRefusedMQTTPipe: MQTTBytePipe {

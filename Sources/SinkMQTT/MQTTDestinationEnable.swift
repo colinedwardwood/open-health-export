@@ -171,6 +171,8 @@ public enum MQTTDestinationEnable {
             destination: destination,
             pipe: pipe,
             canary: canary,
+            pin: setup.pin,
+            observedAt: emittedAt,
             onProgress: onProgress
         )
         try setup.recordTest(report)
