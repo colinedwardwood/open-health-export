@@ -758,6 +758,18 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(
             app.staticTexts["mqtt-password-whitespace"].waitForExistence(timeout: uiWait)
         )
+        let clientID = scrollToHittable(app.textFields["mqtt-client-id"])
+        type(" exporter ", into: clientID)
+        dismissKeyboard()
+        XCTAssertTrue(
+            app.staticTexts["mqtt-client-id-whitespace"].waitForExistence(timeout: uiWait)
+        )
+        let topic = scrollToHittable(app.textFields["mqtt-topic"])
+        type(" health/export ", into: topic)
+        dismissKeyboard()
+        XCTAssertTrue(
+            app.staticTexts["mqtt-topic-whitespace"].waitForExistence(timeout: uiWait)
+        )
     }
 
     func testConfigurationExportIsExplicitAndCredentialFreeLabeled() {
