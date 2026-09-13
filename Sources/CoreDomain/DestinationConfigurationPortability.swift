@@ -312,6 +312,25 @@ public struct PortableDestinationSetupInputs: Sendable, Equatable {
     public let clientID: String?
     public let topic: String?
     public let qos: UInt8?
+    public let serviceName: String?
+
+    public init(
+        slotIdentifier: String,
+        endpoint: String,
+        allowInsecure: Bool,
+        clientID: String?,
+        topic: String?,
+        qos: UInt8?,
+        serviceName: String? = nil
+    ) {
+        self.slotIdentifier = slotIdentifier
+        self.endpoint = endpoint
+        self.allowInsecure = allowInsecure
+        self.clientID = clientID
+        self.topic = topic
+        self.qos = qos
+        self.serviceName = serviceName
+    }
 }
 
 public enum PortableDestinationMaterializer {
@@ -373,7 +392,31 @@ public enum PortableDestinationMaterializer {
                 topic: configuration.settings["topic"],
                 qos: qos
             )
-        case .localFile, .homeAssistant, .companion:
+        case .companion:
+            supported = ["serviceName"]
+            try rejectUnsupported(
+                configuration.settings,
+                supported: supported,
+                kind: .companion
+            )
+            let name = configuration.settings["serviceName"] ?? configuration.endpoint
+            if let setting = configuration.settings["serviceName"],
+               setting != configuration.endpoint {
+                throw DestinationConfigurationPortabilityError.unsupportedSetting(
+                    kind: .companion,
+                    key: "serviceName"
+                )
+            }
+            return PortableDestinationSetupInputs(
+                slotIdentifier: "companion",
+                endpoint: configuration.endpoint,
+                allowInsecure: false,
+                clientID: nil,
+                topic: nil,
+                qos: nil,
+                serviceName: name
+            )
+        case .localFile, .homeAssistant:
             throw DestinationConfigurationPortabilityError
                 .unsupportedDestinationKind(configuration.kind)
         }

@@ -16,9 +16,11 @@ confirmation produces only new `disabledRequiresTest` drafts, with no operation 
 can update an existing local destination or enable a draft. The app allocates fresh
 local identifiers and persists the disabled drafts. HTTPS and MQTT drafts can be
 loaded into their existing setup editors only when that kind's local slot is empty;
-unsupported settings are refused rather than dropped. The user must supply omitted
-credentials and pass the existing probe, identity-confirmation, scope, and enablement
-path before the draft is consumed. Local-file, Home Assistant, and companion imports
+unsupported settings are refused rather than dropped. Companion drafts load the
+Bonjour Mac name into pairing setup without enabling the destination; a pairing
+payload for a different Mac is refused. The user must supply omitted
+credentials or pairing material and pass the existing probe, identity-confirmation, scope, and enablement
+path before the draft is consumed. Local-file and Home Assistant imports
 remain disabled drafts because their runtime setup paths cannot yet preserve the
 portable endpoint/settings contract.
 

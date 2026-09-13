@@ -35,6 +35,39 @@
         }
       }
     },
+    "Add pairing and test": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add pairing and test"
+          }
+        }
+      }
+    },
+    "Imported Mac name": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Imported Mac name"
+          }
+        }
+      }
+    },
+    "The pairing names a different Mac than the imported configuration.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The pairing names a different Mac than the imported configuration."
+          }
+        }
+      }
+    },
     "This destination kind does not yet have an import setup path.": {
       "extractionState": "manual",
       "localizations": {

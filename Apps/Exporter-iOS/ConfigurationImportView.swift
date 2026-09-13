@@ -86,6 +86,13 @@ struct ConfigurationImportView: View {
                             .accessibilityIdentifier(
                                 "configuration-import-configure-\(draft.localIdentifier)"
                             )
+                        } else if draft.configuration.kind == .companion {
+                            Button("Add pairing and test") {
+                                onConfigure(draft)
+                            }
+                            .accessibilityIdentifier(
+                                "configuration-import-configure-\(draft.localIdentifier)"
+                            )
                         } else {
                             Text("This destination kind does not yet have an import setup path.")
                                 .font(.footnote)
@@ -119,6 +126,11 @@ struct ConfigurationImportView: View {
                 "OHE_SEED_IMPORTED_DRAFT"
             ] == "https" {
                 try? ImportedDestinationDraftStore.seedHTTPSForUITests()
+            }
+            if ProcessInfo.processInfo.environment[
+                "OHE_SEED_IMPORTED_DRAFT"
+            ] == "companion" {
+                try? ImportedDestinationDraftStore.seedCompanionForUITests()
             }
             #endif
             reloadDrafts()
@@ -212,6 +224,32 @@ enum ImportedDestinationDraftStore {
             kind: .https,
             endpoint: "https://collector.example/upload",
             settings: ["method": "POST"],
+            exportScope: PortableDestinationExportScope(
+                metrics: [MetricID(rawValue: "heart_rate")],
+                startInclusive: Date(timeIntervalSince1970: 1)
+            )
+        )
+        let review = try DestinationConfigurationDocument(
+            destinations: [configuration]
+        )
+        .encoded()
+        let confirmed = try DestinationConfigurationDocument
+            .reviewImport(review)
+            .confirm(
+                typedConfirmation:
+                    DestinationConfigurationImportReview.confirmationPhrase
+            )
+        _ = try append(confirmed)
+    }
+
+    static func seedCompanionForUITests() throws {
+        guard try load().isEmpty else { return }
+        let configuration = try PortableDestinationConfiguration(
+            sourceIdentifier: "seed-companion",
+            displayName: "Imported Mac",
+            kind: .companion,
+            endpoint: "OHE Lab Mac._ohe-companion._tcp",
+            settings: ["serviceName": "OHE Lab Mac._ohe-companion._tcp"],
             exportScope: PortableDestinationExportScope(
                 metrics: [MetricID(rawValue: "heart_rate")],
                 startInclusive: Date(timeIntervalSince1970: 1)

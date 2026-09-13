@@ -676,6 +676,30 @@ final class ExporterUITests: XCTestCase {
         )
     }
 
+    func testImportedCompanionDraftPrefillsMacNameAndRefusesADifferentPairing() {
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_IMPORTED_DRAFT"] = "companion"
+        app.launchEnvironment["OHE_SEED_PAIRING_PASTE"] = "1"
+        app.launch()
+        enterControls()
+        selectRootTab(2)
+        let configure = scrollToHittable(app.buttons["Add pairing and test"])
+        XCTAssertTrue(configure.exists)
+        configure.tap()
+        let imported = scrollToHittable(app.staticTexts["pairing-imported-service-name"])
+        XCTAssertTrue(imported.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertEqual(imported.label, "OHE Lab Mac._ohe-companion._tcp")
+        XCTAssertFalse(app.buttons["pairing-export"].isEnabled)
+        scrollToHittable(app.buttons["pairing-parse"]).tap()
+        let mismatch = scrollToHittable(app.staticTexts["pairing-import-name-mismatch"])
+        XCTAssertTrue(
+            mismatch.waitForExistence(timeout: uiWait),
+            visibleIdentifiers().joined(separator: ",")
+        )
+        XCTAssertFalse(app.buttons["pairing-export"].isEnabled)
+        XCTAssertFalse(app.staticTexts["pairing-confirmation"].exists)
+    }
+
     func testOTLPURLParseBackNamesWhitespaceAndHost() {
         enterControls()
         let endpoint = scrollToHittable(app.textFields["otlp-url"])

@@ -85,6 +85,7 @@ struct HarnessView: View {
     @State private var localFileTestLines: [String] = []
     @State private var importedDestinationDraft: ImportedDestinationDraftRecord?
     @State private var importedDraftRefreshToken = 0
+    @State private var pairingImportMismatch = false
     @State private var configurationExportURL: URL?
     #if !OHE_OBS25_SIZE_BASELINE
     @State private var otlpURL = ""
@@ -1647,6 +1648,21 @@ struct HarnessView: View {
 
             Text("Companion pairing")
                 .font(.headline)
+            if let importedName = importedCompanionServiceName {
+                Text("Imported Mac name")
+                    .font(.footnote)
+                Text(importedName)
+                    .font(.footnote)
+                    .textSelection(.enabled)
+                    .accessibilityIdentifier("pairing-imported-service-name")
+            }
+            if pairingImportMismatch {
+                Text("The pairing names a different Mac than the imported configuration.")
+                    .font(.footnote)
+                    .foregroundStyle(.primary)
+                    .fontWeight(.semibold)
+                    .accessibilityIdentifier("pairing-import-name-mismatch")
+            }
             if PairingCamera.canPresentScanner {
                 Button("Scan pairing QR") {
                     Task { await openScanner() }
@@ -2861,6 +2877,9 @@ struct HarnessView: View {
             mqttQoS = inputs.qos ?? 1
             allowInsecureMQTT = inputs.allowInsecure
             status = "Ready. MQTT fields loaded from the disabled draft. Add omitted credentials, then run the destination test."
+        case .companion:
+            pairingImportMismatch = false
+            status = "Ready. Companion Mac name loaded from the disabled draft. Paste or scan pairing, then run the destination test."
         default:
             importedDestinationDraft = nil
             status = "Import refused: this destination kind does not have a setup path."
@@ -3370,11 +3389,32 @@ struct HarnessView: View {
         showScanner = true
     }
 
+    private var importedCompanionServiceName: String? {
+        guard importedDestinationDraft?.configuration.kind == .companion,
+              let draft = importedDestinationDraft,
+              let name = try? PortableDestinationMaterializer.materialize(
+                  draft.configuration
+              ).serviceName
+        else {
+            return nil
+        }
+        return name
+    }
+
     private func parsePairing() {
+        pairingImportMismatch = false
         do {
             let payload = try PairingPayload.parse(
                 CredentialFieldHygiene.secret(pairingPaste).normalized
             )
+            if let expected = importedCompanionServiceName,
+               payload.serviceName != expected {
+                pairingImportMismatch = true
+                pairing = nil
+                sas = ""
+                status = "Import refused: the pairing names a different Mac than the imported configuration."
+                return
+            }
             let local = try HarnessExport.installationID()
             let session = PairingSession.phone(payload: payload, localInstallationID: local)
             pairing = session
@@ -3417,7 +3457,27 @@ struct HarnessView: View {
                 }
             }
             refreshDestinationSurfaces()
-            status = "Ready. Companion export finished. Compare confirmation \(sas) with the Mac."
+            if let draft = importedDestinationDraft,
+               draft.configuration.kind == .companion,
+               pairing.serviceName == importedCompanionServiceName {
+                try await HarnessExport.saveDestinationScope(
+                    try DestinationExportScope(
+                        destinationID: "companion",
+                        metrics: browserSelection,
+                        startInclusive: scopeStartDate,
+                        endExclusive: scopeEndEnabled ? scopeEndDate : nil
+                    )
+                )
+                try ImportedDestinationDraftStore.remove(
+                    localIdentifier: draft.localIdentifier
+                )
+                importedDestinationDraft = nil
+                importedDraftRefreshToken += 1
+                status =
+                    "Ready. Companion export finished. Compare confirmation \(sas) with the Mac. Imported scope applied and the disabled draft was consumed."
+            } else {
+                status = "Ready. Companion export finished. Compare confirmation \(sas) with the Mac."
+            }
         } catch {
             await HarnessExport.notifyDestinationFailure(
                 destinationID: "companion",

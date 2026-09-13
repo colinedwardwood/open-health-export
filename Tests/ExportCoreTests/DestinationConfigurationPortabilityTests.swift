@@ -223,6 +223,37 @@ private func portableMQTT(
     )
     #expect(clean.clientID == "phone")
 
+    let companion = try PortableDestinationMaterializer.materialize(
+        try PortableDestinationConfiguration(
+            sourceIdentifier: "mac",
+            displayName: "Lab Mac",
+            kind: .companion,
+            endpoint: "OHE Lab Mac._ohe-companion._tcp",
+            settings: ["serviceName": "OHE Lab Mac._ohe-companion._tcp"]
+        )
+    )
+    #expect(companion.slotIdentifier == "companion")
+    #expect(companion.serviceName == "OHE Lab Mac._ohe-companion._tcp")
+    #expect(companion.endpoint == "OHE Lab Mac._ohe-companion._tcp")
+    #expect(!companion.allowInsecure)
+
+    #expect(
+        throws: DestinationConfigurationPortabilityError.unsupportedSetting(
+            kind: .companion,
+            key: "serviceName"
+        )
+    ) {
+        try PortableDestinationMaterializer.materialize(
+            try PortableDestinationConfiguration(
+                sourceIdentifier: "mac",
+                displayName: "Lab Mac",
+                kind: .companion,
+                endpoint: "OHE Lab Mac._ohe-companion._tcp",
+                settings: ["serviceName": "Other Mac._ohe-companion._tcp"]
+            )
+        )
+    }
+
     #expect(
         throws: DestinationConfigurationPortabilityError.unsupportedSetting(
             kind: .mqtt,

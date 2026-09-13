@@ -374,6 +374,13 @@ enum HarnessExport {
             filename = "https-destination.json"
         case "mqtt":
             filename = "mqtt-destination.json"
+        case "companion":
+            return FileManager.default.fileExists(
+                atPath: root.appendingPathComponent("companion-test.json").path
+            )
+                || FileManager.default.fileExists(
+                    atPath: root.appendingPathComponent("pairing.json").path
+                )
         default:
             return false
         }
@@ -2432,6 +2439,30 @@ enum HarnessExport {
                         "qos": String(record.qos ?? 1),
                         "topic": record.topic,
                     ],
+                    exportScope: try PortableDestinationExportScope(
+                        metrics: scope.metrics.sorted {
+                            $0.rawValue < $1.rawValue
+                        },
+                        startInclusive: scope.startInclusive,
+                        endExclusive: scope.endExclusive
+                    )
+                )
+            )
+        }
+        if let data = try? Data(contentsOf: companionTestReportURL(root: root)),
+           let record = try? JSONDecoder().decode(
+               CompanionVerificationRecord.self,
+               from: data
+           ),
+           record.report.allowsEnablement {
+            let scope = try await destinationScope("companion")
+            destinations.append(
+                try PortableDestinationConfiguration(
+                    sourceIdentifier: "companion",
+                    displayName: record.serviceName,
+                    kind: .companion,
+                    endpoint: record.serviceName,
+                    settings: ["serviceName": record.serviceName],
                     exportScope: try PortableDestinationExportScope(
                         metrics: scope.metrics.sorted {
                             $0.rawValue < $1.rawValue
