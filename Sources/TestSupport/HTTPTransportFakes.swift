@@ -9,14 +9,23 @@ public actor RecordingHTTPTransport: HTTPTransport {
     public var response: OutboundHTTPResponse
     public var error: EgressError?
     public var tls: TLSIdentity?
+    public var identityError: EgressError?
 
     public var queued: [OutboundHTTPResponse] = []
     public var throwOnce: EgressError?
+    public var executeCount = 0
+    public var throwAfterCount: Int?
 
-    public init(response: OutboundHTTPResponse, error: EgressError? = nil, tls: TLSIdentity? = nil) {
+    public init(
+        response: OutboundHTTPResponse,
+        error: EgressError? = nil,
+        tls: TLSIdentity? = nil,
+        identityError: EgressError? = nil
+    ) {
         self.response = response
         self.error = error
         self.tls = tls
+        self.identityError = identityError
     }
 
     public func enqueue(_ next: OutboundHTTPResponse) {
@@ -27,17 +36,29 @@ public actor RecordingHTTPTransport: HTTPTransport {
         throwOnce = error
     }
 
+    public func failStartingAtExecute(_ count: Int, _ error: EgressError) {
+        throwAfterCount = count
+        throwOnce = error
+    }
+
     public func identityProbe() async throws -> TLSIdentity? {
-        tls
+        if let identityError {
+            throw identityError
+        }
+        return tls
     }
 
     public func execute(_ request: OutboundHTTPRequest) async throws -> OutboundHTTPResponse {
         requests.append(request)
-        if let once = throwOnce {
+        executeCount += 1
+        if let throwAfterCount, executeCount >= throwAfterCount {
+            throw throwOnce ?? error ?? EgressError.transport("forced")
+        }
+        if let once = throwOnce, throwAfterCount == nil {
             throwOnce = nil
             throw once
         }
-        if let error {
+        if let error, throwAfterCount == nil {
             throw error
         }
         if !queued.isEmpty {
