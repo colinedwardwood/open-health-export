@@ -481,6 +481,36 @@ private func browserSample(
     )
 }
 
+@Test func ux15ConvertedCategoriesAreSelectableAndStayOffPresets() {
+    #expect(MetricCatalog.convertedCategories.count == 32)
+    #expect(
+        Set(MetricCatalog.convertedCategories.map(\.hkIdentifier)).count
+            == MetricCatalog.convertedCategories.count
+    )
+    #expect(MetricCatalog.convertedCategories.allSatisfy { $0.kind == "sample.category" })
+    let sensitiveIDs = Set(
+        MetricCatalog.convertedCategories.filter { $0.sensitivity == .sensitive }.map(\.id)
+    )
+    #expect(sensitiveIDs.contains(MetricID(rawValue: "pregnancy")))
+    #expect(sensitiveIDs.contains(MetricID(rawValue: "sexual_activity")))
+    #expect(sensitiveIDs.contains(MetricID(rawValue: "menstrual_flow")))
+    #expect(sensitiveIDs.contains(MetricID(rawValue: "fever")))
+    #expect(Set(MetricCatalog.coreDaily.map(\.id)).isDisjoint(with: sensitiveIDs))
+    #expect(
+        MetricCatalog.selectable.map(\.id).contains(MetricID(rawValue: "pregnancy"))
+    )
+    #expect(
+        MetricSearch.matches(
+            MetricCatalog.declaration(for: MetricID(rawValue: "pregnancy"))!,
+            needle: "pregnant"
+        )
+    )
+    var draft = DataSelectionDraft(baseline: [])
+    draft.invertRoutine(MetricCatalog.selectable.map(\.id))
+    #expect(draft.selected.isDisjoint(with: sensitiveIDs))
+    #expect(draft.selected.contains(MetricID(rawValue: "handwashing_event")))
+}
+
 @Test func hk30CharacteristicsStayOffByDefaultAndAreFlaggedReidentifying() throws {
     #expect(MetricCatalog.characteristics.count == 6)
     #expect(MetricCatalog.characteristics.allSatisfy { $0.kind == "characteristic" })

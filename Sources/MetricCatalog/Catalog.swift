@@ -739,13 +739,50 @@ public enum MetricCatalog {
         kind: "sample.stateOfMind"
     )
 
+    /// Converted HealthKit category families that are not sleep or mindful session.
+    /// UX-15: cycle, pregnancy, sexual activity, and symptoms stay sensitive.
+    public static let convertedCategories: [MetricDeclaration] = [
+        convertedCategory("menstrual_flow", "HKCategoryTypeIdentifierMenstrualFlow", .sensitive),
+        convertedCategory("intermenstrual_bleeding", "HKCategoryTypeIdentifierIntermenstrualBleeding", .sensitive),
+        convertedCategory("infrequent_menstrual_cycles", "HKCategoryTypeIdentifierInfrequentMenstrualCycles", .sensitive),
+        convertedCategory("irregular_menstrual_cycles", "HKCategoryTypeIdentifierIrregularMenstrualCycles", .sensitive),
+        convertedCategory("persistent_intermenstrual_bleeding", "HKCategoryTypeIdentifierPersistentIntermenstrualBleeding", .sensitive),
+        convertedCategory("prolonged_menstrual_periods", "HKCategoryTypeIdentifierProlongedMenstrualPeriods", .sensitive),
+        convertedCategory("cervical_mucus_quality", "HKCategoryTypeIdentifierCervicalMucusQuality", .sensitive),
+        convertedCategory("ovulation_test_result", "HKCategoryTypeIdentifierOvulationTestResult", .sensitive),
+        convertedCategory("progesterone_test_result", "HKCategoryTypeIdentifierProgesteroneTestResult", .sensitive),
+        convertedCategory("pregnancy", "HKCategoryTypeIdentifierPregnancy", .sensitive),
+        convertedCategory("pregnancy_test_result", "HKCategoryTypeIdentifierPregnancyTestResult", .sensitive),
+        convertedCategory("contraceptive", "HKCategoryTypeIdentifierContraceptive", .sensitive),
+        convertedCategory("lactation", "HKCategoryTypeIdentifierLactation", .sensitive),
+        convertedCategory("sexual_activity", "HKCategoryTypeIdentifierSexualActivity", .sensitive),
+        convertedCategory("high_heart_rate_event", "HKCategoryTypeIdentifierHighHeartRateEvent", .routine),
+        convertedCategory("low_heart_rate_event", "HKCategoryTypeIdentifierLowHeartRateEvent", .routine),
+        convertedCategory("irregular_heart_rhythm_event", "HKCategoryTypeIdentifierIrregularHeartRhythmEvent", .routine),
+        convertedCategory("audio_exposure_event", "HKCategoryTypeIdentifierHeadphoneAudioExposureEvent", .routine),
+        convertedCategory("environmental_audio_exposure_event", "HKCategoryTypeIdentifierAudioExposureEvent", .routine),
+        convertedCategory("handwashing_event", "HKCategoryTypeIdentifierHandwashingEvent", .routine),
+        convertedCategory("toothbrushing_event", "HKCategoryTypeIdentifierToothbrushingEvent", .routine),
+        convertedCategory("appetite_changes", "HKCategoryTypeIdentifierAppetiteChanges", .sensitive),
+        convertedCategory("bladder_incontinence", "HKCategoryTypeIdentifierBladderIncontinence", .sensitive),
+        convertedCategory("bloating", "HKCategoryTypeIdentifierAbdominalCramps", .sensitive),
+        convertedCategory("chills", "HKCategoryTypeIdentifierChills", .sensitive),
+        convertedCategory("constipation", "HKCategoryTypeIdentifierConstipation", .sensitive),
+        convertedCategory("coughing", "HKCategoryTypeIdentifierCoughing", .sensitive),
+        convertedCategory("diarrhea", "HKCategoryTypeIdentifierDiarrhea", .sensitive),
+        convertedCategory("dizziness", "HKCategoryTypeIdentifierDizziness", .sensitive),
+        convertedCategory("dry_skin", "HKCategoryTypeIdentifierDrySkin", .sensitive),
+        convertedCategory("fatigue", "HKCategoryTypeIdentifierFatigue", .sensitive),
+        convertedCategory("fever", "HKCategoryTypeIdentifierFever", .sensitive),
+    ]
+
     /// Converted category, workout, and structured families that are selectable in-app.
     public static let structural: [MetricDeclaration] = [
         sleepAnalysis,
         mindfulSession,
         workout,
         stateOfMind,
-    ]
+    ] + convertedCategories
 
     public static let biologicalSex = characteristic(
         id: "biologicalSex",
@@ -800,6 +837,28 @@ public enum MetricCatalog {
 
     public static func isCharacteristic(_ id: MetricID) -> Bool {
         declaration(for: id)?.kind == "characteristic"
+    }
+
+    private static func convertedCategory(
+        _ id: String,
+        _ hkIdentifier: String,
+        _ sensitivity: SensitivityClass
+    ) -> MetricDeclaration {
+        MetricDeclaration(
+            id: MetricID(rawValue: id),
+            wireId: id,
+            hkIdentifier: hkIdentifier,
+            canonicalUnit: CanonicalUnit(symbol: "1"),
+            wireUnit: "1",
+            cumulative: false,
+            usesHealthKitStatistics: false,
+            sensitivity: sensitivity,
+            haUnit: nil,
+            haDeviceClass: nil,
+            haStateClass: nil,
+            haRequiresAggregate: false,
+            kind: "sample.category"
+        )
     }
 
     private static func characteristic(

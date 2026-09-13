@@ -975,6 +975,18 @@ final class ExporterUITests: XCTestCase {
                 .waitForExistence(timeout: uiWait),
             visibleIdentifiers().joined(separator: ",")
         )
+        app.terminate()
+        app.launch()
+        enterControls()
+        selectRootTab(1)
+        let cycle = scrollToHittable(app.textFields["browser-search"])
+        type("pregnant", into: cycle)
+        dismissKeyboard()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["browser-row-pregnancy"]
+                .waitForExistence(timeout: uiWait),
+            visibleIdentifiers().joined(separator: ",")
+        )
     }
 
     func testDataBrowserOpensMetricDetailAndOffersNavigationBack() {

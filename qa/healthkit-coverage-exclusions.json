@@ -1,15 +1,7 @@
 {
   "exclusions": [
     {
-      "identifier": "HKCategoryTypeIdentifierAbdominalCramps",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
       "identifier": "HKCategoryTypeIdentifierAcne",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierAppetiteChanges",
       "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
     },
     {
@@ -18,14 +10,6 @@
     },
     {
       "identifier": "HKCategoryTypeIdentifierAppleWalkingSteadinessEvent",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierAudioExposureEvent",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierBladderIncontinence",
       "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
     },
     {
@@ -45,39 +29,7 @@
       "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
     },
     {
-      "identifier": "HKCategoryTypeIdentifierCervicalMucusQuality",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
       "identifier": "HKCategoryTypeIdentifierChestTightnessOrPain",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierChills",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierConstipation",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierContraceptive",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierCoughing",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierDiarrhea",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierDizziness",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierDrySkin",
       "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
     },
     {
@@ -89,14 +41,6 @@
       "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
     },
     {
-      "identifier": "HKCategoryTypeIdentifierFatigue",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierFever",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
       "identifier": "HKCategoryTypeIdentifierGeneralizedBodyAche",
       "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
     },
@@ -105,23 +49,11 @@
       "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
     },
     {
-      "identifier": "HKCategoryTypeIdentifierHandwashingEvent",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
       "identifier": "HKCategoryTypeIdentifierHeadache",
       "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
     },
     {
-      "identifier": "HKCategoryTypeIdentifierHeadphoneAudioExposureEvent",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
       "identifier": "HKCategoryTypeIdentifierHeartburn",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierHighHeartRateEvent",
       "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
     },
     {
@@ -130,26 +62,6 @@
     },
     {
       "identifier": "HKCategoryTypeIdentifierHypertensionEvent",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierInfrequentMenstrualCycles",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierIntermenstrualBleeding",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierIrregularHeartRhythmEvent",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierIrregularMenstrualCycles",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierLactation",
       "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
     },
     {
@@ -165,19 +77,11 @@
       "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
     },
     {
-      "identifier": "HKCategoryTypeIdentifierLowHeartRateEvent",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
       "identifier": "HKCategoryTypeIdentifierLowerBackPain",
       "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
     },
     {
       "identifier": "HKCategoryTypeIdentifierMemoryLapse",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierMenstrualFlow",
       "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
     },
     {
@@ -193,31 +97,7 @@
       "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
     },
     {
-      "identifier": "HKCategoryTypeIdentifierOvulationTestResult",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
       "identifier": "HKCategoryTypeIdentifierPelvicPain",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierPersistentIntermenstrualBleeding",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierPregnancy",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierPregnancyTestResult",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierProgesteroneTestResult",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierProlongedMenstrualPeriods",
       "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
     },
     {
@@ -226,10 +106,6 @@
     },
     {
       "identifier": "HKCategoryTypeIdentifierRunnyNose",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierSexualActivity",
       "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
     },
     {
@@ -254,10 +130,6 @@
     },
     {
       "identifier": "HKCategoryTypeIdentifierSoreThroat",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
-      "identifier": "HKCategoryTypeIdentifierToothbrushingEvent",
       "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
     },
     {

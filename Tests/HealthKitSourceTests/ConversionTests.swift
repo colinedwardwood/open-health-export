@@ -92,6 +92,10 @@ import WireFormat
             .contains(HKCategoryType(.sleepAnalysis))
     )
     #expect(MetricCatalog.sleepAnalysis.id == CategoryConversion.sleepMetric)
+    #expect(
+        Set(CategoryConversion.identifiers.keys)
+            .isSubset(of: Set(MetricCatalog.selectable.map(\.id)))
+    )
     #expect(MetricCatalog.workout.id == WorkoutConversion.metric)
     #expect(
         HealthKitAuthorization.readTypes(for: [MetricCatalog.mindfulSession.id])

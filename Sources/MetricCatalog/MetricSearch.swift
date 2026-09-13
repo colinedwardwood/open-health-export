@@ -22,6 +22,9 @@ public enum MetricSearch {
         MetricCatalog.wheelchairUse.id: ["wheelchair"],
         MetricCatalog.activityMoveMode.id: ["move mode"],
         MetricCatalog.stateOfMind.id: ["mood", "som", "mental", "valence"],
+        MetricID(rawValue: "menstrual_flow"): ["period", "cycle", "menses"],
+        MetricID(rawValue: "pregnancy"): ["pregnant"],
+        MetricID(rawValue: "sexual_activity"): ["sex"],
     ]
 
     public static func haystack(for declaration: MetricDeclaration) -> String {
