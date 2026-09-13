@@ -115,6 +115,8 @@ import WireFormat
     )
     #expect(NativeWire.countQuantityRecords(in: batch) == 1)
     #expect(NativeWire.countRecords(in: batch) == 1)
+    #expect(NativeWire.volumeReceiptCounts(in: batch).quantityRecords == 1)
+    #expect(NativeWire.volumeReceiptCounts(in: batch).acceptedRecords == 1)
     let crlf = Data(
         String(decoding: batch, as: UTF8.self)
             .replacingOccurrences(of: "\n", with: "\r\n")

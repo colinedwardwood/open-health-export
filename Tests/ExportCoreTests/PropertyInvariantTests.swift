@@ -558,7 +558,14 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
     #expect(checker.contains("ingested_lines="))
     #expect(checker.contains("quantitySample(fromNDJSONLine: line, decoder: decoder)"))
     #expect(checker.contains("persistHistoryPayload: exerciseSidecars"))
-    #expect(checker.contains("countQuantityRecords"))
+    #expect(checker.contains("volumeReceiptCounts"))
+    #expect(checker.contains("flushBytes"))
+    let nativeWire = try String(
+        contentsOf: root.appendingPathComponent("Sources/WireFormat/NativeWire.swift"),
+        encoding: .utf8
+    )
+    #expect(nativeWire.contains("countQuantityRecords"))
+    #expect(nativeWire.contains("volumeReceiptCounts"))
     let sha = try String(
         contentsOf: root.appendingPathComponent("Sources/WireFormat/SHA256.swift"),
         encoding: .utf8

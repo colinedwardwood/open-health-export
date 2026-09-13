@@ -125,9 +125,26 @@ public enum NativeWire {
     }
 
     public static func countQuantityRecords(in data: Data) -> Int {
-        countLines(in: data) { line in
-            line.range(of: quantityKind) != nil
+        volumeReceiptCounts(in: data).quantityRecords
+    }
+
+    /// Quantity lines plus every non-framing record, in one NDJSON walk.
+    public static func volumeReceiptCounts(in data: Data) -> (
+        quantityRecords: Int,
+        acceptedRecords: Int
+    ) {
+        var quantityRecords = 0
+        var acceptedRecords = 0
+        enumerateLines(in: data) { line in
+            guard !line.isEmpty else { return }
+            if line.range(of: headerKind) != nil { return }
+            if line.range(of: footerKind) != nil { return }
+            acceptedRecords += 1
+            if line.range(of: quantityKind) != nil {
+                quantityRecords += 1
+            }
         }
+        return (quantityRecords, acceptedRecords)
     }
 
     private static let headerKind = Data(#""kind":"batch.header""#.utf8)
@@ -136,6 +153,13 @@ public enum NativeWire {
 
     private static func countLines(in data: Data, where matches: (Data) -> Bool) -> Int {
         var count = 0
+        enumerateLines(in: data) { line in
+            if matches(line) { count += 1 }
+        }
+        return count
+    }
+
+    private static func enumerateLines(in data: Data, body: (Data) -> Void) {
         var start = data.startIndex
         while start < data.endIndex {
             var end = start
@@ -146,12 +170,9 @@ public enum NativeWire {
             if line.last == 0x0D {
                 line = line.dropLast()
             }
-            if matches(Data(line)) {
-                count += 1
-            }
+            body(Data(line))
             start = end < data.endIndex ? data.index(after: end) : end
         }
-        return count
     }
 
     public static func encode(

@@ -14,7 +14,6 @@ private let memoryLimitMiB = 100
 private let defaultPageSize = 10_000
 private let maximumPageSize = 10_000
 private let maximumConcurrentMetrics = 4
-private let newline = Data([0x0A])
 private let volumeStructuralKinds = NativeWire.volumeStructuralKinds
 
 @main
@@ -47,7 +46,7 @@ struct ExportRunCheck {
         var spools: [MetricID: MetricSpool] = [:]
         defer {
             for spool in spools.values {
-                try? spool.handle.close()
+                try? spool.close()
             }
         }
         var declaredRecords: Int?
@@ -108,8 +107,7 @@ struct ExportRunCheck {
                     spools[metric] = created
                     spool = created
                 }
-                try spool.handle.write(contentsOf: line)
-                try spool.handle.write(contentsOf: newline)
+                try spool.append(line)
                 exportableRecords += 1
             case let structural where volumeStructuralKinds.contains(structural):
                 structuralRecords += 1
@@ -119,7 +117,7 @@ struct ExportRunCheck {
         }
 
         for spool in spools.values {
-            try spool.handle.close()
+            try spool.close()
         }
         let work = spools.keys.sorted(by: { $0.rawValue < $1.rawValue }).enumerated().compactMap {
             ordinal, metric -> MetricWork? in
@@ -342,9 +340,40 @@ private struct KindRecord: Decodable {
     let metricId: String?
 }
 
-private struct MetricSpool {
+private final class MetricSpool {
+    static let flushBytes = 65_536
+
     let url: URL
-    let handle: FileHandle
+    private let handle: FileHandle
+    private var buffer = Data()
+    private var closed = false
+
+    init(url: URL, handle: FileHandle) {
+        self.url = url
+        self.handle = handle
+        buffer.reserveCapacity(Self.flushBytes)
+    }
+
+    func append(_ line: Data) throws {
+        buffer.append(line)
+        buffer.append(0x0A)
+        if buffer.count >= Self.flushBytes {
+            try flush()
+        }
+    }
+
+    func close() throws {
+        guard !closed else { return }
+        try flush()
+        try handle.close()
+        closed = true
+    }
+
+    private func flush() throws {
+        guard !buffer.isEmpty else { return }
+        try handle.write(contentsOf: buffer)
+        buffer.removeAll(keepingCapacity: true)
+    }
 }
 
 private struct MetricWork: Sendable {
@@ -391,11 +420,11 @@ private struct AuditingSink: DestinationSink {
     func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt {
         let payloadURL = URL(fileURLWithPath: fileHandle)
         let data = try Data(contentsOf: payloadURL)
-        let quantityRecords = NativeWire.countQuantityRecords(in: data)
-        guard quantityRecords == expectedQuantityRecords else {
+        let counts = NativeWire.volumeReceiptCounts(in: data)
+        guard counts.quantityRecords == expectedQuantityRecords else {
             throw CheckError.payloadQuantityMismatch(
                 expected: expectedQuantityRecords,
-                emitted: quantityRecords
+                emitted: counts.quantityRecords
             )
         }
         if exerciseSidecars {
@@ -418,7 +447,7 @@ private struct AuditingSink: DestinationSink {
         }
         return DeliveryReceipt(
             batchID: idempotencyKey,
-            accepted: NativeWire.countRecords(in: data),
+            accepted: counts.acceptedRecords,
             statusOnly: false
         )
     }
