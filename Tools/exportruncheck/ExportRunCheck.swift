@@ -11,7 +11,7 @@ import TestSupport
 import WireFormat
 
 private let memoryLimitMiB = 100
-private let defaultPageSize = 500
+private let defaultPageSize = 10_000
 private let maximumPageSize = 10_000
 private let maximumConcurrentMetrics = 4
 private let newline = Data([0x0A])

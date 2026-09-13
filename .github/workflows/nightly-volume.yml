@@ -59,7 +59,7 @@ jobs:
         run: |
           set -euo pipefail
           .build/release/corpusgen --tier T1 --seed 1 |
-            .build/release/exportruncheck |
+            .build/release/exportruncheck --page-size 10000 |
             tee /tmp/t1-exportrun.out
           grep -F 'exportruncheck outcome=success' /tmp/t1-exportrun.out
           grep -F 'declared_records=10000000' /tmp/t1-exportrun.out

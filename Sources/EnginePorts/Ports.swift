@@ -47,6 +47,18 @@ public struct SamplePage: Sendable {
         self.metric = metric
         self.anchorBlob = anchorBlob
         self.observedThrough = observedThrough
+        self.censusKeys = Self.makeCensusKeys(
+            samples: samples,
+            categories: categories,
+            correlations: correlations,
+            workouts: workouts,
+            minds: minds,
+            electrocardiograms: electrocardiograms,
+            audiograms: audiograms,
+            medicationDoses: medicationDoses,
+            series: series,
+            metric: metric
+        )
     }
 
     public var hasRecords: Bool {
@@ -56,7 +68,20 @@ public struct SamplePage: Sendable {
             || !tombstones.isEmpty
     }
 
-    public var censusKeys: [(uuid: String, day: String)] {
+    public let censusKeys: [(uuid: String, day: String)]
+
+    private static func makeCensusKeys(
+        samples: [SampleRecord],
+        categories: [CategoryRecord],
+        correlations: [CorrelationRecord],
+        workouts: [WorkoutRecord],
+        minds: [StateOfMindRecord],
+        electrocardiograms: [ECGRecord],
+        audiograms: [AudiogramRecord],
+        medicationDoses: [MedicationDoseRecord],
+        series: [SeriesRecord],
+        metric: MetricID
+    ) -> [(uuid: String, day: String)] {
         samples.map { ($0.key.uuid, String($0.start.prefix(10))) }
             + categories.map { ($0.key.uuid, String($0.start.prefix(10))) }
             + correlations.compactMap { record in

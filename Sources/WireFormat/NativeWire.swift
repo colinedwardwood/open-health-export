@@ -230,6 +230,7 @@ public enum NativeWire {
             + workoutLines + mindLines + ecgLines + audiogramLines + doseLines
             + seriesLines + tombLines + aggregateLines + characteristicLines
         var body = Data()
+        body.reserveCapacity(records.count * 320)
         for line in records {
             body.append(contentsOf: line.utf8)
             body.append(0x0A)

@@ -552,6 +552,7 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
     #expect(workflow.contains(".build/release/exportruncheck"))
     #expect(workflow.contains("exportruncheck --page-size 10000"))
     #expect(checker.contains("private let memoryLimitMiB = 100"))
+    #expect(checker.contains("private let defaultPageSize = 10_000"))
     #expect(checker.contains("metricByWireId"))
     #expect(checker.contains("NDJSONFieldScan"))
     #expect(checker.contains("ingested_lines="))
