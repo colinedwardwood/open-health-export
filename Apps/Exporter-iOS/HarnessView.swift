@@ -2617,7 +2617,11 @@ struct HarnessView: View {
     @MainActor
     private func enableLocalFile() async {
         phase = .working
-        status = NamedWorkProgress.test(current: 0, total: 4, step: DestinationTestStep.openFolder.progressLabel)
+        status = NamedWorkProgress.test(
+            current: 0,
+            total: DestinationTestPlan.localFile.total,
+            step: DestinationTestPlan.localFile.first.progressLabel
+        )
         wipeArmed = false
         do {
             _ = try await HarnessExport.enableLocalFileDestination { current, total, step in
@@ -2701,7 +2705,14 @@ struct HarnessView: View {
     @MainActor
     private func testHTTPS() async {
         phase = .working
-        status = NamedWorkProgress.test(current: 0, total: 6, step: DestinationTestStep.resolveHost.progressLabel)
+        let httpsURLNormalized = CredentialFieldHygiene.url(httpsURL).normalized
+        let httpsScheme = URL(string: httpsURLNormalized)?.scheme?.lowercased() == "https"
+        let httpsPlan = DestinationTestPlan.https(hasPin: httpsScheme)
+        status = NamedWorkProgress.test(
+            current: 0,
+            total: httpsPlan.total,
+            step: httpsPlan.first.progressLabel
+        )
         do {
             confirmationKind = .https
             confirmationCard = try await HarnessExport.prepareHTTPSDestination(
@@ -2738,7 +2749,19 @@ struct HarnessView: View {
     @MainActor
     private func testMQTT() async {
         phase = .working
-        status = NamedWorkProgress.test(current: 0, total: 3, step: DestinationTestStep.connect.progressLabel)
+        let mqttURLNormalized = CredentialFieldHygiene.url(mqttURL).normalized
+        let mqttScheme = URL(string: mqttURLNormalized)?.scheme
+        let mqtts = mqttScheme?.lowercased() == "mqtts"
+        let mqttPlan = DestinationTestPlan.mqtt(
+            scheme: mqttScheme,
+            confirmsDelivery: mqttQoS != 0,
+            hasPin: mqtts
+        )
+        status = NamedWorkProgress.test(
+            current: 0,
+            total: mqttPlan.total,
+            step: mqttPlan.first.progressLabel
+        )
         do {
             confirmationKind = .mqtt
             confirmationCard = try await HarnessExport.prepareMQTTDestination(

@@ -20,7 +20,7 @@ public enum HTTPSDestinationTest {
         expected: MetricDeclaration? = nil,
         onProgress: DestinationTestProgress? = nil
     ) async -> DestinationTestReport {
-        let total = pin == nil ? 5 : 6
+        let total = DestinationTestPlan.https(hasPin: pin != nil).total
         var steps: [DestinationTestStepReport] = []
         onProgress?(1, total, .resolveHost)
         guard let host = destination.url.host, !host.isEmpty else {

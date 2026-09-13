@@ -243,11 +243,35 @@ import Testing
         expectFailure(
             await MQTTDestinationTest.run(
                 destination: try mqttPlain(),
-                pipe: ConnackRefusedMQTTPipe(),
+                pipe: ConnackCodeMQTTPipe(code: 3),
                 canary: Data("canary\n".utf8)
             ),
             at: .connect,
             id: "mqtt-connack-refused"
+        )
+    )
+
+    named.append(
+        expectFailure(
+            await MQTTDestinationTest.run(
+                destination: try mqttPlain(),
+                pipe: ConnackCodeMQTTPipe(code: 4),
+                canary: Data("canary\n".utf8)
+            ),
+            at: .authenticate,
+            id: "mqtt-bad-password"
+        )
+    )
+
+    named.append(
+        expectFailure(
+            await MQTTDestinationTest.run(
+                destination: try mqttPlain(),
+                pipe: ConnackCodeMQTTPipe(code: 5),
+                canary: Data("canary\n".utf8)
+            ),
+            at: .authenticate,
+            id: "mqtt-not-authorized"
         )
     )
 
@@ -267,7 +291,7 @@ import Testing
         expectFailure(
             await MQTTDestinationTest.run(
                 destination: try mqttsBroker(),
-                pipe: ConnackRefusedMQTTPipe(),
+                pipe: ConnackCodeMQTTPipe(code: 5),
                 canary: Data("canary\n".utf8)
             ),
             at: .tlsHandshake,
@@ -331,6 +355,23 @@ import Testing
 
     #expect(named.count >= 15)
     #expect(Set(named.map(\.0)).count == named.count)
+
+    let mqttPlan = DestinationTestPlan.mqtt(
+        scheme: "mqtt",
+        confirmsDelivery: true,
+        hasPin: false
+    )
+    #expect(mqttPlan.total == 3)
+    #expect(mqttPlan.first == .connect)
+    let mqttsPlan = DestinationTestPlan.mqtt(
+        scheme: "mqtts",
+        confirmsDelivery: true,
+        hasPin: true
+    )
+    #expect(mqttsPlan.total == 5)
+    #expect(mqttsPlan.first == .tlsHandshake)
+    #expect(DestinationTestPlan.https(hasPin: true).total == 6)
+    #expect(DestinationTestPlan.https(hasPin: false).total == 5)
 }
 
 private func httpsHook() throws -> HTTPSDestination {
@@ -385,11 +426,17 @@ private actor IdentityMQTTPipe: MQTTBytePipe {
     }
 }
 
-private actor ConnackRefusedMQTTPipe: MQTTBytePipe {
+private actor ConnackCodeMQTTPipe: MQTTBytePipe {
+    let code: UInt8
+
+    init(code: UInt8) {
+        self.code = code
+    }
+
     func send(_ data: Data) async throws {}
 
     func receive(max: Int) async throws -> Data {
-        Data([0x20, 0x02, 0x00, 0x05])
+        Data([0x20, 0x02, 0x00, code])
     }
 }
 

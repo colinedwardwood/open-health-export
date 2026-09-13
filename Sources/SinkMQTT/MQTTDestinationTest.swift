@@ -3,6 +3,7 @@
 
 import DestinationTrust
 import Foundation
+import MQTTCodec
 import NetEgress
 import WireFormat
 
@@ -17,9 +18,13 @@ public enum MQTTDestinationTest {
         observedAt: String = "1970-01-01T00:00:00Z",
         onProgress: DestinationTestProgress? = nil
     ) async -> DestinationTestReport {
+        let plan = DestinationTestPlan.mqtt(
+            scheme: destination.url.scheme,
+            confirmsDelivery: destination.confirmsDelivery,
+            hasPin: pin != nil
+        )
+        let total = plan.total
         let mqtts = destination.url.scheme?.lowercased() == "mqtts"
-        let extra = (mqtts ? 1 : 0) + (pin == nil ? 0 : 1)
-        let total = (destination.confirmsDelivery ? 3 : 2) + extra
         var steps: [DestinationTestStepReport] = []
         var index = 0
         if mqtts {
@@ -52,6 +57,8 @@ public enum MQTTDestinationTest {
         onProgress?(index, total, .connect)
         do {
             try await session.connect(destination: destination)
+        } catch MQTTError.connack(let code) where Self.isAuthenticationFailure(code) {
+            return .failed(at: .authenticate, prior: steps)
         } catch {
             return .failed(at: .connect, prior: steps)
         }
@@ -81,5 +88,10 @@ public enum MQTTDestinationTest {
             DestinationTestStepReport(name: .publishCanary, outcome: .sentUnconfirmed)
         )
         return DestinationTestReport(verdict: .sentUnconfirmed, steps: steps)
+    }
+
+    /// MQTT 3.1.1 CONNACK 4 (bad user/password) and 5 (not authorized).
+    public static func isAuthenticationFailure(_ connackCode: UInt8) -> Bool {
+        connackCode == 4 || connackCode == 5
     }
 }

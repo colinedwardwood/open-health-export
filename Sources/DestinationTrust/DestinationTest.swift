@@ -63,6 +63,43 @@ extension DestinationTestStep {
 
 public typealias DestinationTestProgress = @Sendable (Int, Int, DestinationTestStep) -> Void
 
+/// UX-23 / UX-09: the first progress line must use the same total and first
+/// named step the real destination test will report.
+public struct DestinationTestPlan: Sendable, Equatable {
+    public var total: Int
+    public var first: DestinationTestStep
+
+    public init(total: Int, first: DestinationTestStep) {
+        self.total = total
+        self.first = first
+    }
+
+    public static func https(hasPin: Bool) -> DestinationTestPlan {
+        DestinationTestPlan(total: hasPin ? 6 : 5, first: .resolveHost)
+    }
+
+    public static func mqtt(
+        scheme: String?,
+        confirmsDelivery: Bool,
+        hasPin: Bool
+    ) -> DestinationTestPlan {
+        let mqtts = scheme?.lowercased() == "mqtts"
+        let extra = (mqtts ? 1 : 0) + (hasPin ? 1 : 0)
+        let total = (confirmsDelivery ? 3 : 2) + extra
+        let first: DestinationTestStep
+        if mqtts {
+            first = .tlsHandshake
+        } else if hasPin {
+            first = .confirmCertificate
+        } else {
+            first = .connect
+        }
+        return DestinationTestPlan(total: total, first: first)
+    }
+
+    public static let localFile = DestinationTestPlan(total: 4, first: .openFolder)
+}
+
 public struct DestinationTestReport: Sendable, Equatable, Codable {
     public var verdict: DestinationTestVerdict
     public var steps: [DestinationTestStepReport]
