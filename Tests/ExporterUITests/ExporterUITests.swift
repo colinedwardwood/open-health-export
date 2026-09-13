@@ -660,6 +660,22 @@ final class ExporterUITests: XCTestCase {
         )
     }
 
+    func testOTLPURLParseBackNamesWhitespaceAndHost() {
+        enterControls()
+        let endpoint = scrollToHittable(app.textFields["otlp-url"])
+        type(" https://otel.example:4318/v1/traces ", into: endpoint)
+        dismissKeyboard()
+        XCTAssertTrue(
+            app.staticTexts["otlp-url-whitespace"].waitForExistence(timeout: uiWait)
+        )
+        let parseBack = app.staticTexts["otlp-url-parseback"]
+        XCTAssertTrue(parseBack.waitForExistence(timeout: uiWait))
+        XCTAssertEqual(
+            parseBack.label,
+            "scheme https · host otel.example · port 4318 · path /v1/traces"
+        )
+    }
+
     func testConfigurationExportIsExplicitAndCredentialFreeLabeled() {
         enterControls()
         XCTAssertFalse(app.buttons["configuration-export-share"].exists)

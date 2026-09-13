@@ -1193,6 +1193,7 @@ struct HarnessView: View {
                 .keyboardType(.URL)
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("otlp-url")
+            urlFieldHygiene(otlpURL, identifierPrefix: "otlp-url")
             Toggle("Allow plain HTTP for OTLP (unsafe)", isOn: $allowInsecureOTLP)
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("otlp-insecure")
@@ -1629,7 +1630,7 @@ struct HarnessView: View {
         }
         do {
             otlpLines = try await HarnessExport.enableOTLPCollector(
-                urlString: otlpURL,
+                urlString: CredentialFieldHygiene.url(otlpURL).normalized,
                 allowInsecureHTTP: allowInsecureOTLP,
                 previewPayload: preview
             )
