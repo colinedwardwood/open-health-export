@@ -117,6 +117,7 @@ struct HarnessView: View {
     @State private var browserSelecting = false
     @State private var browserReviewVisible = false
     @State private var browserBaseline = Set<MetricID>()
+    @State private var authorizedForReview = Set<MetricID>()
     @State private var browserSelection = Set<MetricID>()
     @State private var scopeDestinationID = "local-file"
     @State private var scopeStartDate = Date()
@@ -1015,8 +1016,10 @@ struct HarnessView: View {
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .keyboardType(.URL)
+                .textContentType(.URL)
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("https-url")
+            urlFieldHygiene(httpsURL, identifierPrefix: "https-url")
             Text(CredentialDisclosure.copy)
                 .font(.footnote)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1026,6 +1029,7 @@ struct HarnessView: View {
                 .autocorrectionDisabled()
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("https-bearer")
+            secretFieldHygiene(httpsBearer, identifierPrefix: "https-bearer")
             Toggle("Allow plain HTTP (unsafe)", isOn: $allowInsecureHTTP)
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("https-insecure")
@@ -1073,8 +1077,10 @@ struct HarnessView: View {
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .keyboardType(.URL)
+                .textContentType(.URL)
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("mqtt-url")
+            urlFieldHygiene(mqttURL, identifierPrefix: "mqtt-url")
             TextField("MQTT client ID", text: $mqttClientID)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -1126,6 +1132,7 @@ struct HarnessView: View {
                 .textContentType(.password)
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("mqtt-password")
+            secretFieldHygiene(mqttPassword, identifierPrefix: "mqtt-password")
             Toggle("Allow plain MQTT (unsafe)", isOn: $allowInsecureMQTT)
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("mqtt-insecure")
@@ -1720,6 +1727,58 @@ struct HarnessView: View {
         phase = .ready
     }
 
+    private var scopeDestinationLabel: String {
+        switch scopeDestinationID {
+        case "local-file": "Archive folder"
+        case "https": "HTTPS"
+        case "mqtt": "MQTT"
+        case "companion": "Mac companion"
+        default: scopeDestinationID
+        }
+    }
+
+    @MainActor
+    private func refreshAuthorizedMetricsForReview() async {
+        let union = Set((try? await HarnessExport.selectedMetrics()) ?? [])
+        authorizedForReview = union.union(browserBaseline)
+    }
+
+    @ViewBuilder
+    private func urlFieldHygiene(_ raw: String, identifierPrefix: String) -> some View {
+        let hygiene = CredentialFieldHygiene.url(raw)
+        if hygiene.strippedWhitespace {
+            Text(CredentialFieldHygiene.whitespaceNote)
+                .font(.footnote)
+                .accessibilityIdentifier("\(identifierPrefix)-whitespace")
+        }
+        if hygiene.replacedSmartPunctuation {
+            Text(CredentialFieldHygiene.smartPunctuationNote)
+                .font(.footnote)
+                .accessibilityIdentifier("\(identifierPrefix)-smartquotes")
+        }
+        if let parseBack = hygiene.parseBack {
+            Text(parseBack)
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("\(identifierPrefix)-parseback")
+        }
+    }
+
+    @ViewBuilder
+    private func secretFieldHygiene(_ raw: String, identifierPrefix: String) -> some View {
+        let hygiene = CredentialFieldHygiene.secret(raw)
+        if hygiene.strippedWhitespace {
+            Text(CredentialFieldHygiene.whitespaceNote)
+                .font(.footnote)
+                .accessibilityIdentifier("\(identifierPrefix)-whitespace")
+        }
+        if hygiene.replacedSmartPunctuation {
+            Text(CredentialFieldHygiene.smartPunctuationNote)
+                .font(.footnote)
+                .accessibilityIdentifier("\(identifierPrefix)-smartquotes")
+        }
+    }
+
     @MainActor
     private func presentHealthPriming() async {
         do {
@@ -1854,6 +1913,7 @@ struct HarnessView: View {
                     Button("Review changes") {
                         browserSelecting = false
                         browserReviewVisible = true
+                        Task { await refreshAuthorizedMetricsForReview() }
                     }
                     .accessibilityIdentifier("browser-review")
                 } else {
@@ -1962,18 +2022,29 @@ struct HarnessView: View {
                     }
                 }
                 if browserReviewVisible {
-                    let adding = browserSelection.subtracting(browserBaseline)
-                    let removing = browserBaseline.subtracting(browserSelection)
+                    let review = DataSelectionReview.comparing(
+                        selected: browserSelection,
+                        baseline: browserBaseline,
+                        authorized: authorizedForReview,
+                        destinationName: scopeDestinationLabel
+                    )
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Review changes")
                             .font(.headline)
                             .accessibilityIdentifier("browser-review-title")
-                        Text("Adding \(adding.count) types")
+                        Text("Adding \(review.adding.count) types")
                             .accessibilityIdentifier("browser-review-adding")
-                        Text("Removing \(removing.count) types")
+                        Text("Removing \(review.removing.count) types")
                             .accessibilityIdentifier("browser-review-removing")
-                        if !removing.isEmpty {
-                            Text("Removing a type does not delete data already sent to this destination.")
+                        if let permission = review.permissionConsequence {
+                            Text(permission)
+                                .font(.footnote)
+                                .foregroundStyle(.primary)
+                                .fontWeight(.semibold)
+                                .accessibilityIdentifier("browser-review-permission")
+                        }
+                        if let warning = review.removalWarning {
+                            Text(warning)
                                 .font(.footnote)
                                 .foregroundStyle(.primary)
                                 .fontWeight(.semibold)
@@ -2556,9 +2627,12 @@ struct HarnessView: View {
         do {
             confirmationKind = .https
             confirmationCard = try await HarnessExport.prepareHTTPSDestination(
-                urlString: httpsURL,
+                urlString: CredentialFieldHygiene.url(httpsURL).normalized,
                 allowInsecureHTTP: allowInsecureHTTP,
-                bearer: httpsBearer.isEmpty ? nil : httpsBearer,
+                bearer: {
+                    let token = CredentialFieldHygiene.secret(httpsBearer).normalized
+                    return token.isEmpty ? nil : token
+                }(),
                 importedLocalIdentifier:
                     importedDestinationDraft?.configuration.kind == .https
                         ? importedDestinationDraft?.localIdentifier : nil
@@ -2590,14 +2664,23 @@ struct HarnessView: View {
         do {
             confirmationKind = .mqtt
             confirmationCard = try await HarnessExport.prepareMQTTDestination(
-                urlString: mqttURL,
+                urlString: CredentialFieldHygiene.url(mqttURL).normalized,
                 allowInsecure: allowInsecureMQTT,
-                clientID: mqttClientID,
-                topic: mqttTopic,
+                clientID: CredentialFieldHygiene.secret(mqttClientID).normalized,
+                topic: CredentialFieldHygiene.secret(mqttTopic).normalized,
                 clientPKCS12: mqttPKCS12Data,
-                clientPKCS12Password: mqttPKCS12Password.isEmpty ? nil : mqttPKCS12Password,
-                username: mqttUsername.isEmpty ? nil : mqttUsername,
-                password: mqttPassword.isEmpty ? nil : mqttPassword,
+                clientPKCS12Password: {
+                    let password = CredentialFieldHygiene.secret(mqttPKCS12Password).normalized
+                    return password.isEmpty ? nil : password
+                }(),
+                username: {
+                    let name = CredentialFieldHygiene.secret(mqttUsername).normalized
+                    return name.isEmpty ? nil : name
+                }(),
+                password: {
+                    let password = CredentialFieldHygiene.secret(mqttPassword).normalized
+                    return password.isEmpty ? nil : password
+                }(),
                 qos: mqttQoS,
                 importedLocalIdentifier:
                     importedDestinationDraft?.configuration.kind == .mqtt

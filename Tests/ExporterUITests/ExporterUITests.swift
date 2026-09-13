@@ -569,6 +569,15 @@ final class ExporterUITests: XCTestCase {
                 .waitForExistence(timeout: uiWait)
         )
         try performAccessibilityAudit("browser-review")
+        app.buttons["browser-review-continue"].tap()
+        XCTAssertTrue(app.buttons["browser-select"].waitForExistence(timeout: uiWait))
+        app.buttons["browser-select"].tap()
+        XCTAssertTrue(app.buttons["browser-invert-routine"].waitForExistence(timeout: uiWait))
+        app.buttons["browser-invert-routine"].tap()
+        app.buttons["browser-review"].tap()
+        let permission = app.staticTexts["browser-review-permission"]
+        XCTAssertTrue(permission.waitForExistence(timeout: uiWait))
+        XCTAssertTrue(permission.label.contains("need new Health permission"))
     }
 
     func testDestinationScopeStartsEmptyAndOffersAnExplicitPreset() {
@@ -607,6 +616,25 @@ final class ExporterUITests: XCTestCase {
         XCTAssertFalse(
             app.buttons["destination-confirm"].exists,
             "loading a draft must not run its destination test or enable it"
+        )
+        let parseBack = app.staticTexts["https-url-parseback"]
+        XCTAssertTrue(parseBack.waitForExistence(timeout: uiWait))
+        XCTAssertTrue(parseBack.label.contains("host collector.example"))
+    }
+
+    func testHTTPSURLParseBackNamesWhitespaceAndHost() {
+        enterControls()
+        let endpoint = scrollToHittable(app.textFields["https-url"])
+        type(" https://collector.example:8443/upload ", into: endpoint)
+        dismissKeyboard()
+        XCTAssertTrue(
+            app.staticTexts["https-url-whitespace"].waitForExistence(timeout: uiWait)
+        )
+        let parseBack = app.staticTexts["https-url-parseback"]
+        XCTAssertTrue(parseBack.waitForExistence(timeout: uiWait))
+        XCTAssertEqual(
+            parseBack.label,
+            "scheme https · host collector.example · port 8443 · path /upload"
         )
     }
 

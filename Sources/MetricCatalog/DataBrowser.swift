@@ -151,6 +151,13 @@ public struct DataSelectionReview: Sendable, Equatable {
         self.needingPermission = needingPermission
         self.removalWarning = removalWarning
     }
+
+    /// UX-16: added types that still need a Health read sheet, of the added total.
+    public var permissionConsequence: String? {
+        guard !adding.isEmpty else { return nil }
+        return
+            "\(needingPermission.count) of the \(adding.count) added types need new Health permission."
+    }
 }
 
 public enum DataSelectionError: Error, Equatable {
@@ -199,6 +206,22 @@ public struct DataSelectionDraft: Sendable, Equatable {
     }
 
     public func review(
+        authorized: Set<MetricID>,
+        destinationName: String
+    ) -> DataSelectionReview {
+        DataSelectionReview.comparing(
+            selected: selected,
+            baseline: baseline,
+            authorized: authorized,
+            destinationName: destinationName
+        )
+    }
+}
+
+extension DataSelectionReview {
+    public static func comparing(
+        selected: Set<MetricID>,
+        baseline: Set<MetricID>,
         authorized: Set<MetricID>,
         destinationName: String
     ) -> DataSelectionReview {

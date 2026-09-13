@@ -360,6 +360,20 @@ private func browserSample(
         review.removalWarning
             == "Removing a type does not delete data already sent to Archive folder."
     )
+    #expect(
+        review.permissionConsequence
+            == "1 of the 1 added types need new Health permission."
+    )
+    let mixed = DataSelectionReview.comparing(
+        selected: [MetricCatalog.stepCount.id, MetricCatalog.bodyMass.id],
+        baseline: [],
+        authorized: [MetricCatalog.stepCount.id],
+        destinationName: "HTTPS"
+    )
+    #expect(
+        mixed.permissionConsequence
+            == "1 of the 2 added types need new Health permission."
+    )
 }
 
 @Test func routineBulkInvertNeverSelectsSensitiveMetrics() {
