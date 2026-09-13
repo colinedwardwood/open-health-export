@@ -53,11 +53,14 @@ struct ExportStatusProvider: TimelineProvider {
 struct ExportStatusWidgetView: View {
     @Environment(\.widgetFamily) private var family
     @Environment(\.widgetRenderingMode) private var renderingMode
+    @Environment(\.redactionReasons) private var redactionReasons
     var entry: ExportStatusEntry
 
     var body: some View {
         Group {
-            if entry.snapshots.isEmpty {
+            if redactionReasons.contains(.privacy) {
+                locked
+            } else if entry.snapshots.isEmpty {
                 empty
             } else if family == .accessoryCircular {
                 accessoryCircular
@@ -71,6 +74,17 @@ struct ExportStatusWidgetView: View {
         }
         .containerBackground(.background, for: .widget)
         .widgetURL(statusURL)
+        .privacySensitive()
+    }
+
+    private var locked: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(WidgetLockRedaction.copy, systemImage: WidgetLockRedaction.glyph)
+                .font(.headline)
+                .modifier(ExportStatusChrome(mode: chrome))
+            Spacer()
+        }
+        .accessibilityIdentifier("widget-locked")
     }
 
     private var small: some View {

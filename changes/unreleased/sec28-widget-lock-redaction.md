@@ -1,0 +1,1 @@
+The status widget redacts to a lock glyph and Locked when the system privacy reason is set, and marks its content privacy-sensitive so Lock Screen and app-switcher glances do not show destination facts.

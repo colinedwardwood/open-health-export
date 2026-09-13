@@ -22,3 +22,10 @@ public enum WidgetStatusChrome {
         return "\(state.glyph) \(state.label)"
     }
 }
+
+/// SEC-28: Lock Screen / locked-device widget chrome. No destination names, timestamps,
+/// or health values — those wait until the device is unlocked.
+public enum WidgetLockRedaction {
+    public static let glyph = "lock.fill"
+    public static let copy = "Locked"
+}

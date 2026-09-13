@@ -1504,6 +1504,35 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     #expect(!widget.contains(".foregroundStyle(.green"))
 }
 
+@Test func sec28LockedWidgetRedactsDestinationFacts() throws {
+    #expect(WidgetLockRedaction.copy == "Locked")
+    #expect(WidgetLockRedaction.glyph == "lock.fill")
+    #expect(!DestinationDisplayState.allCases.map(\.label).contains(WidgetLockRedaction.copy))
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let widget = try String(
+        contentsOf: root.appendingPathComponent("Apps/StatusWidget/StatusWidget.swift"),
+        encoding: .utf8
+    )
+    #expect(widget.contains("@Environment(\\.redactionReasons)"))
+    #expect(widget.contains("redactionReasons.contains(.privacy)"))
+    #expect(widget.contains(".privacySensitive()"))
+    let locked = widgetLockedViewSource(widget)
+    #expect(locked.contains("WidgetLockRedaction.copy"))
+    #expect(locked.contains("WidgetLockRedaction.glyph"))
+    #expect(!locked.contains("destinationLabel"))
+    #expect(!locked.contains("lastSuccessEpoch"))
+    #expect(!locked.contains("compactFailure"))
+}
+
+private func widgetLockedViewSource(_ widget: String) -> String {
+    let start = widget.range(of: "private var locked:")!
+    let end = widget.range(of: "private var small:", range: start.upperBound..<widget.endIndex)!
+    return String(widget[start.lowerBound..<end.lowerBound])
+}
+
 @Test func externalStatusKeepsLastSuccessAcrossFailuresAndAdvancesSequence() {
     let successTally = RunTally(read: 3, committed: 3, acked: 3)
     let success = ExternalStatusRecord.next(
