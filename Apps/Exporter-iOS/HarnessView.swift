@@ -1368,10 +1368,11 @@ struct HarnessView: View {
             }
             .disabled(phase == .working)
             .accessibilityIdentifier("otlp-disable")
-            ForEach(Array(otlpLines.enumerated()), id: \.offset) { _, line in
+            ForEach(Array(otlpLines.enumerated()), id: \.offset) { index, line in
                 Text(line)
                     .font(.footnote)
                     .textSelection(.enabled)
+                    .accessibilityIdentifier("otlp-line-\(index)")
             }
             #endif
             Button("Acknowledge destination changes") {

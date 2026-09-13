@@ -692,6 +692,37 @@ final class ExporterUITests: XCTestCase {
         )
     }
 
+    func testOTLPEnableStaysDisabledUntilPreviewEndAndListsTheCollector() {
+        enterControls()
+        selectRootTab(2)
+        let enable = scrollToHittable(app.buttons["otlp-enable"])
+        XCTAssertFalse(enable.isEnabled)
+        let endpoint = scrollToHittable(app.textFields["otlp-url"])
+        type("https://otel.example:4318/v1/traces", into: endpoint)
+        dismissKeyboard()
+        XCTAssertFalse(enable.isEnabled)
+        scrollToHittable(app.buttons["otlp-preview"]).tap()
+        let end = app.staticTexts["otlp-preview-end"]
+        XCTAssertTrue(end.waitForExistence(timeout: uiWait))
+        let body = app.staticTexts["otlp-preview-body"]
+        XCTAssertTrue(body.waitForExistence(timeout: uiWait))
+        XCTAssertTrue(body.label.contains("OTLP/HTTP protobuf"), body.label)
+        XCTAssertFalse(body.label.localizedCaseInsensitiveContains("heartRate"), body.label)
+        XCTAssertFalse(body.label.contains("bpm"), body.label)
+        scrollToHittable(end)
+        for _ in 0 ..< 10 where !enable.isEnabled {
+            app.swipeUp()
+            _ = enable.waitForExistence(timeout: 2)
+        }
+        XCTAssertTrue(enable.isEnabled, "enable never appeared after traversing the preview")
+        enable.tap()
+        let hop = app.staticTexts["data-flow-hop-0"]
+        XCTAssertTrue(hop.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertTrue(hop.label.contains("otel.example"), hop.label)
+        XCTAssertTrue(hop.label.contains("OTLP HTTP"), hop.label)
+        XCTAssertTrue(hop.label.contains("no credential"), hop.label)
+    }
+
     func testMQTTQoS0ErrorOffersSetQoS1AndAppliesIt() {
         app.terminate()
         app.launchEnvironment["OHE_SEED_MQTT_QOS0"] = "1"
