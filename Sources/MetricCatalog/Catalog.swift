@@ -19,7 +19,8 @@ public struct MetricDeclaration: Sendable {
     /// Omitted when nil (enum / timestamp / unmapped). Never `measurement` with energy/volume.
     public var haStateClass: String?
     public var haRequiresAggregate: Bool
-    /// Wire family: `sample.quantity`, `sample.category`, `workout`, or `characteristic`.
+    /// Wire family: `sample.quantity`, `sample.category`, `sample.stateOfMind`,
+    /// `workout`, or `characteristic`.
     public var kind: String
     /// HK-30: static identity-adjacent types. Always confirmed individually.
     public var reidentifying: Bool
@@ -721,11 +722,29 @@ public enum MetricCatalog {
         kind: "workout"
     )
 
-    /// Converted category and workout families that are selectable in-app.
+    /// UX-15: mental wellbeing is selectable only with individual confirmation.
+    public static let stateOfMind = MetricDeclaration(
+        id: MetricID(rawValue: "state_of_mind"),
+        wireId: "state_of_mind",
+        hkIdentifier: "HKDataTypeIdentifierStateOfMind",
+        canonicalUnit: CanonicalUnit(symbol: "1"),
+        wireUnit: "1",
+        cumulative: false,
+        usesHealthKitStatistics: false,
+        sensitivity: .sensitive,
+        haUnit: nil,
+        haDeviceClass: nil,
+        haStateClass: nil,
+        haRequiresAggregate: false,
+        kind: "sample.stateOfMind"
+    )
+
+    /// Converted category, workout, and structured families that are selectable in-app.
     public static let structural: [MetricDeclaration] = [
         sleepAnalysis,
         mindfulSession,
         workout,
+        stateOfMind,
     ]
 
     public static let biologicalSex = characteristic(

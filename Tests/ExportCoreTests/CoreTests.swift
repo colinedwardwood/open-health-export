@@ -859,6 +859,7 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
             MetricCatalog.stepCount.id,
             MetricCatalog.sleepAnalysis.id,
             MetricCatalog.workout.id,
+            MetricCatalog.stateOfMind.id,
         ]
     )
     let root = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
@@ -867,6 +868,7 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     #expect(components.keys.contains { $0.hasPrefix("step_count_") })
     #expect(!components.keys.contains { $0.contains("sleep") })
     #expect(!components.keys.contains { $0.contains("workout") })
+    #expect(!components.keys.contains { $0.contains("state_of_mind") })
 }
 
 @Test func injectedTzDatabaseIdentityIsCommitted2024a() throws {

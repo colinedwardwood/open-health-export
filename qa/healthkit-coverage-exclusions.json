@@ -285,10 +285,6 @@
       "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
     },
     {
-      "identifier": "HKDataTypeIdentifierStateOfMind",
-      "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
-    },
-    {
       "identifier": "HKDataTypeIdentifierUserAnnotatedMedicationConcept",
       "reason": "Not in the v1 selectable catalogue. Export stays off until the type is declared or this exclusion is revised."
     },

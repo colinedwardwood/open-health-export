@@ -388,7 +388,7 @@ private func browserSample(
     #expect(draft.selected.isEmpty)
 }
 
-@Test func coreDailyPresetContainsOnlyRoutineMetrics() {
+@Test func coreDailyPresetContainsOnlyRoutineMetrics() throws {
     #expect(!MetricCatalog.coreDaily.isEmpty)
     #expect(MetricCatalog.coreDaily.count >= 8)
     #expect(MetricCatalog.coreDaily.count <= 28)
@@ -417,6 +417,26 @@ private func browserSample(
         }
     )
     #expect(!MetricCatalog.selectable.contains { $0.id.rawValue == "blood_pressure" })
+    #expect(MetricCatalog.stateOfMind.sensitivity == .sensitive)
+    #expect(MetricCatalog.stateOfMind.kind == "sample.stateOfMind")
+    #expect(MetricCatalog.selectable.contains { $0.id == MetricCatalog.stateOfMind.id })
+    #expect(!MetricCatalog.coreDaily.contains { $0.id == MetricCatalog.stateOfMind.id })
+    #expect(
+        MetricSearch.matches(MetricCatalog.stateOfMind, needle: "mood")
+    )
+    var sensitiveDraft = DataSelectionDraft(baseline: [])
+    #expect(throws: DataSelectionError.sensitiveConfirmationRequired) {
+        try sensitiveDraft.toggle(
+            MetricCatalog.stateOfMind.id,
+            destinationName: "local-file"
+        )
+    }
+    try sensitiveDraft.toggle(
+        MetricCatalog.stateOfMind.id,
+        destinationName: "local-file",
+        sensitiveConfirmation: "local-file"
+    )
+    #expect(sensitiveDraft.selected.contains(MetricCatalog.stateOfMind.id))
 }
 
 @Test func declarationLookupDoesNotRescanTheCataloguePerSample() throws {
@@ -446,6 +466,7 @@ private func browserSample(
     var draft = DataSelectionDraft(baseline: [])
     draft.invertRoutine(MetricCatalog.selectable.map(\.id))
     #expect(draft.selected.isDisjoint(with: Set(MetricCatalog.characteristics.map(\.id))))
+    #expect(!draft.selected.contains(MetricCatalog.stateOfMind.id))
     #expect(throws: DataSelectionError.sensitiveConfirmationRequired) {
         try draft.toggle(
             MetricCatalog.dateOfBirth.id,

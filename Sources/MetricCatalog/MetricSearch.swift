@@ -21,6 +21,7 @@ public enum MetricSearch {
         MetricCatalog.fitzpatrickSkinType.id: ["skin type"],
         MetricCatalog.wheelchairUse.id: ["wheelchair"],
         MetricCatalog.activityMoveMode.id: ["move mode"],
+        MetricCatalog.stateOfMind.id: ["mood", "som", "mental", "valence"],
     ]
 
     public static func haystack(for declaration: MetricDeclaration) -> String {

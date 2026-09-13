@@ -317,6 +317,7 @@ import WireFormat
     #expect(readTypes.contains(HKWorkoutType.workoutType()))
     #expect(readTypes.contains(HKObjectType.electrocardiogramType()))
     #expect(readTypes.contains(HKObjectType.audiogramSampleType()))
+    #expect(MetricCatalog.stateOfMind.id == StateOfMindConversion.metric)
     #expect(readTypes.contains(HKObjectType.stateOfMindType()))
 
     let date = Date(timeIntervalSince1970: 1_704_067_200)
