@@ -475,7 +475,12 @@ private func browserSample(
             MetricCatalog.bloodPressureDiastolic.id,
         ])
     )
-    #expect(matching("mood") == [MetricCatalog.stateOfMind.id])
+    #expect(
+        matching("mood") == Set([
+            MetricCatalog.stateOfMind.id,
+            MetricID(rawValue: "mood_changes"),
+        ])
+    )
     #expect(
         matching("HKDataTypeIdentifierStateOfMind") == [MetricCatalog.stateOfMind.id]
     )
