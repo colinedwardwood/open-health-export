@@ -701,6 +701,48 @@ final class ExporterUITests: XCTestCase {
         )
     }
 
+    func testHTTP413ErrorOffersShortenWindowAndAppliesIt() {
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_HTTP413"] = "1"
+        app.launch()
+        enterControls()
+        let part0 = app.staticTexts["error-part-0"]
+        XCTAssertTrue(part0.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertTrue(part0.label.contains("too large"), part0.label)
+        let fix = scrollToHittable(app.buttons["error-fix-shortenWindow"])
+        XCTAssertEqual(fix.label, "Shorten window")
+        fix.tap()
+        XCTAssertTrue(
+            app.staticTexts["status-line"].label.contains("Applied Shorten window"),
+            app.staticTexts["status-line"].label
+        )
+        selectRootTab(2)
+        let window = scrollToHittable(app.staticTexts["export-window-hours"])
+        XCTAssertTrue(window.waitForExistence(timeout: uiWait))
+        XCTAssertTrue(window.label.contains("6 hours"), window.label)
+    }
+
+    func testHTTP429ErrorOffersLowerFreshnessAndAppliesIt() {
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_HTTP429"] = "1"
+        app.launch()
+        enterControls()
+        let part0 = app.staticTexts["error-part-0"]
+        XCTAssertTrue(part0.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertTrue(part0.label.contains("slow down"), part0.label)
+        let fix = scrollToHittable(app.buttons["error-fix-lowerFreshness"])
+        XCTAssertEqual(fix.label, "Choose a less frequent target")
+        fix.tap()
+        XCTAssertTrue(
+            app.staticTexts["status-line"].label.contains("Applied Choose a less frequent target"),
+            app.staticTexts["status-line"].label
+        )
+        selectRootTab(2)
+        let interval = scrollToHittable(app.staticTexts["freshness-interval-minutes"])
+        XCTAssertTrue(interval.waitForExistence(timeout: uiWait))
+        XCTAssertTrue(interval.label.contains("30 minutes"), interval.label)
+    }
+
     func testMQTTSecretFieldsFlagLeadingWhitespace() {
         enterControls()
         selectRootTab(2)

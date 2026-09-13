@@ -410,6 +410,28 @@ struct HarnessView: View {
                     status = error.title
                     results = error.lines
                 }
+                if ProcessInfo.processInfo.environment["OHE_SEED_HTTP413"] == "1" {
+                    exportWindowHours = 24
+                    let error = UserFacingErrorObject.make(
+                        archetype: .http413,
+                        destinationLabel: "nas",
+                        evidence: UserFacingErrorEvidence(bytesSent: 3_600_000)
+                    )
+                    userFacingError = error
+                    status = error.title
+                    results = error.lines
+                }
+                if ProcessInfo.processInfo.environment["OHE_SEED_HTTP429"] == "1" {
+                    freshnessIntervalMinutes = 15
+                    let error = UserFacingErrorObject.make(
+                        archetype: .http429,
+                        destinationLabel: "nas",
+                        evidence: UserFacingErrorEvidence(retryAfterSeconds: 30)
+                    )
+                    userFacingError = error
+                    status = error.title
+                    results = error.lines
+                }
                 #endif
                 await refreshQueueGaps()
                 await refreshCoverageWindows()
@@ -985,6 +1007,12 @@ struct HarnessView: View {
                 .font(.headline)
                 .accessibilityIdentifier("destination-title")
             dataFlowExplainer
+            Text("Export window: \(exportWindowHours) hours")
+                .font(.footnote)
+                .accessibilityIdentifier("export-window-hours")
+            Text("Freshness interval: \(freshnessIntervalMinutes) minutes")
+                .font(.footnote)
+                .accessibilityIdentifier("freshness-interval-minutes")
             Text(FreshnessTarget.provisionalDisclosure)
                 .font(.footnote)
                 .accessibilityIdentifier("freshness-target")
