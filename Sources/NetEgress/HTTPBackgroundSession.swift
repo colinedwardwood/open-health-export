@@ -13,10 +13,17 @@ public enum HTTPBackgroundSession {
     public static let immediateIdentifier = "app.openhealthexporter.https.immediate"
     public static let retryIdentifier = "app.openhealthexporter.https.retry"
 
+    /// UIKit's background-session completion handler is not Sendable; the box
+    /// only exists so we can hop it onto the main queue after the session finishes.
+    private struct UncheckedMainWork: @unchecked Sendable {
+        let body: () -> Void
+        func run() { body() }
+    }
+
     private final class Storage: @unchecked Sendable {
         let lock = NSLock()
         var sessions: [String: URLSession] = [:]
-        var completionHandlers: [String: @Sendable () -> Void] = [:]
+        var completionHandlers: [String: UncheckedMainWork] = [:]
         var pins: [String: PinRecord] = [:]
     }
 
@@ -79,10 +86,10 @@ public enum HTTPBackgroundSession {
 
     public static func finishEvents(
         for identifier: String,
-        completionHandler: @escaping @Sendable () -> Void
+        completionHandler: @escaping () -> Void
     ) {
         storage.lock.lock()
-        storage.completionHandlers[identifier] = completionHandler
+        storage.completionHandlers[identifier] = UncheckedMainWork(body: completionHandler)
         storage.lock.unlock()
     }
 
@@ -92,6 +99,6 @@ public enum HTTPBackgroundSession {
         let handler = storage.completionHandlers.removeValue(forKey: identifier)
         storage.lock.unlock()
         guard let handler else { return }
-        DispatchQueue.main.async(execute: handler)
+        DispatchQueue.main.async { handler.run() }
     }
 }

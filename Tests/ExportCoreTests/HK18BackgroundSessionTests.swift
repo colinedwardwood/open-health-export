@@ -43,6 +43,12 @@ import Testing
     #expect(runner.contains("HTTPTransferSchedule.$current.withValue(.discretionaryRetry)"))
     #expect(app.contains("handleEventsForBackgroundURLSession"))
     #expect(app.contains("HTTPBackgroundSession.finishEvents"))
+    let exportHarness = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift"),
+        encoding: .utf8
+    )
+    #expect(exportHarness.contains("HarnessExport.freshnessCadenceSeconds()"))
+    #expect(exportHarness.contains("HarnessExport.isLowPowerDeferred()"))
     #expect(HTTPTransferSchedule.current == .immediate)
 }
 

@@ -60,6 +60,7 @@ final class AppLifecycleCoordinator {
         healthObservers = nil
     }
 }
+
 @MainActor
 final class ExporterAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(
@@ -91,16 +92,17 @@ final class ExporterAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
         )
     }
 
-    func userNotificationCenter(
+    nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
-        guard let url = FailureNotificationPayload.url(
-            from: response.notification.request.content.userInfo
-        ) else {
+        let raw = response.notification.request.content.userInfo[
+            FailureNotificationPayload.openURLKey
+        ] as? String
+        guard let url = FailureNotificationPayload.url(fromOpenURLString: raw) else {
             return
         }
-        AppLifecycleCoordinator.shared.queueDeepLink(url)
+        await AppLifecycleCoordinator.shared.queueDeepLink(url)
     }
 }
 

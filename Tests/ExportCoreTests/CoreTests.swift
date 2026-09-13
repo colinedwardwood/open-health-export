@@ -1213,6 +1213,12 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     #expect(UserFacingErrorRoute(url: url)?.archetype == .hostUnresolvable)
     let info = FailureNotificationPayload.userInfo(for: notice)
     #expect(FailureNotificationPayload.url(from: info) == url)
+    #expect(
+        FailureNotificationPayload.url(
+            fromOpenURLString: info[FailureNotificationPayload.openURLKey] as? String
+        ) == url
+    )
+    #expect(FailureNotificationPayload.url(fromOpenURLString: nil) == nil)
     let overdueNotice = UserNotice(
         kind: .exportOverdue,
         destinationID: "home-assistant",

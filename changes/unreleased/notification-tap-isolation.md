@@ -1,0 +1,1 @@
+The iOS app compiles under current Swift concurrency: notification taps hop a Sendable URL string, background-session completion is boxed onto main, the backfill processor qualifies HarnessExport helpers, and Settings keeps its presentation state.

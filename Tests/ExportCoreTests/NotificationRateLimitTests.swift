@@ -143,4 +143,6 @@ import Watchdog
     )
     #expect(!lifecycle.contains("requestAuthorization"))
     #expect(!lifecycle.contains("LocalUserNotifier"))
+    #expect(lifecycle.contains("nonisolated func userNotificationCenter"))
+    #expect(lifecycle.contains("fromOpenURLString"))
 }

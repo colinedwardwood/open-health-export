@@ -36,6 +36,7 @@ struct HarnessView: View {
 
     @State private var phase: Phase = .disclosure
     @State private var rootTab = AppRootTabs.status
+    @State private var showSettings = false
     @State private var showHealthPriming = false
     @State private var primingTypeCount = 0
     @AppStorage("ohe.disclosureAcknowledged")

@@ -33,6 +33,8 @@ import Watchdog
     #expect(view.contains("rootTab = .status"))
     #expect(view.contains("rootTab = .destinations"))
     #expect(view.contains("accessibilityIdentifier(\"status-settings\")"))
+    #expect(view.contains("@State private var showSettings = false"))
+    #expect(view.contains(".sheet(isPresented: $showSettings)"))
     #expect(view.contains("Label(\"Settings\""))
     guard let settings = view.range(of: "private var statusSettings") else {
         Issue.record("statusSettings is missing")

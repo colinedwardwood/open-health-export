@@ -186,12 +186,12 @@ private struct HealthBackfillProcessor: BackfillChunkProcessor {
                 .appendingPathComponent("exports/status.json"),
             ledgerHeadSeal: ledgerHeadSeal,
             ledgerSealURL: ledgerSealURL,
-            freshnessCadenceSeconds: freshnessCadenceSeconds(),
-            deferForLowPower: isLowPowerDeferred()
+            freshnessCadenceSeconds: HarnessExport.freshnessCadenceSeconds(),
+            deferForLowPower: HarnessExport.isLowPowerDeferred()
         ).runBackfill(days: days, mode: mode)
         return BackfillChunkResult(
             samplesRead: await counted.count(),
-            batchesEnqueued: outcome.kind == .successNothingDue ? 0 : 1
+            batchesEnqueued: outcome.kind == RunOutcome.Kind.successNothingDue ? 0 : 1
         )
     }
 }

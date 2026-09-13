@@ -158,11 +158,12 @@ public enum FailureNotificationPayload {
     }
 
     public static func url(from userInfo: [AnyHashable: Any]) -> URL? {
-        guard let raw = userInfo[openURLKey] as? String,
-              let url = URL(string: raw)
-        else {
-            return nil
-        }
+        url(fromOpenURLString: userInfo[openURLKey] as? String)
+    }
+
+    /// Sendable path for notification taps: only the stamped URL string crosses isolation.
+    public static func url(fromOpenURLString raw: String?) -> URL? {
+        guard let raw, let url = URL(string: raw) else { return nil }
         if UserFacingErrorRoute(url: url) != nil { return url }
         if WidgetStatusRoute(url: url) != nil { return url }
         return nil
