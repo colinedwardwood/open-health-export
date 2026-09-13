@@ -82,6 +82,7 @@ struct HarnessView: View {
     @State private var mqttPKCS12Password = ""
     @State private var pickingMQTTPKCS12 = false
     @State private var mqttTestLines: [String] = []
+    @State private var localFileTestLines: [String] = []
     @State private var importedDestinationDraft: ImportedDestinationDraftRecord?
     @State private var importedDraftRefreshToken = 0
     @State private var configurationExportURL: URL?
@@ -444,6 +445,12 @@ struct HarnessView: View {
                    let summary = DestinationTestReport.failed(at: step).failureSummary
                 {
                     mqttTestLines = [summary]
+                }
+                if let raw = ProcessInfo.processInfo.environment["OHE_SEED_LOCAL_FILE_TEST_FAIL"],
+                   let step = DestinationTestStep(rawValue: raw),
+                   let summary = DestinationTestReport.failed(at: step).failureSummary
+                {
+                    localFileTestLines = [summary]
                 }
                 if let raw = ProcessInfo.processInfo.environment["OHE_SEED_USER_FACING_ERROR"] {
                     if raw == "all" {
@@ -1103,7 +1110,19 @@ struct HarnessView: View {
                 Task { await enableLocalFile() }
             }
             .disabled(phase == .working)
+            .accessibilityIdentifier("local-file-enable")
             .accessibilityHint("Writes a canary file, reads it back, then enables the local-file destination.")
+            ForEach(Array(localFileTestLines.enumerated()), id: \.offset) { index, line in
+                Text(line)
+                    .font(.footnote)
+                    .foregroundStyle(.primary)
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: 44,
+                        alignment: .leading
+                    )
+                    .accessibilityIdentifier("local-file-test-line-\(index)")
+            }
             Text(ExportProfile.haeCompatibility.label)
                 .font(.footnote)
                 .fixedSize(horizontal: false, vertical: true)
@@ -2747,8 +2766,15 @@ struct HarnessView: View {
             refreshDestinationSurfaces()
             await startHealthObserversIfEligible()
             await refreshLedgerIntegrity()
+            localFileTestLines = []
             status = "Ready. Local archive passed write/read/confirm and is enabled."
         } catch {
+            if case SetupError.testFailed(let step) = error {
+                localFileTestLines = [DestinationTestReport.failed(at: step).failureSummary]
+                    .compactMap { $0 }
+            } else {
+                localFileTestLines = []
+            }
             status = "Failed: \(error.localizedDescription)"
         }
         phase = .ready

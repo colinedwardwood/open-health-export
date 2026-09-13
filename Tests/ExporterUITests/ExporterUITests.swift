@@ -807,6 +807,17 @@ final class ExporterUITests: XCTestCase {
         XCTAssertEqual(line.label, "Failed at Connect.")
     }
 
+    func testLocalFileDestinationTestFailureNamesTheOpenFolderStep() {
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_LOCAL_FILE_TEST_FAIL"] = "openFolder"
+        app.launch()
+        enterControls()
+        selectRootTab(2)
+        let line = scrollToHittable(app.staticTexts["local-file-test-line-0"])
+        XCTAssertTrue(line.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertEqual(line.label, "Failed at Open folder.")
+    }
+
     func testEveryUserFacingErrorArchetypeRendersFiveParts() {
         app.terminate()
         app.launchEnvironment["OHE_SEED_USER_FACING_ERROR"] = "all"
