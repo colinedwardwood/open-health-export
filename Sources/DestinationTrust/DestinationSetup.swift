@@ -20,6 +20,7 @@ public enum SetupError: Error, Equatable, LocalizedError {
     case canaryMismatch
     case notEnabled
     case verificationRequired
+    case testFailed(at: DestinationTestStep)
 
     public var errorDescription: String? {
         switch self {
@@ -31,7 +32,16 @@ public enum SetupError: Error, Equatable, LocalizedError {
             "The destination is not enabled."
         case .verificationRequired:
             "The destination test must pass before enablement."
+        case .testFailed(let step):
+            "The destination test failed at \(step.progressLabel)."
         }
+    }
+
+    public static func refusingEnablement(_ report: DestinationTestReport) -> SetupError {
+        if let step = report.failingStep {
+            return .testFailed(at: step)
+        }
+        return .verificationRequired
     }
 }
 
@@ -195,8 +205,11 @@ public struct DestinationSetup: Sendable {
         guard state == .pinned || state == .enabled else {
             throw SetupError.illegalTransition(from: state, to: .enabled)
         }
-        guard let testReport, testReport.allowsEnablement else {
+        guard let testReport else {
             throw SetupError.verificationRequired
+        }
+        guard testReport.allowsEnablement else {
+            throw SetupError.refusingEnablement(testReport)
         }
         let wasEnabled = state == .enabled
         state = .enabled

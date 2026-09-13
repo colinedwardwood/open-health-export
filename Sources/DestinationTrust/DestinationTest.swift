@@ -118,6 +118,10 @@ public struct DestinationTestReport: Sendable, Equatable, Codable {
         steps.first { $0.outcome == .failed }?.name
     }
 
+    public var failureSummary: String? {
+        failingStep.map { "Failed at \($0.progressLabel)." }
+    }
+
     public static let passedLocalFile = DestinationTestReport(
         verdict: .passed,
         steps: [

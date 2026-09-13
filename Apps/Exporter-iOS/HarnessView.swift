@@ -2740,7 +2740,11 @@ struct HarnessView: View {
         } catch {
             confirmationCard = nil
             confirmationKind = nil
-            httpsTestLines = []
+            if case SetupError.testFailed(let step) = error {
+                httpsTestLines = [DestinationTestReport.failed(at: step).failureSummary].compactMap { $0 }
+            } else {
+                httpsTestLines = []
+            }
             presentUserFacingFailure(error, destinationLabel: httpsURL)
         }
         phase = .ready
@@ -2811,7 +2815,11 @@ struct HarnessView: View {
         } catch {
             confirmationCard = nil
             confirmationKind = nil
-            mqttTestLines = []
+            if case SetupError.testFailed(let step) = error {
+                mqttTestLines = [DestinationTestReport.failed(at: step).failureSummary].compactMap { $0 }
+            } else {
+                mqttTestLines = []
+            }
             presentUserFacingFailure(error, destinationLabel: mqttURL)
         }
         phase = .ready

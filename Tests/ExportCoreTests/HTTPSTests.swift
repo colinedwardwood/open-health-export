@@ -536,7 +536,7 @@ private func writeHTTPSPayload() throws -> (URL, BatchID) {
         response: OutboundHTTPResponse(status: 401, body: Data()),
         tls: identity
     )
-    await #expect(throws: SetupError.verificationRequired) {
+    await #expect(throws: SetupError.testFailed(at: .authenticate)) {
         _ = try await HTTPSDestinationEnable.complete(
             destination: destination,
             transport: rejected,

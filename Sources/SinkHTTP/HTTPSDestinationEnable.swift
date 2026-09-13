@@ -40,7 +40,7 @@ public enum HTTPSDestinationEnable {
             onProgress: onProgress
         )
         guard prepared.report.allowsEnablement else {
-            throw SetupError.verificationRequired
+            throw SetupError.refusingEnablement(prepared.report)
         }
         var setup = prepared.setup
         return HTTPSDestinationProbe(

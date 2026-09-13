@@ -70,10 +70,11 @@ func sampleIdentity(leaf: String, issuer: String = "issuer00") -> TLSIdentity {
     #expect(throws: SetupError.verificationRequired) {
         _ = try setup.enable(sink: LocalFileSinkStub())
     }
-    try setup.recordTest(.failed(at: .openFolder))
-    #expect(throws: SetupError.verificationRequired) {
-        _ = try setup.enable(sink: LocalFileSinkStub())
-    }
+    #expect(
+        SetupError.testFailed(at: .authenticate).errorDescription
+            == "The destination test failed at Authenticate."
+    )
+    #expect(DestinationTestReport.failed(at: .tlsHandshake).failureSummary == "Failed at TLS.")
     try setup.recordTest(
         DestinationTestReport(
             verdict: .sentUnconfirmed,
@@ -116,7 +117,7 @@ func sampleIdentity(leaf: String, issuer: String = "issuer00") -> TLSIdentity {
 @Test func localFileDestinationEnableRequiresAPassingPathTest() throws {
     let missing = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-enable-missing-\(UUID().uuidString)")
-    #expect(throws: SetupError.verificationRequired) {
+    #expect(throws: SetupError.testFailed(at: .openFolder)) {
         _ = try LocalFileDestinationEnable.complete(
             directory: missing,
             exporterId: "exporter-1",

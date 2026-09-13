@@ -263,6 +263,15 @@ import Testing
         )
     )
 
+    await #expect(throws: SetupError.testFailed(at: .authenticate)) {
+        _ = try await MQTTDestinationEnable.probe(
+            destination: try mqttPlain(),
+            pipe: ConnackCodeMQTTPipe(code: 4),
+            exporterID: "00000000-0000-4000-8000-000000000090",
+            emittedAt: "2026-01-01T00:00:00Z"
+        )
+    }
+
     named.append(
         expectFailure(
             await MQTTDestinationTest.run(
