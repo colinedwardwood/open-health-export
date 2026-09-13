@@ -452,6 +452,18 @@ struct HarnessView: View {
                 {
                     localFileTestLines = [summary]
                 }
+                if ProcessInfo.processInfo.environment["OHE_SEED_PAIRING_PASTE"] == "1",
+                   let secret = try? PairingSecret(bytes: (0 ..< 32).map {
+                       UInt8(truncatingIfNeeded: $0 * 7 + 3)
+                   }),
+                   let payload = try? PairingPayload(
+                       macInstallationID: "mac-ui",
+                       secret: secret,
+                       serviceName: "UI Mac._ohe-companion._tcp"
+                   )
+                {
+                    pairingPaste = " \(payload.encoded()) "
+                }
                 if let raw = ProcessInfo.processInfo.environment["OHE_SEED_USER_FACING_ERROR"] {
                     if raw == "all" {
                         seededUserFacingErrors = UserFacingErrorArchetype.allCases.map { archetype in
@@ -1632,22 +1644,28 @@ struct HarnessView: View {
                     Task { await openScanner() }
                 }
                 .disabled(phase == .working)
+                .accessibilityIdentifier("pairing-scan")
             } else {
                 Text(PairingCamera.unavailableReason)
                     .font(.footnote)
+                    .accessibilityIdentifier("pairing-scan-unavailable")
             }
             TextEditor(text: $pairingPaste)
                 .frame(minHeight: 88)
                 .font(.system(.footnote, design: .monospaced))
                 .accessibilityLabel("Pairing payload from the Mac")
+                .accessibilityIdentifier("pairing-paste")
+            secretFieldHygiene(pairingPaste, identifierPrefix: "pairing-paste")
             Button("Parse pairing payload") {
                 parsePairing()
             }
             .disabled(phase == .working)
+            .accessibilityIdentifier("pairing-parse")
             if !sas.isEmpty {
                 Text("Confirmation: \(sas)")
                     .font(.title2)
                     .accessibilityLabel("Confirmation code \(sas)")
+                    .accessibilityIdentifier("pairing-confirmation")
                 Text("This must match the Mac after the phone connects.")
                     .font(.footnote)
             }
@@ -1655,11 +1673,13 @@ struct HarnessView: View {
                 Task { await runCompanionExport() }
             }
             .disabled(phase == .working || pairing == nil)
+            .accessibilityIdentifier("pairing-export")
             .accessibilityHint("Browses for the paired Mac name and pushes one page over TLS-PSK.")
             Button("Forget companion pairing") {
                 Task { await forgetPairing() }
             }
             .disabled(phase == .working)
+            .accessibilityIdentifier("pairing-forget")
             Toggle("Send traceparent to Mac companion (opt-in)", isOn: $companionTraceparent)
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("companion-traceparent")
@@ -3343,7 +3363,9 @@ struct HarnessView: View {
 
     private func parsePairing() {
         do {
-            let payload = try PairingPayload.parse(pairingPaste.trimmingCharacters(in: .whitespacesAndNewlines))
+            let payload = try PairingPayload.parse(
+                CredentialFieldHygiene.secret(pairingPaste).normalized
+            )
             let local = try HarnessExport.installationID()
             let session = PairingSession.phone(payload: payload, localInstallationID: local)
             pairing = session

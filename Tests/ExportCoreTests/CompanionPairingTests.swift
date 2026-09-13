@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import CompanionWire
+import CoreDomain
 import Foundation
 import Testing
 
@@ -37,6 +38,10 @@ private func samplePayload() throws -> PairingPayload {
     #expect(!lines[2].contains("/"))
     #expect(try PairingPayload.parse(text) == payload)
     #expect(try PairingPayload.parse(text).encoded() == text)
+    #expect(
+        try PairingPayload.parse(CredentialFieldHygiene.secret(" \(text) \n").normalized)
+            == payload
+    )
 }
 
 @Test func pairingPayloadRejectsBadVersionLine() throws {

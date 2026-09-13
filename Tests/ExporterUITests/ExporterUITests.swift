@@ -818,6 +818,22 @@ final class ExporterUITests: XCTestCase {
         XCTAssertEqual(line.label, "Failed at Open folder.")
     }
 
+    func testPaddedPairingPayloadShowsWhitespaceNoteAndParses() {
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_PAIRING_PASTE"] = "1"
+        app.launch()
+        enterControls()
+        selectRootTab(2)
+        XCTAssertTrue(
+            scrollToHittable(app.staticTexts["pairing-paste-whitespace"]).waitForExistence(timeout: uiWait)
+        )
+        scrollToHittable(app.buttons["pairing-parse"]).tap()
+        let confirmation = app.staticTexts["pairing-confirmation"]
+        XCTAssertTrue(confirmation.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertTrue(confirmation.label.contains("Confirmation:"), confirmation.label)
+        XCTAssertTrue(app.buttons["pairing-export"].isEnabled)
+    }
+
     func testEveryUserFacingErrorArchetypeRendersFiveParts() {
         app.terminate()
         app.launchEnvironment["OHE_SEED_USER_FACING_ERROR"] = "all"
