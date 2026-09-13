@@ -962,10 +962,14 @@ struct HarnessView: View {
                 .autocorrectionDisabled()
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("demo-confirm")
+            secretFieldHygiene(demoConfirmName, identifierPrefix: "demo-confirm")
             Button("Export demo dataset (every catalogue metric)") {
                 Task { await runDemoExport() }
             }
-            .disabled(phase == .working || demoConfirmName != "local-file")
+            .disabled(
+                phase == .working
+                    || CredentialFieldHygiene.secret(demoConfirmName).normalized != "local-file"
+            )
             .accessibilityIdentifier("demo-export")
             .accessibilityHint("Exports synthetic samples marked demo:true into a DEMO- prefixed local folder.")
             Button("Send sample destination-enabled notice") {
@@ -2226,15 +2230,30 @@ struct HarnessView: View {
                 if let pendingSensitiveMetric {
                     Text("Sensitive type — type \(scopeDestinationID) to add it individually.")
                         .font(.footnote)
+                        .accessibilityIdentifier("sensitive-type-prompt")
                     TextField(scopeDestinationID, text: $sensitiveDestinationConfirmation)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .frame(minHeight: 44)
+                        .accessibilityIdentifier("sensitive-destination-confirmation")
+                    secretFieldHygiene(
+                        sensitiveDestinationConfirmation,
+                        identifierPrefix: "sensitive-destination-confirmation"
+                    )
                     Button("Confirm sensitive type") {
-                        if sensitiveDestinationConfirmation == scopeDestinationID {
+                        if CredentialFieldHygiene.secret(sensitiveDestinationConfirmation)
+                            .normalized == scopeDestinationID
+                        {
                             browserSelection.insert(pendingSensitiveMetric)
                             self.pendingSensitiveMetric = nil
                             sensitiveDestinationConfirmation = ""
                         }
                     }
-                    .disabled(sensitiveDestinationConfirmation != scopeDestinationID)
+                    .disabled(
+                        CredentialFieldHygiene.secret(sensitiveDestinationConfirmation)
+                            .normalized != scopeDestinationID
+                    )
+                    .accessibilityIdentifier("sensitive-destination-confirm")
                 }
                 Toggle("Only types with data", isOn: $browserOnlyWithData)
                     .accessibilityIdentifier("browser-only-with-data")
@@ -2532,7 +2551,9 @@ struct HarnessView: View {
         phase = .working
         status = "Exporting demo dataset…"
         do {
-            results = try await HarnessExport.runDemoDataset(typedDestinationName: demoConfirmName)
+            results = try await HarnessExport.runDemoDataset(
+                typedDestinationName: CredentialFieldHygiene.secret(demoConfirmName).normalized
+            )
             refreshDestinationSurfaces()
             status = "Demo export finished. Files are DEMO- prefixed."
         } catch {

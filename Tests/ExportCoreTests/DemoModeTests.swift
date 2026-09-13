@@ -28,6 +28,7 @@ import WireFormat
         try DemoExportGate.confirmSending(to: "local-file", typed: "home-assistant")
     }
     try DemoExportGate.confirmSending(to: "local-file", typed: "local-file")
+    try DemoExportGate.confirmSending(to: "local-file", typed: " local-file\n")
 }
 
 @Test func demoSourceCoversEveryCatalogueMetricAndPrefixesFiles() async throws {

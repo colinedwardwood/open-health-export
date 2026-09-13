@@ -890,6 +890,45 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(export.isEnabled)
     }
 
+    func testDemoExportConfirmationStripsLeadingWhitespace() {
+        enterControls()
+        let export = scrollToHittable(app.buttons["demo-export"])
+        XCTAssertFalse(export.isEnabled)
+        let field = app.textFields["demo-confirm"]
+        type(" local-file ", into: field)
+        dismissKeyboard()
+        XCTAssertTrue(
+            app.staticTexts["demo-confirm-whitespace"].waitForExistence(timeout: uiWait)
+        )
+        XCTAssertTrue(export.isEnabled)
+    }
+
+    func testSensitiveTypeRequiresTypedDestinationNameAndStripsPadding() {
+        enterControls()
+        selectRootTab(1)
+        scrollToHittable(app.buttons["browser-select"]).tap()
+        let search = scrollToHittable(app.textFields["browser-search"])
+        type("weight", into: search)
+        dismissKeyboard()
+        let row = app.descendants(matching: .any)["browser-row-bodyMass"]
+        XCTAssertTrue(row.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        row.tap()
+        XCTAssertTrue(
+            app.staticTexts["sensitive-type-prompt"].waitForExistence(timeout: uiWait)
+        )
+        let confirm = app.buttons["sensitive-destination-confirm"]
+        XCTAssertFalse(confirm.isEnabled)
+        let field = app.textFields["sensitive-destination-confirmation"]
+        type(" local-file ", into: field)
+        dismissKeyboard()
+        XCTAssertTrue(
+            app.staticTexts["sensitive-destination-confirmation-whitespace"].waitForExistence(timeout: uiWait)
+        )
+        XCTAssertTrue(confirm.isEnabled)
+        confirm.tap()
+        XCTAssertFalse(app.buttons["sensitive-destination-confirm"].waitForExistence(timeout: 2))
+    }
+
     func testR114DemoQuickstartCompletesAFullExportWithinTenMinutes() {
         let started = Date()
         addUIInterruptionMonitor(withDescription: "Notification permission") { alert in
