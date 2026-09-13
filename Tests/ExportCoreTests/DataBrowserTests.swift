@@ -482,7 +482,7 @@ private func browserSample(
 }
 
 @Test func ux15ConvertedCategoriesAreSelectableAndStayOffPresets() {
-    #expect(MetricCatalog.convertedCategories.count == 32)
+    #expect(MetricCatalog.convertedCategories.count == 67)
     #expect(
         Set(MetricCatalog.convertedCategories.map(\.hkIdentifier)).count
             == MetricCatalog.convertedCategories.count
@@ -495,6 +495,15 @@ private func browserSample(
     #expect(sensitiveIDs.contains(MetricID(rawValue: "sexual_activity")))
     #expect(sensitiveIDs.contains(MetricID(rawValue: "menstrual_flow")))
     #expect(sensitiveIDs.contains(MetricID(rawValue: "fever")))
+    #expect(sensitiveIDs.contains(MetricID(rawValue: "mood_changes")))
+    #expect(
+        MetricCatalog.declaration(for: MetricID(rawValue: "bloating"))?.hkIdentifier
+            == "HKCategoryTypeIdentifierBloating"
+    )
+    #expect(
+        MetricCatalog.declaration(for: MetricID(rawValue: "abdominal_cramps"))?.hkIdentifier
+            == "HKCategoryTypeIdentifierAbdominalCramps"
+    )
     #expect(Set(MetricCatalog.coreDaily.map(\.id)).isDisjoint(with: sensitiveIDs))
     #expect(
         MetricCatalog.selectable.map(\.id).contains(MetricID(rawValue: "pregnancy"))
