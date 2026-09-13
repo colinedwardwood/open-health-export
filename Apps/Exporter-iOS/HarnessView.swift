@@ -109,6 +109,8 @@ struct HarnessView: View {
     @State private var networkActivityLines: [String] = []
     @State private var provenanceLines: [String] = []
     @State private var historyLines: [String] = []
+    @State private var historyEvents: [RunEvent] = []
+    @State private var revealedHistoryIDs: Set<String> = []
     @State private var ledgerWarning = ""
     @State private var wakeAttribution = ""
     @State private var queueEvictionGaps: [GapRecord] = []
@@ -373,6 +375,9 @@ struct HarnessView: View {
                 // could never take effect and the warning could never be dismissed.
                 if ProcessInfo.processInfo.environment["OHE_SEED_SHARE_ACK"] == "clear" {
                     UserDefaults.standard.removeObject(forKey: "ohe.shareProtectionAcknowledged")
+                }
+                if ProcessInfo.processInfo.environment["OHE_SEED_HISTORY_PAYLOAD"] == "1" {
+                    try? await HarnessExport.prepareHistoryPayloadSeedForUITests()
                 }
                 if ProcessInfo.processInfo.environment["OHE_SEED_PUBLIC_CONFIRMATION"] == "true" {
                     confirmationCard = DestinationConfirmationCard(
@@ -1299,11 +1304,34 @@ struct HarnessView: View {
             }
             .disabled(phase == .working)
             .accessibilityIdentifier("history-load")
-            ForEach(Array(historyLines.enumerated()), id: \.offset) { index, line in
-                Text(line)
-                    .font(.system(.footnote, design: .monospaced))
-                    .textSelection(.enabled)
-                    .accessibilityIdentifier("history-row-\(index)")
+            if historyEvents.isEmpty {
+                ForEach(Array(historyLines.enumerated()), id: \.offset) { index, line in
+                    Text(line)
+                        .font(.system(.footnote, design: .monospaced))
+                        .textSelection(.enabled)
+                        .accessibilityIdentifier("history-row-\(index)")
+                }
+            } else {
+                Text(RunHistoryDetail.retentionCopy)
+                    .font(.footnote)
+                    .fixedSize(horizontal: false, vertical: true)
+                ForEach(Array(historyEvents.enumerated()), id: \.offset) { eventIndex, event in
+                    let rowID = historyRowID(event)
+                    let revealed = revealedHistoryIDs.contains(rowID)
+                    let lines = RunHistoryDetail.lines(for: event, revealPayload: revealed)
+                    ForEach(Array(lines.enumerated()), id: \.offset) { lineIndex, line in
+                        Text(line)
+                            .font(.system(.footnote, design: .monospaced))
+                            .textSelection(.enabled)
+                            .accessibilityIdentifier("history-row-\(eventIndex)-\(lineIndex)")
+                    }
+                    if event.facts.payloadPath != nil, !revealed {
+                        Button("Reveal exact payload") {
+                            Task { await revealHistoryPayload(rowID) }
+                        }
+                        .accessibilityIdentifier("history-reveal-payload-\(eventIndex)")
+                    }
+                }
             }
         }
         .buttonStyle(HarnessButtonStyle())
@@ -1663,15 +1691,46 @@ struct HarnessView: View {
     private func loadHistory() async {
         phase = .working
         do {
-            historyLines = try await HarnessExport.historyLines()
-            status = historyLines.contains(RunHistoryDetail.emptyStateCopy)
-                ? RunHistoryDetail.emptyStateCopy
-                : "Ready. Problems are listed before successful runs."
+            historyEvents = try await HarnessExport.historyEvents()
+            revealedHistoryIDs = []
+            if historyEvents.isEmpty {
+                historyLines = [
+                    RunHistoryDetail.emptyStateCopy,
+                    RunHistoryDetail.retentionCopy,
+                ]
+                status = RunHistoryDetail.emptyStateCopy
+            } else {
+                historyLines = []
+                status = "Ready. Problems are listed before successful runs."
+            }
         } catch {
+            historyEvents = []
             historyLines = []
             status = "Failed: \(error.localizedDescription)"
         }
         phase = .ready
+    }
+
+    private func historyRowID(_ event: RunEvent) -> String {
+        "\(event.runID.rawValue)-\(Int(event.wallTimeEpoch))"
+    }
+
+    @MainActor
+    private func revealHistoryPayload(_ rowID: String) async {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["OHE_HISTORY_PAYLOAD_AUTH"] == "skip" {
+            revealedHistoryIDs.insert(rowID)
+            return
+        }
+        #endif
+        let unlocked = await LocalAuthenticationAdapter().authenticate(
+            reason: "Reveal the exact export payload stored on this iPhone."
+        )
+        if unlocked {
+            revealedHistoryIDs.insert(rowID)
+        } else {
+            status = "Payload stayed hidden because authentication did not complete."
+        }
     }
 
     @MainActor

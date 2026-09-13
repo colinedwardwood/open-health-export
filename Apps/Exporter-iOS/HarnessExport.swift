@@ -1482,21 +1482,73 @@ enum HarnessExport {
         return lines.first ?? "Ledger has not been written yet."
     }
 
-    static func historyLines() async throws -> [String] {
+    static func historyEvents() async throws -> [RunEvent] {
         let root = try applicationSupportRoot()
         let store = try SQLiteStateStore(
             path: root.appendingPathComponent("state.sqlite").path
         )
         let events = try await store.transact { try $0.loadJournal() }
+        return RunHistory.problemsFirst(events)
+    }
+
+    static func historyLines() async throws -> [String] {
+        let events = try await historyEvents()
         guard !events.isEmpty else {
             return [RunHistoryDetail.emptyStateCopy, RunHistoryDetail.retentionCopy]
         }
         var lines = [RunHistoryDetail.retentionCopy]
-        for event in RunHistory.problemsFirst(events) {
+        for event in events {
             lines.append(contentsOf: RunHistoryDetail.lines(for: event))
         }
         return lines
     }
+
+    #if DEBUG
+    static func prepareHistoryPayloadSeedForUITests() async throws {
+        let root = try applicationSupportRoot()
+        let payloadURL = root
+            .appendingPathComponent("history-payloads", isDirectory: true)
+            .appendingPathComponent("ui-seed.ndjson")
+        try FileManager.default.createDirectory(
+            at: payloadURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let body = "{\"uuid\":\"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\"}\n"
+        try Data(body.utf8).write(to: payloadURL)
+        let store = try SQLiteStateStore(
+            path: root.appendingPathComponent("state.sqlite").path
+        )
+        let event = RunEvent(
+            runID: RunID(rawValue: "run-heartRate"),
+            outcomeKind: "failed",
+            detail: "destinationUnreachable",
+            trigger: .shortcut,
+            samplesRead: 4,
+            samplesCommitted: 4,
+            samplesAcked: 0,
+            wallTimeEpoch: 100,
+            errorClass: "destinationUnreachable",
+            facts: RunHistoryFacts(
+                destinationID: "https",
+                metric: "heartRate",
+                windowStartDay: "2026-01-01",
+                windowEndDay: "2026-01-02",
+                byteCount: body.utf8.count,
+                durationMillis: 40,
+                payloadSHA256: "seed",
+                redactedPayload: RunHistoryDetail.redactedPayload(
+                    metric: "heartRate",
+                    records: 4,
+                    byteCount: body.utf8.count,
+                    windowStartDay: "2026-01-01",
+                    windowEndDay: "2026-01-02"
+                ),
+                payloadPath: payloadURL.path
+            )
+        )
+        try await store.transact { try $0.appendJournal(event) }
+    }
+    #endif
 
     static func sentThroughDay(metric: MetricID) async throws -> String? {
         let root = try applicationSupportRoot()

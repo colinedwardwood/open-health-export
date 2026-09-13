@@ -67,6 +67,25 @@ import Testing
     #expect(RunHistoryDetail.emptyStateCopy.contains("No exports yet"))
 }
 
+@Test func historyUIRevealsPayloadOnlyAfterAnExplicitAction() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let view = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
+        encoding: .utf8
+    )
+    let export = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift"),
+        encoding: .utf8
+    )
+    #expect(view.contains("Reveal exact payload"))
+    #expect(view.contains("revealPayload: revealed"))
+    #expect(view.contains("LocalAuthenticationAdapter()"))
+    #expect(export.contains("prepareHistoryPayloadSeedForUITests"))
+}
+
 @Test func runHistoryFactsRoundTripThroughJSON() {
     let facts = RunHistoryFacts(
         destinationID: "nas",

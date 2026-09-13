@@ -192,6 +192,28 @@ final class ExporterUITests: XCTestCase {
         XCTAssertFalse(app.buttons["credential-reveal-mqtt"].exists)
     }
 
+    func testHistoryPayloadRevealRequiresAnExplicitActionAndStaysOffByDefault() throws {
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_HISTORY_PAYLOAD"] = "1"
+        app.launchEnvironment["OHE_HISTORY_PAYLOAD_AUTH"] = "skip"
+        app.launch()
+        enterControls()
+        let load = scrollToHittable(app.buttons["history-load"])
+        load.tap()
+        let reveal = app.buttons["history-reveal-payload-0"]
+        XCTAssertTrue(reveal.waitForExistence(timeout: uiWait))
+        XCTAssertFalse(
+            app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")).firstMatch.exists
+        )
+        reveal.tap()
+        XCTAssertTrue(
+            app.staticTexts.containing(
+                NSPredicate(format: "label CONTAINS %@", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+            ).firstMatch.waitForExistence(timeout: uiWait)
+        )
+        XCTAssertFalse(app.buttons["history-reveal-payload-0"].exists)
+    }
+
     func testDisclosureAndMainControlsPassAccessibilityAudit() throws {
         XCTAssertTrue(app.buttons["disclosure-continue"].waitForExistence(timeout: uiWait))
         try performAccessibilityAudit()
