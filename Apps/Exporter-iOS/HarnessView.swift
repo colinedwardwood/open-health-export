@@ -902,10 +902,12 @@ struct HarnessView: View {
                 Task { await runR70() }
             }
             .disabled(phase == .working)
+            .accessibilityIdentifier("r70-run")
             Button("Export one page (local file)") {
                 Task { await runLocalExport() }
             }
             .disabled(phase == .working)
+            .accessibilityIdentifier("local-file-export")
             .accessibilityHint("Writes NDJSON under Application Support using the engine and local-file sink.")
             Text(SchedulingHonesty.shortcutsLine)
                 .font(.footnote)
@@ -995,6 +997,7 @@ struct HarnessView: View {
                 Task { await sendSampleNotice() }
             }
             .disabled(phase == .working)
+            .accessibilityIdentifier("destination-enabled-notice")
             .accessibilityHint("Asks for notification permission and posts one R-40 notice with copy from the registry.")
 
             Text("Security advisories")
@@ -1006,6 +1009,7 @@ struct HarnessView: View {
                 .font(.footnote)
             Toggle("Fetch security advisories", isOn: $advisoryEnabled)
                 .frame(minHeight: 44)
+                .accessibilityIdentifier("advisory-fetch")
             if let advisoryBanner {
                 Text(advisoryBanner)
                     .font(.footnote)
@@ -1385,15 +1389,18 @@ struct HarnessView: View {
                 }
             }
             .disabled(phase == .working)
+            .accessibilityIdentifier("destination-acknowledge-changes")
             Button("Verify and show egress ledger") {
                 Task { await loadLedger() }
             }
             .disabled(phase == .working)
+            .accessibilityIdentifier("destination-ledger-verify")
             .accessibilityHint("Verifies the append-only hash chain and shows up to 50 recent transmission records.")
-            ForEach(Array(ledgerLines.enumerated()), id: \.offset) { _, line in
+            ForEach(Array(ledgerLines.enumerated()), id: \.offset) { index, line in
                 Text(line)
                     .font(.system(.footnote, design: .monospaced))
                     .textSelection(.enabled)
+                    .accessibilityIdentifier("destination-ledger-line-\(index)")
             }
             Text(EgressAttemptLog.sectionTitle)
                 .font(.headline)

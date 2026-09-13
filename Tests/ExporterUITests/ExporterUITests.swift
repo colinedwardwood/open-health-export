@@ -1221,6 +1221,28 @@ final class ExporterUITests: XCTestCase {
         )
     }
 
+    func testDestinationLedgerAndAcknowledgeAreIdentifiable() {
+        enterControls()
+        selectRootTab(2)
+        XCTAssertTrue(scrollToHittable(app.buttons["destination-acknowledge-changes"]).exists)
+        let verify = scrollToHittable(app.buttons["destination-ledger-verify"])
+        XCTAssertTrue(verify.exists)
+        verify.tap()
+        XCTAssertTrue(
+            scrollToHittable(app.staticTexts["network-activity-title"]).waitForExistence(timeout: uiWait)
+        )
+    }
+
+    func testStatusExportAndNoticeControlsAreIdentifiable() {
+        enterControls()
+        XCTAssertTrue(scrollToHittable(app.buttons["r70-run"]).exists)
+        XCTAssertTrue(scrollToHittable(app.buttons["local-file-export"]).exists)
+        XCTAssertTrue(scrollToHittable(app.buttons["destination-enabled-notice"]).exists)
+        XCTAssertTrue(
+            scrollToHittable(app.descendants(matching: .any)["advisory-fetch"]).exists
+        )
+    }
+
     /// QA-17's paused type is the other half of permission-limited: the type is enabled
     /// but not flowing, and the banner saying so is on the first screen.
     func testPausedAnchorBannerPassesAccessibilityAudit() throws {
