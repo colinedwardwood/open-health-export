@@ -383,7 +383,7 @@ import Testing
     #expect(DestinationTestPlan.https(hasPin: false).total == 5)
     #expect(DestinationTestPlan.localFile.total == 4)
     #expect(DestinationTestPlan.localFile.first == .openFolder)
-    #expect(DestinationTestPlan.companion.total == 4)
+    #expect(DestinationTestPlan.companion.total == 3)
     #expect(DestinationTestPlan.companion.first == .connect)
 }
 

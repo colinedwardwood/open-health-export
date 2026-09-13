@@ -199,6 +199,7 @@ private func writeCompanionPayload() throws -> (URL, BatchID, String) {
     )
     #expect(report.verdict == .passed)
     #expect(report.failingStep == nil)
+    #expect(report.steps.map(\.name) == [.connect, .sendCanary, .readResponse])
 }
 
 @Test func companionDestinationEnableTestsBeforeReturningVerifiedSink() async throws {

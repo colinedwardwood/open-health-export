@@ -99,9 +99,9 @@ public struct DestinationTestPlan: Sendable, Equatable {
 
     public static let localFile = DestinationTestPlan(total: 4, first: .openFolder)
 
-    /// Hello, then send/confirm. TLS-PSK has no certificate SPKI, so the first
-    /// named step is Connect rather than TLS.
-    public static let companion = DestinationTestPlan(total: 4, first: .connect)
+    /// Hello, then send/confirm. TLS-PSK has no certificate SPKI, so there is
+    /// no TLS named step — only Connect, Send, and Confirm.
+    public static let companion = DestinationTestPlan(total: 3, first: .connect)
 }
 
 public struct DestinationTestReport: Sendable, Equatable, Codable {
