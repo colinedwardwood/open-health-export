@@ -951,6 +951,32 @@ final class ExporterUITests: XCTestCase {
         )
     }
 
+    func testDataBrowserSearchMatchesHealthKitIdentifierAndMoodSynonym() {
+        enterControls()
+        selectRootTab(1)
+        let search = scrollToHittable(app.textFields["browser-search"])
+        type("HKQuantityTypeIdentifierStepCount", into: search)
+        dismissKeyboard()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["browser-row-stepCount"]
+                .waitForExistence(timeout: uiWait),
+            visibleIdentifiers().joined(separator: ",")
+        )
+        XCTAssertFalse(app.descendants(matching: .any)["browser-row-heartRate"].exists)
+        app.terminate()
+        app.launch()
+        enterControls()
+        selectRootTab(1)
+        let mood = scrollToHittable(app.textFields["browser-search"])
+        type("mood", into: mood)
+        dismissKeyboard()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["browser-row-state_of_mind"]
+                .waitForExistence(timeout: uiWait),
+            visibleIdentifiers().joined(separator: ",")
+        )
+    }
+
     func testDataBrowserOpensMetricDetailAndOffersNavigationBack() {
         enterControls()
         filterBrowserToHeartRate()

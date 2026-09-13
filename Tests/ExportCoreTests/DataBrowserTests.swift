@@ -456,6 +456,31 @@ private func browserSample(
     #expect(!catalog.contains("selectable.first { $0.id == id }"))
 }
 
+@Test func ux17SearchMatchesHealthKitIdentifiersDisplayNamesAndSynonyms() {
+    func matching(_ needle: String) -> Set<MetricID> {
+        Set(DataBrowser.rows(latest: [:], search: needle).map(\.metric))
+    }
+    #expect(
+        matching("HKQuantityTypeIdentifierStepCount") == [MetricCatalog.stepCount.id]
+    )
+    #expect(matching("steps") == [MetricCatalog.stepCount.id])
+    #expect(matching("weight") == [MetricCatalog.bodyMass.id])
+    #expect(
+        matching("HRV") == [MetricCatalog.heartRateVariabilitySDNN.id]
+    )
+    #expect(matching("SpO2") == [MetricCatalog.oxygenSaturation.id])
+    #expect(
+        matching("BP") == Set([
+            MetricCatalog.bloodPressureSystolic.id,
+            MetricCatalog.bloodPressureDiastolic.id,
+        ])
+    )
+    #expect(matching("mood") == [MetricCatalog.stateOfMind.id])
+    #expect(
+        matching("HKDataTypeIdentifierStateOfMind") == [MetricCatalog.stateOfMind.id]
+    )
+}
+
 @Test func hk30CharacteristicsStayOffByDefaultAndAreFlaggedReidentifying() throws {
     #expect(MetricCatalog.characteristics.count == 6)
     #expect(MetricCatalog.characteristics.allSatisfy { $0.kind == "characteristic" })
