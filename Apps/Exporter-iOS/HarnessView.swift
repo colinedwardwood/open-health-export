@@ -3261,10 +3261,26 @@ struct HarnessView: View {
     private func runCompanionExport() async {
         guard let pairing else { return }
         phase = .working
-        status = NamedWorkProgress.types(current: 0, total: 1)
+        let companionPlan = DestinationTestPlan.companion
+        status = NamedWorkProgress.test(
+            current: 0,
+            total: companionPlan.total,
+            step: companionPlan.first.progressLabel
+        )
         results = []
         do {
-            results = try await HarnessExport.runCompanion(session: pairing) { current, total in
+            results = try await HarnessExport.runCompanion(
+                session: pairing,
+                onTestProgress: { current, total, step in
+                    Task { @MainActor in
+                        status = NamedWorkProgress.test(
+                            current: current,
+                            total: total,
+                            step: step.progressLabel
+                        )
+                    }
+                }
+            ) { current, total in
                 await MainActor.run {
                     status = NamedWorkProgress.types(current: current, total: total)
                 }

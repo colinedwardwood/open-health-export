@@ -1077,6 +1077,7 @@ enum HarnessExport {
 
     static func runCompanion(
         session: PairingSession,
+        onTestProgress: DestinationTestProgress? = nil,
         onProgress: (@Sendable (Int, Int) async -> Void)? = nil
     ) async throws -> [String] {
         let scope = try await destinationScope("companion")
@@ -1122,7 +1123,8 @@ enum HarnessExport {
                 emittedAt: Date().ISO8601Format(),
                 traceparent: emission,
                 meteredPolicy: .fromAllowsMetered(allowsMeteredNetwork(destinationID: "companion")),
-                pathConditions: networkPathConditions()
+                pathConditions: networkPathConditions(),
+                onProgress: onTestProgress
             )
             verified = completed.destination
             let record = CompanionVerificationRecord(

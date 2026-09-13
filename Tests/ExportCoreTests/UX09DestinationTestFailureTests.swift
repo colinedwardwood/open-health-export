@@ -381,6 +381,10 @@ import Testing
     #expect(mqttsPlan.first == .tlsHandshake)
     #expect(DestinationTestPlan.https(hasPin: true).total == 6)
     #expect(DestinationTestPlan.https(hasPin: false).total == 5)
+    #expect(DestinationTestPlan.localFile.total == 4)
+    #expect(DestinationTestPlan.localFile.first == .openFolder)
+    #expect(DestinationTestPlan.companion.total == 4)
+    #expect(DestinationTestPlan.companion.first == .connect)
 }
 
 private func httpsHook() throws -> HTTPSDestination {

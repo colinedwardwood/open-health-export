@@ -15,7 +15,7 @@ public enum CompanionDestinationTest {
         batchID: String = "canary",
         onProgress: DestinationTestProgress? = nil
     ) async -> DestinationTestReport {
-        let total = 4
+        let total = DestinationTestPlan.companion.total
         var steps: [DestinationTestStepReport] = []
         let session = CompanionSession(pipe: pipe)
         onProgress?(1, total, .connect)

@@ -259,6 +259,7 @@ private func backfillCheckpoint(
     #expect(!view.contains("Working:"))
     #expect(view.contains("DestinationTestPlan.mqtt("))
     #expect(view.contains("DestinationTestPlan.https("))
+    #expect(view.contains("DestinationTestPlan.companion"))
     #expect(view.contains("NamedWorkProgress.measure("))
 
     let harness = try String(
