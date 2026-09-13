@@ -173,7 +173,9 @@ public enum DemoCorpus {
             random & 0xFFFF_FFFF_FFFF
         )
         let value = Double(random % 100_000) / 100
-        let sourceIndex = (index / max(MetricCatalog.all.count, 1)) % sources.count
+        // Rotating per record rather than per catalogue pass keeps all six synthetic
+        // identities present in a 200-record T0 corpus however large the catalogue grows.
+        let sourceIndex = index % sources.count
         let source = sources[sourceIndex]
         return SampleRecord(
             key: RecordKey(uuid: uuid),

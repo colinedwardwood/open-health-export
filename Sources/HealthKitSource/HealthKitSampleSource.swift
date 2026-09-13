@@ -90,18 +90,58 @@ enum SampleConversion {
                 by: .gramUnit(with: .kilo).unitMultiplied(by: .hour())
             )
         default:
+            return catalogUnit(for: metric)
+        }
+    }
+
+    static func catalogUnit(for metric: MetricID) -> HKUnit {
+        let symbol = MetricCatalog.declaration(for: metric)?.canonicalUnit.symbol ?? "count"
+        switch symbol {
+        case "count":
+            return .count()
+        case "g":
+            return .gram()
+        case "kcal":
+            return .kilocalorie()
+        case "km", "m":
+            return .meter()
+        case "m/s":
+            return HKUnit.meter().unitDivided(by: .second())
+        case "count/min":
+            return HKUnit.count().unitDivided(by: .minute())
+        case "%":
+            return .percent()
+        case "degC":
+            return .degreeCelsius()
+        case "W":
+            return .watt()
+        case "L":
+            return .liter()
+        case "L/min":
+            return HKUnit.liter().unitDivided(by: .minute())
+        case "dBASPL":
+            return .decibelAWeightedSoundPressureLevel()
+        case "ms":
+            return .secondUnit(with: .milli)
+        case "mcS":
+            return .siemenUnit(with: .micro)
+        case "IU":
+            return .internationalUnit()
+        case "appleEffortScore":
+            if #available(iOS 18.0, macOS 15.0, *) {
+                return .appleEffortScore()
+            }
+            return .count()
+        default:
             return .count()
         }
     }
 
     static func canonicalValue(_ hkValue: Double, metric: MetricID) -> Double {
-        switch metric {
-        case MetricCatalog.oxygenSaturation.id, MetricCatalog.bodyFatPercentage.id:
+        switch MetricCatalog.declaration(for: metric)?.wireUnit {
+        case "%":
             return hkValue * 100
-        case MetricCatalog.walkingRunningDistance.id,
-             MetricCatalog.cyclingDistance.id,
-             MetricCatalog.swimmingDistance.id,
-             MetricCatalog.wheelchairDistance.id:
+        case "km":
             return hkValue / 1000
         default:
             return hkValue

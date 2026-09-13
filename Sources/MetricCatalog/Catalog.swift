@@ -633,6 +633,418 @@ public enum MetricCatalog {
         haRequiresAggregate: false
     )
 
+    /// Converted HealthKit quantity families that already have generic sample.quantity conversion.
+    /// Sensitive insulin, alcohol, and body-size types stay out of Core Daily.
+    public static let convertedQuantities: [MetricDeclaration] = {
+        func gram(_ id: String, _ hk: String) -> MetricDeclaration {
+            convertedQuantity(
+                id,
+                hk,
+                symbol: "g",
+                cumulative: true,
+                sensitivity: .routine,
+                haUnit: "g",
+                haDeviceClass: nil,
+                haStateClass: "total_increasing"
+            )
+        }
+        func km(_ id: String, _ hk: String) -> MetricDeclaration {
+            convertedQuantity(
+                id,
+                hk,
+                symbol: "km",
+                cumulative: true,
+                sensitivity: .routine,
+                haUnit: "km",
+                haDeviceClass: "distance",
+                haStateClass: "total_increasing"
+            )
+        }
+        func speed(_ id: String, _ hk: String) -> MetricDeclaration {
+            convertedQuantity(
+                id,
+                hk,
+                symbol: "m/s",
+                cumulative: false,
+                sensitivity: .routine,
+                haUnit: "m/s",
+                haDeviceClass: "speed",
+                haStateClass: "measurement"
+            )
+        }
+        func watts(_ id: String, _ hk: String) -> MetricDeclaration {
+            convertedQuantity(
+                id,
+                hk,
+                symbol: "W",
+                cumulative: false,
+                sensitivity: .routine,
+                haUnit: "W",
+                haDeviceClass: "power",
+                haStateClass: "measurement"
+            )
+        }
+        func percent(_ id: String, _ hk: String, _ sensitivity: SensitivityClass) -> MetricDeclaration {
+            convertedQuantity(
+                id,
+                hk,
+                symbol: "%",
+                cumulative: false,
+                sensitivity: sensitivity,
+                haUnit: "%",
+                haDeviceClass: nil,
+                haStateClass: "measurement"
+            )
+        }
+        func count(
+            _ id: String,
+            _ hk: String,
+            cumulative: Bool,
+            sensitivity: SensitivityClass
+        ) -> MetricDeclaration {
+            convertedQuantity(
+                id,
+                hk,
+                symbol: "count",
+                cumulative: cumulative,
+                sensitivity: sensitivity,
+                haUnit: "count",
+                haDeviceClass: nil,
+                haStateClass: cumulative ? "total_increasing" : "measurement"
+            )
+        }
+        return [
+            count(
+                "apple_sleeping_breathing_disturbances",
+                "HKQuantityTypeIdentifierAppleSleepingBreathingDisturbances",
+                cumulative: false,
+                sensitivity: .sensitive
+            ),
+            convertedQuantity(
+                "apple_sleeping_wrist_temperature",
+                "HKQuantityTypeIdentifierAppleSleepingWristTemperature",
+                symbol: "degC",
+                cumulative: false,
+                sensitivity: .sensitive,
+                haUnit: "°C",
+                haDeviceClass: "temperature",
+                haStateClass: "measurement"
+            ),
+            percent(
+                "apple_walking_steadiness",
+                "HKQuantityTypeIdentifierAppleWalkingSteadiness",
+                .sensitive
+            ),
+            percent(
+                "atrial_fibrillation_burden",
+                "HKQuantityTypeIdentifierAtrialFibrillationBurden",
+                .sensitive
+            ),
+            percent(
+                "blood_alcohol_content",
+                "HKQuantityTypeIdentifierBloodAlcoholContent",
+                .sensitive
+            ),
+            speed("cross_country_skiing_speed", "HKQuantityTypeIdentifierCrossCountrySkiingSpeed"),
+            convertedQuantity(
+                "cycling_cadence",
+                "HKQuantityTypeIdentifierCyclingCadence",
+                symbol: "count/min",
+                cumulative: false,
+                sensitivity: .routine,
+                haUnit: "rpm",
+                haDeviceClass: nil,
+                haStateClass: "measurement"
+            ),
+            watts(
+                "cycling_functional_threshold_power",
+                "HKQuantityTypeIdentifierCyclingFunctionalThresholdPower"
+            ),
+            watts("cycling_power", "HKQuantityTypeIdentifierCyclingPower"),
+            gram("dietary_biotin", "HKQuantityTypeIdentifierDietaryBiotin"),
+            gram("dietary_caffeine", "HKQuantityTypeIdentifierDietaryCaffeine"),
+            gram("dietary_calcium", "HKQuantityTypeIdentifierDietaryCalcium"),
+            gram("dietary_carbohydrates", "HKQuantityTypeIdentifierDietaryCarbohydrates"),
+            gram("dietary_chloride", "HKQuantityTypeIdentifierDietaryChloride"),
+            gram("dietary_cholesterol", "HKQuantityTypeIdentifierDietaryCholesterol"),
+            gram("dietary_chromium", "HKQuantityTypeIdentifierDietaryChromium"),
+            gram("dietary_copper", "HKQuantityTypeIdentifierDietaryCopper"),
+            convertedQuantity(
+                "dietary_energy_consumed",
+                "HKQuantityTypeIdentifierDietaryEnergyConsumed",
+                symbol: "kcal",
+                cumulative: true,
+                sensitivity: .routine,
+                haUnit: "kcal",
+                haDeviceClass: nil,
+                haStateClass: "total_increasing"
+            ),
+            gram("dietary_fat_monounsaturated", "HKQuantityTypeIdentifierDietaryFatMonounsaturated"),
+            gram("dietary_fat_polyunsaturated", "HKQuantityTypeIdentifierDietaryFatPolyunsaturated"),
+            gram("dietary_fat_saturated", "HKQuantityTypeIdentifierDietaryFatSaturated"),
+            gram("dietary_fat_total", "HKQuantityTypeIdentifierDietaryFatTotal"),
+            gram("dietary_fiber", "HKQuantityTypeIdentifierDietaryFiber"),
+            gram("dietary_folate", "HKQuantityTypeIdentifierDietaryFolate"),
+            gram("dietary_iodine", "HKQuantityTypeIdentifierDietaryIodine"),
+            gram("dietary_iron", "HKQuantityTypeIdentifierDietaryIron"),
+            gram("dietary_magnesium", "HKQuantityTypeIdentifierDietaryMagnesium"),
+            gram("dietary_manganese", "HKQuantityTypeIdentifierDietaryManganese"),
+            gram("dietary_molybdenum", "HKQuantityTypeIdentifierDietaryMolybdenum"),
+            gram("dietary_niacin", "HKQuantityTypeIdentifierDietaryNiacin"),
+            gram("dietary_pantothenic_acid", "HKQuantityTypeIdentifierDietaryPantothenicAcid"),
+            gram("dietary_phosphorus", "HKQuantityTypeIdentifierDietaryPhosphorus"),
+            gram("dietary_potassium", "HKQuantityTypeIdentifierDietaryPotassium"),
+            gram("dietary_protein", "HKQuantityTypeIdentifierDietaryProtein"),
+            gram("dietary_riboflavin", "HKQuantityTypeIdentifierDietaryRiboflavin"),
+            gram("dietary_selenium", "HKQuantityTypeIdentifierDietarySelenium"),
+            gram("dietary_sodium", "HKQuantityTypeIdentifierDietarySodium"),
+            gram("dietary_sugar", "HKQuantityTypeIdentifierDietarySugar"),
+            gram("dietary_thiamin", "HKQuantityTypeIdentifierDietaryThiamin"),
+            gram("dietary_vitamin_a", "HKQuantityTypeIdentifierDietaryVitaminA"),
+            gram("dietary_vitamin_b12", "HKQuantityTypeIdentifierDietaryVitaminB12"),
+            gram("dietary_vitamin_b6", "HKQuantityTypeIdentifierDietaryVitaminB6"),
+            gram("dietary_vitamin_c", "HKQuantityTypeIdentifierDietaryVitaminC"),
+            gram("dietary_vitamin_d", "HKQuantityTypeIdentifierDietaryVitaminD"),
+            gram("dietary_vitamin_e", "HKQuantityTypeIdentifierDietaryVitaminE"),
+            gram("dietary_vitamin_k", "HKQuantityTypeIdentifierDietaryVitaminK"),
+            gram("dietary_zinc", "HKQuantityTypeIdentifierDietaryZinc"),
+            km("distance_cross_country_skiing", "HKQuantityTypeIdentifierDistanceCrossCountrySkiing"),
+            km("distance_downhill_snow_sports", "HKQuantityTypeIdentifierDistanceDownhillSnowSports"),
+            km("distance_paddle_sports", "HKQuantityTypeIdentifierDistancePaddleSports"),
+            km("distance_rowing", "HKQuantityTypeIdentifierDistanceRowing"),
+            km("distance_skating_sports", "HKQuantityTypeIdentifierDistanceSkatingSports"),
+            convertedQuantity(
+                "electrodermal_activity",
+                "HKQuantityTypeIdentifierElectrodermalActivity",
+                symbol: "mcS",
+                cumulative: false,
+                sensitivity: .sensitive,
+                haUnit: "µS",
+                haDeviceClass: nil,
+                haStateClass: "measurement"
+            ),
+            convertedQuantity(
+                "environmental_sound_reduction",
+                "HKQuantityTypeIdentifierEnvironmentalSoundReduction",
+                symbol: "dBASPL",
+                cumulative: false,
+                sensitivity: .routine,
+                haUnit: "dBA",
+                haDeviceClass: "sound_pressure",
+                haStateClass: "measurement"
+            ),
+            convertedQuantity(
+                "estimated_workout_effort_score",
+                "HKQuantityTypeIdentifierEstimatedWorkoutEffortScore",
+                symbol: "appleEffortScore",
+                cumulative: false,
+                sensitivity: .routine,
+                haUnit: nil,
+                haDeviceClass: nil,
+                haStateClass: "measurement"
+            ),
+            convertedQuantity(
+                "forced_expiratory_volume_1",
+                "HKQuantityTypeIdentifierForcedExpiratoryVolume1",
+                symbol: "L",
+                cumulative: false,
+                sensitivity: .sensitive,
+                haUnit: "L",
+                haDeviceClass: nil,
+                haStateClass: "measurement"
+            ),
+            convertedQuantity(
+                "forced_vital_capacity",
+                "HKQuantityTypeIdentifierForcedVitalCapacity",
+                symbol: "L",
+                cumulative: false,
+                sensitivity: .sensitive,
+                haUnit: "L",
+                haDeviceClass: nil,
+                haStateClass: "measurement"
+            ),
+            convertedQuantity(
+                "headphone_audio_exposure",
+                "HKQuantityTypeIdentifierHeadphoneAudioExposure",
+                symbol: "dBASPL",
+                cumulative: false,
+                sensitivity: .routine,
+                haUnit: "dBA",
+                haDeviceClass: "sound_pressure",
+                haStateClass: "measurement"
+            ),
+            convertedQuantity(
+                "heart_rate_recovery_one_minute",
+                "HKQuantityTypeIdentifierHeartRateRecoveryOneMinute",
+                symbol: "count/min",
+                cumulative: false,
+                sensitivity: .routine,
+                haUnit: "bpm",
+                haDeviceClass: nil,
+                haStateClass: "measurement"
+            ),
+            count(
+                "inhaler_usage",
+                "HKQuantityTypeIdentifierInhalerUsage",
+                cumulative: true,
+                sensitivity: .sensitive
+            ),
+            convertedQuantity(
+                "insulin_delivery",
+                "HKQuantityTypeIdentifierInsulinDelivery",
+                symbol: "IU",
+                cumulative: true,
+                sensitivity: .sensitive,
+                haUnit: "IU",
+                haDeviceClass: nil,
+                haStateClass: "total_increasing"
+            ),
+            count(
+                "nike_fuel",
+                "HKQuantityTypeIdentifierNikeFuel",
+                cumulative: true,
+                sensitivity: .routine
+            ),
+            count(
+                "number_of_alcoholic_beverages",
+                "HKQuantityTypeIdentifierNumberOfAlcoholicBeverages",
+                cumulative: true,
+                sensitivity: .sensitive
+            ),
+            count(
+                "number_of_times_fallen",
+                "HKQuantityTypeIdentifierNumberOfTimesFallen",
+                cumulative: true,
+                sensitivity: .sensitive
+            ),
+            speed("paddle_sports_speed", "HKQuantityTypeIdentifierPaddleSportsSpeed"),
+            convertedQuantity(
+                "peak_expiratory_flow_rate",
+                "HKQuantityTypeIdentifierPeakExpiratoryFlowRate",
+                symbol: "L/min",
+                cumulative: false,
+                sensitivity: .sensitive,
+                haUnit: "L/min",
+                haDeviceClass: nil,
+                haStateClass: "measurement"
+            ),
+            percent(
+                "peripheral_perfusion_index",
+                "HKQuantityTypeIdentifierPeripheralPerfusionIndex",
+                .sensitive
+            ),
+            speed("rowing_speed", "HKQuantityTypeIdentifierRowingSpeed"),
+            convertedQuantity(
+                "running_ground_contact_time",
+                "HKQuantityTypeIdentifierRunningGroundContactTime",
+                symbol: "ms",
+                cumulative: false,
+                sensitivity: .routine,
+                haUnit: "ms",
+                haDeviceClass: "duration",
+                haStateClass: "measurement"
+            ),
+            watts("running_power", "HKQuantityTypeIdentifierRunningPower"),
+            convertedQuantity(
+                "running_stride_length",
+                "HKQuantityTypeIdentifierRunningStrideLength",
+                symbol: "m",
+                cumulative: false,
+                sensitivity: .routine,
+                haUnit: "m",
+                haDeviceClass: "distance",
+                haStateClass: "measurement"
+            ),
+            convertedQuantity(
+                "running_vertical_oscillation",
+                "HKQuantityTypeIdentifierRunningVerticalOscillation",
+                symbol: "m",
+                cumulative: false,
+                sensitivity: .routine,
+                haUnit: "m",
+                haDeviceClass: "distance",
+                haStateClass: "measurement"
+            ),
+            convertedQuantity(
+                "six_minute_walk_test_distance",
+                "HKQuantityTypeIdentifierSixMinuteWalkTestDistance",
+                symbol: "m",
+                cumulative: false,
+                sensitivity: .routine,
+                haUnit: "m",
+                haDeviceClass: "distance",
+                haStateClass: "measurement"
+            ),
+            speed("stair_descent_speed", "HKQuantityTypeIdentifierStairDescentSpeed"),
+            count(
+                "uv_exposure",
+                "HKQuantityTypeIdentifierUVExposure",
+                cumulative: false,
+                sensitivity: .routine
+            ),
+            convertedQuantity(
+                "underwater_depth",
+                "HKQuantityTypeIdentifierUnderwaterDepth",
+                symbol: "m",
+                cumulative: false,
+                sensitivity: .routine,
+                haUnit: "m",
+                haDeviceClass: "distance",
+                haStateClass: "measurement"
+            ),
+            convertedQuantity(
+                "waist_circumference",
+                "HKQuantityTypeIdentifierWaistCircumference",
+                symbol: "m",
+                cumulative: false,
+                sensitivity: .sensitive,
+                haUnit: "m",
+                haDeviceClass: "distance",
+                haStateClass: "measurement"
+            ),
+            percent(
+                "walking_asymmetry_percentage",
+                "HKQuantityTypeIdentifierWalkingAsymmetryPercentage",
+                .routine
+            ),
+            percent(
+                "walking_double_support_percentage",
+                "HKQuantityTypeIdentifierWalkingDoubleSupportPercentage",
+                .routine
+            ),
+            convertedQuantity(
+                "walking_step_length",
+                "HKQuantityTypeIdentifierWalkingStepLength",
+                symbol: "m",
+                cumulative: false,
+                sensitivity: .routine,
+                haUnit: "m",
+                haDeviceClass: "distance",
+                haStateClass: "measurement"
+            ),
+            convertedQuantity(
+                "water_temperature",
+                "HKQuantityTypeIdentifierWaterTemperature",
+                symbol: "degC",
+                cumulative: false,
+                sensitivity: .routine,
+                haUnit: "°C",
+                haDeviceClass: "temperature",
+                haStateClass: "measurement"
+            ),
+            convertedQuantity(
+                "workout_effort_score",
+                "HKQuantityTypeIdentifierWorkoutEffortScore",
+                symbol: "appleEffortScore",
+                cumulative: false,
+                sensitivity: .routine,
+                haUnit: nil,
+                haDeviceClass: nil,
+                haStateClass: "measurement"
+            ),
+        ]
+    }()
+
     public static let all: [MetricDeclaration] = [
         stepCount,
         heartRate,
@@ -672,7 +1084,7 @@ public enum MetricCatalog {
         environmentalAudioExposure,
         appleMoveTime,
         physicalEffort,
-    ]
+    ] + convertedQuantities
 
     public static let sleepAnalysis = MetricDeclaration(
         id: MetricID(rawValue: "sleep_analysis"),
@@ -874,6 +1286,32 @@ public enum MetricCatalog {
         declaration(for: id)?.kind == "characteristic"
     }
 
+    private static func convertedQuantity(
+        _ id: String,
+        _ hkIdentifier: String,
+        symbol: String,
+        cumulative: Bool,
+        sensitivity: SensitivityClass,
+        haUnit: String?,
+        haDeviceClass: String?,
+        haStateClass: String?
+    ) -> MetricDeclaration {
+        MetricDeclaration(
+            id: MetricID(rawValue: id),
+            wireId: id,
+            hkIdentifier: hkIdentifier,
+            canonicalUnit: CanonicalUnit(symbol: symbol),
+            wireUnit: symbol,
+            cumulative: cumulative,
+            usesHealthKitStatistics: cumulative,
+            sensitivity: sensitivity,
+            haUnit: haUnit,
+            haDeviceClass: haDeviceClass,
+            haStateClass: haStateClass,
+            haRequiresAggregate: cumulative
+        )
+    }
+
     private static func convertedCategory(
         _ id: String,
         _ hkIdentifier: String,
@@ -963,6 +1401,9 @@ public enum MetricCatalog {
         "HKQuantityTypeIdentifierAppleExerciseTime",
         "HKQuantityTypeIdentifierAppleStandTime",
         "HKQuantityTypeIdentifierAppleMoveTime",
+        "HKQuantityTypeIdentifierAppleWalkingSteadiness",
+        "HKQuantityTypeIdentifierAppleSleepingWristTemperature",
+        "HKQuantityTypeIdentifierAppleSleepingBreathingDisturbances",
         "HKDataTypeIdentifierElectrocardiogram",
     ]
 }

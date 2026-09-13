@@ -595,4 +595,39 @@ import WireFormat
             == .healthDataRestricted
     )
 }
+
+@Test func convertedQuantitiesConstructAndConvertWithCatalogUnits() {
+    let start = Date(timeIntervalSince1970: 1_704_067_200)
+    for declaration in MetricCatalog.convertedQuantities {
+        guard let type = SampleConversion.quantityType(for: declaration.id) else {
+            Issue.record("missing HealthKit quantity type for \(declaration.id.rawValue)")
+            continue
+        }
+        let unit = SampleConversion.catalogUnit(for: declaration.id)
+        var metadata: [String: Any] = [:]
+        if declaration.id.rawValue == "insulin_delivery" {
+            metadata[HKMetadataKeyInsulinDeliveryReason] = HKInsulinDeliveryReason.basal.rawValue
+        }
+        let sample = HKQuantitySample(
+            type: type,
+            quantity: HKQuantity(unit: unit, doubleValue: 1),
+            start: start,
+            end: start.addingTimeInterval(1),
+            metadata: metadata.isEmpty ? nil : metadata
+        )
+        let record = SampleConversion.record(
+            from: sample,
+            metric: declaration.id,
+            context: .utc
+        )
+        if declaration.wireUnit == "%" {
+            #expect(abs(record.value - 100) < 0.000_001)
+        } else if declaration.wireUnit == "km" {
+            #expect(abs(record.value - 0.001) < 0.000_001)
+        } else {
+            #expect(abs(record.value - 1) < 0.000_001)
+        }
+        #expect(record.unit == declaration.canonicalUnit)
+    }
+}
 #endif

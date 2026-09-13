@@ -484,6 +484,12 @@ private func browserSample(
     #expect(
         matching("HKDataTypeIdentifierStateOfMind") == [MetricCatalog.stateOfMind.id]
     )
+    #expect(
+        matching("insulin") == [MetricID(rawValue: "insulin_delivery")]
+    )
+    #expect(
+        matching("caffeine") == [MetricID(rawValue: "dietary_caffeine")]
+    )
 }
 
 @Test func ux15ConvertedCategoriesAreSelectableAndStayOffPresets() {
@@ -523,6 +529,42 @@ private func browserSample(
     draft.invertRoutine(MetricCatalog.selectable.map(\.id))
     #expect(draft.selected.isDisjoint(with: sensitiveIDs))
     #expect(draft.selected.contains(MetricID(rawValue: "handwashing_event")))
+}
+
+@Test func convertedQuantitiesAreSelectableAndStayOffCoreDailyWhenSensitive() {
+    #expect(MetricCatalog.convertedQuantities.count == 82)
+    #expect(
+        Set(MetricCatalog.convertedQuantities.map(\.hkIdentifier)).count
+            == MetricCatalog.convertedQuantities.count
+    )
+    #expect(MetricCatalog.convertedQuantities.allSatisfy { $0.kind == "sample.quantity" })
+    #expect(Set(MetricCatalog.all.map(\.hkIdentifier)).isSuperset(of:
+        Set(MetricCatalog.convertedQuantities.map(\.hkIdentifier))
+    ))
+    let sensitiveIDs = Set(
+        MetricCatalog.convertedQuantities.filter { $0.sensitivity == .sensitive }.map(\.id)
+    )
+    #expect(sensitiveIDs.contains(MetricID(rawValue: "insulin_delivery")))
+    #expect(sensitiveIDs.contains(MetricID(rawValue: "blood_alcohol_content")))
+    #expect(sensitiveIDs.contains(MetricID(rawValue: "waist_circumference")))
+    #expect(Set(MetricCatalog.coreDaily.map(\.id)).isDisjoint(with: sensitiveIDs))
+    #expect(
+        MetricSearch.matches(
+            MetricCatalog.declaration(for: MetricID(rawValue: "insulin_delivery"))!,
+            needle: "insulin"
+        )
+    )
+    #expect(
+        MetricSearch.matches(
+            MetricCatalog.declaration(for: MetricID(rawValue: "dietary_caffeine"))!,
+            needle: "caffeine"
+        )
+    )
+    var draft = DataSelectionDraft(baseline: [])
+    draft.invertRoutine(MetricCatalog.selectable.map(\.id))
+    #expect(draft.selected.isDisjoint(with: sensitiveIDs))
+    #expect(draft.selected.contains(MetricID(rawValue: "dietary_protein")))
+    #expect(draft.selected.contains(MetricID(rawValue: "cycling_power")))
 }
 
 @Test func hk30CharacteristicsStayOffByDefaultAndAreFlaggedReidentifying() throws {

@@ -755,7 +755,8 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     let measurementForbidden: Set<String> = [
         "date", "enum", "energy", "gas", "monetary", "timestamp", "volume", "water",
     ]
-    #expect(MetricCatalog.all.count == 38)
+    #expect(MetricCatalog.all.count == 38 + MetricCatalog.convertedQuantities.count)
+    #expect(MetricCatalog.convertedQuantities.count == 82)
     #expect(MetricCatalog.height.haUnit == "cm")
     #expect(MetricCatalog.height.haDeviceClass == "distance")
     #expect(MetricCatalog.bodyFatPercentage.haDeviceClass == nil)

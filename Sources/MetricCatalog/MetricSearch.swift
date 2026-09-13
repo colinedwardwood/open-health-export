@@ -25,6 +25,10 @@ public enum MetricSearch {
         MetricID(rawValue: "menstrual_flow"): ["period", "cycle", "menses"],
         MetricID(rawValue: "pregnancy"): ["pregnant"],
         MetricID(rawValue: "sexual_activity"): ["sex"],
+        MetricID(rawValue: "insulin_delivery"): ["insulin"],
+        MetricID(rawValue: "blood_alcohol_content"): ["bac", "alcohol"],
+        MetricID(rawValue: "dietary_caffeine"): ["caffeine"],
+        MetricID(rawValue: "number_of_alcoholic_beverages"): ["alcohol", "drinks"],
     ]
 
     public static func haystack(for declaration: MetricDeclaration) -> String {
