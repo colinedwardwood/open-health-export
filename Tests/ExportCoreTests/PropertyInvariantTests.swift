@@ -556,6 +556,15 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
     #expect(checker.contains("NDJSONFieldScan"))
     #expect(checker.contains("ingested_lines="))
     #expect(checker.contains("quantitySample(fromNDJSONLine: line, decoder: decoder)"))
+    #expect(checker.contains("persistHistoryPayload: exerciseSidecars"))
+    #expect(checker.contains("countQuantityRecords"))
+    let sha = try String(
+        contentsOf: root.appendingPathComponent("Sources/WireFormat/SHA256.swift"),
+        encoding: .utf8
+    )
+    #expect(sha.contains("drainFullBlocks"))
+    #expect(sha.contains("removeFirst(offset)"))
+    #expect(!sha.contains("removeFirst(64)"))
     let reader = try String(
         contentsOf: root.appendingPathComponent("Sources/WireFormat/NDJSONLineReader.swift"),
         encoding: .utf8

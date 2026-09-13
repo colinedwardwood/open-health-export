@@ -115,6 +115,45 @@ public enum NativeWire {
         }.count
     }
 
+    public static func countRecords(in data: Data) -> Int {
+        countLines(in: data) { line in
+            guard !line.isEmpty else { return false }
+            if line.range(of: headerKind) != nil { return false }
+            if line.range(of: footerKind) != nil { return false }
+            return true
+        }
+    }
+
+    public static func countQuantityRecords(in data: Data) -> Int {
+        countLines(in: data) { line in
+            line.range(of: quantityKind) != nil
+        }
+    }
+
+    private static let headerKind = Data(#""kind":"batch.header""#.utf8)
+    private static let footerKind = Data(#""kind":"batch.footer""#.utf8)
+    private static let quantityKind = Data(#""kind":"sample.quantity""#.utf8)
+
+    private static func countLines(in data: Data, where matches: (Data) -> Bool) -> Int {
+        var count = 0
+        var start = data.startIndex
+        while start < data.endIndex {
+            var end = start
+            while end < data.endIndex, data[end] != 0x0A {
+                end = data.index(after: end)
+            }
+            var line = data[start..<end]
+            if line.last == 0x0D {
+                line = line.dropLast()
+            }
+            if matches(Data(line)) {
+                count += 1
+            }
+            start = end < data.endIndex ? data.index(after: end) : end
+        }
+        return count
+    }
+
     public static func encode(
         samples: [SampleRecord],
         categories: [CategoryRecord] = [],

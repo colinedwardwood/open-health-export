@@ -257,7 +257,8 @@ struct ExportRunCheck {
                 observedAt: "2025-01-01T00:00:00Z"
             ),
             clock: FrozenClock(instant: Date(timeIntervalSince1970: 1_735_689_600)),
-            trigger: .bgProcessing
+            trigger: .bgProcessing,
+            persistHistoryPayload: exerciseSidecars
         )
         let outcome = try await run.run()
         guard outcome.kind == .success else {
@@ -390,10 +391,7 @@ private struct AuditingSink: DestinationSink {
     func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt {
         let payloadURL = URL(fileURLWithPath: fileHandle)
         let data = try Data(contentsOf: payloadURL)
-        let text = String(decoding: data, as: UTF8.self)
-        let quantityRecords = text.split(whereSeparator: \.isNewline)
-            .filter { $0.contains("\"kind\":\"sample.quantity\"") }
-            .count
+        let quantityRecords = NativeWire.countQuantityRecords(in: data)
         guard quantityRecords == expectedQuantityRecords else {
             throw CheckError.payloadQuantityMismatch(
                 expected: expectedQuantityRecords,
@@ -420,7 +418,7 @@ private struct AuditingSink: DestinationSink {
         }
         return DeliveryReceipt(
             batchID: idempotencyKey,
-            accepted: NativeWire.countRecords(in: text),
+            accepted: NativeWire.countRecords(in: data),
             statusOnly: false
         )
     }

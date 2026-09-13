@@ -37,6 +37,9 @@ public struct ExportRun: Sendable {
     /// UX-22: C, the owned freshness cadence that drives stale and overdue windows.
     public var freshnessCadenceSeconds: TimeInterval
     public var deferForLowPower: Bool
+    /// UX-40 history archive copy. Volume pages skip this so SHA-256 is not re-run
+    /// on every bounded ExportRun after the first page of a metric.
+    public var persistHistoryPayload: Bool
     #if DEBUG
     public var faults: any ExportFaultInjector = NoExportFaults()
     #endif
@@ -63,7 +66,8 @@ public struct ExportRun: Sendable {
         scope: DestinationExportScope? = nil,
         replaySampleLimit: Int = AnchorGuard.implausibleDeltaSamples,
         freshnessCadenceSeconds: TimeInterval = FreshnessTarget.defaultCadenceSeconds,
-        deferForLowPower: Bool = false
+        deferForLowPower: Bool = false,
+        persistHistoryPayload: Bool = true
     ) {
         self.source = source
         self.destination = destination
@@ -87,6 +91,7 @@ public struct ExportRun: Sendable {
         self.replaySampleLimit = replaySampleLimit
         self.freshnessCadenceSeconds = freshnessCadenceSeconds
         self.deferForLowPower = deferForLowPower
+        self.persistHistoryPayload = persistHistoryPayload
     }
 
     public func run() async throws -> RunOutcome {
@@ -558,7 +563,7 @@ public struct ExportRun: Sendable {
         } ?? 0
         var payloadPath: String?
         var payloadSHA: String?
-        if let payload {
+        if let payload, persistHistoryPayload {
             let dir = scratchDirectory.appendingPathComponent("history-payloads", isDirectory: true)
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             let url = dir.appendingPathComponent("\(metric.rawValue)-\(Int(nowEpoch)).ndjson")
