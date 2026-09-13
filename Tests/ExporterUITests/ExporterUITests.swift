@@ -794,6 +794,43 @@ final class ExporterUITests: XCTestCase {
         XCTAssertEqual(line.label, "Failed at Connect.")
     }
 
+    func testEveryUserFacingErrorArchetypeRendersFiveParts() {
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_USER_FACING_ERROR"] = "all"
+        app.launch()
+        enterControls()
+        let archetypes = [
+            "hostUnresolvable",
+            "tlsTrustFailure",
+            "certificateExpired",
+            "http401",
+            "http403",
+            "http404",
+            "http413",
+            "http429",
+            "http5xx",
+            "timeout",
+            "mqttNotAuthorised",
+            "mqttQoS0",
+            "healthLocked",
+            "backgroundNeverRan",
+            "waitingForUnmetered",
+            "zeroRecords",
+        ]
+        XCTAssertEqual(archetypes.count, 16)
+        for name in archetypes {
+            let part0 = scrollToHittable(app.staticTexts["error-\(name)-part-0"])
+            XCTAssertTrue(
+                part0.waitForExistence(timeout: uiWait),
+                "missing \(name); available: \(visibleIdentifiers().joined(separator: ","))"
+            )
+            XCTAssertTrue(part0.label.hasPrefix("①"), "\(name) \(part0.label)")
+            let part4 = app.staticTexts["error-\(name)-part-4"]
+            XCTAssertTrue(part4.waitForExistence(timeout: uiWait), name)
+            XCTAssertTrue(part4.label.hasPrefix("⑤"), "\(name) \(part4.label)")
+        }
+    }
+
     func testConfigurationExportIsExplicitAndCredentialFreeLabeled() {
         enterControls()
         XCTAssertFalse(app.buttons["configuration-export-share"].exists)

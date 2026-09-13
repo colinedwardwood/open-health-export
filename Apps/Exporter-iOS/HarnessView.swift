@@ -69,6 +69,7 @@ struct HarnessView: View {
     @State private var mqttTopic = "ohe/health"
     @State private var mqttQoS: UInt8 = 1
     @State private var userFacingError: UserFacingErrorObject?
+    @State private var seededUserFacingErrors: [UserFacingErrorObject] = []
     @AppStorage("ohe.exportWindowHours")
     private var exportWindowHours = 24
     @AppStorage("ohe.freshnessIntervalMinutes")
@@ -444,6 +445,24 @@ struct HarnessView: View {
                 {
                     mqttTestLines = [summary]
                 }
+                if let raw = ProcessInfo.processInfo.environment["OHE_SEED_USER_FACING_ERROR"] {
+                    if raw == "all" {
+                        seededUserFacingErrors = UserFacingErrorArchetype.allCases.map { archetype in
+                            UserFacingErrorObject.make(
+                                archetype: archetype,
+                                destinationLabel: "nas"
+                            )
+                        }
+                    } else if let archetype = UserFacingErrorArchetype(rawValue: raw) {
+                        let error = UserFacingErrorObject.make(
+                            archetype: archetype,
+                            destinationLabel: "nas"
+                        )
+                        userFacingError = error
+                        status = error.title
+                        results = error.lines
+                    }
+                }
                 #endif
                 await refreshQueueGaps()
                 await refreshCoverageWindows()
@@ -670,7 +689,22 @@ struct HarnessView: View {
                 .accessibilityIdentifier("coverage-drop-attention")
             }
 
-            if let userFacingError {
+            if !seededUserFacingErrors.isEmpty {
+                ForEach(seededUserFacingErrors, id: \.archetype) { error in
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(Array(error.lines.enumerated()), id: \.offset) { index, line in
+                            Text(line)
+                                .font(.system(.footnote, design: .monospaced))
+                                .textSelection(.enabled)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier(
+                                    "error-\(error.archetype.rawValue)-part-\(index)"
+                                )
+                        }
+                    }
+                    .accessibilityIdentifier("error-\(error.archetype.rawValue)")
+                }
+            } else if let userFacingError {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(Array(userFacingError.lines.enumerated()), id: \.offset) { index, line in
                         Text(line)
