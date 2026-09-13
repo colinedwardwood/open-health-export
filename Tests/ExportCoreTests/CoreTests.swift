@@ -4993,6 +4993,9 @@ private func anchorHoldFixture(
     ] {
         #expect(harness.contains("\"\(artifact)\""))
     }
+    #expect(harness.contains("mqtt_pkcs12_password"))
+    #expect(harness.contains("StoredCredentialDescriptor"))
+    #expect(harness.contains("clientPKCS12Password: nil"))
     #expect(harness.contains("removePersistentDomain"))
     #expect(harness.contains("try removeIfPresent(directory)"))
 }

@@ -43,6 +43,7 @@ private struct HTTPSVerificationRecord: Codable {
     var issuerSPKISha256: String?
     var firstSeen: String
     var hasBearer: Bool
+    var bearerDescriptor: StoredCredentialDescriptor?
     var propagateTraceparent: Bool?
     var importedLocalIdentifier: String?
 }
@@ -118,9 +119,13 @@ private struct MQTTVerificationRecord: Codable {
     var qos: UInt8?
     var report: DestinationTestReport
     var hasClientPKCS12: Bool?
+    var hasClientPKCS12Password: Bool?
+    /// Pre-Keychain JSON copies. Read on launch, then rewritten off disk.
     var clientPKCS12Password: String?
     var username: String?
     var hasPassword: Bool?
+    var passwordDescriptor: StoredCredentialDescriptor?
+    var pkcs12PasswordDescriptor: StoredCredentialDescriptor?
     var leafSPKISha256: String?
     var issuerSPKISha256: String?
     var firstSeen: String?
@@ -1606,6 +1611,11 @@ enum HarnessExport {
             issuerSPKISha256: probe.identity?.issuerSPKISha256,
             firstSeen: pending.firstSeen,
             hasBearer: pending.bearer != nil,
+            bearerDescriptor: StoredCredentialDescriptor.capturing(
+                pending.bearer,
+                appearance: .bearerToken,
+                addedOnDay: pending.firstSeen
+            ),
             propagateTraceparent: propagateTraceparent,
             importedLocalIdentifier: pending.importedLocalIdentifier
         )
@@ -1744,9 +1754,20 @@ enum HarnessExport {
             qos: pending.qos,
             report: probe.report,
             hasClientPKCS12: pending.clientPKCS12 != nil,
-            clientPKCS12Password: pending.clientPKCS12Password,
+            hasClientPKCS12Password: pending.clientPKCS12Password != nil,
+            clientPKCS12Password: nil,
             username: pending.username,
             hasPassword: pending.password != nil,
+            passwordDescriptor: StoredCredentialDescriptor.capturing(
+                pending.password,
+                appearance: .password,
+                addedOnDay: pending.firstSeen
+            ),
+            pkcs12PasswordDescriptor: StoredCredentialDescriptor.capturing(
+                pending.clientPKCS12Password,
+                appearance: .pkcs12Password,
+                addedOnDay: pending.firstSeen
+            ),
             leafSPKISha256: probe.identity?.leafSPKISha256,
             issuerSPKISha256: probe.identity?.issuerSPKISha256,
             firstSeen: pending.firstSeen,
@@ -1767,6 +1788,12 @@ enum HarnessExport {
             try await passwordStore.store(Array(password.utf8), handle: passwordHandle)
         } else {
             try? await passwordStore.delete(passwordHandle)
+        }
+        let pkcs12PasswordHandle = SecretHandle(rawValue: "mqtt_pkcs12_password")
+        if let pkcs12Password = pending.clientPKCS12Password {
+            try await passwordStore.store(Array(pkcs12Password.utf8), handle: pkcs12PasswordHandle)
+        } else {
+            try? await passwordStore.delete(pkcs12PasswordHandle)
         }
         try JSONEncoder().encode(record).write(
             to: root.appendingPathComponent("mqtt-destination.json"),
@@ -1812,6 +1839,74 @@ enum HarnessExport {
         Task { await PendingDestination.shared.setMQTT(nil) }
     }
 
+    static func storedCredentialSummaries() -> (
+        httpsBearer: String?,
+        mqttPassword: String?,
+        mqttPKCS12Password: String?
+    ) {
+        let root = try? applicationSupportRoot()
+        let https: String?
+        if let root,
+           let data = try? Data(contentsOf: root.appendingPathComponent("https-destination.json")),
+           let record = try? JSONDecoder().decode(HTTPSVerificationRecord.self, from: data),
+           let descriptor = record.bearerDescriptor,
+           descriptor.appearance != .absent
+        {
+            https = descriptor.summary
+        } else {
+            https = nil
+        }
+        let mqttPassword: String?
+        let mqttPKCS12: String?
+        if let root,
+           let data = try? Data(contentsOf: root.appendingPathComponent("mqtt-destination.json")),
+           let record = try? JSONDecoder().decode(MQTTVerificationRecord.self, from: data)
+        {
+            mqttPassword = record.passwordDescriptor.flatMap {
+                $0.appearance == .absent ? nil : $0.summary
+            }
+            mqttPKCS12 = record.pkcs12PasswordDescriptor.flatMap {
+                $0.appearance == .absent ? nil : $0.summary
+            }
+        } else {
+            mqttPassword = nil
+            mqttPKCS12 = nil
+        }
+        return (https, mqttPassword, mqttPKCS12)
+    }
+
+    private static func mqttPKCS12Password(
+        from saved: MQTTVerificationRecord,
+        root: URL
+    ) async throws -> String? {
+        let store = KeychainSecretStore(service: "app.openhealthexporter.mqtt")
+        let handle = SecretHandle(rawValue: "mqtt_pkcs12_password")
+        if let leftover = saved.clientPKCS12Password, !leftover.isEmpty {
+            try await store.store(Array(leftover.utf8), handle: handle)
+            var migrated = saved
+            migrated.clientPKCS12Password = nil
+            migrated.hasClientPKCS12Password = true
+            if migrated.pkcs12PasswordDescriptor == nil
+                || migrated.pkcs12PasswordDescriptor?.appearance == .absent
+            {
+                migrated.pkcs12PasswordDescriptor = StoredCredentialDescriptor.capturing(
+                    leftover,
+                    appearance: .pkcs12Password,
+                    addedOnDay: saved.firstSeen ?? ""
+                )
+            }
+            try JSONEncoder().encode(migrated).write(
+                to: root.appendingPathComponent("mqtt-destination.json"),
+                options: .atomic
+            )
+            return leftover
+        }
+        if saved.hasClientPKCS12Password == true {
+            return String(decoding: try await store.load(handle), as: UTF8.self)
+        }
+        return nil
+    }
+
     static func runMQTTDestination(
         onProgress: (@Sendable (Int, Int) async -> Void)? = nil
     ) async throws -> [String] {
@@ -1844,7 +1939,7 @@ enum HarnessExport {
             username: saved.username,
             password: password,
             clientPKCS12: pkcs12,
-            clientPKCS12Password: saved.clientPKCS12Password,
+            clientPKCS12Password: try await mqttPKCS12Password(from: saved, root: root),
             exporterID: try installationID()
         )
         let pin: PinRecord?

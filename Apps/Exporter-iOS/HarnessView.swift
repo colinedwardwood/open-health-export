@@ -49,6 +49,9 @@ struct HarnessView: View {
     @State private var sas = ""
     @State private var httpsURL = ""
     @State private var httpsBearer = ""
+    @State private var httpsBearerDescriptor: String?
+    @State private var mqttPasswordDescriptor: String?
+    @State private var mqttPKCS12PasswordDescriptor: String?
     @State private var allowInsecureHTTP = false
     @AppStorage("ohe.https.allowsMeteredNetwork")
     private var allowMeteredHTTPS = false
@@ -1030,6 +1033,11 @@ struct HarnessView: View {
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("https-bearer")
             secretFieldHygiene(httpsBearer, identifierPrefix: "https-bearer")
+            if let httpsBearerDescriptor {
+                Text(httpsBearerDescriptor)
+                    .font(.footnote)
+                    .accessibilityIdentifier("https-bearer-descriptor")
+            }
             Toggle("Allow plain HTTP (unsafe)", isOn: $allowInsecureHTTP)
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("https-insecure")
@@ -1133,6 +1141,16 @@ struct HarnessView: View {
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("mqtt-password")
             secretFieldHygiene(mqttPassword, identifierPrefix: "mqtt-password")
+            if let mqttPasswordDescriptor {
+                Text(mqttPasswordDescriptor)
+                    .font(.footnote)
+                    .accessibilityIdentifier("mqtt-password-descriptor")
+            }
+            if let mqttPKCS12PasswordDescriptor {
+                Text(mqttPKCS12PasswordDescriptor)
+                    .font(.footnote)
+                    .accessibilityIdentifier("mqtt-pkcs12-password-descriptor")
+            }
             Toggle("Allow plain MQTT (unsafe)", isOn: $allowInsecureMQTT)
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("mqtt-insecure")
@@ -2882,6 +2900,10 @@ struct HarnessView: View {
         destinationChangeBanner = HarnessExport.destinationChangeBannerDetail()
         overdueBanner = HarnessExport.overdueBannerDetail()
         dataFlowHops = HarnessExport.dataFlowHops()
+        let credentials = HarnessExport.storedCredentialSummaries()
+        httpsBearerDescriptor = credentials.httpsBearer
+        mqttPasswordDescriptor = credentials.mqttPassword
+        mqttPKCS12PasswordDescriptor = credentials.mqttPKCS12Password
         Task {
             dataFlowTypeCount = await HarnessExport.dataFlowTypeCount()
             wipeInventory = await HarnessExport.wipeInventory()
