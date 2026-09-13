@@ -831,6 +831,45 @@ final class ExporterUITests: XCTestCase {
         }
     }
 
+    func testEveryDestinationDisplayStatePassesAccessibilityAudit() throws {
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_DESTINATION_STATUS"] = "all-states"
+        app.launch()
+        enterControls()
+        let refresh = scrollToHittable(app.buttons["destination-refresh"])
+        refresh.tap()
+        var labels: [String] = []
+        for index in 0 ..< 15 {
+            let line = scrollToHittable(destinationStatusElement(index))
+            XCTAssertTrue(
+                line.waitForExistence(timeout: uiWait),
+                "no destination line \(index); available: \(visibleIdentifiers())"
+            )
+            labels.append(line.label)
+        }
+        let joined = labels.joined(separator: "\n")
+        for state in [
+            "not_set_up",
+            "no_exports_yet",
+            "manual_only",
+            "healthy",
+            "quiet",
+            "sent_unconfirmed",
+            "partial",
+            "stale",
+            "failing",
+            "blocked",
+            "waiting",
+            "deferred",
+            "limited_by_ios",
+            "paused",
+            "overdue",
+        ] {
+            XCTAssertTrue(joined.contains(state), "missing \(state) in \(joined)")
+        }
+        try performAccessibilityAudit("destination-all-states")
+    }
+
     func testDestinationChangeStillEscalatesWhenNotificationsAreDenied() throws {
         app.terminate()
         app.launchEnvironment["OHE_SEED_DESTINATION_STATUS"] = "changed"

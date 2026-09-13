@@ -1472,6 +1472,36 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     }
 }
 
+@Test func qa26UIFixturesCoverEveryDisplayStateWithoutClockOverride() throws {
+    let now: TimeInterval = 2_000_000
+    let all = DestinationStatusUIFixtures.snapshots(
+        scenario: DestinationStatusUIFixtures.allStatesScenario,
+        nowEpoch: now
+    )
+    #expect(Set(all.map(\.state)) == Set(DestinationDisplayState.allCases))
+    #expect(Set(all.map(\.destinationID)).count == DestinationDisplayState.allCases.count)
+    for snapshot in all {
+        #expect(snapshot.state(at: now) == snapshot.state, "\(snapshot.state.rawValue)")
+        let line = DestinationStatusLine.render(snapshot, nowEpoch: now) { _ in "earlier" }
+        #expect(line.contains(snapshot.state.rawValue), "\(line)")
+    }
+    for scenario in ["success", "stale", "overdue", "failed", "deferred", "changed"] {
+        let seeded = DestinationStatusUIFixtures.snapshots(scenario: scenario, nowEpoch: now)
+        #expect(seeded.count == 1, "\(scenario)")
+        #expect(seeded[0].destinationID == DestinationStatusUIFixtures.homeAssistantID)
+        #expect(seeded[0].destinationLabel == DestinationStatusUIFixtures.homeAssistantLabel)
+    }
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let harness = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift"),
+        encoding: .utf8
+    )
+    #expect(harness.contains("DestinationStatusUIFixtures.snapshots"))
+}
+
 @Test func ux41DisplayStatesStayDistinguishableByGlyphAndLabelWithoutHue() {
     let states = DestinationDisplayState.allCases
     #expect(states.count == 15)

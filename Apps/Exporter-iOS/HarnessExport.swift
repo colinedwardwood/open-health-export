@@ -1405,86 +1405,17 @@ enum HarnessExport {
     /// app uses in the field.
     static func seedDestinationStatusForUITests(scenario: String) throws {
         let now = Date().timeIntervalSince1970
-        let day: TimeInterval = 86_400
-        let snapshot: DestinationStatusSnapshot
-        switch scenario {
-        case "stale":
-            snapshot = DestinationStatusSnapshot(
-                destinationID: "home-assistant",
-                destinationLabel: "Home Assistant",
-                enabled: true,
-                lastOutcome: "success",
-                lastSuccessEpoch: now - (3 * day),
-                staleThresholdSeconds: day,
-                overdueThresholdSeconds: 7 * day,
-                writtenAtEpoch: now
+        for snapshot in DestinationStatusUIFixtures.snapshots(scenario: scenario, nowEpoch: now) {
+            guard let url = StatusSnapshotLocation.url(destinationID: snapshot.destinationID)
+            else {
+                throw CocoaError(.fileNoSuchFile)
+            }
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true
             )
-        case "overdue":
-            snapshot = DestinationStatusSnapshot(
-                destinationID: "home-assistant",
-                destinationLabel: "Home Assistant",
-                enabled: true,
-                lastOutcome: "success",
-                lastSuccessEpoch: now - (8 * day),
-                staleThresholdSeconds: day,
-                overdueThresholdSeconds: 7 * day,
-                writtenAtEpoch: now
-            )
-        case "failed":
-            snapshot = DestinationStatusSnapshot(
-                destinationID: "home-assistant",
-                destinationLabel: "Home Assistant",
-                enabled: true,
-                lastOutcome: "failed",
-                lastSuccessEpoch: now - (2 * day),
-                errorClass: ErrorClass.destinationUnreachable.rawValue,
-                writtenAtEpoch: now
-            )
-        case "deferred":
-            snapshot = DestinationStatusSnapshot(
-                destinationID: "home-assistant",
-                destinationLabel: "Home Assistant",
-                enabled: true,
-                lastOutcome: "blockedDeviceLocked",
-                lastSuccessEpoch: now - 60,
-                errorClass: ErrorClass.deviceLocked.rawValue,
-                staleThresholdSeconds: day,
-                overdueThresholdSeconds: 7 * day,
-                writtenAtEpoch: now
-            )
-        case "changed":
-            snapshot = DestinationStatusSnapshot(
-                destinationID: "home-assistant",
-                destinationLabel: "Home Assistant",
-                enabled: true,
-                lastOutcome: "success",
-                lastSuccessEpoch: now - 60,
-                errorClass: ErrorClass.none.rawValue,
-                staleThresholdSeconds: day,
-                unacknowledgedSecurityEventCount: 2,
-                writtenAtEpoch: now
-            )
-        default:
-            snapshot = DestinationStatusSnapshot(
-                destinationID: "home-assistant",
-                destinationLabel: "Home Assistant",
-                enabled: true,
-                lastOutcome: "success",
-                lastSuccessEpoch: now - 60,
-                errorClass: ErrorClass.none.rawValue,
-                staleThresholdSeconds: day,
-                writtenAtEpoch: now
-            )
+            try DestinationSnapshotFile.write(snapshot, to: url)
         }
-        guard let url = StatusSnapshotLocation.url(destinationID: snapshot.destinationID)
-        else {
-            throw CocoaError(.fileNoSuchFile)
-        }
-        try FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try DestinationSnapshotFile.write(snapshot, to: url)
     }
 
     /// A hold can only arise from state the simulator has no way to produce — a cursor
