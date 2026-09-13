@@ -676,6 +676,48 @@ final class ExporterUITests: XCTestCase {
         )
     }
 
+    func testMQTTQoS0ErrorOffersSetQoS1AndAppliesIt() {
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_MQTT_QOS0"] = "1"
+        app.launch()
+        enterControls()
+        let part0 = app.staticTexts["error-part-0"]
+        XCTAssertTrue(part0.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertTrue(part0.label.contains("Sent"), part0.label)
+        let fix = scrollToHittable(app.buttons["error-fix-setQoS1"])
+        XCTAssertEqual(fix.label, "Set QoS to 1")
+        fix.tap()
+        XCTAssertTrue(
+            app.staticTexts["status-line"].label.contains("Applied Set QoS to 1"),
+            app.staticTexts["status-line"].label
+        )
+        selectRootTab(2)
+        let qos = scrollToHittable(app.descendants(matching: .any)["mqtt-qos"])
+        XCTAssertTrue(qos.waitForExistence(timeout: uiWait))
+        let shown = qos.label + ((qos.value as? String) ?? "")
+        XCTAssertTrue(
+            shown.contains("At least once"),
+            shown
+        )
+    }
+
+    func testMQTTSecretFieldsFlagLeadingWhitespace() {
+        enterControls()
+        selectRootTab(2)
+        let username = scrollToHittable(app.textFields["mqtt-username"])
+        type(" user ", into: username)
+        dismissKeyboard()
+        XCTAssertTrue(
+            app.staticTexts["mqtt-username-whitespace"].waitForExistence(timeout: uiWait)
+        )
+        let password = scrollToHittable(app.secureTextFields["mqtt-password"])
+        type(" token\n", into: password)
+        dismissKeyboard()
+        XCTAssertTrue(
+            app.staticTexts["mqtt-password-whitespace"].waitForExistence(timeout: uiWait)
+        )
+    }
+
     func testConfigurationExportIsExplicitAndCredentialFreeLabeled() {
         enterControls()
         XCTAssertFalse(app.buttons["configuration-export-share"].exists)

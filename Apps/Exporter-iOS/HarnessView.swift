@@ -400,6 +400,16 @@ struct HarnessView: View {
                     )
                     confirmationKind = .https
                 }
+                if ProcessInfo.processInfo.environment["OHE_SEED_MQTT_QOS0"] == "1" {
+                    mqttQoS = 0
+                    let error = UserFacingErrorObject.make(
+                        archetype: .mqttQoS0,
+                        destinationLabel: "broker.example"
+                    )
+                    userFacingError = error
+                    status = error.title
+                    results = error.lines
+                }
                 #endif
                 await refreshQueueGaps()
                 await refreshCoverageWindows()
@@ -1124,6 +1134,7 @@ struct HarnessView: View {
                 .textContentType(.password)
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("mqtt-pkcs12-password")
+            secretFieldHygiene(mqttPKCS12Password, identifierPrefix: "mqtt-pkcs12-password")
             if mqttPKCS12Data != nil {
                 Button("Clear client certificate") {
                     mqttPKCS12Data = nil
@@ -1137,6 +1148,7 @@ struct HarnessView: View {
                 .autocorrectionDisabled()
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("mqtt-username")
+            secretFieldHygiene(mqttUsername, identifierPrefix: "mqtt-username")
             Text(CredentialDisclosure.copy)
                 .font(.footnote)
                 .fixedSize(horizontal: false, vertical: true)
@@ -3331,7 +3343,9 @@ struct HarnessView: View {
                 Task { await testHTTPS() }
             }
         case .setQoS1:
-            Task { await testMQTT() }
+            if !mqttURL.isEmpty, !mqttClientID.isEmpty, !mqttTopic.isEmpty {
+                Task { await testMQTT() }
+            }
         default:
             break
         }
