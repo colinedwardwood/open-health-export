@@ -152,3 +152,24 @@ import WireFormat
     }
     try WireJSONSchema.validateNDJSON(Data("\n\r\n".utf8), schema: schema)
 }
+
+@Test func nativeWireHeaderTypesIncludeOffMetricSamples() throws {
+    var steps = heartSample("00000000-0000-0000-0000-000000000002")
+    steps.metric = MetricID(rawValue: "stepCount")
+    let data = try NativeWire.encode(
+        samples: [
+            heartSample("00000000-0000-0000-0000-000000000001"),
+            steps,
+        ],
+        tombstones: [],
+        metric: MetricID(rawValue: "heartRate"),
+        batchID: BatchID(rawValue: "0192f3c1-0000-0000-0000-0000000000aa"),
+        envelope: testEnvelope()
+    )
+    let header = String(decoding: data, as: UTF8.self)
+        .split(whereSeparator: \.isNewline)
+        .first
+        .map(String.init) ?? ""
+    #expect(header.contains("\"heart_rate\""))
+    #expect(header.contains("\"step_count\""))
+}

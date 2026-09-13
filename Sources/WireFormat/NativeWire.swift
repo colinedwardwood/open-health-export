@@ -260,18 +260,18 @@ public enum NativeWire {
         let header = try encodeHeader(
             batchID: batchID,
             envelope: envelope,
-            types: Set(
-                [wireMetricID(metric)]
-                    + samples.map { wireMetricID($0.metric) }
-                    + categories.map(\.metric.rawValue)
-                    + correlations.map(\.metric.rawValue)
-                    + workouts.map(\.metric.rawValue)
-                    + minds.map(\.metric.rawValue)
-                    + electrocardiograms.map(\.metric.rawValue)
-                    + audiograms.map(\.metric.rawValue)
-                    + medicationDoses.map(\.metric.rawValue)
-                    + characteristics.map(\.characteristicId)
-            ).sorted(),
+            types: headerTypes(
+                metric: metric,
+                samples: samples,
+                categories: categories,
+                correlations: correlations,
+                workouts: workouts,
+                minds: minds,
+                electrocardiograms: electrocardiograms,
+                audiograms: audiograms,
+                medicationDoses: medicationDoses,
+                characteristics: characteristics
+            ),
             recordCount: records.count
         )
         let footer = try encodeFooter(
@@ -1010,5 +1010,50 @@ private extension NativeWire {
 
     static func wireMetricID(_ metric: MetricID) -> String {
         MetricCatalog.declaration(for: metric)?.wireId ?? metric.rawValue
+    }
+
+    /// Quantity pages are one metric. Walk extras only when a row disagrees,
+    /// instead of allocating a `wireMetricID` string for every sample.
+    static func headerTypes(
+        metric: MetricID,
+        samples: [SampleRecord],
+        categories: [CategoryRecord],
+        correlations: [CorrelationRecord],
+        workouts: [WorkoutRecord],
+        minds: [StateOfMindRecord],
+        electrocardiograms: [ECGRecord],
+        audiograms: [AudiogramRecord],
+        medicationDoses: [MedicationDoseRecord],
+        characteristics: [CharacteristicRecord]
+    ) -> [String] {
+        var types: Set<String> = [wireMetricID(metric)]
+        for sample in samples where sample.metric != metric {
+            types.insert(wireMetricID(sample.metric))
+        }
+        for record in categories {
+            types.insert(record.metric.rawValue)
+        }
+        for record in correlations {
+            types.insert(record.metric.rawValue)
+        }
+        for record in workouts {
+            types.insert(record.metric.rawValue)
+        }
+        for record in minds {
+            types.insert(record.metric.rawValue)
+        }
+        for record in electrocardiograms {
+            types.insert(record.metric.rawValue)
+        }
+        for record in audiograms {
+            types.insert(record.metric.rawValue)
+        }
+        for record in medicationDoses {
+            types.insert(record.metric.rawValue)
+        }
+        for record in characteristics {
+            types.insert(record.characteristicId)
+        }
+        return types.sorted()
     }
 }

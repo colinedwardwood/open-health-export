@@ -566,6 +566,8 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
     )
     #expect(nativeWire.contains("countQuantityRecords"))
     #expect(nativeWire.contains("volumeReceiptCounts"))
+    #expect(nativeWire.contains("headerTypes("))
+    #expect(!nativeWire.contains("samples.map { wireMetricID"))
     let sha = try String(
         contentsOf: root.appendingPathComponent("Sources/WireFormat/SHA256.swift"),
         encoding: .utf8
