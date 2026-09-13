@@ -469,6 +469,9 @@ final class ExporterUITests: XCTestCase {
         let warning = app.staticTexts["public-destination-warning"]
         XCTAssertTrue(warning.waitForExistence(timeout: uiWait))
         XCTAssertTrue(warning.label.contains("public address"), warning.label)
+        let identity = app.staticTexts["destination-confirm-line-0"]
+        XCTAssertTrue(identity.waitForExistence(timeout: uiWait))
+        XCTAssertTrue(identity.label.contains("collector.example.com"), identity.label)
 
         let confirm = app.buttons["destination-confirm"]
         XCTAssertTrue(confirm.exists)

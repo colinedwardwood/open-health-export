@@ -3173,7 +3173,7 @@ struct HarnessView: View {
                         .accessibilityIdentifier("destination-confirm-title")
                         .accessibilityAddTraits(.isHeader)
                         .accessibilityRespondsToUserInteraction(false)
-                    ForEach(Array(card.lines.dropFirst().enumerated()), id: \.offset) { _, line in
+                    ForEach(Array(card.lines.dropFirst().enumerated()), id: \.offset) { index, line in
                         Text(line)
                             .font(.footnote)
                             .foregroundStyle(.primary)
@@ -3183,6 +3183,7 @@ struct HarnessView: View {
                                 minHeight: 44,
                                 alignment: .leading
                             )
+                            .accessibilityIdentifier("destination-confirm-line-\(index)")
                     }
                     if card.requiresPublicAddressConfirmation {
                         Text(ConfirmationCopy.publicAddressWarning)
