@@ -256,6 +256,31 @@ import WireFormat
     #expect(days.isEmpty)
 }
 
+@Test func ux06CoverageProbeUsesOneSampleDayRange() throws {
+    let source = try String(
+        contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/HealthKitSource/HealthKitCoverageProbe.swift"),
+        encoding: .utf8
+    )
+    #expect(source.contains("availableDayRange(metric:"))
+    #expect(source.contains("HealthKitAnchoredSource"))
+    let view = try String(
+        contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
+        encoding: .utf8
+    )
+    #expect(view.contains("HealthKitCoverageProbe.observations"))
+    #expect(view.contains("await refreshCoverageWindows()"))
+    #expect(view.contains("coverage-drop-attention"))
+    #expect(view.contains("CoverageDrop.attentionHeadline"))
+}
+
 @Test func ux44PreferredDisplayUnitsReadHealthKitAndRefreshOnChange() throws {
     let source = try String(
         contentsOf: URL(fileURLWithPath: #filePath)

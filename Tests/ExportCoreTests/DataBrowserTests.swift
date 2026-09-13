@@ -165,6 +165,62 @@ private func browserSample(
     )
 }
 
+@Test func ux06CoverageDropRaisesAttentionAndInlineNote() throws {
+    let steps = MetricCatalog.stepCount.id
+    let heart = MetricCatalog.heartRate.id
+    let previous = [steps: "2026-08-28"]
+    let current: [MetricID: CoverageState] = [
+        steps: .nothingReturned,
+        heart: .dataAvailable(sampleCount: 12, latestStart: "2026-09-12T08:41:00Z"),
+    ]
+    #expect(
+        CoverageDrop.nextLastDataDays(previous: previous, current: current)[steps] == "2026-08-28"
+    )
+    #expect(
+        CoverageDrop.nextLastDataDays(previous: previous, current: current)[heart] == "2026-09-12"
+    )
+    let drops = CoverageDrop.events(
+        lastDataDays: previous,
+        current: current,
+        selected: [steps, heart]
+    )
+    #expect(drops == [CoverageDropEvent(metric: steps, lastDataDay: "2026-08-28")])
+    #expect(
+        CoverageDrop.events(
+            lastDataDays: previous,
+            current: current,
+            selected: [heart]
+        ).isEmpty
+    )
+    #expect(CoverageDrop.isoDay(from: "2026-08-28T08:41:00Z") == "2026-08-28")
+    #expect(CoverageDrop.displayDay("2026-08-28", fullMonth: false) == "28 Aug")
+    #expect(CoverageDrop.displayDay("2026-08-28", fullMonth: true) == "28 August")
+    #expect(
+        CoverageDrop.inlineNote(lastDataDay: "2026-08-28")
+            == "Returned data until 28 Aug, then stopped."
+    )
+    #expect(
+        CoverageDrop.attentionHeadline(for: drops[0])
+            == "Step count stopped returning data on 28 August."
+    )
+    #expect(CoverageDrop.attentionDetail.contains("access was turned off in Health"))
+    for claim in ["denied", "denial", "revoked"] {
+        #expect(!CoverageDrop.attentionDetail.lowercased().contains(claim))
+        #expect(!CoverageDrop.inlineNote(lastDataDay: "2026-08-28").lowercased().contains(claim))
+    }
+    let rows = DataBrowser.rows(
+        latest: [:],
+        coverage: [steps: CoverageObservation()],
+        coverageLastDataDays: previous
+    )
+    #expect(
+        rows.first { $0.metric == steps }?.subtitle
+            == CoverageDrop.inlineNote(lastDataDay: "2026-08-28")
+    )
+    let encoded = try #require(CoverageDrop.encodeLastDataDays(previous))
+    #expect(CoverageDrop.decodeLastDataDays(encoded) == previous)
+}
+
 @Test func ux17SearchMatchesIdentifierDisplayNameAndSynonyms() {
     func ids(_ needle: String) -> Set<MetricID> {
         Set(DataBrowser.rows(latest: [:], search: needle).map(\.metric))

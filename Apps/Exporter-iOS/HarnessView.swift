@@ -126,6 +126,8 @@ struct HarnessView: View {
     @State private var sensitiveDestinationConfirmation = ""
     @State private var liveBrowserSamples: [MetricID: [SampleRecord]] = [:]
     @State private var browserAuthorizedDays: [MetricID: String] = [:]
+    @State private var coverageProbeObservations: [MetricID: CoverageObservation] = [:]
+    @State private var coverageLastDataDays: [MetricID: String] = [:]
     @State private var browserSentThroughDay: [MetricID: String] = [:]
     @State private var browserIndexHorizonDay: String?
     @State private var browserLoadingHealth = false
@@ -595,6 +597,23 @@ struct HarnessView: View {
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("ipad-only-exporter")
+            }
+
+            if userFacingError == nil, let drop = coverageDropEvents.first {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(CoverageDrop.attentionHeadline(for: drop))
+                        .font(.headline)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(CoverageDrop.attentionDetail)
+                        .font(.footnote)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button(CoverageDrop.reviewAction) {
+                        rootTab = .data
+                    }
+                    .accessibilityIdentifier("coverage-drop-review")
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("coverage-drop-attention")
             }
 
             if let userFacingError {
@@ -1799,7 +1818,8 @@ struct HarnessView: View {
             search: browserSearch,
             onlyWithData: browserOnlyWithData && !browserSelecting,
             displayUnits: displayUnitPolicy,
-            coverage: coverage
+            coverage: coverage,
+            coverageLastDataDays: coverageLastDataDays
         )
         let selectedDetail = selectedBrowserMetric.flatMap { metric in
             let live = liveBrowserSamples[metric]
@@ -2142,32 +2162,83 @@ struct HarnessView: View {
         return records
     }
 
+    private var coverageDropEvents: [CoverageDropEvent] {
+        let current = Dictionary(
+            uniqueKeysWithValues: browserCoverageObservations().map {
+                ($0.key, CoverageClassification.classify($0.value))
+            }
+        )
+        return CoverageDrop.events(
+            lastDataDays: coverageLastDataDays,
+            current: current,
+            selected: browserSelection
+        )
+    }
+
     private func browserCoverageObservations() -> [MetricID: CoverageObservation] {
-        var observations: [MetricID: CoverageObservation] = [:]
-        let metrics = Set(liveBrowserSamples.keys).union(browserAuthorizedDays.keys).union(browserSelection)
-        for metric in metrics {
-            let samples = liveBrowserSamples[metric] ?? []
+        var observations = coverageProbeObservations
+        for (metric, samples) in liveBrowserSamples where !samples.isEmpty {
             let latest = samples.max { $0.start < $1.start }
             observations[metric] = CoverageObservation(
                 sampleCount: samples.count,
                 latestStart: latest?.start,
+                earliestAuthorizedDay: browserAuthorizedDays[metric]
+                    ?? observations[metric]?.earliestAuthorizedDay
+            )
+        }
+        for metric in browserSelection where observations[metric] == nil {
+            observations[metric] = CoverageObservation(
                 earliestAuthorizedDay: browserAuthorizedDays[metric]
             )
         }
         return observations
     }
 
+    private func exporterTemporalContext() -> TemporalContext {
+        let timeZone = TimeZone.current
+        return TemporalContext(
+            timeZoneIdentifier: timeZone.identifier,
+            localeIdentifier: "en_US_POSIX",
+            tzDatabaseVersion: TemporalContext.hostTzDatabaseVersion
+        )
+    }
+
     @MainActor
     private func refreshCoverageWindows(metrics: [MetricID]? = nil) async {
         let probed = metrics ?? Array(browserSelection.union(Set(liveBrowserSamples.keys)))
         guard !probed.isEmpty else { return }
-        do {
-            let days = try await HealthKitAuthorization.earliestAuthorizedDays(for: probed)
+        if coverageLastDataDays.isEmpty {
+            coverageLastDataDays = CoverageDrop.decodeLastDataDays(
+                UserDefaults.standard.data(forKey: CoverageDrop.storageKey)
+            )
+        }
+        if let days = try? await HealthKitAuthorization.earliestAuthorizedDays(for: probed) {
             for metric in probed {
                 browserAuthorizedDays[metric] = days[metric]
             }
-        } catch {
-            return
+        }
+        let probedObservations = await HealthKitCoverageProbe.observations(
+            for: probed,
+            context: exporterTemporalContext()
+        )
+        for (metric, observation) in probedObservations {
+            var merged = observation
+            if merged.earliestAuthorizedDay == nil {
+                merged.earliestAuthorizedDay = browserAuthorizedDays[metric]
+            }
+            coverageProbeObservations[metric] = merged
+        }
+        let current = Dictionary(
+            uniqueKeysWithValues: coverageProbeObservations.map {
+                ($0.key, CoverageClassification.classify($0.value))
+            }
+        )
+        coverageLastDataDays = CoverageDrop.nextLastDataDays(
+            previous: coverageLastDataDays,
+            current: current
+        )
+        if let data = CoverageDrop.encodeLastDataDays(coverageLastDataDays) {
+            UserDefaults.standard.set(data, forKey: CoverageDrop.storageKey)
         }
     }
 
@@ -2176,11 +2247,7 @@ struct HarnessView: View {
         browserLoadingHealth = true
         defer { browserLoadingHealth = false }
         let timeZone = TimeZone.current
-        let context = TemporalContext(
-            timeZoneIdentifier: timeZone.identifier,
-            localeIdentifier: "en_US_POSIX",
-            tzDatabaseVersion: TemporalContext.hostTzDatabaseVersion
-        )
+        let context = exporterTemporalContext()
         var loaded: [SampleRecord] = []
         do {
             if MetricCatalog.declaration(for: metric)?.kind == "sample.quantity" {
@@ -2238,6 +2305,7 @@ struct HarnessView: View {
         phase = .working
         status = CombinedExportSummary.progress(current: 0, total: 1)
         results = []
+        await refreshCoverageWindows()
         do {
             results = try await HarnessExport.runOnePageEachMetric(trigger: trigger) { current, total in
                 await MainActor.run {

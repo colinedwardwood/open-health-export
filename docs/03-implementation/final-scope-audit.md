@@ -7,6 +7,7 @@ This file separates repository-complete engineering work from evidence that cann
 ## Repository-complete controls
 
 - Automatic Data-tab display units follow HealthKit preferred units and refresh on `HKUserPreferencesDidChange`. Export units stay canonical on the wire (UX-44). Region policy remains the fallback when HealthKit does not answer.
+- Coverage is re-probed on foreground and before export. A selected type that previously returned data and later returns nothing raises a Status attention row and a Data-tab note (UX-06). Limited-window dates still wait on the HealthKit selector. Device revocation remains a later gate.
 - HealthKit characteristics are in the selectable catalogue, off in Core Daily and bulk-select, flagged as re-identifying, and read on demand outside the anchored delta pipeline (HK-30).
 - Blood-pressure pairing is emitted as `sample.correlation` beside systolic and diastolic quantity pages. The correlation type stays off the selectable catalogue so it is not a second anchored cursor (ADR-6).
 - The Mac companion keeps a last-received clock, shows a quiet watch after three days of silence, and posts a local notification (Q12). Device-to-device radio evidence remains a later gate.

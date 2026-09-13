@@ -244,7 +244,8 @@ public enum DataBrowser {
         search: String = "",
         onlyWithData: Bool = false,
         displayUnits: UnitDisplayPolicy = .canonical,
-        coverage: [MetricID: CoverageObservation] = [:]
+        coverage: [MetricID: CoverageObservation] = [:],
+        coverageLastDataDays: [MetricID: String] = [:]
     ) -> [DataBrowserRow] {
         return MetricCatalog.selectable.compactMap { declaration in
             let title = declaration.wireId.replacingOccurrences(of: "_", with: " ")
@@ -253,7 +254,11 @@ public enum DataBrowser {
             let state = observation.map(CoverageClassification.classify)
             let subtitle: String
             if let state {
-                subtitle = CoverageClassification.subtitle(state)
+                if case .nothingReturned = state, let day = coverageLastDataDays[declaration.id] {
+                    subtitle = CoverageDrop.inlineNote(lastDataDay: day)
+                } else {
+                    subtitle = CoverageClassification.subtitle(state)
+                }
             } else if let sample {
                 let display = displayMeasurement(
                     sample.value,
