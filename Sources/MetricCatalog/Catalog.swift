@@ -769,10 +769,14 @@ public enum MetricCatalog {
         activityMoveMode,
     ]
 
-    public static var selectable: [MetricDeclaration] { all + structural + characteristics }
+    public static let selectable: [MetricDeclaration] = all + structural + characteristics
+
+    private static let declarationByID: [MetricID: MetricDeclaration] = Dictionary(
+        uniqueKeysWithValues: selectable.map { ($0.id, $0) }
+    )
 
     public static func declaration(for id: MetricID) -> MetricDeclaration? {
-        selectable.first { $0.id == id }
+        declarationByID[id]
     }
 
     public static func isCharacteristic(_ id: MetricID) -> Bool {

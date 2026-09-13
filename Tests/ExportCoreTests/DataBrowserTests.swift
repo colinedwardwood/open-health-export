@@ -405,6 +405,23 @@ private func browserSample(
     #expect(!MetricCatalog.selectable.contains { $0.id.rawValue == "blood_pressure" })
 }
 
+@Test func declarationLookupDoesNotRescanTheCataloguePerSample() throws {
+    for declaration in MetricCatalog.selectable {
+        #expect(MetricCatalog.declaration(for: declaration.id)?.wireId == declaration.wireId)
+    }
+    #expect(MetricCatalog.declaration(for: MetricID(rawValue: "not-a-metric")) == nil)
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let catalog = try String(
+        contentsOf: root.appendingPathComponent("Sources/MetricCatalog/Catalog.swift"),
+        encoding: .utf8
+    )
+    #expect(catalog.contains("declarationByID"))
+    #expect(!catalog.contains("selectable.first { $0.id == id }"))
+}
+
 @Test func hk30CharacteristicsStayOffByDefaultAndAreFlaggedReidentifying() throws {
     #expect(MetricCatalog.characteristics.count == 6)
     #expect(MetricCatalog.characteristics.allSatisfy { $0.kind == "characteristic" })
