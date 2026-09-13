@@ -40,6 +40,10 @@ struct ExportRunCheck {
         defer { try? FileManager.default.removeItem(at: root) }
 
         var reader = NDJSONLineReader(handle: .standardInput)
+        let decoder = JSONDecoder()
+        let metricByWireId = Dictionary(
+            uniqueKeysWithValues: MetricCatalog.all.map { ($0.wireId, $0.id) }
+        )
         var spools: [MetricID: MetricSpool] = [:]
         defer {
             for spool in spools.values {
@@ -69,17 +73,21 @@ struct ExportRunCheck {
             }
             let record: KindRecord
             do {
-                record = try JSONDecoder().decode(KindRecord.self, from: line)
+                record = try decoder.decode(KindRecord.self, from: line)
             } catch {
                 throw CheckError.invalidRecord(line: inputLines)
+            }
+            if inputLines.isMultiple(of: 1_000_000) {
+                FileHandle.standardError.write(
+                    Data("exportruncheck ingested_lines=\(inputLines)\n".utf8)
+                )
             }
             switch record.kind {
             case "sample.quantity":
                 guard let wireId = record.metricId else {
                     throw CheckError.invalidRecord(line: inputLines)
                 }
-                let metric = MetricCatalog.all.first { $0.wireId == wireId }?.id
-                    ?? MetricID(rawValue: wireId)
+                let metric = metricByWireId[wireId] ?? MetricID(rawValue: wireId)
                 let spool: MetricSpool
                 if let existing = spools[metric] {
                     spool = existing

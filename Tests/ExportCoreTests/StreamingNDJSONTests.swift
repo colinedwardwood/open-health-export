@@ -19,6 +19,21 @@ import WireFormat
     #expect(try reader.next() == nil)
 }
 
+@Test func ndjsonLineReaderDropsConsumedPrefixInBulk() throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-ndjson-bulk-\(UUID().uuidString)")
+    let lines = (0..<8_000).map { "record-\($0)" }
+    try lines.joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8)
+    defer { try? FileManager.default.removeItem(at: url) }
+    let handle = try FileHandle(forReadingFrom: url)
+    defer { try? handle.close() }
+    var reader = NDJSONLineReader(handle: handle, chunkSize: 32)
+    for expected in lines {
+        #expect(try reader.next() == Data(expected.utf8))
+    }
+    #expect(try reader.next() == nil)
+}
+
 @Test func ndjsonLineReaderRejectsAnUnboundedRecord() throws {
     let pipe = Pipe()
     try pipe.fileHandleForWriting.write(contentsOf: Data("12345\n".utf8))

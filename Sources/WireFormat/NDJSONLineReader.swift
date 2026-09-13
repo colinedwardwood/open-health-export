@@ -8,7 +8,8 @@ public struct NDJSONLineReader {
     private let handle: FileHandle
     private let chunkSize: Int
     private let maximumLineBytes: Int
-    private var buffer = Data()
+    private var buffer: [UInt8] = []
+    private var consumed = 0
     private var reachedEOF = false
 
     public init(
@@ -23,36 +24,66 @@ public struct NDJSONLineReader {
 
     public mutating func next() throws -> Data? {
         while true {
-            if let newline = buffer.firstIndex(of: 0x0A) {
-                guard newline <= maximumLineBytes else {
+            if let newline = newlineIndex() {
+                let length = newline - consumed
+                guard length <= maximumLineBytes else {
                     throw NDJSONLineReaderError.lineTooLong(maximumBytes: maximumLineBytes)
                 }
-                var line = Data(buffer[..<newline])
-                buffer.removeSubrange(...newline)
+                var line = Data(buffer[consumed..<newline])
+                consumed = newline + 1
                 if line.last == 0x0D {
                     line.removeLast()
                 }
+                compactIfStale()
                 return line
             }
             if reachedEOF {
-                guard !buffer.isEmpty else { return nil }
-                guard buffer.count <= maximumLineBytes else {
+                let remaining = buffer.count - consumed
+                guard remaining > 0 else { return nil }
+                guard remaining <= maximumLineBytes else {
                     throw NDJSONLineReaderError.lineTooLong(maximumBytes: maximumLineBytes)
                 }
-                let line = buffer
+                let line = Data(buffer[consumed..<buffer.count])
                 buffer.removeAll(keepingCapacity: true)
+                consumed = 0
                 return line
             }
-            guard buffer.count <= maximumLineBytes else {
+            let pending = buffer.count - consumed
+            guard pending <= maximumLineBytes else {
                 throw NDJSONLineReaderError.lineTooLong(maximumBytes: maximumLineBytes)
             }
+            compactIfStale()
             let chunk = try handle.read(upToCount: chunkSize) ?? Data()
             if chunk.isEmpty {
                 reachedEOF = true
             } else {
-                buffer.append(chunk)
+                buffer.append(contentsOf: chunk)
             }
         }
+    }
+
+    private func newlineIndex() -> Int? {
+        var index = consumed
+        while index < buffer.count {
+            if buffer[index] == 0x0A {
+                return index
+            }
+            index += 1
+        }
+        return nil
+    }
+
+    /// Drop already-returned prefix in bulk so each line is not an O(buffer) memmove.
+    private mutating func compactIfStale() {
+        guard consumed > 0 else { return }
+        if consumed == buffer.count {
+            buffer.removeAll(keepingCapacity: true)
+            consumed = 0
+            return
+        }
+        guard consumed >= chunkSize else { return }
+        buffer.removeFirst(consumed)
+        consumed = 0
     }
 }
 

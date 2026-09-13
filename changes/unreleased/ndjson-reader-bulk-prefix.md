@@ -1,0 +1,1 @@
+The NDJSON line reader now drops consumed prefix in bulk, and the T2 ExportRun checker maps metric wire IDs once and logs ingest progress, so a fifty-million-record stream is not quadratic in the leftover buffer.

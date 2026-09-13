@@ -30,10 +30,10 @@ Tier-1 remote `ExportRun` (10 million records, 100 MiB RSS) succeeded on
 https://github.com/colinedwardwood/open-health-export/actions/runs/34667824738.
 
 T2 tombstone accounting is on `main` (`volumeStructuralKinds` includes `tombstone`;
-`exportruncheck --page-size 10000`). The verification run is
-https://github.com/colinedwardwood/open-health-export/actions/runs/34697618358
-(dispatched on `cd652d6`, which already contains that fix). T2 is not verified
-until that job, or a later `nightly-volume` run on `main`, concludes success.
+`exportruncheck --page-size 10000`). Sunday 2026-09-13 T2
+https://github.com/colinedwardwood/open-health-export/actions/runs/34749776396
+was cancelled at the six-hour job wall with no success line. T2 is not verified
+until a later `nightly-volume` `tier-two-pathologies` job on `main` concludes success.
 
 Weekly mutation (`qa/mutants.json`) and flake-quarantine skip citations are
 wired. Linux kills hostless mutants; macOS kills Darwin-hosted mutants.

@@ -552,6 +552,13 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
     #expect(workflow.contains(".build/release/exportruncheck"))
     #expect(workflow.contains("exportruncheck --page-size 10000"))
     #expect(checker.contains("private let memoryLimitMiB = 100"))
+    #expect(checker.contains("metricByWireId"))
+    #expect(checker.contains("ingested_lines="))
+    let reader = try String(
+        contentsOf: root.appendingPathComponent("Sources/WireFormat/NDJSONLineReader.swift"),
+        encoding: .utf8
+    )
+    #expect(reader.contains("compactIfStale"))
     #expect(checker.contains("NativeWire.volumeStructuralKinds"))
     #expect(NativeWire.volumeStructuralKinds.contains("tombstone"))
     #expect(NativeWire.volumeStructuralKinds.contains("sample.ecg"))
