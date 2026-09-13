@@ -9,6 +9,7 @@ import Foundation
 import StorageSQLite
 import TestSupport
 import Testing
+import Watchdog
 import WireFormat
 
 private enum BackfillProcessorFailure: Error {
@@ -330,6 +331,55 @@ private func backfillCheckpoint(
     #expect(manifest.types[0].recordCount == 20)
     #expect(manifest.types[0].windowStartDay == "2024-01-31")
     #expect(manifest.types[0].windowEndDay == "2024-02-01")
+}
+
+@Test func ux25ArchiveLiveActivityDismissesWithinFifteenToThirtyMinutes() throws {
+    #expect(ArchiveLiveActivity.dismissalSeconds >= 15 * 60)
+    #expect(ArchiveLiveActivity.dismissalSeconds <= 30 * 60)
+    let line = NamedWorkProgress.archive(completedMonths: 1, totalMonths: 3, type: 2, types: 4)
+    #expect(ArchiveLiveActivity.parseProgress(line) != nil)
+    let parsed = ArchiveLiveActivity.parseProgress(line)!
+    #expect(parsed.completedMonths == 1)
+    #expect(parsed.totalMonths == 3)
+    #expect(parsed.type == 2)
+    #expect(parsed.types == 4)
+    #expect(ArchiveLiveActivity.parseProgress("Reading 1 of 2 types") == nil)
+    for copy in [ArchiveLiveActivity.title, ArchiveLiveActivity.finishedCopy, line] {
+        #expect(!copy.lowercased().contains("bpm"))
+        #expect(!copy.lowercased().contains("heart rate"))
+    }
+
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let appInfo = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/Info.plist"),
+        encoding: .utf8
+    )
+    #expect(appInfo.contains("NSSupportsLiveActivities"))
+    let view = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
+        encoding: .utf8
+    )
+    #expect(view.contains("ArchiveLiveActivitySession.start()"))
+    #expect(view.contains("ArchiveLiveActivitySession.finish()"))
+    let session = try String(
+        contentsOf: root.appendingPathComponent(
+            "Apps/Exporter-iOS/ArchiveLiveActivitySession.swift"
+        ),
+        encoding: .utf8
+    )
+    #expect(session.contains("dismissalPolicy: .after"))
+    #expect(session.contains("ArchiveLiveActivity.dismissalSeconds"))
+    let widget = try String(
+        contentsOf: root.appendingPathComponent(
+            "Apps/StatusWidget/ArchiveLiveActivityWidget.swift"
+        ),
+        encoding: .utf8
+    )
+    #expect(widget.contains("ActivityConfiguration(for: ArchiveLiveActivityAttributes.self)"))
+    #expect(widget.contains(".privacySensitive()"))
 }
 
 @Test func backfillUpgradesV1CheckpointThenResumes() async throws {

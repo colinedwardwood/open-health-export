@@ -9,5 +9,8 @@ struct StatusWidgetBundle: WidgetBundle {
     var body: some Widget {
         ExportStatusWidget()
         ExportNowControl()
+        #if canImport(ActivityKit) && os(iOS)
+        ArchiveLiveActivityWidget()
+        #endif
     }
 }

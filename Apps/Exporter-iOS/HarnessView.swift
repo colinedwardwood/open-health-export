@@ -2365,10 +2365,18 @@ struct HarnessView: View {
             }
             UIApplication.shared.isIdleTimerDisabled = true
             defer { UIApplication.shared.isIdleTimerDisabled = false }
-            results = try await HarnessExport.runBackfill(mode: mode) { line in
-                await MainActor.run {
-                    status = line
+            ArchiveLiveActivitySession.start()
+            do {
+                results = try await HarnessExport.runBackfill(mode: mode) { line in
+                    await MainActor.run {
+                        status = line
+                    }
+                    await ArchiveLiveActivitySession.update(progressLine: line)
                 }
+                await ArchiveLiveActivitySession.finish()
+            } catch {
+                await ArchiveLiveActivitySession.finish()
+                throw error
             }
             refreshDestinationSurfaces()
             await refreshLedgerIntegrity()

@@ -65,6 +65,8 @@
 	<string>The exporter finds your Mac companion on this network so it can push batches you approved. The iPhone does not accept incoming connections.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>The camera is used only to read a pairing QR from your Mac. The image is not stored or sent anywhere.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSAppTransportSecurity</key>
