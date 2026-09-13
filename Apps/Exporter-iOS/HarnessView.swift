@@ -432,6 +432,18 @@ struct HarnessView: View {
                     status = error.title
                     results = error.lines
                 }
+                if let raw = ProcessInfo.processInfo.environment["OHE_SEED_HTTPS_TEST_FAIL"],
+                   let step = DestinationTestStep(rawValue: raw),
+                   let summary = DestinationTestReport.failed(at: step).failureSummary
+                {
+                    httpsTestLines = [summary]
+                }
+                if let raw = ProcessInfo.processInfo.environment["OHE_SEED_MQTT_TEST_FAIL"],
+                   let step = DestinationTestStep(rawValue: raw),
+                   let summary = DestinationTestReport.failed(at: step).failureSummary
+                {
+                    mqttTestLines = [summary]
+                }
                 #endif
                 await refreshQueueGaps()
                 await refreshCoverageWindows()
@@ -1114,7 +1126,7 @@ struct HarnessView: View {
             }
             .disabled(phase == .working)
             .accessibilityIdentifier("https-export")
-            ForEach(Array(httpsTestLines.enumerated()), id: \.offset) { _, line in
+            ForEach(Array(httpsTestLines.enumerated()), id: \.offset) { index, line in
                 Text(line)
                     .font(.footnote)
                     .foregroundStyle(.primary)
@@ -1123,6 +1135,7 @@ struct HarnessView: View {
                         minHeight: 44,
                         alignment: .leading
                     )
+                    .accessibilityIdentifier("https-test-line-\(index)")
             }
             TextField("MQTT broker URL", text: $mqttURL)
                 .textInputAutocapitalization(.never)
@@ -1223,10 +1236,11 @@ struct HarnessView: View {
             }
             .disabled(phase == .working)
             .accessibilityIdentifier("mqtt-export")
-            ForEach(Array(mqttTestLines.enumerated()), id: \.offset) { _, line in
+            ForEach(Array(mqttTestLines.enumerated()), id: \.offset) { index, line in
                 Text(line)
                     .font(.footnote)
                     .textSelection(.enabled)
+                    .accessibilityIdentifier("mqtt-test-line-\(index)")
             }
             #if !OHE_OBS25_SIZE_BASELINE
             TextField("OTLP collector URL", text: $otlpURL)

@@ -772,6 +772,28 @@ final class ExporterUITests: XCTestCase {
         )
     }
 
+    func testHTTPSDestinationTestFailureNamesTheAuthenticateStep() {
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_HTTPS_TEST_FAIL"] = "authenticate"
+        app.launch()
+        enterControls()
+        selectRootTab(2)
+        let line = scrollToHittable(app.staticTexts["https-test-line-0"])
+        XCTAssertTrue(line.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertEqual(line.label, "Failed at Authenticate.")
+    }
+
+    func testMQTTDestinationTestFailureNamesTheConnectStep() {
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_MQTT_TEST_FAIL"] = "connect"
+        app.launch()
+        enterControls()
+        selectRootTab(2)
+        let line = scrollToHittable(app.staticTexts["mqtt-test-line-0"])
+        XCTAssertTrue(line.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertEqual(line.label, "Failed at Connect.")
+    }
+
     func testConfigurationExportIsExplicitAndCredentialFreeLabeled() {
         enterControls()
         XCTAssertFalse(app.buttons["configuration-export-share"].exists)
