@@ -423,6 +423,11 @@ private func sleepCategory(value: Int = 3) -> CategoryRecord {
         envelope: envelope
     )
     try WireJSONSchema.validateNDJSON(String(decoding: batch, as: UTF8.self), schema: schema)
+    try WireJSONSchema.validateNDJSON(Data(batch), schema: schema)
+    let compiled = WireJSONSchema.compile(schema)
+    let first = try #require(batch.split(separator: 0x0A, maxSplits: 1, omittingEmptySubsequences: true).first)
+    let instance = try JSONSerialization.jsonObject(with: Data(first))
+    try WireJSONSchema.validate(instance: instance, compiled: compiled)
 
     let canary = try NativeWire.encodeCanary(
         code: "ABCD-EF01",

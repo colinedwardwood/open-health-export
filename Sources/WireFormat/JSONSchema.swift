@@ -33,6 +33,11 @@ public struct FreezeChange: Sendable, Equatable {
 
 /// Subset JSON Schema validator for ohe.wire/1 (R-12 G2/G4). No third-party library.
 public enum WireJSONSchema {
+    public struct Compiled {
+        fileprivate let root: [String: Any]
+        fileprivate let byKind: [String: [String: Any]]
+    }
+
     public static func load(_ data: Data) throws -> [String: Any] {
         guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw JSONSchemaError.notObject
@@ -40,26 +45,45 @@ public enum WireJSONSchema {
         return object
     }
 
+    public static func compile(_ schema: [String: Any]) -> Compiled {
+        var byKind: [String: [String: Any]] = [:]
+        if let oneOf = schema["oneOf"] as? [Any] {
+            for entry in oneOf {
+                let candidate = resolve(entry, root: schema)
+                let properties = candidate["properties"] as? [String: Any]
+                let kindSchema = properties?["kind"] as? [String: Any]
+                if let kind = kindSchema?["const"] as? String {
+                    byKind[kind] = candidate
+                }
+            }
+        }
+        return Compiled(root: schema, byKind: byKind)
+    }
+
     public static func specVersion(of schema: [String: Any]) -> String {
         schema["x-ohe-specVersion"] as? String ?? "0.0"
     }
 
     public static func validate(instance: Any, schema: [String: Any]) throws {
+        try validate(instance: instance, compiled: compile(schema))
+    }
+
+    public static func validate(instance: Any, compiled: Compiled) throws {
+        if let object = instance as? [String: Any],
+           let kind = object["kind"] as? String,
+           let match = compiled.byKind[kind] {
+            try validate(instance: instance, schema: match, root: compiled.root)
+            return
+        }
+        let schema = compiled.root
         if let oneOf = schema["oneOf"] as? [Any] {
-            if let object = instance as? [String: Any],
-               let kind = object["kind"] as? String,
-               let match = oneOf.first(where: {
-                   let candidate = resolve($0, root: schema)
-                   let properties = candidate["properties"] as? [String: Any]
-                   let kindSchema = properties?["kind"] as? [String: Any]
-                   return kindSchema?["const"] as? String == kind
-               }) {
-                try validate(instance: instance, schema: resolve(match, root: schema), root: schema)
-                return
-            }
             for entry in oneOf {
                 do {
-                    try validate(instance: instance, schema: resolve(entry, root: schema), root: schema)
+                    try validate(
+                        instance: instance,
+                        schema: resolve(entry, root: schema),
+                        root: schema
+                    )
                     return
                 } catch {}
             }
@@ -69,10 +93,26 @@ public enum WireJSONSchema {
     }
 
     public static func validateNDJSON(_ text: String, schema: [String: Any]) throws {
-        for line in text.split(whereSeparator: \.isNewline) where !line.isEmpty {
-            let data = Data(line.utf8)
-            let instance = try JSONSerialization.jsonObject(with: data)
-            try validate(instance: instance, schema: schema)
+        try validateNDJSON(Data(text.utf8), schema: schema)
+    }
+
+    public static func validateNDJSON(_ data: Data, schema: [String: Any]) throws {
+        let compiled = compile(schema)
+        var start = data.startIndex
+        while start < data.endIndex {
+            var end = start
+            while end < data.endIndex, data[end] != 0x0A {
+                end = data.index(after: end)
+            }
+            var line = data[start..<end]
+            if line.last == 0x0D {
+                line = line.dropLast()
+            }
+            if !line.isEmpty {
+                let instance = try JSONSerialization.jsonObject(with: Data(line))
+                try validate(instance: instance, compiled: compiled)
+            }
+            start = end < data.endIndex ? data.index(after: end) : end
         }
     }
 

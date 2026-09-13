@@ -72,10 +72,17 @@ struct ExportRunCheck {
                 continue
             }
             let record: KindRecord
-            do {
-                record = try decoder.decode(KindRecord.self, from: line)
-            } catch {
-                throw CheckError.invalidRecord(line: inputLines)
+            if let kind = NDJSONFieldScan.unescapedString(named: "kind", in: line) {
+                record = KindRecord(
+                    kind: kind,
+                    metricId: NDJSONFieldScan.unescapedString(named: "metricId", in: line)
+                )
+            } else {
+                do {
+                    record = try decoder.decode(KindRecord.self, from: line)
+                } catch {
+                    throw CheckError.invalidRecord(line: inputLines)
+                }
             }
             if inputLines.isMultiple(of: 1_000_000) {
                 FileHandle.standardError.write(
@@ -279,6 +286,7 @@ struct ExportRunCheck {
             try? FileManager.default.removeItem(at: work.url)
         }
         var reader = NDJSONLineReader(handle: handle)
+        let decoder = JSONDecoder()
         var page: [SampleRecord] = []
         page.reserveCapacity(pageSize)
         var result = MetricWorkResult()
@@ -295,7 +303,7 @@ struct ExportRunCheck {
         }
 
         while let line = try reader.next() {
-            page.append(try NativeSidecars.quantitySample(fromNDJSONLine: line))
+            page.append(try NativeSidecars.quantitySample(fromNDJSONLine: line, decoder: decoder))
             guard page.count == pageSize else { continue }
             let counts = try await submit(page, pageNumber: result.pages + 1)
             result.pages += 1

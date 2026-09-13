@@ -71,8 +71,18 @@ import WireFormat
         )
     )
 
-    let decoded = try NativeSidecars.quantitySample(fromNDJSONLine: Data(line.utf8))
+    let payload = Data(line.utf8)
+    let decoder = JSONDecoder()
+    let decoded = try NativeSidecars.quantitySample(fromNDJSONLine: payload, decoder: decoder)
     #expect(decoded.key == sample.key)
     #expect(decoded.metric == sample.metric)
     #expect(decoded.value == sample.value)
+    #expect(NDJSONFieldScan.unescapedString(named: "kind", in: payload) == "sample.quantity")
+    #expect(NDJSONFieldScan.unescapedString(named: "metricId", in: payload) == "heart_rate")
+}
+
+@Test func ndjsonFieldScanRefusesEscapedValuesSoCallersFallBack() {
+    let line = Data(#"{"kind":"sample.quantity","note":"say \"hi\""}"#.utf8)
+    #expect(NDJSONFieldScan.unescapedString(named: "kind", in: line) == "sample.quantity")
+    #expect(NDJSONFieldScan.unescapedString(named: "note", in: line) == nil)
 }

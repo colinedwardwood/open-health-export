@@ -553,12 +553,27 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
     #expect(workflow.contains("exportruncheck --page-size 10000"))
     #expect(checker.contains("private let memoryLimitMiB = 100"))
     #expect(checker.contains("metricByWireId"))
+    #expect(checker.contains("NDJSONFieldScan"))
     #expect(checker.contains("ingested_lines="))
+    #expect(checker.contains("quantitySample(fromNDJSONLine: line, decoder: decoder)"))
     let reader = try String(
         contentsOf: root.appendingPathComponent("Sources/WireFormat/NDJSONLineReader.swift"),
         encoding: .utf8
     )
     #expect(reader.contains("compactIfStale"))
+    let sidecars = try String(
+        contentsOf: root.appendingPathComponent("Sources/WireFormat/NativeSidecars.swift"),
+        encoding: .utf8
+    )
+    #expect(sidecars.contains("metricByWireId"))
+    #expect(!sidecars.contains("MetricCatalog.all.first { $0.wireId == wireId }"))
+    let pipeline = try String(
+        contentsOf: root.appendingPathComponent("Tools/pipelinecheck/PipelineCheck.swift"),
+        encoding: .utf8
+    )
+    #expect(pipeline.contains("NDJSONLineReader"))
+    #expect(pipeline.contains("WireJSONSchema.compile"))
+    #expect(!pipeline.contains("readLine("))
     #expect(checker.contains("NativeWire.volumeStructuralKinds"))
     #expect(NativeWire.volumeStructuralKinds.contains("tombstone"))
     #expect(NativeWire.volumeStructuralKinds.contains("sample.ecg"))

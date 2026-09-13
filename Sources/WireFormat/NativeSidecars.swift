@@ -20,19 +20,29 @@ public enum NativeSidecars {
         let observedAt: String
     }
 
+    private static let metricByWireId: [String: MetricID] = Dictionary(
+        uniqueKeysWithValues: MetricCatalog.all.map { ($0.wireId, $0.id) }
+    )
+
     /// Decodes one `sample.quantity` line without requiring batch framing.
     /// Callers must classify the line first; accepting structural records here would
     /// make a streaming export checker capable of silently skipping them.
     public static func quantitySample(fromNDJSONLine data: Data) throws -> SampleRecord {
+        try quantitySample(fromNDJSONLine: data, decoder: JSONDecoder())
+    }
+
+    public static func quantitySample(
+        fromNDJSONLine data: Data,
+        decoder: JSONDecoder
+    ) throws -> SampleRecord {
         // JSONDecoder uses correctly-rounded binary64 conversion. JSONSerialization
         // rounds some 17-digit decimals to the adjacent Double on Linux.
-        let quantity = try JSONDecoder().decode(QuantityLine.self, from: data)
+        let quantity = try decoder.decode(QuantityLine.self, from: data)
         guard quantity.kind == "sample.quantity" else {
             throw WireError.utf8
         }
         let wireId = quantity.metricId
-        let resolved = MetricCatalog.all.first { $0.wireId == wireId }?.id
-            ?? MetricID(rawValue: wireId)
+        let resolved = metricByWireId[wireId] ?? MetricID(rawValue: wireId)
         return SampleRecord(
             key: RecordKey(uuid: quantity.uuid),
             metric: resolved,
