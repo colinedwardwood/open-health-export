@@ -767,41 +767,6 @@ struct HarnessView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("about-disclaimer")
 
-            Text("App privacy")
-                .font(.headline)
-            Toggle(
-                "Require Face ID, Touch ID, or device passcode to open the app",
-                isOn: Binding(
-                    get: { appPrivacyGateEnabled },
-                    set: { enabled in
-                        if enabled {
-                            Task {
-                                if await appPrivacyGate.authenticateIfNeeded(enabled: true) {
-                                    appPrivacyGateEnabled = true
-                                    status = "Ready. The app screen will lock whenever you leave it."
-                                } else {
-                                    status = "App privacy was not enabled because authentication did not complete."
-                                }
-                            }
-                        } else {
-                            appPrivacyGateEnabled = false
-                            appPrivacyGate.prepare(enabled: false)
-                            status = "Ready. The optional app privacy gate is off."
-                        }
-                    }
-                )
-            )
-            .frame(minHeight: 44)
-            .accessibilityIdentifier("privacy-gate-enabled")
-            Text("This protects the foreground screen only. It never gates background tasks or destination delivery.")
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("privacy-gate-scope")
-            Text(CredentialPresentationPolicy.copy)
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("credential-no-reveal-policy")
-
             Text("HealthKit provides no deletion callback. Tombstones are best-effort when iOS next reports a deletion; a full reconcile repairs deletions that were not reported.")
                 .font(.footnote)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1314,6 +1279,40 @@ struct HarnessView: View {
                     .textSelection(.enabled)
                     .accessibilityIdentifier("settings-build-provenance-\(index)")
             }
+            Text("App privacy")
+                .font(.headline)
+            Toggle(
+                "Require Face ID, Touch ID, or device passcode to open the app",
+                isOn: Binding(
+                    get: { appPrivacyGateEnabled },
+                    set: { enabled in
+                        if enabled {
+                            Task {
+                                if await appPrivacyGate.authenticateIfNeeded(enabled: true) {
+                                    appPrivacyGateEnabled = true
+                                    status = "Ready. The app screen will lock whenever you leave it."
+                                } else {
+                                    status = "App privacy was not enabled because authentication did not complete."
+                                }
+                            }
+                        } else {
+                            appPrivacyGateEnabled = false
+                            appPrivacyGate.prepare(enabled: false)
+                            status = "Ready. The optional app privacy gate is off."
+                        }
+                    }
+                )
+            )
+            .frame(minHeight: 44)
+            .accessibilityIdentifier("privacy-gate-enabled")
+            Text("This protects the foreground screen only. It never gates background tasks or destination delivery.")
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("privacy-gate-scope")
+            Text(CredentialPresentationPolicy.copy)
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("credential-no-reveal-policy")
             Text("If someone else set this up")
                 .font(.headline)
             Text("iOS can hide this app. We cannot prevent that, and we do not offer stealth mode, alternate icons, or a second name. Check Settings → Apps → Hidden Apps, Screen Time, Battery, and App Store purchase history. Apple's Personal Safety guide: https://support.apple.com/guide/personal-safety/lock-or-hide-apps-on-your-iphone-ipsd0be4c185/web")

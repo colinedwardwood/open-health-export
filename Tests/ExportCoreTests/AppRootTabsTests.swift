@@ -38,7 +38,15 @@ import Watchdog
         Issue.record("statusSettings is missing")
         return
     }
-    let window = String(view[settings.lowerBound...].prefix(1200))
+    let window = String(view[settings.lowerBound...].prefix(2800))
     #expect(window.contains("settings-open-destinations"))
     #expect(window.contains("dataFlowExplainer"))
+    #expect(window.contains("privacy-gate-enabled"))
+    #expect(window.contains("credential-no-reveal-policy"))
+    guard let operations = view.range(of: "private var statusOperations") else {
+        Issue.record("statusOperations is missing")
+        return
+    }
+    let statusWindow = String(view[operations.lowerBound...].prefix(900))
+    #expect(!statusWindow.contains("privacy-gate-enabled"))
 }
