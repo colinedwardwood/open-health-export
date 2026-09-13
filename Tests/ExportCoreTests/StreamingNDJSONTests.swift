@@ -85,4 +85,68 @@ import WireFormat
     let line = Data(#"{"kind":"sample.quantity","note":"say \"hi\""}"#.utf8)
     #expect(NDJSONFieldScan.unescapedString(named: "kind", in: line) == "sample.quantity")
     #expect(NDJSONFieldScan.unescapedString(named: "note", in: line) == nil)
+    #expect(NDJSONFieldScan.unescapedString(named: "kind", in: Data("{}".utf8)) == nil)
+    #expect(NDJSONFieldScan.unescapedString(named: "kind", in: Data(#"{"kind":"open"#.utf8)) == nil)
+}
+
+@Test func ndjsonDataRecordCountsSkipFramingAndHonorCRLF() throws {
+    let sample = SampleRecord(
+        key: RecordKey(uuid: "82000000-0000-4000-8000-000000000002"),
+        metric: MetricCatalog.heartRate.id,
+        start: "2026-09-11T00:00:00Z",
+        end: "2026-09-11T00:00:00Z",
+        timeZoneOffsetMinutes: 0,
+        timeZoneSource: .unknown,
+        value: 72,
+        unit: CanonicalUnit(symbol: "count/min"),
+        observedAt: "2026-09-11T00:00:00Z"
+    )
+    let batch = try NativeWire.encode(
+        samples: [sample],
+        tombstones: [],
+        metric: sample.metric,
+        batchID: BatchID(rawValue: "82000000-0000-4000-8000-000000000003"),
+        envelope: WireEnvelope(
+            exporterId: "00000000-0000-4000-8000-000000000082",
+            seq: 1,
+            emittedAt: sample.observedAt,
+            observedAt: sample.observedAt
+        )
+    )
+    #expect(NativeWire.countQuantityRecords(in: batch) == 1)
+    #expect(NativeWire.countRecords(in: batch) == 1)
+    let crlf = Data(
+        String(decoding: batch, as: UTF8.self)
+            .replacingOccurrences(of: "\n", with: "\r\n")
+            .utf8
+    )
+    #expect(NativeWire.countQuantityRecords(in: crlf) == 1)
+    #expect(NativeWire.countRecords(in: crlf) == 1)
+    #expect(NativeWire.countRecords(in: Data("\n\n".utf8)) == 0)
+}
+
+@Test func compiledSchemaWithoutOneOfAndUnknownKindsStayHonest() throws {
+    let direct: [String: Any] = [
+        "type": "object",
+        "required": ["kind"],
+        "properties": ["kind": ["type": "string"]],
+    ]
+    try WireJSONSchema.validate(
+        instance: ["kind": "x"],
+        compiled: WireJSONSchema.compile(direct)
+    )
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let schema = try WireJSONSchema.load(
+        Data(contentsOf: root.appendingPathComponent("spec/v1.0.0/schema/ohe.wire.1.json"))
+    )
+    #expect(throws: JSONSchemaError.noOneOfMatch) {
+        try WireJSONSchema.validate(
+            instance: ["kind": "not.a.record"],
+            compiled: WireJSONSchema.compile(schema)
+        )
+    }
+    try WireJSONSchema.validateNDJSON(Data("\n\r\n".utf8), schema: schema)
 }
