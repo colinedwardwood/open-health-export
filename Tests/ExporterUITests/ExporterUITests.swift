@@ -480,6 +480,19 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(confirm.isEnabled)
     }
 
+    func testPublicDestinationConfirmationStripsLeadingWhitespace() {
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_PUBLIC_CONFIRMATION"] = "true"
+        app.launch()
+        let phrase = app.textFields["public-destination-confirmation"]
+        XCTAssertTrue(phrase.waitForExistence(timeout: uiWait))
+        type(" send to public server ", into: phrase)
+        XCTAssertTrue(
+            app.staticTexts["public-destination-confirmation-whitespace"].waitForExistence(timeout: uiWait)
+        )
+        XCTAssertTrue(app.buttons["destination-confirm"].isEnabled)
+    }
+
     /// SEC-45: sharing ends our protection over those bytes, so consent is a tap on the
     /// warning rather than an inference from a tap on the share button.
     func testShareWarningIsShownOnceAndGatesTheShareControl() throws {

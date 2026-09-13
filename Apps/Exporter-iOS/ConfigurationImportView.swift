@@ -53,11 +53,12 @@ struct ConfigurationImportView: View {
                 .autocorrectionDisabled()
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("configuration-import-confirmation")
+                confirmationHygiene
                 Button("Create disabled destination drafts") {
                     confirm(review)
                 }
                 .disabled(
-                    confirmation
+                    CredentialFieldHygiene.secret(confirmation).normalized
                         != DestinationConfigurationImportReview.confirmationPhrase
                 )
                 .frame(minHeight: 44)
@@ -145,7 +146,9 @@ struct ConfigurationImportView: View {
 
     private func confirm(_ review: DestinationConfigurationImportReview) {
         do {
-            let confirmed = try review.confirm(typedConfirmation: confirmation)
+            let confirmed = try review.confirm(
+                typedConfirmation: CredentialFieldHygiene.secret(confirmation).normalized
+            )
             let count = try ImportedDestinationDraftStore.append(confirmed)
             reloadDrafts()
             self.review = nil
@@ -174,6 +177,21 @@ struct ConfigurationImportView: View {
             status = "Disabled draft discarded."
         } catch {
             status = "Draft could not be discarded: \(error.localizedDescription)"
+        }
+    }
+
+    @ViewBuilder
+    private var confirmationHygiene: some View {
+        let hygiene = CredentialFieldHygiene.secret(confirmation)
+        if hygiene.strippedWhitespace {
+            Text(CredentialFieldHygiene.whitespaceNote)
+                .font(.footnote)
+                .accessibilityIdentifier("configuration-import-confirmation-whitespace")
+        }
+        if hygiene.replacedSmartPunctuation {
+            Text(CredentialFieldHygiene.smartPunctuationNote)
+                .font(.footnote)
+                .accessibilityIdentifier("configuration-import-confirmation-smartquotes")
         }
     }
 }

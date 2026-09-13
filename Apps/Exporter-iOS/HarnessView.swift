@@ -3132,13 +3132,18 @@ struct HarnessView: View {
                         .autocorrectionDisabled()
                         .frame(minHeight: 44)
                         .accessibilityIdentifier("public-destination-confirmation")
+                        secretFieldHygiene(
+                            publicAddressConfirmation,
+                            identifierPrefix: "public-destination-confirmation"
+                        )
                     }
                     Button("This is my server") {
                         Task { await confirmPendingDestination() }
                     }
                     .disabled(
                         card.requiresPublicAddressConfirmation
-                            && publicAddressConfirmation != ConfirmationCopy.publicAddressPhrase
+                            && CredentialFieldHygiene.secret(publicAddressConfirmation)
+                                .normalized != ConfirmationCopy.publicAddressPhrase
                     )
                     .accessibilityIdentifier("destination-confirm")
                     .buttonStyle(.borderedProminent)
