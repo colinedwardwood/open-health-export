@@ -105,17 +105,7 @@ enum ShortcutExportKind: String, AppEnum {
     ]
 
     static func summarizing(_ outcomes: [RunOutcome.Kind]) -> ShortcutExportKind {
-        switch CombinedExportSummary.kind(outcomes) {
-        case .success: .success
-        case .successNothingDue: .nothingDue
-        case .partial: .partial
-        case .failed: .failed
-        case .unknownAck: .sentUnconfirmed
-        case .localNetworkDenied: .blocked
-        case .blockedDeviceLocked, .abandonedNoBudget, .cancelledBySystem, .blockedLowPower,
-             .blockedUnmetered:
-            .deferred
-        }
+        ShortcutExportKind(rawValue: CombinedExportSummary.shortcutKind(outcomes)) ?? .failed
     }
 
     static func kinds(fromExportLines lines: [String]) -> [RunOutcome.Kind] {

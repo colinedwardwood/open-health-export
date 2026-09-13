@@ -30,6 +30,33 @@ public enum CombinedExportSummary {
         return .successNothingDue
     }
 
+    /// UX-38: Shortcut and Control Centre branches. Distinct from snapshot `kind`
+    /// so a sent-unconfirmed ack does not collapse into Partial.
+    public static func shortcutKind(_ outcomes: [RunOutcome.Kind]) -> String {
+        if outcomes.contains(.failed) { return "failed" }
+        if outcomes.contains(.localNetworkDenied) { return "blocked" }
+        if outcomes.contains(.blockedDeviceLocked)
+            || outcomes.contains(.abandonedNoBudget)
+            || outcomes.contains(.cancelledBySystem)
+            || outcomes.contains(.blockedLowPower)
+            || outcomes.contains(.blockedUnmetered)
+        {
+            return "deferred"
+        }
+        if outcomes.contains(.unknownAck) { return "sentUnconfirmed" }
+        switch kind(outcomes) {
+        case .success: return "success"
+        case .partial: return "partial"
+        case .successNothingDue: return "nothingDue"
+        case .failed: return "failed"
+        case .localNetworkDenied: return "blocked"
+        case .unknownAck: return "sentUnconfirmed"
+        case .blockedDeviceLocked, .abandonedNoBudget, .cancelledBySystem, .blockedLowPower,
+             .blockedUnmetered:
+            return "deferred"
+        }
+    }
+
     public static func copy(_ outcomes: [RunOutcome.Kind]) -> String {
         let selected = outcomes.count
         let withData = typesWithData(outcomes)

@@ -30,6 +30,28 @@ import Watchdog
     #expect(CombinedExportSummary.kind([.success, .blockedUnmetered]) == .blockedUnmetered)
 }
 
+@Test func ux38ShortcutKindBranchesOnSuccessPartialAndFailureClasses() {
+    #expect(CombinedExportSummary.shortcutKind([.success, .success]) == "success")
+    #expect(
+        CombinedExportSummary.shortcutKind([.success, .successNothingDue]) == "partial"
+    )
+    #expect(CombinedExportSummary.shortcutKind([.failed]) == "failed")
+    #expect(CombinedExportSummary.shortcutKind([.localNetworkDenied]) == "blocked")
+    #expect(CombinedExportSummary.shortcutKind([.blockedUnmetered]) == "deferred")
+    #expect(CombinedExportSummary.shortcutKind([.blockedLowPower]) == "deferred")
+    #expect(CombinedExportSummary.shortcutKind([.blockedDeviceLocked]) == "deferred")
+    #expect(CombinedExportSummary.shortcutKind([.unknownAck]) == "sentUnconfirmed")
+    #expect(
+        CombinedExportSummary.shortcutKind([.success, .unknownAck]) == "sentUnconfirmed"
+    )
+    #expect(
+        CombinedExportSummary.shortcutKind(Array(repeating: .successNothingDue, count: 3))
+            == "nothingDue"
+    )
+    #expect(CombinedExportSummary.shortcutKind([.failed, .unknownAck]) == "failed")
+    #expect(CombinedExportSummary.shortcutKind([.localNetworkDenied, .failed]) == "failed")
+}
+
 @Test func combinedPartialOverwritesLastPerTypeOutcomeOnSnapshot() {
     var snapshot = DestinationStatusSnapshot(
         destinationID: "local-file",
