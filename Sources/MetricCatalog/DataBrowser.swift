@@ -13,7 +13,7 @@ public enum DisplayUnitPreference: String, Sendable, CaseIterable, Codable {
 
     public var label: String {
         switch self {
-        case .automatic: "Follow this iPhone's region"
+        case .automatic: "Follow Health"
         case .canonical: "Export units"
         case .metric: "Metric display"
         case .usCustomary: "US customary display"

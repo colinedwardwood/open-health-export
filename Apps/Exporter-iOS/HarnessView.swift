@@ -144,11 +144,15 @@ struct HarnessView: View {
     private var displayUnitPreference: DisplayUnitPreference = .automatic
     @AppStorage("ohe.clockDisplay")
     private var clockDisplay: ClockDisplay = .system
+    @State private var healthKitUnitPolicy: UnitDisplayPolicy?
 
-    /// The device locale enters here and nowhere deeper: every reading path below takes
-    /// an explicit policy, so a locale matrix test can drive them all (R-65).
+    /// Automatic follows Health preferred units when HealthKit answers; otherwise the
+    /// region. Explicit picker values never consult Health (UX-44).
     private var displayUnitPolicy: UnitDisplayPolicy {
-        displayUnitPreference.policy(locale: Locale.current)
+        if displayUnitPreference == .automatic, let healthKitUnitPolicy {
+            return healthKitUnitPolicy
+        }
+        return displayUnitPreference.policy(locale: Locale.current)
     }
 
     private var acknowledgementsText: String {
@@ -300,6 +304,8 @@ struct HarnessView: View {
             appPrivacyGate.prepare(enabled: appPrivacyGateEnabled)
             timeToFirstFrameMS = LaunchMark.millisecondsToNow()
             refreshDestinationSurfaces()
+            HealthKitPreferredDisplayUnits.startObserving()
+            Task { await refreshHealthKitDisplayUnits() }
             #if !OHE_OBS25_SIZE_BASELINE
             if otlpURL.isEmpty {
                 otlpURL = HarnessExport.storedOTLPURL()
@@ -395,6 +401,12 @@ struct HarnessView: View {
         }
         .onOpenURL { url in
             applyOpenURL(url)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: HealthKitPreferredDisplayUnits.didChange)) { _ in
+            Task { await refreshHealthKitDisplayUnits() }
+        }
+        .onChange(of: displayUnitPreference) { _, _ in
+            Task { await refreshHealthKitDisplayUnits() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .oheOpenDeepLink)) { note in
             guard let url = note.object as? URL else { return }
@@ -2687,6 +2699,15 @@ struct HarnessView: View {
         } else {
             status = "Review the disclosure before opening destination status."
         }
+    }
+
+    private func refreshHealthKitDisplayUnits() async {
+        let fallback = displayUnitPreference.policy(locale: Locale.current)
+        guard displayUnitPreference == .automatic else {
+            healthKitUnitPolicy = nil
+            return
+        }
+        healthKitUnitPolicy = await HealthKitPreferredDisplayUnits.policy(fallback: fallback)
     }
 
     private func refreshDestinationSurfaces() {

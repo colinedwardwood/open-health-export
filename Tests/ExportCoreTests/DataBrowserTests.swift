@@ -487,6 +487,49 @@ func displayUnitsFollowTheRegion(
     #expect(DisplayUnitPreference.automatic.policy(locale: locale) == policy)
 }
 
+@Test func healthDisplayUnitsOverlayHealthKitStringsOntoTheRegionFallback() throws {
+    let uk = UnitDisplayPolicy.following(Locale(identifier: "en_GB"))
+    #expect(uk.mass == .kilograms)
+    #expect(uk.distance == .miles)
+    let fromHealth = HealthDisplayUnitMapping.overlay(
+        mass: "lb",
+        distance: "km",
+        length: "in",
+        temperature: "degF",
+        glucose: "mmol<L>",
+        volume: "fl_oz",
+        onto: uk
+    )
+    #expect(fromHealth.mass == .pounds)
+    #expect(fromHealth.distance == .kilometres)
+    #expect(fromHealth.length == .inches)
+    #expect(fromHealth.temperature == .fahrenheit)
+    #expect(fromHealth.glucose == .millimolesPerLitre)
+    #expect(fromHealth.volume == .fluidOunces)
+    let unknown = HealthDisplayUnitMapping.overlay(
+        mass: "stone",
+        distance: nil,
+        length: nil,
+        temperature: nil,
+        glucose: nil,
+        volume: nil,
+        onto: uk
+    )
+    #expect(unknown.mass == .kilograms)
+    #expect(unknown.distance == .miles)
+    #expect(DisplayUnitPreference.automatic.label == "Follow Health")
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let view = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
+        encoding: .utf8
+    )
+    #expect(view.contains("HealthKitPreferredDisplayUnits.policy"))
+    #expect(view.contains("HealthKitPreferredDisplayUnits.didChange"))
+}
+
 @Test(arguments: [
     ("en_US", false),
     ("en_GB", true),

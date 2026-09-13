@@ -256,6 +256,30 @@ import WireFormat
     #expect(days.isEmpty)
 }
 
+@Test func ux44PreferredDisplayUnitsReadHealthKitAndRefreshOnChange() throws {
+    let source = try String(
+        contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/HealthKitSource/HealthKitPreferredDisplayUnits.swift"),
+        encoding: .utf8
+    )
+    #expect(source.contains("HKUserPreferencesDidChange"))
+    #expect(source.contains("preferredUnits(for:"))
+    let view = try String(
+        contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
+        encoding: .utf8
+    )
+    #expect(view.contains("HealthKitPreferredDisplayUnits.policy"))
+    #expect(view.contains("HealthKitPreferredDisplayUnits.didChange"))
+    #expect(view.contains("refreshHealthKitDisplayUnits"))
+}
+
 @Test func structuredHealthKitTypesAreAuthorizedAndStateOfMindConverts() {
     let readTypes = HealthKitAuthorization.readTypes(
         for: [
