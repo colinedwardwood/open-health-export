@@ -722,6 +722,7 @@ struct HarnessView: View {
                             )
                         }
                     }
+                    .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("error-\(error.archetype.rawValue)")
                 }
             } else if let userFacingError {
@@ -740,6 +741,7 @@ struct HarnessView: View {
                         .accessibilityIdentifier("error-fix-\(action.rawValue)")
                     }
                 }
+                .accessibilityElement(children: .contain)
                 .id("user-facing-error")
             }
 
