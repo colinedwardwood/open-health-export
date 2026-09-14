@@ -1494,6 +1494,7 @@ struct HarnessView: View {
             }
             Text("App privacy")
                 .font(.headline)
+                .accessibilityIdentifier("app-privacy-heading")
             Toggle(
                 "Require Face ID, Touch ID, or device passcode to open the app",
                 isOn: Binding(
@@ -1536,6 +1537,7 @@ struct HarnessView: View {
 
             Text("Stop and delete")
                 .font(.headline)
+                .accessibilityIdentifier("wipe-section-heading")
             Text(WipeCopy.counts(wipeInventory))
                 .font(.footnote)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1593,6 +1595,7 @@ struct HarnessView: View {
             Text("Diagnostics")
                 .font(.headline)
                 .foregroundStyle(.primary)
+                .accessibilityIdentifier("diagnostic-section-heading")
             Stepper(
                 "Include at least \(diagnosticMinimumRuns) recent runs",
                 value: $diagnosticMinimumRuns,

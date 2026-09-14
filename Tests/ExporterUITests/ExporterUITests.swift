@@ -117,6 +117,10 @@ final class ExporterUITests: XCTestCase {
         enterControls()
         XCTAssertTrue(app.buttons["health-request"].waitForExistence(timeout: uiWait))
         XCTAssertEqual(
+            scrollToHittable(app.staticTexts["app-privacy-heading"]).label,
+            "App privacy"
+        )
+        XCTAssertEqual(
             scrollToHittable(app.staticTexts["hide-lock-heading"]).label,
             "If someone else set this up"
         )
@@ -124,6 +128,10 @@ final class ExporterUITests: XCTestCase {
             scrollToHittable(app.staticTexts["hide-lock-body"]).label.contains("Hidden Apps")
         )
         let wipe = scrollToHittable(app.buttons["wipe-everything"])
+        XCTAssertEqual(
+            scrollToHittable(app.staticTexts["wipe-section-heading"]).label,
+            "Stop and delete"
+        )
         XCTAssertEqual(wipe.label, "Delete everything on this device")
         XCTAssertTrue(scrollToHittable(app.staticTexts["wipe-received-limit"]).exists)
         XCTAssertEqual(
