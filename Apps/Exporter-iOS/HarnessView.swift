@@ -331,6 +331,7 @@ struct HarnessView: View {
             {
                 try? HarnessExport.seedDestinationStatusForUITests(scenario: scenario)
             }
+            seedUserFacingErrorsFromLaunchEnvironment()
             #endif
             refreshDestinationSurfaces()
             HealthKitPreferredDisplayUnits.startObserving()
@@ -480,24 +481,6 @@ struct HarnessView: View {
                    )
                 {
                     pairingPaste = " \(payload.encoded()) "
-                }
-                if let raw = ProcessInfo.processInfo.environment["OHE_SEED_USER_FACING_ERROR"] {
-                    if raw == "all" {
-                        seededUserFacingErrors = UserFacingErrorArchetype.allCases.map { archetype in
-                            UserFacingErrorObject.make(
-                                archetype: archetype,
-                                destinationLabel: "nas"
-                            )
-                        }
-                    } else if let archetype = UserFacingErrorArchetype(rawValue: raw) {
-                        let error = UserFacingErrorObject.make(
-                            archetype: archetype,
-                            destinationLabel: "nas"
-                        )
-                        userFacingError = error
-                        status = error.title
-                        results = error.lines
-                    }
                 }
                 #endif
                 await refreshQueueGaps()
@@ -2043,6 +2026,31 @@ struct HarnessView: View {
                 .accessibilityIdentifier("\(identifierPrefix)-parseback")
         }
     }
+
+    #if DEBUG
+    private func seedUserFacingErrorsFromLaunchEnvironment() {
+        guard let raw = ProcessInfo.processInfo.environment["OHE_SEED_USER_FACING_ERROR"]
+        else {
+            return
+        }
+        if raw == "all" {
+            seededUserFacingErrors = UserFacingErrorArchetype.allCases.map { archetype in
+                UserFacingErrorObject.make(
+                    archetype: archetype,
+                    destinationLabel: "nas"
+                )
+            }
+        } else if let archetype = UserFacingErrorArchetype(rawValue: raw) {
+            let error = UserFacingErrorObject.make(
+                archetype: archetype,
+                destinationLabel: "nas"
+            )
+            userFacingError = error
+            status = error.title
+            results = error.lines
+        }
+    }
+    #endif
 
     @ViewBuilder
     private func selectableMonospaceLine(_ line: String, identifier: String) -> some View {

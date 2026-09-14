@@ -1010,6 +1010,11 @@ final class ExporterUITests: XCTestCase {
         app.launchEnvironment["OHE_SEED_USER_FACING_ERROR"] = "all"
         app.launch()
         enterControls()
+        let first = identified("error-hostUnresolvable-part-0")
+        XCTAssertTrue(
+            first.waitForExistence(timeout: uiWait),
+            "seeded errors missing: \(visibleIdentifiers().joined(separator: ","))"
+        )
         let archetypes = [
             "hostUnresolvable",
             "tlsTrustFailure",
