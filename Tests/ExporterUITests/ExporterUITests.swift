@@ -1631,10 +1631,10 @@ final class ExporterUITests: XCTestCase {
     /// SDK-owned finding into an unexplained contrast failure on one simulator only.
     private func suppressionCause(for element: XCUIElement) -> String? {
         let frame = element.frame
-        let navigationBar = app.navigationBars.firstMatch
-        if navigationBar.exists,
-           frame.minY < navigationBar.frame.maxY + Self.navigationScrollEdgeEffectHeight {
-            return "behindNavigationBar"
+        for bar in app.navigationBars.allElementsBoundByIndex where bar.exists {
+            if frame.minY < bar.frame.maxY + Self.navigationScrollEdgeEffectHeight {
+                return "behindNavigationBar"
+            }
         }
         let tabBar = app.tabBars.firstMatch
         if tabBar.exists, frame.maxY > tabBar.frame.minY - Self.scrollEdgeEffectHeight {
