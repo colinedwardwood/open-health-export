@@ -812,12 +812,14 @@ struct HarnessView: View {
                 .navigationTitle(rootTabTitle(tab))
                 .toolbar {
                     if tab == .status {
-                        Button {
-                            showSettings = true
-                        } label: {
-                            Label("Settings", systemImage: "gearshape")
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button {
+                                showSettings = true
+                            } label: {
+                                Label("Settings", systemImage: "gearshape")
+                            }
+                            .accessibilityIdentifier("status-settings")
                         }
-                        .accessibilityIdentifier("status-settings")
                     }
                 }
                 .onChange(of: userFacingError) { _, error in

@@ -1408,6 +1408,24 @@ final class ExporterUITests: XCTestCase {
         )
     }
 
+    /// R-41's Settings entry is the Status toolbar gear. The in-page button remains
+    /// as a second path; this case proves the toolbar identifier actually presents.
+    func testStatusToolbarOpensSettings() {
+        enterControls()
+        let gear = app.buttons["status-settings"]
+        XCTAssertTrue(
+            gear.waitForExistence(timeout: uiWait),
+            "available identifiers: \(visibleIdentifiers())"
+        )
+        XCTAssertTrue(gear.isHittable, "status-settings exists but is not hittable")
+        gear.tap()
+        XCTAssertTrue(
+            settingsCloseControl().waitForExistence(timeout: uiWait)
+                || app.scrollViews["settings-scroll"].waitForExistence(timeout: uiWait),
+            "toolbar Settings did not present the sheet"
+        )
+    }
+
     /// QA-17's paused type is the other half of permission-limited: the type is enabled
     /// but not flowing, and the banner saying so is on the first screen.
     func testPausedAnchorBannerPassesAccessibilityAudit() throws {
@@ -1858,6 +1876,15 @@ final class ExporterUITests: XCTestCase {
         if settingsCloseControl().exists { return true }
         if app.scrollViews["settings-scroll"].exists { return true }
         selectRootTab(0)
+        let toolbar = app.buttons["status-settings"]
+        if toolbar.waitForExistence(timeout: 1), toolbar.isHittable {
+            toolbar.tap()
+            if settingsCloseControl().waitForExistence(timeout: uiWait)
+                || app.scrollViews["settings-scroll"].waitForExistence(timeout: uiWait)
+            {
+                return true
+            }
+        }
         let settings = scrollStatus(app.buttons["status-open-settings"])
         guard settings.exists else { return false }
         settings.tap()

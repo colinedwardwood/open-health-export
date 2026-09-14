@@ -33,6 +33,7 @@ import Watchdog
     #expect(view.contains("rootTab = .status"))
     #expect(view.contains("rootTab = .destinations"))
     #expect(view.contains("accessibilityIdentifier(\"status-settings\")"))
+    #expect(view.contains("ToolbarItem(placement: .topBarTrailing)"))
     #expect(view.contains("@State private var showSettings = false"))
     #expect(view.contains(".sheet(isPresented: $showSettings)"))
     #expect(view.contains("accessibilityIdentifier(\"settings-scroll\")"))
