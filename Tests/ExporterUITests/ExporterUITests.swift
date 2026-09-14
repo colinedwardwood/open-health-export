@@ -8,7 +8,11 @@ final class ExporterUITests: XCTestCase {
     /// CI runs three simulator clones on a shared runner, where every launch and
     /// transition takes several times what it does locally. These waits assert that a
     /// control exists, not how fast it arrives; the timing budgets are R-73's job.
-    private let uiWait: TimeInterval = 30
+    /// Local runs omit `CI`, so the same assertions use a shorter wait instead of
+    /// burning 30s on every existence check.
+    private var uiWait: TimeInterval {
+        ProcessInfo.processInfo.environment["CI"] == nil ? 8 : 30
+    }
 
     private var app: XCUIApplication!
 
@@ -1524,13 +1528,18 @@ final class ExporterUITests: XCTestCase {
         // tapping again, not by waiting longer for a keyboard that is not coming.
         for _ in 0 ..< 3 {
             field.tap()
-            if app.keyboards.element.waitForExistence(timeout: 10) { break }
+            if app.keyboards.element.waitForExistence(timeout: min(10, uiWait)) { break }
         }
         XCTAssertTrue(app.keyboards.element.exists, "keyboard never appeared for \(field.identifier)")
         field.typeText(text)
     }
 
-    /// Arabic and other software keyboards do not expose identifier `return`.
+    /// Arabic and other software keyboards do not expose identifier `return`. A
+    /// keyboard that stays up is not a cosmetic problem: the accessibility audits then
+    /// inspect the system keyboard, and its undescribed candidate bar is reported as an
+    /// app element with no description. Dismissal is therefore confirmed, not assumed.
+    /// Swiping the *app* scrolls content and leaves the keyboard; swiping the keyboard
+    /// itself, or tapping its return corner, is what actually puts it away.
     private func dismissKeyboard() {
         guard app.keyboards.element.exists else { return }
         let predicate = NSPredicate(
@@ -1539,11 +1548,28 @@ final class ExporterUITests: XCTestCase {
             "return"
         )
         let key = app.keyboards.buttons.matching(predicate).firstMatch
-        if key.waitForExistence(timeout: 2), key.isHittable {
+        if key.waitForExistence(timeout: 1), key.isHittable {
             key.tap()
-            return
+            if keyboardIsGone() { return }
         }
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.04)).tap()
+        let keyboard = app.keyboards.element
+        keyboard.swipeDown()
+        if keyboardIsGone() { return }
+        keyboard.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.88)).tap()
+        if keyboardIsGone() { return }
+        app.navigationBars.firstMatch.tap()
+        XCTAssertTrue(
+            keyboardIsGone(),
+            "keyboard stayed up, so the audit would inspect system keyboard chrome"
+        )
+    }
+
+    private func keyboardIsGone() -> Bool {
+        let gone = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: app.keyboards.element
+        )
+        return XCTWaiter().wait(for: [gone], timeout: 2) == .completed
     }
 
     private func visibleIdentifiers() -> [String] {
