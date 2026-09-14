@@ -116,6 +116,13 @@ final class ExporterUITests: XCTestCase {
     func testDeleteEverythingShowsHonestLimitsWithinTwoTaps() {
         enterControls()
         XCTAssertTrue(app.buttons["health-request"].waitForExistence(timeout: uiWait))
+        XCTAssertEqual(
+            scrollToHittable(app.staticTexts["hide-lock-heading"]).label,
+            "If someone else set this up"
+        )
+        XCTAssertTrue(
+            scrollToHittable(app.staticTexts["hide-lock-body"]).label.contains("Hidden Apps")
+        )
         let wipe = scrollToHittable(app.buttons["wipe-everything"])
         XCTAssertEqual(wipe.label, "Delete everything on this device")
         XCTAssertTrue(scrollToHittable(app.staticTexts["wipe-received-limit"]).exists)
@@ -515,6 +522,8 @@ final class ExporterUITests: XCTestCase {
         app.launch()
         enterControls()
         scrollToHittable(app.buttons["diagnostic-build"]).tap()
+        XCTAssertTrue(app.staticTexts["diagnostic-preview"].waitForExistence(timeout: uiWait))
+        XCTAssertFalse(app.staticTexts["diagnostic-preview"].label.isEmpty)
 
         // R-26 still decides where this lives: nothing about sharing is reachable until
         // the bundle's last line has been traversed.

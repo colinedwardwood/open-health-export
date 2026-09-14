@@ -1523,8 +1523,11 @@ struct HarnessView: View {
                 .accessibilityIdentifier("credential-no-reveal-policy")
             Text("If someone else set this up")
                 .font(.headline)
+                .accessibilityIdentifier("hide-lock-heading")
             Text("iOS can hide this app. We cannot prevent that, and we do not offer stealth mode, alternate icons, or a second name. Check Settings → Apps → Hidden Apps, Screen Time, Battery, and App Store purchase history. Apple's Personal Safety guide: https://support.apple.com/guide/personal-safety/lock-or-hide-apps-on-your-iphone-ipsd0be4c185/web")
                 .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("hide-lock-body")
 
             Text("Stop and delete")
                 .font(.headline)
@@ -1612,6 +1615,7 @@ struct HarnessView: View {
                 Text(diagnosticPreview)
                     .font(.system(.footnote, design: .monospaced))
                     .textSelection(.enabled)
+                    .accessibilityIdentifier("diagnostic-preview")
                 // S9: the share affordance exists only past the last line of content, so
                 // it cannot be reached without traversing the bundle by scroll, VoiceOver
                 // or Full Keyboard Access. Visibility, not an onAppear, is the evidence:
