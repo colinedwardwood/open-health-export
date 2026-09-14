@@ -1175,10 +1175,13 @@ final class ExporterUITests: XCTestCase {
         let field = app.textFields["demo-confirm"]
         XCTAssertTrue(field.waitForExistence(timeout: uiWait))
         type("local-file", into: field)
+        let export = app.buttons["demo-export"]
+        XCTAssertTrue(
+            export.isEnabled,
+            "demo export stayed disabled after typing local-file"
+        )
         dismissKeyboard()
-        let export = scrollStatus(app.buttons["demo-export"])
-        XCTAssertTrue(export.isEnabled)
-        export.tap()
+        scrollStatus(export).tap()
         app.tap()
         let finished = NSPredicate(
             format: "label CONTAINS %@",
@@ -1706,9 +1709,11 @@ final class ExporterUITests: XCTestCase {
     private func dismissKeyboard() {
         guard app.keyboards.element.exists else { return }
         let predicate = NSPredicate(
-            format: "identifier CONTAINS[cd] %@ OR label CONTAINS[cd] %@",
+            format: "identifier CONTAINS[cd] %@ OR label CONTAINS[cd] %@ OR identifier CONTAINS[cd] %@ OR label CONTAINS[cd] %@",
             "return",
-            "return"
+            "return",
+            "done",
+            "done"
         )
         let key = app.keyboards.buttons.matching(predicate).firstMatch
         if key.waitForExistence(timeout: 1), key.isHittable {
