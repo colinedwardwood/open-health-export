@@ -68,7 +68,7 @@ jobs:
     runs-on: macos-26
     # The suite ran to the wall on one runner. Shards cover both required device
     # families, and reuse the products built once above.
-    timeout-minutes: 40
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
