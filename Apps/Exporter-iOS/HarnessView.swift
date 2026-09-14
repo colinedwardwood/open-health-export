@@ -1648,14 +1648,10 @@ struct HarnessView: View {
                         ),
                         id: \.offset
                     ) { index, line in
-                        Text(line.isEmpty ? " " : String(line))
-                            .font(.system(.footnote, design: .monospaced))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier(
-                                index == 0 ? "diagnostic-preview" : "diagnostic-preview-\(index)"
-                            )
+                        selectableMonospaceLine(
+                            line.isEmpty ? " " : String(line),
+                            identifier: index == 0 ? "diagnostic-preview" : "diagnostic-preview-\(index)"
+                        )
                     }
                 }
                 // S9: the share affordance exists only past the last line of content, so

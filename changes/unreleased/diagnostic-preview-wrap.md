@@ -1,3 +1,2 @@
-The diagnostic JSON preview is one selectable line per record in Settings so
-the accessibility audit can read the bundle instead of clipping a viewport-tall
-text view.
+The diagnostic JSON preview is one 44-point selectable line per record so
+the SEC-45 audit can read the bundle without clipping or a too-small hit area.
