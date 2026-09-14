@@ -239,6 +239,7 @@ struct HarnessView: View {
                             statusSettings
                                 .padding()
                         }
+                        .accessibilityIdentifier("settings-scroll")
                         .navigationTitle("Settings")
                         .toolbar {
                             Button("Close settings") {
@@ -790,6 +791,7 @@ struct HarnessView: View {
                     }
                     .padding()
                 }
+                .accessibilityIdentifier("root-scroll-\(tab.rawValue)")
                 .navigationTitle(rootTabTitle(tab))
                 .toolbar {
                     if tab == .status {
@@ -811,16 +813,19 @@ struct HarnessView: View {
             switch tab {
             case .status:
                 Label("Status", systemImage: tab.systemImage)
+                    .accessibilityIdentifier(tab.accessibilityIdentifier)
             case .data:
                 Label("Data", systemImage: tab.systemImage)
+                    .accessibilityIdentifier(tab.accessibilityIdentifier)
             case .destinations:
                 Label("Destinations", systemImage: tab.systemImage)
+                    .accessibilityIdentifier(tab.accessibilityIdentifier)
             case .history:
                 Label("History", systemImage: tab.systemImage)
+                    .accessibilityIdentifier(tab.accessibilityIdentifier)
             }
         }
         .tag(tab)
-        .accessibilityIdentifier(tab.accessibilityIdentifier)
     }
 
     private func rootTabTitle(_ tab: AppRootTabs) -> String {

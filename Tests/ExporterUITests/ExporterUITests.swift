@@ -1337,7 +1337,7 @@ final class ExporterUITests: XCTestCase {
 
     func testAcknowledgementsRenderTheGeneratedNotice() {
         enterControls()
-        let body = scrollToHittable(app.staticTexts["acknowledgements-body"])
+        let body = scrollToHittable(app.descendants(matching: .any)["acknowledgements-body"])
         XCTAssertTrue(
             body.label.contains("no third-party Swift packages"),
             body.label
@@ -1589,11 +1589,38 @@ final class ExporterUITests: XCTestCase {
 
     private func selectRootTab(_ index: Int) {
         dismissSettingsIfNeeded()
+        let identifiers = ["tab-status", "tab-data", "tab-destinations", "tab-history"]
+        guard identifiers.indices.contains(index) else { return }
+        let identifier = identifiers[index]
+
         let bar = app.tabBars.firstMatch
-        guard bar.waitForExistence(timeout: uiWait) else { return }
-        let button = bar.buttons.element(boundBy: index)
-        if button.exists {
-            button.tap()
+        if bar.waitForExistence(timeout: 1) {
+            let identified = bar.buttons[identifier].firstMatch
+            if identified.exists {
+                identified.tap()
+                return
+            }
+            let positional = bar.buttons.element(boundBy: index)
+            if positional.exists {
+                positional.tap()
+                return
+            }
+        }
+
+        // iPadOS `sidebarAdaptable` has no tab bar. The page itself used to carry
+        // `tab-status`, so a tap hit the whole Status Other and never changed tabs.
+        // Prefer the compact control (sidebar row / tab item), not the page.
+        let matches = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier == %@", identifier)
+        )
+        for offset in 0 ..< min(matches.count, 8) {
+            let candidate = matches.element(boundBy: offset)
+            guard candidate.exists else { continue }
+            let height = candidate.frame.height
+            if candidate.elementType == .button || (height > 0 && height < 120) {
+                candidate.tap()
+                return
+            }
         }
     }
 
@@ -1607,39 +1634,75 @@ final class ExporterUITests: XCTestCase {
     @discardableResult
     private func scrollToHittable(_ element: XCUIElement) -> XCUIElement {
         dismissSettingsIfNeeded()
-        if becomeHittable(element) {
-            return element
-        }
         for index in 0 ..< 4 {
             selectRootTab(index)
-            if becomeHittable(element) {
+            if isReachable(element, scrolls: 40) {
                 return element
             }
         }
-        selectRootTab(0)
-        let settings = app.buttons["status-settings"]
-        if settings.waitForExistence(timeout: 2), settings.isHittable {
-            settings.tap()
-            if becomeHittable(element) {
-                return element
-            }
-            dismissSettingsIfNeeded()
+        if openSettingsSheet(), isReachable(element, scrolls: 40) {
+            return element
         }
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = "Element did not become hittable"
         attachment.lifetime = .keepAlways
         add(attachment)
-        XCTAssertTrue(element.isHittable)
+        XCTAssertTrue(isReachable(element, scrolls: 0), "control never became reachable")
         return element
     }
 
-    private func becomeHittable(_ element: XCUIElement) -> Bool {
-        if element.waitForExistence(timeout: 1), element.isHittable {
-            return true
+    @discardableResult
+    private func openSettingsSheet() -> Bool {
+        if app.buttons["settings-close"].exists { return true }
+        selectRootTab(0)
+        let settings = app.buttons["status-settings"]
+        guard settings.waitForExistence(timeout: uiWait), settings.isHittable else {
+            return false
         }
-        for _ in 0 ..< 40 where !element.isHittable {
-            app.swipeUp()
+        settings.tap()
+        return app.buttons["settings-close"].waitForExistence(timeout: uiWait)
+    }
+
+    private func isReachable(_ element: XCUIElement, scrolls: Int) -> Bool {
+        if elementIsCurrentlyReachable(element) { return true }
+        guard scrolls > 0 else { return false }
+        for _ in 0 ..< scrolls {
+            swipeTowardContentBottom()
+            if elementIsCurrentlyReachable(element) { return true }
         }
-        return element.isHittable
+        return false
+    }
+
+    private func elementIsCurrentlyReachable(_ element: XCUIElement) -> Bool {
+        guard element.exists else { return false }
+        if element.isHittable { return true }
+        switch element.elementType {
+        case .button, .textField, .secureTextField, .switch:
+            return false
+        default:
+            let frame = element.frame
+            let window = app.windows.firstMatch.frame
+            return frame.width > 0 && frame.height > 0 && frame.intersects(window)
+        }
+    }
+
+    private func swipeTowardContentBottom() {
+        let settingsScroll = app.scrollViews["settings-scroll"]
+        if settingsScroll.exists {
+            settingsScroll.swipeUp()
+            return
+        }
+        var hittableRoots: [XCUIElement] = []
+        for name in ["status", "data", "destinations", "history"] {
+            let root = app.scrollViews["root-scroll-\(name)"]
+            if root.exists, root.isHittable {
+                hittableRoots.append(root)
+            }
+        }
+        if let tallest = hittableRoots.max(by: { $0.frame.height < $1.frame.height }) {
+            tallest.swipeUp()
+            return
+        }
+        app.swipeUp()
     }
 }
