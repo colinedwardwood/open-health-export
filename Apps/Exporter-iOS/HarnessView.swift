@@ -2070,6 +2070,7 @@ struct HarnessView: View {
     private func selectableMonospaceLine(_ line: String, identifier: String) -> some View {
         Text(line)
             .font(.system(.footnote, design: .monospaced))
+            .foregroundStyle(.primary)
             .textSelection(.enabled)
             .lineLimit(nil)
             .fixedSize(horizontal: false, vertical: true)
