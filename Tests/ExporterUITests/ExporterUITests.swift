@@ -721,6 +721,33 @@ final class ExporterUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["pairing-confirmation"].exists)
     }
 
+    /// R-67: local-file imports stay disabled drafts. There is no folder-path setup
+    /// editor, and the UI says so rather than inventing one.
+    func testImportedLocalFileDraftHasNoSetupPath() {
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_IMPORTED_DRAFT"] = "local-file"
+        app.launch()
+        enterControls()
+        selectRootTab(2)
+        let notice = app.staticTexts["configuration-import-unsupported-kind"]
+        if !notice.waitForExistence(timeout: uiWait) {
+            for _ in 0 ..< 12 {
+                app.scrollViews["root-scroll-destinations"].swipeUp()
+                if notice.exists { break }
+            }
+        }
+        XCTAssertTrue(
+            notice.waitForExistence(timeout: uiWait),
+            visibleIdentifiers().joined(separator: ",")
+        )
+        XCTAssertEqual(
+            notice.label,
+            "This destination kind does not yet have an import setup path."
+        )
+        XCTAssertFalse(app.buttons["Add credentials and test"].exists)
+        XCTAssertFalse(app.buttons["Add pairing and test"].exists)
+    }
+
     func testOTLPURLParseBackNamesWhitespaceAndHost() {
         enterControls()
         let endpoint = scrollToHittable(app.textFields["otlp-url"])

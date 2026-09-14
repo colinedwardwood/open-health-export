@@ -20,9 +20,11 @@ struct ConfigurationImportView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Configuration portability")
                 .font(.headline)
+                .accessibilityIdentifier("configuration-import-heading")
             Text("Imports never contain credentials and cannot replace or enable an existing destination.")
                 .font(.footnote)
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("configuration-import-limits")
             Button("Review a .tributary configuration") {
                 showingImporter = true
             }
@@ -96,6 +98,10 @@ struct ConfigurationImportView: View {
                         } else {
                             Text("This destination kind does not yet have an import setup path.")
                                 .font(.footnote)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier(
+                                    "configuration-import-unsupported-kind"
+                                )
                         }
                         Button("Discard draft") {
                             discard(draft.localIdentifier)
@@ -131,6 +137,11 @@ struct ConfigurationImportView: View {
                 "OHE_SEED_IMPORTED_DRAFT"
             ] == "companion" {
                 try? ImportedDestinationDraftStore.seedCompanionForUITests()
+            }
+            if ProcessInfo.processInfo.environment[
+                "OHE_SEED_IMPORTED_DRAFT"
+            ] == "local-file" {
+                try? ImportedDestinationDraftStore.seedLocalFileForUITests()
             }
             #endif
             reloadDrafts()
@@ -266,6 +277,37 @@ enum ImportedDestinationDraftStore {
                     DestinationConfigurationImportReview.confirmationPhrase
             )
         _ = try append(confirmed)
+    }
+
+    static func seedLocalFileForUITests() throws {
+        let configuration = try PortableDestinationConfiguration(
+            sourceIdentifier: "seed-local-file",
+            displayName: "Imported archive",
+            kind: .localFile,
+            endpoint: "archive",
+            exportScope: PortableDestinationExportScope(
+                metrics: [MetricID(rawValue: "heart_rate")],
+                startInclusive: Date(timeIntervalSince1970: 1)
+            )
+        )
+        let review = try DestinationConfigurationDocument(
+            destinations: [configuration]
+        )
+        .encoded()
+        let confirmed = try DestinationConfigurationDocument
+            .reviewImport(review)
+            .confirm(
+                typedConfirmation:
+                    DestinationConfigurationImportReview.confirmationPhrase
+            )
+        let records = confirmed.drafts.map {
+            ImportedDestinationDraftRecord(
+                localIdentifier: "seed-local-file",
+                configuration: $0.configuration,
+                state: $0.state.rawValue
+            )
+        }
+        try write(records, to: try fileURL())
     }
     #endif
 

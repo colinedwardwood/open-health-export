@@ -293,3 +293,31 @@ private func portableMQTT(
         try PortableDestinationMaterializer.materialize(https)
     }
 }
+
+@Test func localFileDocumentRoundTripsAsADisabledDraftWithoutASetupPath() throws {
+    let configuration = try PortableDestinationConfiguration(
+        sourceIdentifier: "seed-local-file",
+        displayName: "Imported archive",
+        kind: .localFile,
+        endpoint: "archive"
+    )
+    let data = try DestinationConfigurationDocument(
+        destinations: [configuration]
+    ).encoded()
+    let confirmed = try DestinationConfigurationDocument
+        .reviewImport(data)
+        .confirm(
+            typedConfirmation: DestinationConfigurationImportReview.confirmationPhrase
+        )
+    #expect(confirmed.drafts.count == 1)
+    #expect(confirmed.drafts[0].configuration.kind == .localFile)
+    #expect(confirmed.drafts[0].state == .disabledRequiresTest)
+    #expect(
+        throws: DestinationConfigurationPortabilityError
+            .unsupportedDestinationKind(.localFile)
+    ) {
+        try PortableDestinationMaterializer.materialize(
+            confirmed.drafts[0].configuration
+        )
+    }
+}
