@@ -44,6 +44,7 @@ private struct HTTPSVerificationRecord: Codable {
     var firstSeen: String
     var hasBearer: Bool
     var bearerDescriptor: StoredCredentialDescriptor?
+    var webhookDescriptor: StoredCredentialDescriptor?
     var propagateTraceparent: Bool?
     var importedLocalIdentifier: String?
 }
@@ -73,10 +74,14 @@ private struct OTLPDestinationRecord: Codable {
 
 private struct PendingHTTPS {
     var probe: HTTPSDestinationProbe
+    var destinationID: String
+    var destinationLabel: String
     var host: String
     var allowedHosts: [String]
     var allowInsecureHTTP: Bool
     var bearer: String?
+    var webhookID: String?
+    var persistedURLString: String?
     var firstSeen: String
     var importedLocalIdentifier: String?
 }
@@ -236,7 +241,9 @@ private actor ObserverExportGate {
 }
 
 enum HarnessExport {
-    static let healthDestinationIDs = ["local-file", "https", "mqtt", "companion"]
+    static let healthDestinationIDs = [
+        "local-file", "https", "home-assistant", "mqtt", "companion",
+    ]
 
     /// UX-29: the 413 shorten-window action writes `ohe.exportWindowHours`; HealthKit
     /// pages follow that owned setting so the next batch is smaller.
@@ -358,9 +365,12 @@ enum HarnessExport {
         switch destinationID {
         case "local-file":
             return isLocalFileEnabled()
-        case "https":
+        case "https", "home-assistant":
             guard let data = try? Data(
-                contentsOf: root.appendingPathComponent("https-destination.json")
+                contentsOf: httpsDestinationRecordURL(
+                    root: root,
+                    destinationID: destinationID
+                )
             ), let record = try? JSONDecoder().decode(HTTPSVerificationRecord.self, from: data)
             else { return false }
             return record.report.allowsEnablement
@@ -384,8 +394,8 @@ enum HarnessExport {
         guard let root = try? applicationSupportRoot() else { return false }
         let filename: String
         switch destinationID {
-        case "https":
-            filename = "https-destination.json"
+        case "https", "home-assistant":
+            filename = "\(destinationID)-destination.json"
         case "mqtt":
             filename = "mqtt-destination.json"
         case "companion":
@@ -1465,6 +1475,7 @@ enum HarnessExport {
                 "local-file-test.json",
                 "local-export-folder.bookmark",
                 "https-destination.json",
+                "home-assistant-destination.json",
                 "mqtt-destination.json",
                 "mqtt-client.p12",
                 "otlp-destination.json",
@@ -1681,10 +1692,52 @@ enum HarnessExport {
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
     }
 
+    private static func httpsDestinationRecordURL(
+        root: URL,
+        destinationID: String
+    ) -> URL {
+        root.appendingPathComponent("\(destinationID)-destination.json")
+    }
+
+    private static func httpsKeychainService(_ destinationID: String) -> String {
+        "app.openhealthexporter.ios.\(destinationID)"
+    }
+
+    static func prepareHomeAssistantWebhook(
+        baseURLString: String,
+        webhookID: String,
+        allowInsecureHTTP: Bool,
+        importedLocalIdentifier: String? = nil,
+        onProgress: DestinationTestProgress? = nil
+    ) async throws -> DestinationConfirmationCard {
+        let endpoint = try HomeAssistantWebhookPreset.endpoint(
+            baseURLString: baseURLString,
+            webhookID: webhookID
+        )
+        return try await prepareHTTPSDestination(
+            urlString: endpoint.absoluteString,
+            allowInsecureHTTP: allowInsecureHTTP,
+            bearer: nil,
+            destinationID: "home-assistant",
+            destinationLabel: "Home Assistant",
+            webhookID: webhookID,
+            persistedURLString:
+                try HomeAssistantWebhookPreset.baseURL(
+                    from: endpoint
+                ).absoluteString,
+            importedLocalIdentifier: importedLocalIdentifier,
+            onProgress: onProgress
+        )
+    }
+
     static func prepareHTTPSDestination(
         urlString: String,
         allowInsecureHTTP: Bool,
         bearer: String?,
+        destinationID: String = "https",
+        destinationLabel: String = "HTTPS destination",
+        webhookID: String? = nil,
+        persistedURLString: String? = nil,
         importedLocalIdentifier: String? = nil,
         onProgress: DestinationTestProgress? = nil
     ) async throws -> DestinationConfirmationCard {
@@ -1710,17 +1763,23 @@ enum HarnessExport {
                 transport: transport,
                 exporterID: try installationID(),
                 emittedAt: now,
-                meteredPolicy: .fromAllowsMetered(allowsMeteredNetwork(destinationID: "https")),
+                meteredPolicy: .fromAllowsMetered(
+                    allowsMeteredNetwork(destinationID: destinationID)
+                ),
                 pathConditions: networkPathConditions(),
                 onProgress: onProgress
             )
         }
         await PendingDestination.shared.setHTTPS(PendingHTTPS(
             probe: probe,
+            destinationID: destinationID,
+            destinationLabel: destinationLabel,
             host: host,
             allowedHosts: allowedHosts.sorted(),
             allowInsecureHTTP: allowInsecureHTTP,
             bearer: bearer,
+            webhookID: webhookID,
+            persistedURLString: persistedURLString,
             firstSeen: now,
             importedLocalIdentifier: importedLocalIdentifier
         ))
@@ -1733,14 +1792,18 @@ enum HarnessExport {
     }
 
     static func confirmPendingHTTPSDestination(propagateTraceparent: Bool = false) async throws -> [String] {
-        try ExportScopeGate.requireConfigured(try await destinationScope("https"))
         guard let pending = await PendingDestination.shared.takeHTTPS() else {
             throw SetupError.verificationRequired
         }
+        try ExportScopeGate.requireConfigured(
+            try await destinationScope(pending.destinationID)
+        )
         let probe = pending.probe
         let events = probe.pendingEvents + [.destinationEnabled]
         let record = HTTPSVerificationRecord(
-            urlString: probe.destination.url.absoluteString,
+            urlString:
+                pending.persistedURLString
+                    ?? probe.destination.url.absoluteString,
             allowedHosts: pending.allowedHosts,
             allowInsecureHTTP: pending.allowInsecureHTTP,
             report: probe.report,
@@ -1753,12 +1816,17 @@ enum HarnessExport {
                 appearance: .bearerToken,
                 addedOnDay: pending.firstSeen
             ),
+            webhookDescriptor: StoredCredentialDescriptor.capturing(
+                pending.webhookID,
+                appearance: .webhookID,
+                addedOnDay: pending.firstSeen
+            ),
             propagateTraceparent: propagateTraceparent,
             importedLocalIdentifier: pending.importedLocalIdentifier
         )
         let root = try applicationSupportRoot()
         let bearerStore = KeychainSecretStore(
-            service: "app.openhealthexporter.ios.https"
+            service: httpsKeychainService(pending.destinationID)
         )
         let bearerHandle = SecretHandle(rawValue: "bearer")
         if let bearer = pending.bearer {
@@ -1766,21 +1834,35 @@ enum HarnessExport {
         } else {
             try? await bearerStore.delete(bearerHandle)
         }
+        let webhookHandle = SecretHandle(rawValue: "webhook-id")
+        if let webhookID = pending.webhookID {
+            try await bearerStore.store(
+                Array(webhookID.utf8),
+                handle: webhookHandle
+            )
+        } else {
+            try? await bearerStore.delete(webhookHandle)
+        }
         try JSONEncoder().encode(record).write(
-            to: root.appendingPathComponent("https-destination.json"),
+            to: httpsDestinationRecordURL(
+                root: root,
+                destinationID: pending.destinationID
+            ),
             options: .atomic
         )
-        if let snapshotURL = StatusSnapshotLocation.url(destinationID: "https") {
+        if let snapshotURL = StatusSnapshotLocation.url(
+            destinationID: pending.destinationID
+        ) {
             try DestinationSnapshotFile.recordSecurityEvents(
                 events.count,
-                destinationID: "https",
-                destinationLabel: pending.host,
+                destinationID: pending.destinationID,
+                destinationLabel: pending.destinationLabel,
                 writtenAtEpoch: Date().timeIntervalSince1970,
                 at: snapshotURL
             )
         }
-        try await emitTrustNotices(events, destination: pending.host)
-        try await requestScopeAuthorizationIfConfigured("https")
+        try await emitTrustNotices(events, destination: pending.destinationLabel)
+        try await requestScopeAuthorizationIfConfigured(pending.destinationID)
         if pending.allowInsecureHTTP {
             let store = try SQLiteStateStore(
                 path: root.appendingPathComponent("state.sqlite").path
@@ -1978,6 +2060,7 @@ enum HarnessExport {
 
     static func storedCredentialSummaries() -> (
         httpsBearer: String?,
+        homeAssistantWebhook: String?,
         mqttPassword: String?,
         mqttPKCS12Password: String?
     ) {
@@ -1992,6 +2075,24 @@ enum HarnessExport {
             https = descriptor.summary
         } else {
             https = nil
+        }
+        let homeAssistant: String?
+        if let root,
+           let data = try? Data(
+               contentsOf: root.appendingPathComponent(
+                   "home-assistant-destination.json"
+               )
+           ),
+           let record = try? JSONDecoder().decode(
+               HTTPSVerificationRecord.self,
+               from: data
+           ),
+           let descriptor = record.webhookDescriptor,
+           descriptor.appearance != .absent
+        {
+            homeAssistant = descriptor.summary
+        } else {
+            homeAssistant = nil
         }
         let mqttPassword: String?
         let mqttPKCS12: String?
@@ -2009,7 +2110,7 @@ enum HarnessExport {
             mqttPassword = nil
             mqttPKCS12 = nil
         }
-        return (https, mqttPassword, mqttPKCS12)
+        return (https, homeAssistant, mqttPassword, mqttPKCS12)
     }
 
     private static func mqttPKCS12Password(
@@ -2181,19 +2282,30 @@ enum HarnessExport {
     }
 
     static func runHTTPSDestination(
+        destinationID: String = "https",
+        destinationLabel: String = "HTTPS destination",
         onProgress: (@Sendable (Int, Int) async -> Void)? = nil
     ) async throws -> [String] {
         try await withThermalCompression {
-            try await runHTTPSDestinationUnscoped(onProgress: onProgress)
+            try await runHTTPSDestinationUnscoped(
+                destinationID: destinationID,
+                destinationLabel: destinationLabel,
+                onProgress: onProgress
+            )
         }
     }
 
     private static func runHTTPSDestinationUnscoped(
+        destinationID: String,
+        destinationLabel: String,
         onProgress: (@Sendable (Int, Int) async -> Void)?
     ) async throws -> [String] {
         let root = try applicationSupportRoot()
         let data = try Data(
-            contentsOf: root.appendingPathComponent("https-destination.json")
+            contentsOf: httpsDestinationRecordURL(
+                root: root,
+                destinationID: destinationID
+            )
         )
         let saved = try JSONDecoder().decode(HTTPSVerificationRecord.self, from: data)
         let allowedHosts = Set(saved.allowedHosts)
@@ -2201,15 +2313,30 @@ enum HarnessExport {
         if saved.hasBearer {
             bearer = String(
                 decoding: try await KeychainSecretStore(
-                    service: "app.openhealthexporter.ios.https"
+                    service: httpsKeychainService(destinationID)
                 ).load(SecretHandle(rawValue: "bearer")),
                 as: UTF8.self
             )
         } else {
             bearer = nil
         }
+        let destinationURLString: String
+        if destinationID == "home-assistant" {
+            let webhookID = String(
+                decoding: try await KeychainSecretStore(
+                    service: httpsKeychainService(destinationID)
+                ).load(SecretHandle(rawValue: "webhook-id")),
+                as: UTF8.self
+            )
+            destinationURLString = try HomeAssistantWebhookPreset.endpoint(
+                baseURLString: saved.urlString,
+                webhookID: webhookID
+            ).absoluteString
+        } else {
+            destinationURLString = saved.urlString
+        }
         let destination = try HTTPSDestination(
-            urlString: saved.urlString,
+            urlString: destinationURLString,
             allowedHosts: allowedHosts,
             allowInsecureHTTP: saved.allowInsecureHTTP,
             authorizationBearer: bearer
@@ -2241,7 +2368,9 @@ enum HarnessExport {
                 destination: destination,
                 transport: transport,
                 traceparent: emission,
-                meteredPolicy: .fromAllowsMetered(allowsMeteredNetwork(destinationID: "https")),
+                meteredPolicy: .fromAllowsMetered(
+                    allowsMeteredNetwork(destinationID: destinationID)
+                ),
                 pathConditions: networkPathConditions()
             )
         )
@@ -2253,7 +2382,7 @@ enum HarnessExport {
         let now = Date().ISO8601Format()
         let exporterID = try installationID()
         var lines: [String] = []
-        let scope = try await destinationScope("https")
+        let scope = try await destinationScope(destinationID)
         try ExportScopeGate.requireConfigured(scope)
         let source = HealthKitAnchoredSource(
             context: context,
@@ -2262,7 +2391,7 @@ enum HarnessExport {
         )
         let observations = HealthKitDayObservationSource(context: context)
         let statistics = HealthKitStatisticsSource(context: context)
-        let snapshotURL = StatusSnapshotLocation.url(destinationID: "https")
+        let snapshotURL = StatusSnapshotLocation.url(destinationID: destinationID)
         let ledgerSeal = ledgerHeadSeal()
         let ledgerSealURL = root.appendingPathComponent("ledger-head-seal.json")
         let metrics = scope.metrics.sorted { $0.rawValue < $1.rawValue }
@@ -2280,7 +2409,7 @@ enum HarnessExport {
                 store: store,
                 metric: metric,
                 scratchDirectory: scratch,
-                destinationName: "https",
+                destinationName: destinationID,
                 envelope: envelope,
                 temporal: context,
                 statistics: statistics,
@@ -2296,8 +2425,8 @@ enum HarnessExport {
             ).run()
             await notifyIfFailed(
                 outcome,
-                destinationID: "https",
-                destinationLabel: "HTTPS destination"
+                destinationID: destinationID,
+                destinationLabel: destinationLabel
             )
             lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
             lines.append(
@@ -2307,8 +2436,8 @@ enum HarnessExport {
                     store: store,
                     metric: metric,
                     scratchDirectory: scratch,
-                    destinationID: "https",
-                    destinationLabel: "HTTPS destination",
+                    destinationID: destinationID,
+                    destinationLabel: destinationLabel,
                     envelope: envelope,
                     temporal: context,
                     statistics: statistics,
@@ -2328,7 +2457,7 @@ enum HarnessExport {
         try await applyQueueRedIfNeeded(
             store: store,
             root: root,
-            destinationLabel: "HTTPS destination"
+            destinationLabel: destinationLabel
         )
         return lines
     }
@@ -2483,6 +2612,39 @@ enum HarnessExport {
                         "allowInsecureHTTP":
                             record.allowInsecureHTTP ? "true" : "false",
                         "method": "POST",
+                    ],
+                    exportScope: try PortableDestinationExportScope(
+                        metrics: scope.metrics.sorted {
+                            $0.rawValue < $1.rawValue
+                        },
+                        startInclusive: scope.startInclusive,
+                        endExclusive: scope.endExclusive
+                    )
+                )
+            )
+        }
+        let homeAssistantURL = root.appendingPathComponent(
+            "home-assistant-destination.json"
+        )
+        if let data = try? Data(contentsOf: homeAssistantURL),
+           let record = try? JSONDecoder().decode(
+               HTTPSVerificationRecord.self,
+               from: data
+           ),
+           record.report.allowsEnablement,
+           let baseURL = URL(string: record.urlString) {
+            let scope = try await destinationScope("home-assistant")
+            destinations.append(
+                try PortableDestinationConfiguration(
+                    sourceIdentifier:
+                        record.importedLocalIdentifier ?? "home-assistant",
+                    displayName: baseURL.host ?? "Home Assistant",
+                    kind: .homeAssistant,
+                    endpoint: baseURL.absoluteString,
+                    settings: [
+                        "allowInsecureHTTP":
+                            record.allowInsecureHTTP ? "true" : "false",
+                        "mode": "webhook",
                     ],
                     exportScope: try PortableDestinationExportScope(
                         metrics: scope.metrics.sorted {
@@ -2850,6 +3012,7 @@ enum HarnessExport {
             secretStores: [
                 KeychainSecretStore(service: "app.openhealthexporter.ios.psk"),
                 KeychainSecretStore(service: "app.openhealthexporter.ios.https"),
+                KeychainSecretStore(service: "app.openhealthexporter.ios.home-assistant"),
                 KeychainSecretStore(service: "app.openhealthexporter.mqtt"),
             ],
             ledgerSeal: resettableLedgerHeadSeal(),
@@ -2868,11 +3031,13 @@ enum HarnessExport {
             "demo-state.sqlite-shm",
             "demo-state.sqlite-wal",
             "https-destination.json",
+            "home-assistant-destination.json",
             "mqtt-destination.json",
             "mqtt-client.p12",
             "imported-destination-drafts.json",
             "otlp-destination.json",
             "local-file-test.json",
+            "local-export-folder.bookmark",
             "companion-test.json",
             "backfill-raw.json",
             "backfill-aggregate.json",
@@ -3073,6 +3238,27 @@ enum HarnessExport {
                     host: dataFlowHost(record.urlString),
                     transport: record.allowInsecureHTTP ? "HTTP" : "HTTPS",
                     credential: record.hasBearer ? DataFlowHop.bearerToken : DataFlowHop.noCredential
+                )
+            )
+        }
+        if let data = try? Data(
+            contentsOf: root.appendingPathComponent(
+                "home-assistant-destination.json"
+            )
+        ),
+           let record = try? JSONDecoder().decode(
+               HTTPSVerificationRecord.self,
+               from: data
+           ),
+           record.report.allowsEnablement
+        {
+            hops.append(
+                DataFlowHop(
+                    id: "home-assistant",
+                    host: dataFlowHost(record.urlString),
+                    transport:
+                        record.allowInsecureHTTP ? "HTTP webhook" : "HTTPS webhook",
+                    credential: DataFlowHop.webhookSecret
                 )
             )
         }

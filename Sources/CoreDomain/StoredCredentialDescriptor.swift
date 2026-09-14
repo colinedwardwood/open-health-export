@@ -6,6 +6,7 @@
 public struct StoredCredentialDescriptor: Sendable, Equatable, Codable {
     public enum Appearance: String, Sendable, Equatable, Codable {
         case bearerToken = "bearer token"
+        case webhookID = "webhook ID"
         case password
         case pkcs12Password = "PKCS#12 password"
         case absent
@@ -44,7 +45,7 @@ public struct StoredCredentialDescriptor: Sendable, Equatable, Codable {
         switch appearance {
         case .absent:
             return "No saved credential."
-        case .bearerToken, .password, .pkcs12Password:
+        case .bearerToken, .webhookID, .password, .pkcs12Password:
             let count = characterCount == 1 ? "1 character" : "\(characterCount) characters"
             if let addedOnDay, !addedOnDay.isEmpty {
                 return "•••• \(count) · \(appearance.rawValue) · added \(addedOnDay)"

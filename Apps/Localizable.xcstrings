@@ -2,6 +2,94 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
+    "Home Assistant webhook": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Home Assistant webhook"
+          }
+        }
+      }
+    },
+    "Sends the complete native NDJSON feed to an automation webhook. Home Assistant does not import historical sensor states from this feed by itself.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sends the complete native NDJSON feed to an automation webhook. Home Assistant does not import historical sensor states from this feed by itself."
+          }
+        }
+      }
+    },
+    "Home Assistant base URL": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Home Assistant base URL"
+          }
+        }
+      }
+    },
+    "Webhook ID": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Webhook ID"
+          }
+        }
+      }
+    },
+    "Allow plain HTTP to Home Assistant (unsafe)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow plain HTTP to Home Assistant (unsafe)"
+          }
+        }
+      }
+    },
+    "Test Home Assistant webhook": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test Home Assistant webhook"
+          }
+        }
+      }
+    },
+    "Export one page (Home Assistant webhook)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export one page (Home Assistant webhook)"
+          }
+        }
+      }
+    },
+    "Home Assistant": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Home Assistant"
+          }
+        }
+      }
+    },
     "Choose an archive folder in Files before enabling local export.": {
       "extractionState": "manual",
       "localizations": {

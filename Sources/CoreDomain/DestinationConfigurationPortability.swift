@@ -416,7 +416,29 @@ public enum PortableDestinationMaterializer {
                 qos: nil,
                 serviceName: name
             )
-        case .localFile, .homeAssistant:
+        case .homeAssistant:
+            supported = ["allowInsecureHTTP", "mode"]
+            try rejectUnsupported(
+                configuration.settings,
+                supported: supported,
+                kind: .homeAssistant
+            )
+            if configuration.settings["mode"] != "webhook" {
+                throw DestinationConfigurationPortabilityError.unsupportedSetting(
+                    kind: .homeAssistant,
+                    key: "mode"
+                )
+            }
+            return PortableDestinationSetupInputs(
+                slotIdentifier: "home-assistant",
+                endpoint: configuration.endpoint,
+                allowInsecure:
+                    configuration.settings["allowInsecureHTTP"] == "true",
+                clientID: nil,
+                topic: nil,
+                qos: nil
+            )
+        case .localFile:
             throw DestinationConfigurationPortabilityError
                 .unsupportedDestinationKind(configuration.kind)
         }

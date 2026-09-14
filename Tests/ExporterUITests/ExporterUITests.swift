@@ -996,6 +996,32 @@ final class ExporterUITests: XCTestCase {
         XCTAssertFalse(scrollDestinations(app.buttons["local-file-enable"]).isEnabled)
     }
 
+    func testHomeAssistantPresetStatesWebhookSemanticsAndProtectsTheID() {
+        enterDestinations()
+        XCTAssertTrue(
+            scrollDestinations(app.staticTexts["home-assistant-title"])
+                .waitForExistence(timeout: uiWait)
+        )
+        let semantics = scrollDestinations(
+            app.staticTexts["home-assistant-semantics"]
+        )
+        XCTAssertTrue(semantics.waitForExistence(timeout: uiWait))
+        XCTAssertTrue(
+            semantics.label.contains("does not import historical sensor states"),
+            semantics.label
+        )
+        XCTAssertTrue(
+            scrollDestinations(
+                app.secureTextFields["home-assistant-webhook-id"]
+            ).waitForExistence(timeout: uiWait)
+        )
+        XCTAssertFalse(
+            scrollDestinations(
+                app.buttons["home-assistant-export"]
+            ).isEnabled
+        )
+    }
+
     func testPaddedPairingPayloadShowsWhitespaceNoteAndParses() {
         app.terminate()
         app.launchEnvironment["OHE_SEED_PAIRING_PASTE"] = "1"
@@ -1601,6 +1627,12 @@ final class ExporterUITests: XCTestCase {
                 cause = self.suppressionCause(for: element)
             } else if issue.auditType == .dynamicType {
                 cause = self.dynamicTypeSuppressionCause(for: issue.element)
+            } else if issue.element == nil,
+                      self.app.windows.firstMatch.frame.width >= 700,
+                      Self.iPadUnhostedTextStates.contains(state),
+                      String(describing: issue).contains("Potentially inaccessible text")
+            {
+                cause = "iPadUnhostedPotentiallyInaccessibleText"
             } else {
                 cause = nil
             }
@@ -1699,6 +1731,16 @@ final class ExporterUITests: XCTestCase {
         "disabledControl": trackingIssue,
         "systemTextFieldPlaceholder": trackingIssue,
         "unhostedDynamicTypeLabel": trackingIssue,
+        "iPadUnhostedPotentiallyInaccessibleText": trackingIssue,
+    ]
+
+    /// iPadOS 26.5 sometimes returns a text-detection audit finding with no
+    /// `XCUIElement`, despite the queried SwiftUI controls being present in the
+    /// accessibility tree. Keep this exception restricted to the two reproduced
+    /// states instead of suppressing unattributed text findings globally.
+    private static let iPadUnhostedTextStates: Set<String> = [
+        "public-destination-confirmation",
+        "diagnostic-preview-share-warning",
     ]
 
     /// The floating tab bar fades content above its own frame, and the navigation

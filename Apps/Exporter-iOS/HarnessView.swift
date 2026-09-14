@@ -31,6 +31,7 @@ struct HarnessView: View {
 
     private enum PendingConfirmationKind {
         case https
+        case homeAssistant
         case mqtt
     }
 
@@ -50,11 +51,18 @@ struct HarnessView: View {
     @State private var httpsURL = ""
     @State private var httpsBearer = ""
     @State private var httpsBearerDescriptor: String?
+    @State private var homeAssistantBaseURL = ""
+    @State private var homeAssistantWebhookID = ""
+    @State private var homeAssistantWebhookDescriptor: String?
+    @State private var allowInsecureHomeAssistant = false
+    @State private var homeAssistantTestLines: [String] = []
     @State private var mqttPasswordDescriptor: String?
     @State private var mqttPKCS12PasswordDescriptor: String?
     @State private var allowInsecureHTTP = false
     @AppStorage("ohe.https.allowsMeteredNetwork")
     private var allowMeteredHTTPS = false
+    @AppStorage("ohe.home-assistant.allowsMeteredNetwork")
+    private var allowMeteredHomeAssistant = false
     @AppStorage("ohe.mqtt.allowsMeteredNetwork")
     private var allowMeteredMQTT = false
     @AppStorage("ohe.companion.allowsMeteredNetwork")
@@ -1270,6 +1278,86 @@ struct HarnessView: View {
                     )
                     .accessibilityIdentifier("https-test-line-\(index)")
             }
+            Text("Home Assistant webhook")
+                .font(.headline)
+                .accessibilityIdentifier("home-assistant-title")
+            Text("Sends the complete native NDJSON feed to an automation webhook. Home Assistant does not import historical sensor states from this feed by itself.")
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("home-assistant-semantics")
+            TextField("Home Assistant base URL", text: $homeAssistantBaseURL)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.URL)
+                .textContentType(.URL)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("home-assistant-url")
+            urlFieldHygiene(
+                homeAssistantBaseURL,
+                identifierPrefix: "home-assistant-url"
+            )
+            SecureField("Webhook ID", text: $homeAssistantWebhookID)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("home-assistant-webhook-id")
+            secretFieldHygiene(
+                homeAssistantWebhookID,
+                identifierPrefix: "home-assistant-webhook-id"
+            )
+            if let homeAssistantWebhookDescriptor {
+                Text(homeAssistantWebhookDescriptor)
+                    .font(.footnote)
+                    .accessibilityIdentifier(
+                        "home-assistant-webhook-descriptor"
+                    )
+            }
+            Toggle(
+                "Allow plain HTTP to Home Assistant (unsafe)",
+                isOn: $allowInsecureHomeAssistant
+            )
+            .frame(minHeight: 44)
+            .accessibilityIdentifier("home-assistant-insecure")
+            Toggle(
+                "Allow cellular and other metered networks",
+                isOn: $allowMeteredHomeAssistant
+            )
+            .frame(minHeight: 44)
+            .accessibilityIdentifier("home-assistant-metered")
+            Text("Off by default. Exports wait for Wi-Fi unless you turn this on.")
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Test Home Assistant webhook") {
+                Task { await testHomeAssistantWebhook() }
+            }
+            .disabled(
+                phase == .working
+                    || homeAssistantBaseURL.isEmpty
+                    || homeAssistantWebhookID.isEmpty
+            )
+            .accessibilityIdentifier("home-assistant-enable")
+            Button("Export one page (Home Assistant webhook)") {
+                Task { await runHomeAssistantExport() }
+            }
+            .disabled(
+                phase == .working
+                    || !HarnessExport.isDestinationEnabled("home-assistant")
+            )
+            .accessibilityIdentifier("home-assistant-export")
+            ForEach(
+                Array(homeAssistantTestLines.enumerated()),
+                id: \.offset
+            ) { index, line in
+                Text(line)
+                    .font(.footnote)
+                    .foregroundStyle(.primary)
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: 44,
+                        alignment: .leading
+                    )
+                    .accessibilityIdentifier("home-assistant-test-line-\(index)")
+            }
             TextField("MQTT broker URL", text: $mqttURL)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -2052,6 +2140,7 @@ struct HarnessView: View {
         switch scopeDestinationID {
         case "local-file": "Archive folder"
         case "https": "HTTPS"
+        case "home-assistant": "Home Assistant webhook"
         case "mqtt": "MQTT"
         case "companion": "Mac companion"
         default: scopeDestinationID
@@ -2297,6 +2386,7 @@ struct HarnessView: View {
                 Picker("Export destination", selection: $scopeDestinationID) {
                     Text("Archive folder").tag("local-file")
                     Text("HTTPS").tag("https")
+                    Text("Home Assistant").tag("home-assistant")
                     Text("MQTT").tag("mqtt")
                     Text("Mac companion").tag("companion")
                 }
@@ -2994,6 +3084,10 @@ struct HarnessView: View {
             httpsURL = inputs.endpoint
             allowInsecureHTTP = inputs.allowInsecure
             status = "Ready. HTTPS fields loaded from the disabled draft. Add the omitted credential, then run the destination test."
+        case .homeAssistant:
+            homeAssistantBaseURL = inputs.endpoint
+            allowInsecureHomeAssistant = inputs.allowInsecure
+            status = "Ready. Home Assistant fields loaded from the disabled draft. Add the omitted webhook ID, then run the destination test."
         case .mqtt:
             mqttURL = inputs.endpoint
             mqttClientID = inputs.clientID ?? mqttClientID
@@ -3054,6 +3148,61 @@ struct HarnessView: View {
                 httpsTestLines = []
             }
             presentUserFacingFailure(error, destinationLabel: httpsURL)
+        }
+        phase = .ready
+    }
+
+    @MainActor
+    private func testHomeAssistantWebhook() async {
+        phase = .working
+        let base = CredentialFieldHygiene.url(
+            homeAssistantBaseURL
+        ).normalized
+        let hasPin = URL(string: base)?.scheme?.lowercased() == "https"
+        let plan = DestinationTestPlan.https(hasPin: hasPin)
+        status = NamedWorkProgress.test(
+            current: 0,
+            total: plan.total,
+            step: plan.first.progressLabel
+        )
+        do {
+            confirmationKind = .homeAssistant
+            confirmationCard = try await HarnessExport.prepareHomeAssistantWebhook(
+                baseURLString: base,
+                webhookID: CredentialFieldHygiene.secret(
+                    homeAssistantWebhookID
+                ).normalized,
+                allowInsecureHTTP: allowInsecureHomeAssistant,
+                importedLocalIdentifier:
+                    importedDestinationDraft?.configuration.kind
+                        == .homeAssistant
+                        ? importedDestinationDraft?.localIdentifier : nil
+            ) { current, total, step in
+                Task { @MainActor in
+                    status = NamedWorkProgress.test(
+                        current: current,
+                        total: total,
+                        step: step.progressLabel
+                    )
+                }
+            }
+            homeAssistantTestLines = confirmationCard?.lines ?? []
+            userFacingError = nil
+            status = "Ready. Confirm this Home Assistant webhook before any Health data moves."
+        } catch {
+            confirmationCard = nil
+            confirmationKind = nil
+            if case SetupError.testFailed(let step) = error {
+                homeAssistantTestLines = [
+                    DestinationTestReport.failed(at: step).failureSummary
+                ].compactMap { $0 }
+            } else {
+                homeAssistantTestLines = []
+            }
+            presentUserFacingFailure(
+                error,
+                destinationLabel: "Home Assistant webhook"
+            )
         }
         phase = .ready
     }
@@ -3141,12 +3290,20 @@ struct HarnessView: View {
             let activatingDraft = importedDestinationDraft.flatMap { draft in
                 let kind = draft.configuration.kind
                 return (confirmationKind == .https && kind == .https)
+                    || (confirmationKind == .homeAssistant && kind == .homeAssistant)
                     || (confirmationKind == .mqtt && kind == .mqtt)
                     ? draft : nil
             }
             if let draft = activatingDraft {
-                let destinationID =
-                    draft.configuration.kind == .https ? "https" : "mqtt"
+                let destinationID: String
+                switch draft.configuration.kind {
+                case .https:
+                    destinationID = "https"
+                case .homeAssistant:
+                    destinationID = "home-assistant"
+                default:
+                    destinationID = "mqtt"
+                }
                 try await HarnessExport.saveDestinationScope(
                     try DestinationExportScope(
                         destinationID: destinationID,
@@ -3163,6 +3320,11 @@ struct HarnessView: View {
                 )
                 httpsBearer = ""
                 status = "Ready. Network destination passed its real-path test and is enabled."
+            case .homeAssistant:
+                homeAssistantTestLines =
+                    try await HarnessExport.confirmPendingHTTPSDestination()
+                homeAssistantWebhookID = ""
+                status = "Ready. Home Assistant webhook passed its real-path test and is enabled."
             case .mqtt:
                 mqttTestLines = try await HarnessExport.confirmPendingMQTTDestination()
                 status = "Ready. MQTT destination passed its real-path test and is enabled."
@@ -3301,6 +3463,7 @@ struct HarnessView: View {
         dataFlowHops = HarnessExport.dataFlowHops()
         let credentials = HarnessExport.storedCredentialSummaries()
         httpsBearerDescriptor = credentials.httpsBearer
+        homeAssistantWebhookDescriptor = credentials.homeAssistantWebhook
         mqttPasswordDescriptor = credentials.mqttPassword
         mqttPKCS12PasswordDescriptor = credentials.mqttPKCS12Password
         Task {
@@ -3424,6 +3587,39 @@ struct HarnessView: View {
                 destinationLabel: "HTTPS destination"
             )
             presentUserFacingFailure(error, destinationLabel: "HTTPS destination")
+        }
+        phase = .ready
+    }
+
+    @MainActor
+    private func runHomeAssistantExport() async {
+        phase = .working
+        status = NamedWorkProgress.types(current: 0, total: 1)
+        do {
+            results = try await HarnessExport.runHTTPSDestination(
+                destinationID: "home-assistant",
+                destinationLabel: "Home Assistant webhook"
+            ) { current, total in
+                await MainActor.run {
+                    status = NamedWorkProgress.types(
+                        current: current,
+                        total: total
+                    )
+                }
+            }
+            refreshDestinationSurfaces()
+            await refreshLedgerIntegrity()
+            await refreshWakeAttribution()
+            status = "Ready. Home Assistant webhook export finished."
+        } catch {
+            await HarnessExport.notifyDestinationFailure(
+                destinationID: "home-assistant",
+                destinationLabel: "Home Assistant webhook"
+            )
+            presentUserFacingFailure(
+                error,
+                destinationLabel: "Home Assistant webhook"
+            )
         }
         phase = .ready
     }

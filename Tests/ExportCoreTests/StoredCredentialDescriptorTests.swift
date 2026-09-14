@@ -18,6 +18,14 @@ import Testing
     )
     #expect(!captured.summary.contains("super-secret-token"))
 
+    let webhook = StoredCredentialDescriptor.capturing(
+        "secret-webhook-id",
+        appearance: .webhookID,
+        addedOnDay: "2026-09-14"
+    )
+    #expect(webhook.summary.contains("webhook ID"))
+    #expect(!webhook.summary.contains("secret-webhook-id"))
+
     let empty = StoredCredentialDescriptor.capturing(
         nil,
         appearance: .password,

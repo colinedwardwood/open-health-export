@@ -5064,12 +5064,21 @@ private func anchorHoldFixture(
     )
     #expect(harness.contains("allowsMeteredNetwork(destinationID:"))
     #expect(harness.contains("NetworkPathMonitorCache.conditions()"))
-    for destinationID in ["https", "mqtt", "companion", "otlp"] {
+    for destinationID in ["mqtt", "companion", "otlp"] {
         #expect(
             harness.contains("allowsMeteredNetwork(destinationID: \"\(destinationID)\")"),
             "missing metered opt-in for \(destinationID)"
         )
     }
+    #expect(
+        harness.contains(
+            "allowsMeteredNetwork(destinationID: destinationID)"
+        )
+    )
+    #expect(
+        harness.contains(#"destinationID: "home-assistant""#),
+        "Home Assistant must use its own metered-network preference"
+    )
     for relative in [
         "Sources/SinkHTTP/HTTPSSink.swift",
         "Sources/SinkMQTT/MQTTSink.swift",

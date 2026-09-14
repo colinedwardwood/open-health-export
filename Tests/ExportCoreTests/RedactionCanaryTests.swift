@@ -255,17 +255,25 @@ enum LeakMutant: String, CaseIterable {
         encoding: .utf8
     )
 
-    for destinationID in ["local-file", "https", "mqtt", "companion"] {
+    for destinationID in ["local-file", "mqtt", "companion"] {
         #expect(exportHarness.contains("destinationScope(\"\(destinationID)\")"))
         #expect(exportHarness.contains(
             "requestScopeAuthorizationIfConfigured(\"\(destinationID)\")"
         ))
     }
+    #expect(exportHarness.contains(#""home-assistant""#))
+    #expect(exportHarness.contains("destinationScope(pending.destinationID)"))
+    #expect(
+        exportHarness.contains(
+            "requestScopeAuthorizationIfConfigured(pending.destinationID)"
+        )
+    )
+    #expect(exportHarness.contains("destinationScope(destinationID)"))
     #expect(exportHarness.contains("guard isDestinationEnabled($1.destinationID)"))
     #expect(exportHarness.contains("window: HealthKitQueryWindow(scope: scope)"))
     #expect(exportHarness.contains("try ExportScopeGate.requireConfigured(scope)"))
     #expect(exportHarness.contains(
-        #"try ExportScopeGate.requireConfigured(try await destinationScope("https"))"#
+        "try ExportScopeGate.requireConfigured(\n            try await destinationScope(pending.destinationID)"
     ))
     #expect(exportHarness.contains(
         #"try ExportScopeGate.requireConfigured(try await destinationScope("mqtt"))"#

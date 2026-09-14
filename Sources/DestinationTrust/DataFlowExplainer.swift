@@ -21,6 +21,7 @@ public struct DataFlowHop: Sendable, Equatable, Identifiable {
     public static let usernamePassword = "username + password"
     public static let clientCertificate = "client certificate"
     public static let pairing = "pairing"
+    public static let webhookSecret = "webhook secret"
     public static let noCredential = "no credential"
 }
 

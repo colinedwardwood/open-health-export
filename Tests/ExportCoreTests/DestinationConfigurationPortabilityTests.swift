@@ -347,12 +347,16 @@ private func portableMQTT(
     }
 }
 
-@Test func homeAssistantDocumentRoundTripsAsADisabledDraftWithoutASetupPath() throws {
+@Test func homeAssistantDocumentRoundTripsAsADisabledDraftWithAWebhookSetupPath() throws {
     let configuration = try PortableDestinationConfiguration(
         sourceIdentifier: "seed-home-assistant",
         displayName: "Imported Home Assistant",
         kind: .homeAssistant,
-        endpoint: "http://homeassistant.local:8123"
+        endpoint: "http://homeassistant.local:8123",
+        settings: [
+            "allowInsecureHTTP": "true",
+            "mode": "webhook",
+        ]
     )
     let data = try DestinationConfigurationDocument(
         destinations: [configuration]
@@ -365,12 +369,10 @@ private func portableMQTT(
     #expect(confirmed.drafts.count == 1)
     #expect(confirmed.drafts[0].configuration.kind == .homeAssistant)
     #expect(confirmed.drafts[0].state == .disabledRequiresTest)
-    #expect(
-        throws: DestinationConfigurationPortabilityError
-            .unsupportedDestinationKind(.homeAssistant)
-    ) {
-        try PortableDestinationMaterializer.materialize(
-            confirmed.drafts[0].configuration
-        )
-    }
+    let inputs = try PortableDestinationMaterializer.materialize(
+        confirmed.drafts[0].configuration
+    )
+    #expect(inputs.slotIdentifier == "home-assistant")
+    #expect(inputs.endpoint == "http://homeassistant.local:8123")
+    #expect(inputs.allowInsecure)
 }
