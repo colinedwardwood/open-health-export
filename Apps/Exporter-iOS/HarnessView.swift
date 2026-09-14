@@ -2071,6 +2071,8 @@ struct HarnessView: View {
         Text(line)
             .font(.system(.footnote, design: .monospaced))
             .textSelection(.enabled)
+            .lineLimit(nil)
+            .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .contentShape(Rectangle())
             .accessibilityIdentifier(identifier)

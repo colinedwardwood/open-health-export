@@ -1313,8 +1313,21 @@ enum HarnessExport {
             events: journal.events
         )
         let text = String(decoding: payload, as: UTF8.self)
+        let prettyText: String
+        if let object = try? JSONSerialization.jsonObject(with: payload),
+           JSONSerialization.isValidJSONObject(object),
+           let pretty = try? JSONSerialization.data(
+               withJSONObject: object,
+               options: [.prettyPrinted, .sortedKeys]
+           ),
+           let decoded = String(data: pretty, encoding: .utf8)
+        {
+            prettyText = decoded
+        } else {
+            prettyText = text
+        }
         let lines = assembler.previewLines(events: journal.events)
-        let preview = lines.isEmpty ? text : lines.joined(separator: "\n") + "\n\n" + text
+        let preview = lines.isEmpty ? prettyText : lines.joined(separator: "\n") + "\n\n" + prettyText
         return (preview, payload)
     }
 
