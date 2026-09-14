@@ -261,12 +261,15 @@ struct HarnessView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Export overdue")
                         .font(.headline)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(overdueBanner)
                         .font(.footnote)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
                 .background(.yellow)
+                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("export-overdue-banner")
             }
         }
@@ -292,12 +295,15 @@ struct HarnessView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(AnchorHoldBanner.title)
                         .font(.headline)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(AnchorHoldBanner.detail(anchorHolds))
                         .font(.footnote)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
                 .background(.yellow)
+                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("anchor-hold-banner")
             }
         }
@@ -716,13 +722,10 @@ struct HarnessView: View {
                 ForEach(seededUserFacingErrors, id: \.archetype) { error in
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(Array(error.lines.enumerated()), id: \.offset) { index, line in
-                            Text(line)
-                                .font(.system(.footnote, design: .monospaced))
-                                .textSelection(.enabled)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .accessibilityIdentifier(
-                                    "error-\(error.archetype.rawValue)-part-\(index)"
-                                )
+                            selectableMonospaceLine(
+                                line,
+                                identifier: "error-\(error.archetype.rawValue)-part-\(index)"
+                            )
                         }
                     }
                     .accessibilityIdentifier("error-\(error.archetype.rawValue)")
@@ -730,11 +733,10 @@ struct HarnessView: View {
             } else if let userFacingError {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(Array(userFacingError.lines.enumerated()), id: \.offset) { index, line in
-                        Text(line)
-                            .font(.system(.footnote, design: .monospaced))
-                            .textSelection(.enabled)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("error-part-\(index)")
+                        selectableMonospaceLine(
+                            line,
+                            identifier: "error-part-\(index)"
+                        )
                     }
                     ForEach(userFacingError.actions, id: \.rawValue) { action in
                         Button(action.label) {
@@ -1422,10 +1424,10 @@ struct HarnessView: View {
             .accessibilityIdentifier("destination-ledger-verify")
             .accessibilityHint("Verifies the append-only hash chain and shows up to 50 recent transmission records.")
             ForEach(Array(ledgerLines.enumerated()), id: \.offset) { index, line in
-                Text(line)
-                    .font(.system(.footnote, design: .monospaced))
-                    .textSelection(.enabled)
-                    .accessibilityIdentifier("destination-ledger-line-\(index)")
+                selectableMonospaceLine(
+                    line,
+                    identifier: "destination-ledger-line-\(index)"
+                )
             }
             Text(EgressAttemptLog.sectionTitle)
                 .font(.headline)
@@ -1465,12 +1467,10 @@ struct HarnessView: View {
             .accessibilityIdentifier("history-load")
             if historyEvents.isEmpty {
                 ForEach(Array(historyLines.enumerated()), id: \.offset) { index, line in
-                    Text(line)
-                        .font(.system(.footnote, design: .monospaced))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                        .contentShape(Rectangle())
-                        .accessibilityIdentifier("history-row-\(index)")
+                    selectableMonospaceLine(
+                        line,
+                        identifier: "history-row-\(index)"
+                    )
                 }
             } else {
                 Text(RunHistoryDetail.retentionCopy)
@@ -1481,12 +1481,10 @@ struct HarnessView: View {
                     let revealed = revealedHistoryIDs.contains(rowID)
                     let lines = RunHistoryDetail.lines(for: event, revealPayload: revealed)
                     ForEach(Array(lines.enumerated()), id: \.offset) { lineIndex, line in
-                        Text(line)
-                            .font(.system(.footnote, design: .monospaced))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                            .contentShape(Rectangle())
-                            .accessibilityIdentifier("history-row-\(eventIndex)-\(lineIndex)")
+                        selectableMonospaceLine(
+                            line,
+                            identifier: "history-row-\(eventIndex)-\(lineIndex)"
+                        )
                     }
                     if event.facts.payloadPath != nil, !revealed {
                         Button("Reveal exact payload") {
@@ -2031,6 +2029,16 @@ struct HarnessView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("\(identifierPrefix)-parseback")
         }
+    }
+
+    @ViewBuilder
+    private func selectableMonospaceLine(_ line: String, identifier: String) -> some View {
+        Text(line)
+            .font(.system(.footnote, design: .monospaced))
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+            .accessibilityIdentifier(identifier)
     }
 
     @ViewBuilder
