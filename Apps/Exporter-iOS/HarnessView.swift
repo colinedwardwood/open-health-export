@@ -1648,8 +1648,9 @@ struct HarnessView: View {
                         ),
                         id: \.offset
                     ) { index, line in
+                        let trimmed = String(line).trimmingCharacters(in: .whitespaces)
                         selectableMonospaceLine(
-                            line.isEmpty ? " " : String(line),
+                            trimmed.isEmpty ? " " : trimmed,
                             identifier: index == 0 ? "diagnostic-preview" : "diagnostic-preview-\(index)"
                         )
                     }

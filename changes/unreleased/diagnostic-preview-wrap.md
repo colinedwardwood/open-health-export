@@ -1,2 +1,2 @@
-The diagnostic JSON preview pretty-prints and wraps. Settings-sheet audits
-use a taller navigation fade band than Status, matching the presented chrome.
+The diagnostic JSON preview pretty-prints, wraps, and strips leading indent so
+Settings accessibility audits do not score padded braces as low contrast.
