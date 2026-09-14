@@ -233,55 +233,35 @@ struct ImportedDestinationDraftRecord: Codable, Equatable {
 enum ImportedDestinationDraftStore {
     #if DEBUG
     static func seedHTTPSForUITests() throws {
-        guard try load().isEmpty else { return }
-        let configuration = try PortableDestinationConfiguration(
-            sourceIdentifier: "seed-https",
-            displayName: "Imported HTTPS",
-            kind: .https,
-            endpoint: "https://collector.example/upload",
-            settings: ["method": "POST"],
-            exportScope: PortableDestinationExportScope(
-                metrics: [MetricID(rawValue: "heart_rate")],
-                startInclusive: Date(timeIntervalSince1970: 1)
+        try replaceStore(
+            with: try PortableDestinationConfiguration(
+                sourceIdentifier: "seed-https",
+                displayName: "Imported HTTPS",
+                kind: .https,
+                endpoint: "https://collector.example/upload",
+                settings: ["method": "POST"],
+                exportScope: PortableDestinationExportScope(
+                    metrics: [MetricID(rawValue: "heart_rate")],
+                    startInclusive: Date(timeIntervalSince1970: 1)
+                )
             )
         )
-        let review = try DestinationConfigurationDocument(
-            destinations: [configuration]
-        )
-        .encoded()
-        let confirmed = try DestinationConfigurationDocument
-            .reviewImport(review)
-            .confirm(
-                typedConfirmation:
-                    DestinationConfigurationImportReview.confirmationPhrase
-            )
-        _ = try append(confirmed)
     }
 
     static func seedCompanionForUITests() throws {
-        guard try load().isEmpty else { return }
-        let configuration = try PortableDestinationConfiguration(
-            sourceIdentifier: "seed-companion",
-            displayName: "Imported Mac",
-            kind: .companion,
-            endpoint: "OHE Lab Mac._ohe-companion._tcp",
-            settings: ["serviceName": "OHE Lab Mac._ohe-companion._tcp"],
-            exportScope: PortableDestinationExportScope(
-                metrics: [MetricID(rawValue: "heart_rate")],
-                startInclusive: Date(timeIntervalSince1970: 1)
+        try replaceStore(
+            with: try PortableDestinationConfiguration(
+                sourceIdentifier: "seed-companion",
+                displayName: "Imported Mac",
+                kind: .companion,
+                endpoint: "OHE Lab Mac._ohe-companion._tcp",
+                settings: ["serviceName": "OHE Lab Mac._ohe-companion._tcp"],
+                exportScope: PortableDestinationExportScope(
+                    metrics: [MetricID(rawValue: "heart_rate")],
+                    startInclusive: Date(timeIntervalSince1970: 1)
+                )
             )
         )
-        let review = try DestinationConfigurationDocument(
-            destinations: [configuration]
-        )
-        .encoded()
-        let confirmed = try DestinationConfigurationDocument
-            .reviewImport(review)
-            .confirm(
-                typedConfirmation:
-                    DestinationConfigurationImportReview.confirmationPhrase
-            )
-        _ = try append(confirmed)
     }
 
     static func seedLocalFileForUITests() throws {
@@ -308,16 +288,23 @@ enum ImportedDestinationDraftStore {
         kind: PortableDestinationKind,
         endpoint: String
     ) throws {
-        let configuration = try PortableDestinationConfiguration(
-            sourceIdentifier: sourceIdentifier,
-            displayName: displayName,
-            kind: kind,
-            endpoint: endpoint,
-            exportScope: PortableDestinationExportScope(
-                metrics: [MetricID(rawValue: "heart_rate")],
-                startInclusive: Date(timeIntervalSince1970: 1)
+        try replaceStore(
+            with: try PortableDestinationConfiguration(
+                sourceIdentifier: sourceIdentifier,
+                displayName: displayName,
+                kind: kind,
+                endpoint: endpoint,
+                exportScope: PortableDestinationExportScope(
+                    metrics: [MetricID(rawValue: "heart_rate")],
+                    startInclusive: Date(timeIntervalSince1970: 1)
+                )
             )
         )
+    }
+
+    private static func replaceStore(
+        with configuration: PortableDestinationConfiguration
+    ) throws {
         let review = try DestinationConfigurationDocument(
             destinations: [configuration]
         )
@@ -330,7 +317,7 @@ enum ImportedDestinationDraftStore {
             )
         let records = confirmed.drafts.map {
             ImportedDestinationDraftRecord(
-                localIdentifier: sourceIdentifier,
+                localIdentifier: configuration.sourceIdentifier,
                 configuration: $0.configuration,
                 state: $0.state.rawValue
             )

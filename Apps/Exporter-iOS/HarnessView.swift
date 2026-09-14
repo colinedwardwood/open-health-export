@@ -1115,6 +1115,8 @@ struct HarnessView: View {
             }
             Text("Your health data is sent only to destinations listed here. This is what the app records about its own use, not independent proof.")
                 .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("destination-ledger-honesty")
             ConfigurationImportView(
                 refreshToken: importedDraftRefreshToken
             ) { loadImportedDestinationDraft($0) }

@@ -729,6 +729,9 @@ final class ExporterUITests: XCTestCase {
         app.launch()
         enterControls()
         selectRootTab(2)
+        XCTAssertTrue(
+            app.staticTexts["destination-ledger-honesty"].waitForExistence(timeout: uiWait)
+        )
         let notice = app.staticTexts["configuration-import-unsupported-localFile"]
         if !notice.waitForExistence(timeout: uiWait) {
             for _ in 0 ..< 12 {
