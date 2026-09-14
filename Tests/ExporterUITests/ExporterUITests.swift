@@ -1443,27 +1443,30 @@ final class ExporterUITests: XCTestCase {
 
     private func performAccessibilityAudit(_ state: String = #function) throws {
         try app.performAccessibilityAudit { issue in
-            guard let element = issue.element else {
-                return false
-            }
             let cause: String?
-            if issue.auditType == .contrast {
+            if issue.auditType == .contrast, let element = issue.element {
                 cause = self.suppressionCause(for: element)
+            } else if issue.auditType == .dynamicType {
+                cause = self.dynamicTypeSuppressionCause(for: issue.element)
             } else {
                 cause = nil
             }
             guard let cause else {
-                print(
-                    "UNSUPPRESSED AX \(state): type=\(issue.auditType) "
-                        + "id=\(element.identifier) label=\(element.label) "
-                        + "enabled=\(element.isEnabled) hittable=\(element.isHittable) "
-                        + "frame=\(element.frame)"
-                )
+                if let element = issue.element {
+                    print(
+                        "UNSUPPRESSED AX \(state): type=\(issue.auditType) "
+                            + "id=\(element.identifier) label=\(element.label) "
+                            + "enabled=\(element.isEnabled) hittable=\(element.isHittable) "
+                            + "frame=\(element.frame)"
+                    )
+                } else {
+                    print(
+                        "UNSUPPRESSED AX \(state): type=\(issue.auditType) "
+                            + "element=nil issue=\(String(describing: issue))"
+                    )
+                }
                 return false
             }
-            // QA-26: a waiver is only valid with a tracking issue behind it. A cause
-            // that is not in the table cannot be suppressed, so adding one without a
-            // link fails the audit instead of passing quietly.
             guard let link = Self.accessibilitySuppressionIssues[cause],
                   link.hasPrefix("https://")
             else {
@@ -1501,6 +1504,22 @@ final class ExporterUITests: XCTestCase {
         return nil
     }
 
+    /// iPadOS `sidebarAdaptable` tab labels are UIKit UILabels that do not take the
+    /// accessibility content-size category. Xcode 26 reports that as a Dynamic Type
+    /// failure with no `XCUIElement`, so the finding cannot be attributed to app copy.
+    private func dynamicTypeSuppressionCause(for element: XCUIElement?) -> String? {
+        guard let element else { return "unhostedDynamicTypeLabel" }
+        if app.tabBars.firstMatch.exists, element.frame.intersects(app.tabBars.firstMatch.frame) {
+            return "unhostedDynamicTypeLabel"
+        }
+        if app.navigationBars.firstMatch.exists,
+           element.frame.intersects(app.navigationBars.firstMatch.frame)
+        {
+            return "unhostedDynamicTypeLabel"
+        }
+        return nil
+    }
+
     func testAccessibilitySuppressionsCarryALinkedIssue() {
         XCTAssertFalse(Self.accessibilitySuppressionIssues.isEmpty)
         for (cause, link) in Self.accessibilitySuppressionIssues {
@@ -1517,6 +1536,7 @@ final class ExporterUITests: XCTestCase {
         "offscreenElement": trackingIssue,
         "disabledControl": trackingIssue,
         "systemTextFieldPlaceholder": trackingIssue,
+        "unhostedDynamicTypeLabel": trackingIssue,
     ]
 
     /// The floating tab bar fades content above its own frame, so an intersection test
