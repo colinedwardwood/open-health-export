@@ -1639,11 +1639,25 @@ struct HarnessView: View {
             .disabled(phase == .working)
             .accessibilityHint("Assembles a redacted ohe.diagnostic/1 JSON preview. Sharing exists only below the bundle's last line.")
             if !diagnosticPreview.isEmpty {
-                Text(diagnosticPreview)
-                    .font(.system(.footnote, design: .monospaced))
-                    .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("diagnostic-preview")
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(
+                        Array(
+                            diagnosticPreview
+                                .split(separator: "\n", omittingEmptySubsequences: false)
+                                .enumerated()
+                        ),
+                        id: \.offset
+                    ) { index, line in
+                        Text(line.isEmpty ? " " : String(line))
+                            .font(.system(.footnote, design: .monospaced))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier(
+                                index == 0 ? "diagnostic-preview" : "diagnostic-preview-\(index)"
+                            )
+                    }
+                }
                 // S9: the share affordance exists only past the last line of content, so
                 // it cannot be reached without traversing the bundle by scroll, VoiceOver
                 // or Full Keyboard Access. Visibility, not an onAppear, is the evidence:

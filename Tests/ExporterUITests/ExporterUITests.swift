@@ -565,8 +565,8 @@ final class ExporterUITests: XCTestCase {
         app.launch()
         enterControls()
         scrollSettings(app.buttons["diagnostic-build"]).tap()
-        XCTAssertTrue(app.staticTexts["diagnostic-preview"].waitForExistence(timeout: uiWait))
-        XCTAssertFalse(app.staticTexts["diagnostic-preview"].label.isEmpty)
+        XCTAssertTrue(identified("diagnostic-preview").waitForExistence(timeout: uiWait))
+        XCTAssertFalse(identified("diagnostic-preview").label.isEmpty)
 
         // R-26 still decides where this lives: nothing about sharing is reachable until
         // the bundle's last line has been traversed.

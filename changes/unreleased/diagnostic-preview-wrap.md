@@ -1,3 +1,3 @@
-The diagnostic JSON preview now wraps to its full height in Settings so the
-accessibility audit can read every line instead of clipping the bundle to the
-visible sheet.
+The diagnostic JSON preview is one selectable line per record in Settings so
+the accessibility audit can read the bundle instead of clipping a viewport-tall
+text view.
