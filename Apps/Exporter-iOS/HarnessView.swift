@@ -651,6 +651,7 @@ struct HarnessView: View {
                 Text(DataFlowExplainer.empty)
                     .font(.footnote)
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("data-flow-empty")
             } else {
                 ForEach(Array(dataFlowHops.enumerated()), id: \.element.id) { index, hop in
                     Text(DataFlowExplainer.hopLine(hop))
@@ -662,6 +663,7 @@ struct HarnessView: View {
             Text(DataFlowExplainer.nowhereElse)
                 .font(.footnote)
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("data-flow-nowhere-else")
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("data-flow-explainer")

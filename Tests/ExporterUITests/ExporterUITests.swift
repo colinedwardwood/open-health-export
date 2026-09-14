@@ -45,13 +45,18 @@ final class ExporterUITests: XCTestCase {
         )
         XCTAssertFalse(app.buttons["health-request"].exists)
         XCTAssertTrue(app.otherElements["data-flow-explainer"].waitForExistence(timeout: uiWait))
+        let emptyFlow = app.staticTexts["data-flow-empty"]
         XCTAssertTrue(
-            app.staticTexts["No destinations yet. Health stays on this iPhone until you add one."]
-                .exists
+            emptyFlow.waitForExistence(timeout: uiWait),
+            visibleIdentifiers().joined(separator: ",")
         )
-        XCTAssertTrue(
-            app.staticTexts["Nowhere else. No account. No analytics. No crash reporting."]
-                .exists
+        XCTAssertEqual(
+            emptyFlow.label,
+            "No destinations yet. Health stays on this iPhone until you add one."
+        )
+        XCTAssertEqual(
+            app.staticTexts["data-flow-nowhere-else"].label,
+            "Nowhere else. No account. No analytics. No crash reporting."
         )
         XCTAssertTrue(app.otherElements["scheduling-honesty"].waitForExistence(timeout: uiWait))
         XCTAssertTrue(
@@ -1823,7 +1828,7 @@ final class ExporterUITests: XCTestCase {
         selectRootTab(tab)
         if isReachable(
             element,
-            scrolls: 40,
+            scrolls: 80,
             preferredScroll: "root-scroll-\(names[tab])",
             huntIfMissing: true
         ) {

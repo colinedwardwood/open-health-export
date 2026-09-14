@@ -1419,6 +1419,23 @@ enum HarnessExport {
         if let directory = StatusSnapshotLocation.directory() {
             try? FileManager.default.removeItem(at: directory)
         }
+        // Destination reports survive across XCUITest cases in one simulator.
+        // Leaving them would put hops on first-run disclosure after a prior case
+        // enabled local-file.
+        if let root = try? applicationSupportRoot() {
+            for name in [
+                "local-file-test.json",
+                "https-destination.json",
+                "mqtt-destination.json",
+                "mqtt-client.p12",
+                "otlp-destination.json",
+                "companion-test.json",
+                "pairing.json",
+                "imported-destination-drafts.json",
+            ] {
+                try? FileManager.default.removeItem(at: root.appendingPathComponent(name))
+            }
+        }
     }
 
     static func clearAnchorHoldsForUITests() async throws {
