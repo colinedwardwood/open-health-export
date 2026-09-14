@@ -548,6 +548,7 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
     )
     #expect(workflow.contains("corpusgen --tier T1 --seed 1 |"))
     #expect(workflow.contains("corpusgen --tier T2 --seed 1 |"))
+    #expect(workflow.contains("tier-two-exportrun:"))
     #expect(!workflow.contains("corpusgen --tier T1 --seed 1 --count"))
     #expect(workflow.contains(".build/release/exportruncheck"))
     #expect(workflow.contains("exportruncheck --page-size 10000"))

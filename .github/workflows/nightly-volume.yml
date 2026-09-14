@@ -65,6 +65,9 @@ jobs:
           grep -F 'declared_records=10000000' /tmp/t1-exportrun.out
           grep -F 'limit_mib=100' /tmp/t1-exportrun.out
           grep -F 'formats=native-ndjson,native-json,native-json-pretty,csv,hae' /tmp/t1-exportrun.out
+  # One GitHub-hosted job is 360 minutes. Piping 50 million records through
+  # pipelinecheck and ExportRun together hit that wall with no success line.
+  # Each consumer now gets its own generation and its own budget.
   tier-two-pathologies:
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 4 * * 0'
     runs-on: ubuntu-latest
@@ -78,32 +81,47 @@ jobs:
         run: |
           swift build -c release --product corpusgen
           swift build -c release --product pipelinecheck
-          swift build -c release --product exportruncheck
-      - name: Exercise all fifty million records through the bounded pipeline
+      - name: Validate all fifty million records
         shell: bash
         run: |
           set -euo pipefail
-          mkfifo /tmp/t2-hash-stream /tmp/t2-pipeline-stream
+          mkfifo /tmp/t2-hash-stream
           sha256sum < /tmp/t2-hash-stream |
             cut -d' ' -f1 > /tmp/t2.sha256 &
           hash_pid=$!
-          .build/release/pipelinecheck \
-            < /tmp/t2-pipeline-stream \
-            > /tmp/t2-pipeline.out &
-          pipeline_pid=$!
           .build/release/corpusgen --tier T2 --seed 1 |
-            tee /tmp/t2-hash-stream /tmp/t2-pipeline-stream |
-            .build/release/exportruncheck --page-size 10000 |
-            tee /tmp/t2-exportrun.out
-          wait "$hash_pid" "$pipeline_pid"
+            tee /tmp/t2-hash-stream |
+            .build/release/pipelinecheck |
+            tee /tmp/t2-pipeline.out
+          wait "$hash_pid"
           digest="$(cat /tmp/t2.sha256)"
           test "${#digest}" -eq 64
           grep -Fx 'pipelinecheck lines=50000001' /tmp/t2-pipeline.out
           grep -Fx \
             'pipelinecheck concentrated_heart_prefix=20000000 year_range=2010-2024 distinct_years=15' \
             /tmp/t2-pipeline.out
+          printf 'tier=T2 records=50000000 sha256=%s\n' "$digest"
+  tier-two-exportrun:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 4 * * 0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc
+        with:
+          swift-version: "6.3.3"
+      - name: Build release corpus generator
+        run: |
+          swift build -c release --product corpusgen
+          swift build -c release --product exportruncheck
+      - name: Exercise ExportRun within its memory ceiling
+        shell: bash
+        run: |
+          set -euo pipefail
+          .build/release/corpusgen --tier T2 --seed 1 |
+            .build/release/exportruncheck --page-size 10000 |
+            tee /tmp/t2-exportrun.out
           grep -F 'exportruncheck outcome=success' /tmp/t2-exportrun.out
           grep -F 'declared_records=50000000' /tmp/t2-exportrun.out
           grep -F 'limit_mib=100' /tmp/t2-exportrun.out
           grep -F 'formats=native-ndjson,native-json,native-json-pretty,csv,hae' /tmp/t2-exportrun.out
-          printf 'tier=T2 records=50000000 sha256=%s\n' "$digest"
