@@ -1504,6 +1504,12 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
         #expect(seeded[0].destinationID == DestinationStatusUIFixtures.homeAssistantID)
         #expect(seeded[0].destinationLabel == DestinationStatusUIFixtures.homeAssistantLabel)
     }
+    let failed = DestinationStatusUIFixtures.snapshots(scenario: "failed", nowEpoch: now)[0]
+    #expect(failed.state(at: now) == .failing)
+    #expect(
+        DestinationStatusLine.render(failed, nowEpoch: now) { _ in "earlier" }
+            .contains("failing")
+    )
     let root = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
         .deletingLastPathComponent()
