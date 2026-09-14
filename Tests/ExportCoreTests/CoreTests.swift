@@ -1506,6 +1506,7 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     }
     let failed = DestinationStatusUIFixtures.snapshots(scenario: "failed", nowEpoch: now)[0]
     #expect(failed.state(at: now) == .failing)
+    #expect(failed.state(at: now + (8 * 86_400)) == .overdue)
     #expect(
         DestinationStatusLine.render(failed, nowEpoch: now) { _ in "earlier" }
             .contains("failing")

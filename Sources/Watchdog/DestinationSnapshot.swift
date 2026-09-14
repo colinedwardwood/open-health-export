@@ -204,22 +204,21 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
 
     public func state(at epoch: TimeInterval) -> DestinationDisplayState {
         guard enabled, let lastSuccessEpoch else { return state }
-        switch state {
-        case .healthy, .quiet, .stale, .overdue:
-            break
-        default:
-            // A recorded failure, block, or deferral is still that outcome after the
-            // freshness clock moves. Stale and overdue are for a destination that last
-            // succeeded and then went quiet.
-            return state
-        }
         if let overdueThresholdSeconds,
            epoch >= lastSuccessEpoch + overdueThresholdSeconds {
             return .overdue
         }
         if let staleThresholdSeconds,
            epoch >= lastSuccessEpoch + staleThresholdSeconds {
-            return .stale
+            switch state {
+            case .failing, .blocked:
+                // QA-14: a failed send is still a failure inside the stale window so
+                // the line can name the reason. Overdue still wins once silence is
+                // past that deadline (R-23, missed-window notifications).
+                return state
+            default:
+                return .stale
+            }
         }
         return state
     }
