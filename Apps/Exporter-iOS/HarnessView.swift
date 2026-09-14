@@ -1468,6 +1468,8 @@ struct HarnessView: View {
                     Text(line)
                         .font(.system(.footnote, design: .monospaced))
                         .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
                         .accessibilityIdentifier("history-row-\(index)")
                 }
             } else {
@@ -1482,6 +1484,8 @@ struct HarnessView: View {
                         Text(line)
                             .font(.system(.footnote, design: .monospaced))
                             .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
                             .accessibilityIdentifier("history-row-\(eventIndex)-\(lineIndex)")
                     }
                     if event.facts.payloadPath != nil, !revealed {
