@@ -70,8 +70,9 @@ final class ExporterUITests: XCTestCase {
             "This is not a medical device. It does not diagnose or treat anything."
         )
         XCTAssertTrue(scrollHistory(app.buttons["history-load"]).exists)
+        let shortcuts = scrollStatus(identified("shortcut-export"))
         XCTAssertEqual(
-            app.staticTexts["shortcut-export"].label,
+            shortcuts.label,
             "Shortcuts can run one page to the local archive after you enable it."
         )
         XCTAssertTrue(app.otherElements["scheduling-honesty"].exists)
@@ -416,13 +417,13 @@ final class ExporterUITests: XCTestCase {
         app.launchEnvironment["OHE_OPEN_URL"] =
             "openhealthexporter://error?destination=home-assistant&archetype=hostUnresolvable"
         app.launch()
-        let part0 = app.staticTexts["error-part-0"]
+        let part0 = identified("error-part-0")
         XCTAssertTrue(
             part0.waitForExistence(timeout: uiWait),
             visibleIdentifiers().joined(separator: ",")
         )
         XCTAssertTrue(part0.label.hasPrefix("①"), part0.label)
-        XCTAssertTrue(app.staticTexts["error-part-3"].label.hasPrefix("④"))
+        XCTAssertTrue(identified("error-part-3").label.hasPrefix("④"))
         XCTAssertTrue(
             app.staticTexts["status-line"].label.contains("Couldn't find"),
             app.staticTexts["status-line"].label
@@ -436,13 +437,13 @@ final class ExporterUITests: XCTestCase {
         enterControls()
         let row = scrollStatus(destinationStatusElement(0))
         row.tap()
-        let part0 = scrollStatus(app.staticTexts["error-part-0"])
+        let part0 = scrollStatus(identified("error-part-0"))
         XCTAssertTrue(
             part0.waitForExistence(timeout: uiWait),
             visibleIdentifiers().joined(separator: ",")
         )
         XCTAssertTrue(part0.label.hasPrefix("①"), part0.label)
-        XCTAssertTrue(app.staticTexts["error-part-3"].waitForExistence(timeout: uiWait))
+        XCTAssertTrue(identified("error-part-3").waitForExistence(timeout: uiWait))
     }
 
     private func destinationLine(seeding scenario: String) -> String {
@@ -868,7 +869,7 @@ final class ExporterUITests: XCTestCase {
         app.launchEnvironment["OHE_SEED_MQTT_QOS0"] = "1"
         app.launch()
         enterControls()
-        let part0 = app.staticTexts["error-part-0"]
+        let part0 = identified("error-part-0")
         XCTAssertTrue(part0.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
         XCTAssertTrue(part0.label.contains("Sent"), part0.label)
         let fix = scrollStatus(app.buttons["error-fix-setQoS1"])
@@ -892,7 +893,7 @@ final class ExporterUITests: XCTestCase {
         app.launchEnvironment["OHE_SEED_HTTP413"] = "1"
         app.launch()
         enterControls()
-        let part0 = app.staticTexts["error-part-0"]
+        let part0 = identified("error-part-0")
         XCTAssertTrue(part0.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
         XCTAssertTrue(part0.label.contains("too large"), part0.label)
         let fix = scrollStatus(app.buttons["error-fix-shortenWindow"])
@@ -912,7 +913,7 @@ final class ExporterUITests: XCTestCase {
         app.launchEnvironment["OHE_SEED_HTTP429"] = "1"
         app.launch()
         enterControls()
-        let part0 = app.staticTexts["error-part-0"]
+        let part0 = identified("error-part-0")
         XCTAssertTrue(part0.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
         XCTAssertTrue(part0.label.contains("slow down"), part0.label)
         let fix = scrollStatus(app.buttons["error-fix-lowerFreshness"])
@@ -1029,13 +1030,13 @@ final class ExporterUITests: XCTestCase {
         ]
         XCTAssertEqual(archetypes.count, 16)
         for name in archetypes {
-            let part0 = scrollStatus(app.staticTexts["error-\(name)-part-0"])
+            let part0 = scrollStatus(identified("error-\(name)-part-0"))
             XCTAssertTrue(
                 part0.waitForExistence(timeout: uiWait),
                 "missing \(name); available: \(visibleIdentifiers().joined(separator: ","))"
             )
             XCTAssertTrue(part0.label.hasPrefix("①"), "\(name) \(part0.label)")
-            let part4 = app.staticTexts["error-\(name)-part-4"]
+            let part4 = identified("error-\(name)-part-4")
             XCTAssertTrue(part4.waitForExistence(timeout: uiWait), name)
             XCTAssertTrue(part4.label.hasPrefix("⑤"), "\(name) \(part4.label)")
         }
@@ -1477,6 +1478,10 @@ final class ExporterUITests: XCTestCase {
             XCTAssertTrue(line.label.contains("pending R-71"), line.label)
             XCTAssertTrue(line.label.contains("not a delivery promise"), line.label)
         }
+    }
+
+    private func identified(_ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any)[identifier]
     }
 
     private func destinationStatusElement(_ index: Int) -> XCUIElement {
