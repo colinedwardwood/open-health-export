@@ -729,7 +729,34 @@ final class ExporterUITests: XCTestCase {
         app.launch()
         enterControls()
         selectRootTab(2)
-        let notice = app.staticTexts["configuration-import-unsupported-kind"]
+        let notice = app.staticTexts["configuration-import-unsupported-localFile"]
+        if !notice.waitForExistence(timeout: uiWait) {
+            for _ in 0 ..< 12 {
+                app.scrollViews["root-scroll-destinations"].swipeUp()
+                if notice.exists { break }
+            }
+        }
+        XCTAssertTrue(
+            notice.waitForExistence(timeout: uiWait),
+            visibleIdentifiers().joined(separator: ",")
+        )
+        XCTAssertEqual(
+            notice.label,
+            "This destination kind does not yet have an import setup path."
+        )
+        XCTAssertFalse(app.buttons["Add credentials and test"].exists)
+        XCTAssertFalse(app.buttons["Add pairing and test"].exists)
+    }
+
+    /// R-67: Home Assistant imports stay disabled drafts. There is no dedicated
+    /// setup editor, and the UI says so rather than folding HA into HTTPS.
+    func testImportedHomeAssistantDraftHasNoSetupPath() {
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_IMPORTED_DRAFT"] = "home-assistant"
+        app.launch()
+        enterControls()
+        selectRootTab(2)
+        let notice = app.staticTexts["configuration-import-unsupported-homeAssistant"]
         if !notice.waitForExistence(timeout: uiWait) {
             for _ in 0 ..< 12 {
                 app.scrollViews["root-scroll-destinations"].swipeUp()

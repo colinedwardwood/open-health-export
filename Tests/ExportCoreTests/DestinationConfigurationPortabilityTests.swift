@@ -321,3 +321,31 @@ private func portableMQTT(
         )
     }
 }
+
+@Test func homeAssistantDocumentRoundTripsAsADisabledDraftWithoutASetupPath() throws {
+    let configuration = try PortableDestinationConfiguration(
+        sourceIdentifier: "seed-home-assistant",
+        displayName: "Imported Home Assistant",
+        kind: .homeAssistant,
+        endpoint: "http://homeassistant.local:8123"
+    )
+    let data = try DestinationConfigurationDocument(
+        destinations: [configuration]
+    ).encoded()
+    let confirmed = try DestinationConfigurationDocument
+        .reviewImport(data)
+        .confirm(
+            typedConfirmation: DestinationConfigurationImportReview.confirmationPhrase
+        )
+    #expect(confirmed.drafts.count == 1)
+    #expect(confirmed.drafts[0].configuration.kind == .homeAssistant)
+    #expect(confirmed.drafts[0].state == .disabledRequiresTest)
+    #expect(
+        throws: DestinationConfigurationPortabilityError
+            .unsupportedDestinationKind(.homeAssistant)
+    ) {
+        try PortableDestinationMaterializer.materialize(
+            confirmed.drafts[0].configuration
+        )
+    }
+}

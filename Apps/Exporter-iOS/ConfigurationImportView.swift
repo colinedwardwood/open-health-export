@@ -100,7 +100,7 @@ struct ConfigurationImportView: View {
                                 .font(.footnote)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .accessibilityIdentifier(
-                                    "configuration-import-unsupported-kind"
+                                    "configuration-import-unsupported-\(draft.configuration.kind.rawValue)"
                                 )
                         }
                         Button("Discard draft") {
@@ -142,6 +142,11 @@ struct ConfigurationImportView: View {
                 "OHE_SEED_IMPORTED_DRAFT"
             ] == "local-file" {
                 try? ImportedDestinationDraftStore.seedLocalFileForUITests()
+            }
+            if ProcessInfo.processInfo.environment[
+                "OHE_SEED_IMPORTED_DRAFT"
+            ] == "home-assistant" {
+                try? ImportedDestinationDraftStore.seedHomeAssistantForUITests()
             }
             #endif
             reloadDrafts()
@@ -280,11 +285,34 @@ enum ImportedDestinationDraftStore {
     }
 
     static func seedLocalFileForUITests() throws {
-        let configuration = try PortableDestinationConfiguration(
+        try writeUnsupportedKindSeed(
             sourceIdentifier: "seed-local-file",
             displayName: "Imported archive",
             kind: .localFile,
-            endpoint: "archive",
+            endpoint: "archive"
+        )
+    }
+
+    static func seedHomeAssistantForUITests() throws {
+        try writeUnsupportedKindSeed(
+            sourceIdentifier: "seed-home-assistant",
+            displayName: "Imported Home Assistant",
+            kind: .homeAssistant,
+            endpoint: "http://homeassistant.local:8123"
+        )
+    }
+
+    private static func writeUnsupportedKindSeed(
+        sourceIdentifier: String,
+        displayName: String,
+        kind: PortableDestinationKind,
+        endpoint: String
+    ) throws {
+        let configuration = try PortableDestinationConfiguration(
+            sourceIdentifier: sourceIdentifier,
+            displayName: displayName,
+            kind: kind,
+            endpoint: endpoint,
             exportScope: PortableDestinationExportScope(
                 metrics: [MetricID(rawValue: "heart_rate")],
                 startInclusive: Date(timeIntervalSince1970: 1)
@@ -302,7 +330,7 @@ enum ImportedDestinationDraftStore {
             )
         let records = confirmed.drafts.map {
             ImportedDestinationDraftRecord(
-                localIdentifier: "seed-local-file",
+                localIdentifier: sourceIdentifier,
                 configuration: $0.configuration,
                 state: $0.state.rawValue
             )
