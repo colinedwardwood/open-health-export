@@ -7,6 +7,12 @@ on:
   pull_request:
 permissions:
   contents: read
+concurrency:
+  # Coverage reports the current ref, not every historical SHA. macos-build keeps
+  # per-SHA groups on main; this workflow must not occupy a macos-26 slot for a
+  # commit that has already been replaced.
+  group: coverage-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   focused-coverage:
     runs-on: macos-26
