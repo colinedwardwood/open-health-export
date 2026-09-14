@@ -1123,11 +1123,14 @@ final class ExporterUITests: XCTestCase {
         XCTAssertFalse(export.isEnabled)
         let field = app.textFields["demo-confirm"]
         type(" local-file ", into: field)
-        dismissKeyboard()
         XCTAssertTrue(
             app.staticTexts["demo-confirm-whitespace"].waitForExistence(timeout: uiWait)
         )
-        XCTAssertTrue(export.isEnabled)
+        XCTAssertTrue(
+            app.buttons["demo-export"].isEnabled,
+            "demo export stayed disabled after a padded local-file confirmation"
+        )
+        dismissKeyboard()
     }
 
     func testSensitiveTypeRequiresTypedDestinationNameAndStripsPadding() {
