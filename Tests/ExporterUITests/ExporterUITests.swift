@@ -103,10 +103,15 @@ final class ExporterUITests: XCTestCase {
         app.launchEnvironment["OHE_IPAD_ONLY_EXPORTER"] = "1"
         app.launch()
 
-        XCTAssertTrue(app.otherElements["ipad-only-exporter"].waitForExistence(timeout: uiWait))
+        let notice = app.descendants(matching: .any)["ipad-only-exporter"]
+        XCTAssertTrue(
+            notice.waitForExistence(timeout: uiWait),
+            "available identifiers: \(visibleIdentifiers())"
+        )
         XCTAssertTrue(
             app.staticTexts["This iPad is your only exporter."].exists
-            || app.otherElements["ipad-only-exporter"].label.contains("This iPad is your only exporter.")
+                || notice.label.contains("This iPad is your only exporter."),
+            notice.label
         )
         XCTAssertFalse(app.buttons["ipad-only-exporter-dismiss"].exists)
     }
