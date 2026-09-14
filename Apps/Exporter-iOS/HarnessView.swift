@@ -83,6 +83,8 @@ struct HarnessView: View {
     @State private var pickingMQTTPKCS12 = false
     @State private var mqttTestLines: [String] = []
     @State private var localFileTestLines: [String] = []
+    @State private var pickingLocalExportFolder = false
+    @State private var localExportFolderName: String?
     @State private var importedDestinationDraft: ImportedDestinationDraftRecord?
     @State private var importedDraftRefreshToken = 0
     @State private var pairingImportMismatch = false
@@ -333,6 +335,7 @@ struct HarnessView: View {
             }
             seedUserFacingErrorsFromLaunchEnvironment()
             #endif
+            localExportFolderName = HarnessExport.localExportFolderName()
             refreshDestinationSurfaces()
             HealthKitPreferredDisplayUnits.startObserving()
             Task { await refreshHealthKitDisplayUnits() }
@@ -541,6 +544,21 @@ struct HarnessView: View {
                     status = "Failed: \(message). Paste the pairing payload instead."
                 }
             )
+        }
+        .fileImporter(
+            isPresented: $pickingLocalExportFolder,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+            guard case .success(let urls) = result, let url = urls.first else { return }
+            do {
+                localExportFolderName = try HarnessExport.chooseLocalExportFolder(url)
+                localFileTestLines = []
+                status = "Ready. Test the selected archive folder before exporting."
+                refreshDestinationSurfaces()
+            } catch {
+                status = "Failed: \(error.localizedDescription)"
+            }
         }
         .fileImporter(
             isPresented: $pickingMQTTPKCS12,
@@ -918,9 +936,9 @@ struct HarnessView: View {
             Button("Export one page (local file)") {
                 Task { await runLocalExport() }
             }
-            .disabled(phase == .working)
+            .disabled(phase == .working || !HarnessExport.isLocalFileEnabled())
             .accessibilityIdentifier("local-file-export")
-            .accessibilityHint("Writes NDJSON under Application Support using the engine and local-file sink.")
+            .accessibilityHint("Writes NDJSON to the archive folder you chose in Files.")
             Text(SchedulingHonesty.shortcutsLine)
                 .font(.footnote)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1147,10 +1165,27 @@ struct HarnessView: View {
                 }
                 .accessibilityIdentifier("configuration-export-share")
             }
-            Button("Enable local archive folder (R-25 test)") {
-                Task { await enableLocalFile() }
+            Button(
+                localExportFolderName == nil
+                    ? "Choose archive folder"
+                    : "Choose archive folder again"
+            ) {
+                pickingLocalExportFolder = true
             }
             .disabled(phase == .working)
+            .accessibilityIdentifier("local-file-choose-folder")
+            .accessibilityHint("Opens the system folder picker. The app remembers access to that folder.")
+            Text(
+                localExportFolderName.map { "Archive folder: \($0)" }
+                    ?? "No archive folder selected."
+            )
+            .font(.footnote)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("local-file-folder")
+            Button("Test and enable archive folder") {
+                Task { await enableLocalFile() }
+            }
+            .disabled(phase == .working || localExportFolderName == nil)
             .accessibilityIdentifier("local-file-enable")
             .accessibilityHint("Writes a canary file, reads it back, then enables the local-file destination.")
             ForEach(Array(localFileTestLines.enumerated()), id: \.offset) { index, line in

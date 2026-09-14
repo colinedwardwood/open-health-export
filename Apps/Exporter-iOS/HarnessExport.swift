@@ -48,6 +48,20 @@ private struct HTTPSVerificationRecord: Codable {
     var importedLocalIdentifier: String?
 }
 
+private enum LocalExportFolderError: LocalizedError {
+    case notSelected
+    case inaccessible
+
+    var errorDescription: String? {
+        switch self {
+        case .notSelected:
+            "Choose an archive folder in Files before enabling local export."
+        case .inaccessible:
+            "The archive folder is no longer accessible. Choose it again in Files."
+        }
+    }
+}
+
 #if !OHE_OBS25_SIZE_BASELINE
 private struct OTLPDestinationRecord: Codable {
     var urlString: String
@@ -161,6 +175,7 @@ private struct HealthBackfillProcessor: BackfillChunkProcessor {
     var temporal: TemporalContext
     var ledgerHeadSeal: any LedgerHeadSeal
     var ledgerSealURL: URL
+    var externalStatusDirectory: URL
 
     func process(
         metric: MetricID,
@@ -186,9 +201,8 @@ private struct HealthBackfillProcessor: BackfillChunkProcessor {
             statistics: statistics,
             trigger: .manual,
             snapshotURL: StatusSnapshotLocation.url(destinationID: "local-file"),
-            externalStatusURL: scratchDirectory
-                .deletingLastPathComponent()
-                .appendingPathComponent("exports/status.json"),
+            externalStatusURL: externalStatusDirectory
+                .appendingPathComponent("status.json"),
             ledgerHeadSeal: ledgerHeadSeal,
             ledgerSealURL: ledgerSealURL,
             freshnessCadenceSeconds: HarnessExport.freshnessCadenceSeconds(),
@@ -497,7 +511,9 @@ enum HarnessExport {
         }
         let root = try applicationSupportRoot()
         let sqliteURL = root.appendingPathComponent("state.sqlite")
-        let dest = try protectedPayloadDirectory(named: "exports", under: root)
+        let folderAccess = try localExportFolder(root: root)
+        defer { withExtendedLifetime(folderAccess) {} }
+        let dest = folderAccess.url
         let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
 
         let store = try SQLiteStateStore(path: sqliteURL.path)
@@ -769,7 +785,9 @@ enum HarnessExport {
             try ExportScopeGate.require(metric: metric, scope: scope)
         }
         let root = try applicationSupportRoot()
-        let dest = try protectedPayloadDirectory(named: "exports", under: root)
+        let folderAccess = try localExportFolder(root: root)
+        defer { withExtendedLifetime(folderAccess) {} }
+        let dest = folderAccess.url
         let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
         let store = try SQLiteStateStore(
             path: root.appendingPathComponent("state.sqlite").path
@@ -832,7 +850,9 @@ enum HarnessExport {
         onProgress: (@Sendable (String) async -> Void)? = nil
     ) async throws -> [String] {
         let root = try applicationSupportRoot()
-        let destinationDirectory = try protectedPayloadDirectory(named: "exports", under: root)
+        let folderAccess = try localExportFolder(root: root)
+        defer { withExtendedLifetime(folderAccess) {} }
+        let destinationDirectory = folderAccess.url
         let scratch = try protectedPayloadDirectory(named: "backfill-scratch", under: root)
         let store = try SQLiteStateStore(
             path: root.appendingPathComponent("state.sqlite").path
@@ -882,7 +902,8 @@ enum HarnessExport {
             exporterID: try installationID(),
             temporal: context,
             ledgerHeadSeal: ledgerHeadSeal(),
-            ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json")
+            ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
+            externalStatusDirectory: destinationDirectory
         )
         let job = BackfillJob(
             checkpointURL: checkpointURL,
@@ -997,7 +1018,9 @@ enum HarnessExport {
 
     static func reExportQueueGap(_ gap: GapRecord) async throws -> RunOutcome {
         let root = try applicationSupportRoot()
-        let dest = try protectedPayloadDirectory(named: "exports", under: root)
+        let folderAccess = try localExportFolder(root: root)
+        defer { withExtendedLifetime(folderAccess) {} }
+        let dest = folderAccess.url
         let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
         let store = try SQLiteStateStore(
             path: root.appendingPathComponent("state.sqlite").path
@@ -1043,7 +1066,9 @@ enum HarnessExport {
         try DemoExportGate.confirmSending(to: "local-file", typed: typedDestinationName)
         let root = try applicationSupportRoot()
         let sqliteURL = root.appendingPathComponent("demo-state.sqlite")
-        let dest = try protectedPayloadDirectory(named: "demo-exports", under: root)
+        let folderAccess = try localExportFolder(root: root)
+        defer { withExtendedLifetime(folderAccess) {} }
+        let dest = folderAccess.url
         let scratch = try protectedPayloadDirectory(named: "demo-scratch", under: root)
         let store = try SQLiteStateStore(path: sqliteURL.path)
         let (verified, events) = try verifiedLocalFile(root: root, destinationDirectory: dest)
@@ -1438,6 +1463,7 @@ enum HarnessExport {
         if let root = try? applicationSupportRoot() {
             for name in [
                 "local-file-test.json",
+                "local-export-folder.bookmark",
                 "https-destination.json",
                 "mqtt-destination.json",
                 "mqtt-client.p12",
@@ -2312,7 +2338,9 @@ enum HarnessExport {
     ) async throws -> [String] {
         try ExportScopeGate.requireConfigured(try await destinationScope("local-file"))
         let root = try applicationSupportRoot()
-        let dest = try protectedPayloadDirectory(named: "exports", under: root)
+        let folderAccess = try localExportFolder(root: root)
+        defer { withExtendedLifetime(folderAccess) {} }
+        let dest = folderAccess.url
         try? FileManager.default.removeItem(at: localFileTestReportURL(root: root))
         let (_, events) = try verifiedLocalFile(
             root: root,
@@ -2958,13 +2986,64 @@ enum HarnessExport {
         root.appendingPathComponent("local-file-test.json")
     }
 
+    private static func localExportFolderBookmarkURL(root: URL) -> URL {
+        root.appendingPathComponent("local-export-folder.bookmark")
+    }
+
+    static func chooseLocalExportFolder(_ url: URL) throws -> String {
+        let root = try applicationSupportRoot()
+        let bookmark = try SecurityScopedBookmark.create(from: url)
+        try FileWriteKit.writeAtomically(
+            bookmark,
+            to: localExportFolderBookmarkURL(root: root)
+        )
+        try? FileManager.default.removeItem(at: localFileTestReportURL(root: root))
+        return url.lastPathComponent
+    }
+
+    static func localExportFolderName() -> String? {
+        guard let root = try? applicationSupportRoot(),
+              let access = try? localExportFolder(root: root)
+        else {
+            return nil
+        }
+        return access.url.lastPathComponent
+    }
+
+    private static func localExportFolder(root: URL) throws -> SecurityScopedAccess {
+        guard let bookmark = try? Data(
+            contentsOf: localExportFolderBookmarkURL(root: root)
+        ) else {
+            throw LocalExportFolderError.notSelected
+        }
+        let resolved = try SecurityScopedBookmark.resolve(bookmark)
+        let access: SecurityScopedAccess
+        do {
+            access = try SecurityScopedAccess(url: resolved.url)
+        } catch {
+            throw LocalExportFolderError.inaccessible
+        }
+        if resolved.isStale {
+            let refreshed = try SecurityScopedBookmark.create(
+                fromAccessibleURL: access.url
+            )
+            try FileWriteKit.writeAtomically(
+                refreshed,
+                to: localExportFolderBookmarkURL(root: root)
+            )
+        }
+        return access
+    }
+
     static func isLocalFileEnabled() -> Bool {
         guard let root = try? applicationSupportRoot(),
+              let folderAccess = try? localExportFolder(root: root),
               let data = try? Data(contentsOf: localFileTestReportURL(root: root)),
               let report = try? JSONDecoder().decode(DestinationTestReport.self, from: data)
         else {
             return false
         }
+        defer { withExtendedLifetime(folderAccess) {} }
         return report.allowsEnablement
     }
 
@@ -2977,7 +3056,8 @@ enum HarnessExport {
             hops.append(
                 DataFlowHop(
                     id: "local-file",
-                    host: "Files on this iPhone",
+                    host: localExportFolderName().map { "Files · \($0)" }
+                        ?? "Files",
                     transport: "Local files",
                     credential: DataFlowHop.noNetwork
                 )

@@ -2,6 +2,83 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
+    "Choose an archive folder in Files before enabling local export.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose an archive folder in Files before enabling local export."
+          }
+        }
+      }
+    },
+    "The archive folder is no longer accessible. Choose it again in Files.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The archive folder is no longer accessible. Choose it again in Files."
+          }
+        }
+      }
+    },
+    "Choose archive folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose archive folder"
+          }
+        }
+      }
+    },
+    "Choose archive folder again": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose archive folder again"
+          }
+        }
+      }
+    },
+    "Opens the system folder picker. The app remembers access to that folder.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens the system folder picker. The app remembers access to that folder."
+          }
+        }
+      }
+    },
+    "Test and enable archive folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test and enable archive folder"
+          }
+        }
+      }
+    },
+    "Writes NDJSON to the archive folder you chose in Files.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Writes NDJSON to the archive folder you chose in Files."
+          }
+        }
+      }
+    },
     "Prepare credential-free configuration export": {
       "extractionState": "manual",
       "localizations": {

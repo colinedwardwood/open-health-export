@@ -986,6 +986,16 @@ final class ExporterUITests: XCTestCase {
         XCTAssertEqual(line.label, "Failed at Open folder.")
     }
 
+    func testLocalArchiveRequiresAUserPickedFolder() {
+        enterDestinations()
+        let choose = scrollDestinations(app.buttons["local-file-choose-folder"])
+        XCTAssertTrue(choose.waitForExistence(timeout: uiWait))
+        let folder = scrollDestinations(app.staticTexts["local-file-folder"])
+        XCTAssertTrue(folder.waitForExistence(timeout: uiWait))
+        XCTAssertEqual(folder.label, "No archive folder selected.")
+        XCTAssertFalse(scrollDestinations(app.buttons["local-file-enable"]).isEnabled)
+    }
+
     func testPaddedPairingPayloadShowsWhitespaceNoteAndParses() {
         app.terminate()
         app.launchEnvironment["OHE_SEED_PAIRING_PASTE"] = "1"
