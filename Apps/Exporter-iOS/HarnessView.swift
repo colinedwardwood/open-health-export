@@ -1639,13 +1639,12 @@ struct HarnessView: View {
             .disabled(phase == .working)
             .accessibilityHint("Assembles a redacted ohe.diagnostic/1 JSON preview. Sharing exists only below the bundle's last line.")
             if !diagnosticPreview.isEmpty {
-                VStack(alignment: .leading, spacing: 0) {
+                let previewParts = diagnosticPreview.components(separatedBy: "\n\n")
+                let summary = previewParts.first ?? diagnosticPreview
+                let json = previewParts.dropFirst().joined(separator: "\n\n")
+                VStack(alignment: .leading, spacing: 8) {
                     ForEach(
-                        Array(
-                            diagnosticPreview
-                                .split(separator: "\n", omittingEmptySubsequences: false)
-                                .enumerated()
-                        ),
+                        Array(summary.split(separator: "\n", omittingEmptySubsequences: false).enumerated()),
                         id: \.offset
                     ) { index, line in
                         let trimmed = String(line).trimmingCharacters(in: .whitespaces)
@@ -1653,6 +1652,15 @@ struct HarnessView: View {
                             trimmed.isEmpty ? " " : trimmed,
                             identifier: index == 0 ? "diagnostic-preview" : "diagnostic-preview-\(index)"
                         )
+                    }
+                    if !json.isEmpty {
+                        Text(json)
+                            .font(.system(.body, design: .monospaced))
+                            .foregroundStyle(.primary)
+                            .lineLimit(nil)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .accessibilityIdentifier("diagnostic-preview-json")
                     }
                 }
                 // S9: the share affordance exists only past the last line of content, so
