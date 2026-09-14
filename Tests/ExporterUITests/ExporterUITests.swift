@@ -302,7 +302,7 @@ final class ExporterUITests: XCTestCase {
         try performAccessibilityAudit("dark-bold-ax5-disclosure")
         enterControls()
         try performAccessibilityAudit("dark-bold-ax5-controls")
-        _ = scrollToHittable(app.staticTexts["destination-title"])
+        _ = scrollDestinations(app.staticTexts["destination-title"])
         try performAccessibilityAudit("dark-bold-ax5-destinations")
     }
 
@@ -671,17 +671,15 @@ final class ExporterUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment["OHE_SEED_IMPORTED_DRAFT"] = "https"
         app.launch()
-        enterControls()
-        selectRootTab(2)
-        let configure = scrollToHittable(
-            app.buttons["configuration-import-configure-https"],
-            on: 2
+        enterDestinations()
+        let configure = scrollDestinations(
+            app.buttons["configuration-import-configure-https"]
         )
         XCTAssertTrue(configure.exists)
         try performAccessibilityAudit("configuration-import-disabled-draft")
         configure.tap()
 
-        let endpoint = scrollToHittable(app.textFields["https-url"], on: 2)
+        let endpoint = scrollDestinations(app.textFields["https-url"])
         XCTAssertEqual(
             endpoint.value as? String,
             "https://collector.example/upload"
@@ -697,8 +695,8 @@ final class ExporterUITests: XCTestCase {
     }
 
     func testHTTPSURLParseBackNamesWhitespaceAndHost() {
-        enterControls()
-        let endpoint = scrollToHittable(app.textFields["https-url"])
+        enterDestinations()
+        let endpoint = scrollDestinations(app.textFields["https-url"])
         type(" https://collector.example:8443/upload ", into: endpoint)
         dismissKeyboard()
         XCTAssertTrue(
@@ -717,27 +715,23 @@ final class ExporterUITests: XCTestCase {
         app.launchEnvironment["OHE_SEED_IMPORTED_DRAFT"] = "companion"
         app.launchEnvironment["OHE_SEED_PAIRING_PASTE"] = "1"
         app.launch()
-        enterControls()
-        selectRootTab(2)
-        let configure = scrollToHittable(
-            app.buttons["configuration-import-configure-companion"],
-            on: 2
+        enterDestinations()
+        let configure = scrollDestinations(
+            app.buttons["configuration-import-configure-companion"]
         )
         XCTAssertTrue(configure.exists)
         dismissKeyboard()
         configure.tap()
-        let imported = scrollToHittable(
-            app.staticTexts["pairing-imported-service-name"],
-            on: 2
+        let imported = scrollDestinations(
+            app.staticTexts["pairing-imported-service-name"]
         )
         XCTAssertTrue(imported.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
         XCTAssertEqual(imported.label, "OHE Lab Mac._ohe-companion._tcp")
-        let export = scrollToHittable(app.buttons["pairing-export"], on: 2)
+        let export = scrollDestinations(app.buttons["pairing-export"])
         XCTAssertFalse(export.isEnabled)
-        scrollToHittable(app.buttons["pairing-parse"], on: 2).tap()
-        let mismatch = scrollToHittable(
-            app.staticTexts["pairing-import-name-mismatch"],
-            on: 2
+        scrollDestinations(app.buttons["pairing-parse"]).tap()
+        let mismatch = scrollDestinations(
+            app.staticTexts["pairing-import-name-mismatch"]
         )
         XCTAssertTrue(
             mismatch.waitForExistence(timeout: uiWait),
@@ -753,8 +747,7 @@ final class ExporterUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment["OHE_SEED_IMPORTED_DRAFT"] = "local-file"
         app.launch()
-        enterControls()
-        selectRootTab(2)
+        enterDestinations()
         XCTAssertTrue(
             app.staticTexts["destination-ledger-honesty"].waitForExistence(timeout: uiWait)
         )
@@ -783,8 +776,7 @@ final class ExporterUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment["OHE_SEED_IMPORTED_DRAFT"] = "home-assistant"
         app.launch()
-        enterControls()
-        selectRootTab(2)
+        enterDestinations()
         let notice = app.staticTexts["configuration-import-unsupported-homeAssistant"]
         if !notice.waitForExistence(timeout: uiWait) {
             for _ in 0 ..< 12 {
@@ -805,8 +797,8 @@ final class ExporterUITests: XCTestCase {
     }
 
     func testOTLPURLParseBackNamesWhitespaceAndHost() {
-        enterControls()
-        let endpoint = scrollToHittable(app.textFields["otlp-url"])
+        enterDestinations()
+        let endpoint = scrollDestinations(app.textFields["otlp-url"])
         type(" https://otel.example:4318/v1/traces ", into: endpoint)
         dismissKeyboard()
         XCTAssertTrue(
@@ -821,15 +813,14 @@ final class ExporterUITests: XCTestCase {
     }
 
     func testOTLPEnableStaysDisabledUntilPreviewEndAndListsTheCollector() {
-        enterControls()
-        selectRootTab(2)
-        let enable = scrollToHittable(app.buttons["otlp-enable"])
+        enterDestinations()
+        let enable = scrollDestinations(app.buttons["otlp-enable"])
         XCTAssertFalse(enable.isEnabled)
-        let endpoint = scrollToHittable(app.textFields["otlp-url"])
+        let endpoint = scrollDestinations(app.textFields["otlp-url"])
         type("https://otel.example:4318/v1/traces", into: endpoint)
         dismissKeyboard()
         XCTAssertFalse(enable.isEnabled)
-        scrollToHittable(app.buttons["otlp-preview"]).tap()
+        scrollDestinations(app.buttons["otlp-preview"]).tap()
         let end = app.staticTexts["otlp-preview-end"]
         XCTAssertTrue(end.waitForExistence(timeout: uiWait))
         let body = app.staticTexts["otlp-preview-body"]
@@ -867,7 +858,7 @@ final class ExporterUITests: XCTestCase {
             app.staticTexts["status-line"].label
         )
         selectRootTab(2)
-        let qos = scrollToHittable(app.descendants(matching: .any)["mqtt-qos"])
+        let qos = scrollDestinations(app.descendants(matching: .any)["mqtt-qos"])
         XCTAssertTrue(qos.waitForExistence(timeout: uiWait))
         let shown = qos.label + ((qos.value as? String) ?? "")
         XCTAssertTrue(
@@ -892,7 +883,7 @@ final class ExporterUITests: XCTestCase {
             app.staticTexts["status-line"].label
         )
         selectRootTab(2)
-        let window = scrollToHittable(app.staticTexts["export-window-hours"])
+        let window = scrollDestinations(app.staticTexts["export-window-hours"])
         XCTAssertTrue(window.waitForExistence(timeout: uiWait))
         XCTAssertTrue(window.label.contains("6 hours"), window.label)
     }
@@ -913,33 +904,32 @@ final class ExporterUITests: XCTestCase {
             app.staticTexts["status-line"].label
         )
         selectRootTab(2)
-        let interval = scrollToHittable(app.staticTexts["freshness-interval-minutes"])
+        let interval = scrollDestinations(app.staticTexts["freshness-interval-minutes"])
         XCTAssertTrue(interval.waitForExistence(timeout: uiWait))
         XCTAssertTrue(interval.label.contains("30 minutes"), interval.label)
     }
 
     func testMQTTSecretFieldsFlagLeadingWhitespace() {
-        enterControls()
-        selectRootTab(2)
-        let username = scrollToHittable(app.textFields["mqtt-username"])
+        enterDestinations()
+        let username = scrollDestinations(app.textFields["mqtt-username"])
         type(" user ", into: username)
         dismissKeyboard()
         XCTAssertTrue(
             app.staticTexts["mqtt-username-whitespace"].waitForExistence(timeout: uiWait)
         )
-        let password = scrollToHittable(app.secureTextFields["mqtt-password"])
+        let password = scrollDestinations(app.secureTextFields["mqtt-password"])
         type(" token\n", into: password)
         dismissKeyboard()
         XCTAssertTrue(
             app.staticTexts["mqtt-password-whitespace"].waitForExistence(timeout: uiWait)
         )
-        let clientID = scrollToHittable(app.textFields["mqtt-client-id"])
+        let clientID = scrollDestinations(app.textFields["mqtt-client-id"])
         type(" exporter ", into: clientID)
         dismissKeyboard()
         XCTAssertTrue(
             app.staticTexts["mqtt-client-id-whitespace"].waitForExistence(timeout: uiWait)
         )
-        let topic = scrollToHittable(app.textFields["mqtt-topic"])
+        let topic = scrollDestinations(app.textFields["mqtt-topic"])
         type(" health/export ", into: topic)
         dismissKeyboard()
         XCTAssertTrue(
@@ -951,9 +941,8 @@ final class ExporterUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment["OHE_SEED_HTTPS_TEST_FAIL"] = "authenticate"
         app.launch()
-        enterControls()
-        selectRootTab(2)
-        let line = scrollToHittable(app.staticTexts["https-test-line-0"])
+        enterDestinations()
+        let line = scrollDestinations(app.staticTexts["https-test-line-0"])
         XCTAssertTrue(line.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
         XCTAssertEqual(line.label, "Failed at Authenticate.")
     }
@@ -962,9 +951,8 @@ final class ExporterUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment["OHE_SEED_MQTT_TEST_FAIL"] = "connect"
         app.launch()
-        enterControls()
-        selectRootTab(2)
-        let line = scrollToHittable(app.staticTexts["mqtt-test-line-0"])
+        enterDestinations()
+        let line = scrollDestinations(app.staticTexts["mqtt-test-line-0"])
         XCTAssertTrue(line.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
         XCTAssertEqual(line.label, "Failed at Connect.")
     }
@@ -973,9 +961,8 @@ final class ExporterUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment["OHE_SEED_LOCAL_FILE_TEST_FAIL"] = "openFolder"
         app.launch()
-        enterControls()
-        selectRootTab(2)
-        let line = scrollToHittable(app.staticTexts["local-file-test-line-0"])
+        enterDestinations()
+        let line = scrollDestinations(app.staticTexts["local-file-test-line-0"])
         XCTAssertTrue(line.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
         XCTAssertEqual(line.label, "Failed at Open folder.")
     }
@@ -984,13 +971,12 @@ final class ExporterUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment["OHE_SEED_PAIRING_PASTE"] = "1"
         app.launch()
-        enterControls()
-        selectRootTab(2)
+        enterDestinations()
         XCTAssertTrue(
-            scrollToHittable(app.staticTexts["pairing-paste-whitespace"], on: 2)
+            scrollDestinations(app.staticTexts["pairing-paste-whitespace"])
                 .waitForExistence(timeout: uiWait)
         )
-        scrollToHittable(app.buttons["pairing-parse"], on: 2).tap()
+        scrollDestinations(app.buttons["pairing-parse"]).tap()
         let confirmation = app.staticTexts["pairing-confirmation"]
         XCTAssertTrue(confirmation.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
         XCTAssertTrue(
@@ -1246,22 +1232,23 @@ final class ExporterUITests: XCTestCase {
     }
 
     func testDestinationSectionExposesTheEmptyStateAndRefreshControl() throws {
-        enterControls()
-        let title = scrollToHittable(app.staticTexts["destination-title"])
+        enterDestinations()
+        let title = scrollDestinations(app.staticTexts["destination-title"])
         XCTAssertEqual(title.label, "Where your data goes")
+        let hae = scrollDestinations(app.staticTexts["hae-compatibility-label"])
+        XCTAssertEqual(
+            hae.label,
+            "compatibility export — correctness claims do not apply"
+        )
+        _ = scrollDestinations(app.textFields["https-url"])
+        selectRootTab(0)
         XCTAssertTrue(scrollToHittable(app.buttons["destination-refresh"]).exists)
         XCTAssertEqual(
             scrollToHittable(app.staticTexts["destination-empty"]).label,
             "No destination snapshots yet."
         )
-        let hae = scrollToHittable(app.staticTexts["hae-compatibility-label"])
-        XCTAssertEqual(
-            hae.label,
-            "compatibility export — correctness claims do not apply"
-        )
         XCTAssertFalse(app.otherElements["destination-change-banner"].exists)
         XCTAssertFalse(app.staticTexts["destination-change-banner"].exists)
-        _ = scrollToHittable(app.textFields["https-url"])
         try performAccessibilityAudit()
     }
 
@@ -1392,14 +1379,13 @@ final class ExporterUITests: XCTestCase {
     }
 
     func testDestinationLedgerAndAcknowledgeAreIdentifiable() {
-        enterControls()
-        selectRootTab(2)
-        XCTAssertTrue(scrollToHittable(app.buttons["destination-acknowledge-changes"]).exists)
-        let verify = scrollToHittable(app.buttons["destination-ledger-verify"])
+        enterDestinations()
+        XCTAssertTrue(scrollDestinations(app.buttons["destination-acknowledge-changes"]).exists)
+        let verify = scrollDestinations(app.buttons["destination-ledger-verify"])
         XCTAssertTrue(verify.exists)
         verify.tap()
         XCTAssertTrue(
-            scrollToHittable(app.staticTexts["network-activity-title"]).waitForExistence(timeout: uiWait)
+            scrollDestinations(app.staticTexts["network-activity-title"]).waitForExistence(timeout: uiWait)
         )
     }
 
@@ -1431,8 +1417,8 @@ final class ExporterUITests: XCTestCase {
     }
 
     func testAcknowledgementsRenderTheGeneratedNotice() {
-        enterControls()
-        let body = scrollToHittable(app.descendants(matching: .any)["acknowledgements-body"])
+        enterDestinations()
+        let body = scrollDestinations(app.descendants(matching: .any)["acknowledgements-body"])
         XCTAssertTrue(
             body.label.contains("no third-party Swift packages"),
             body.label
@@ -1442,8 +1428,8 @@ final class ExporterUITests: XCTestCase {
     }
 
     func testFreshnessTargetsAreShownPerClassWhileR71IsPending() {
-        enterControls()
-        _ = scrollToHittable(app.staticTexts["freshness-target"])
+        enterDestinations()
+        _ = scrollDestinations(app.staticTexts["freshness-target"])
         for freshnessClass in ["a", "b", "c", "d"] {
             let line = app.staticTexts["freshness-class-\(freshnessClass)"]
             XCTAssertTrue(
@@ -1463,6 +1449,11 @@ final class ExporterUITests: XCTestCase {
         let disclosure = app.buttons["disclosure-continue"]
         XCTAssertTrue(disclosure.waitForExistence(timeout: uiWait))
         disclosure.tap()
+    }
+
+    private func enterDestinations() {
+        enterControls()
+        selectRootTab(2)
     }
 
     /// QA-27 exercises structure and accessibility under localization expansion and
@@ -1512,9 +1503,8 @@ final class ExporterUITests: XCTestCase {
         _ configuration: String
     ) throws {
         launchLocalized(arguments)
-        enterControls()
-        selectRootTab(2)
-        XCTAssertTrue(scrollToHittable(app.staticTexts["destination-title"]).exists)
+        enterDestinations()
+        XCTAssertTrue(scrollDestinations(app.staticTexts["destination-title"]).exists)
         try performAccessibilityAudit("\(configuration)-destinations")
         selectRootTab(3)
         XCTAssertTrue(scrollToHittable(app.buttons["history-load"]).exists)
@@ -1800,6 +1790,11 @@ final class ExporterUITests: XCTestCase {
             "control never became reachable on \(names[tab])"
         )
         return element
+    }
+
+    @discardableResult
+    private func scrollDestinations(_ element: XCUIElement) -> XCUIElement {
+        scrollToHittable(element, on: 2)
     }
 
     @discardableResult
