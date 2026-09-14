@@ -85,10 +85,7 @@ jobs:
         env:
           DEVICE_FAMILY: ${{ matrix.family }}
         run: |
-          DESTINATION_ID="$(
-            xcrun simctl list devices available -j |
-              python3 -c 'import json,os,sys; d=json.load(sys.stdin)["devices"]; family=os.environ["DEVICE_FAMILY"]; print(next(x["udid"] for runtime in d.values() for x in runtime if family in x["name"]))'
-          )"
+          DESTINATION_ID="$(bash scripts/ui-test-simulator.sh "$DEVICE_FAMILY")"
           # One simulator per runner. Three clones on a runner this size timed out
           # launching the app, which reads as a test failure and is not one. The
           # parallelism lives in the shards now, where it costs no simulator memory.

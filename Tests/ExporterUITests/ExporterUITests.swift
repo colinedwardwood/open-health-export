@@ -1435,7 +1435,7 @@ final class ExporterUITests: XCTestCase {
             }
             let cause: String?
             if issue.auditType == .contrast {
-                cause = Self.suppressionCause(for: element)
+                cause = self.suppressionCause(for: element)
             } else {
                 cause = nil
             }
@@ -1462,11 +1462,24 @@ final class ExporterUITests: XCTestCase {
     }
 
     /// Xcode 26 audits system-rendered empty SwiftUI text-field placeholders and
-    /// disabled controls as low contrast, and audits content behind the navigation bar
-    /// after a scroll. Those findings are SDK-owned, so they are named rather than
-    /// silently tolerated.
-    private static func suppressionCause(for element: XCUIElement) -> String? {
-        if element.frame.minY < 130 { return "behindNavigationBar" }
+    /// disabled controls as low contrast, and audits content that system chrome draws
+    /// over: the navigation bar at the top, and the floating tab bar at the bottom,
+    /// whose scroll-edge effect fades the band of content just above its own frame.
+    /// Those findings are SDK-owned, so they are named rather than silently tolerated.
+    ///
+    /// Both bars are measured at audit time. A hardcoded cutoff stops describing the
+    /// chrome as soon as a device or SDK changes its bar heights, which turns an
+    /// SDK-owned finding into an unexplained contrast failure on one simulator only.
+    private func suppressionCause(for element: XCUIElement) -> String? {
+        let frame = element.frame
+        let navigationBar = app.navigationBars.firstMatch
+        if navigationBar.exists, frame.minY < navigationBar.frame.maxY {
+            return "behindNavigationBar"
+        }
+        let tabBar = app.tabBars.firstMatch
+        if tabBar.exists, frame.maxY > tabBar.frame.minY - Self.scrollEdgeEffectHeight {
+            return "behindTabBar"
+        }
         if !element.isHittable { return "offscreenElement" }
         if element.isEnabled == false { return "disabledControl" }
         if element.elementType == .textField || element.elementType == .secureTextField {
@@ -1487,10 +1500,15 @@ final class ExporterUITests: XCTestCase {
 
     private static let accessibilitySuppressionIssues = [
         "behindNavigationBar": trackingIssue,
+        "behindTabBar": trackingIssue,
         "offscreenElement": trackingIssue,
         "disabledControl": trackingIssue,
         "systemTextFieldPlaceholder": trackingIssue,
     ]
+
+    /// The floating tab bar fades content above its own frame, so an intersection test
+    /// against the bar alone leaves that faded band reported as an app contrast defect.
+    private static let scrollEdgeEffectHeight: CGFloat = 32
 
     private func filterBrowserToHeartRate() {
         let search = scrollToHittable(app.textFields["browser-search"])
