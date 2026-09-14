@@ -1642,6 +1642,7 @@ struct HarnessView: View {
                 Text(diagnosticPreview)
                     .font(.system(.footnote, design: .monospaced))
                     .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("diagnostic-preview")
                 // S9: the share affordance exists only past the last line of content, so
                 // it cannot be reached without traversing the bundle by scroll, VoiceOver
@@ -1649,6 +1650,7 @@ struct HarnessView: View {
                 // a ScrollView builds every child eagerly whether it is on screen or not.
                 Text("End of diagnostic bundle")
                     .font(.footnote)
+                    .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("diagnostic-end")
                     // A low threshold is the honest one: the marker sits below every line
                     // of the bundle, so any part of it entering the viewport already
