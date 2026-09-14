@@ -3141,6 +3141,16 @@ enum HarnessExport {
         )
     }
 
+    #if DEBUG
+    static func resetCompanionSlotForUITests() {
+        guard let root = try? applicationSupportRoot() else { return }
+        try? FileManager.default.removeItem(
+            at: root.appendingPathComponent("pairing.json")
+        )
+        try? FileManager.default.removeItem(at: companionTestReportURL(root: root))
+    }
+    #endif
+
     static func forgetCompanion() async throws {
         let root = try applicationSupportRoot()
         try await vault().forget()

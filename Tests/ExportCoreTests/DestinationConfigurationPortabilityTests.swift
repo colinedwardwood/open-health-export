@@ -294,6 +294,31 @@ private func portableMQTT(
     }
 }
 
+@Test func companionDocumentRoundTripsAsADisabledDraftWithASetupPath() throws {
+    let configuration = try PortableDestinationConfiguration(
+        sourceIdentifier: "seed-companion",
+        displayName: "Imported Mac",
+        kind: .companion,
+        endpoint: "OHE Lab Mac._ohe-companion._tcp",
+        settings: ["serviceName": "OHE Lab Mac._ohe-companion._tcp"]
+    )
+    let data = try DestinationConfigurationDocument(
+        destinations: [configuration]
+    ).encoded()
+    let confirmed = try DestinationConfigurationDocument
+        .reviewImport(data)
+        .confirm(
+            typedConfirmation: DestinationConfigurationImportReview.confirmationPhrase
+        )
+    #expect(confirmed.drafts.count == 1)
+    #expect(confirmed.drafts[0].configuration.kind == .companion)
+    #expect(confirmed.drafts[0].state == .disabledRequiresTest)
+    let inputs = try PortableDestinationMaterializer.materialize(
+        confirmed.drafts[0].configuration
+    )
+    #expect(inputs.serviceName == "OHE Lab Mac._ohe-companion._tcp")
+}
+
 @Test func localFileDocumentRoundTripsAsADisabledDraftWithoutASetupPath() throws {
     let configuration = try PortableDestinationConfiguration(
         sourceIdentifier: "seed-local-file",

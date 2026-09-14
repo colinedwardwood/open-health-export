@@ -172,6 +172,14 @@ final class ExporterUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(app.buttons["privacy-gate-unlock"].waitForExistence(timeout: uiWait))
+        XCTAssertTrue(app.otherElements["privacy-gate"].exists)
+        XCTAssertEqual(
+            app.staticTexts["privacy-gate-locked-title"].label,
+            "Open Health Exporter is locked"
+        )
+        XCTAssertTrue(
+            app.staticTexts["privacy-gate-background-scope"].label.contains("Background exports")
+        )
         XCTAssertFalse(app.buttons["health-request"].exists)
         try performAccessibilityAudit("privacy-gate-locked")
 
@@ -198,6 +206,11 @@ final class ExporterUITests: XCTestCase {
         app.activate()
 
         XCTAssertTrue(app.buttons["privacy-gate-unlock"].waitForExistence(timeout: uiWait))
+        XCTAssertTrue(app.otherElements["privacy-gate"].exists)
+        XCTAssertEqual(
+            app.staticTexts["privacy-gate-locked-title"].label,
+            "Open Health Exporter is locked"
+        )
         XCTAssertFalse(app.buttons["health-request"].exists)
     }
 
@@ -659,14 +672,16 @@ final class ExporterUITests: XCTestCase {
         app.launchEnvironment["OHE_SEED_IMPORTED_DRAFT"] = "https"
         app.launch()
         enterControls()
+        selectRootTab(2)
         let configure = scrollToHittable(
-            app.buttons["Add credentials and test"]
+            app.buttons["configuration-import-configure-https"],
+            on: 2
         )
         XCTAssertTrue(configure.exists)
         try performAccessibilityAudit("configuration-import-disabled-draft")
         configure.tap()
 
-        let endpoint = scrollToHittable(app.textFields["https-url"])
+        let endpoint = scrollToHittable(app.textFields["https-url"], on: 2)
         XCTAssertEqual(
             endpoint.value as? String,
             "https://collector.example/upload"
@@ -704,20 +719,31 @@ final class ExporterUITests: XCTestCase {
         app.launch()
         enterControls()
         selectRootTab(2)
-        let configure = scrollToHittable(app.buttons["Add pairing and test"])
+        let configure = scrollToHittable(
+            app.buttons["configuration-import-configure-companion"],
+            on: 2
+        )
         XCTAssertTrue(configure.exists)
+        dismissKeyboard()
         configure.tap()
-        let imported = scrollToHittable(app.staticTexts["pairing-imported-service-name"])
+        let imported = scrollToHittable(
+            app.staticTexts["pairing-imported-service-name"],
+            on: 2
+        )
         XCTAssertTrue(imported.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
         XCTAssertEqual(imported.label, "OHE Lab Mac._ohe-companion._tcp")
-        XCTAssertFalse(app.buttons["pairing-export"].isEnabled)
-        scrollToHittable(app.buttons["pairing-parse"]).tap()
-        let mismatch = scrollToHittable(app.staticTexts["pairing-import-name-mismatch"])
+        let export = scrollToHittable(app.buttons["pairing-export"], on: 2)
+        XCTAssertFalse(export.isEnabled)
+        scrollToHittable(app.buttons["pairing-parse"], on: 2).tap()
+        let mismatch = scrollToHittable(
+            app.staticTexts["pairing-import-name-mismatch"],
+            on: 2
+        )
         XCTAssertTrue(
             mismatch.waitForExistence(timeout: uiWait),
             visibleIdentifiers().joined(separator: ",")
         )
-        XCTAssertFalse(app.buttons["pairing-export"].isEnabled)
+        XCTAssertFalse(export.isEnabled)
         XCTAssertFalse(app.staticTexts["pairing-confirmation"].exists)
     }
 
@@ -747,8 +773,8 @@ final class ExporterUITests: XCTestCase {
             notice.label,
             "This destination kind does not yet have an import setup path."
         )
-        XCTAssertFalse(app.buttons["Add credentials and test"].exists)
-        XCTAssertFalse(app.buttons["Add pairing and test"].exists)
+        XCTAssertFalse(app.buttons["configuration-import-configure-https"].exists)
+        XCTAssertFalse(app.buttons["configuration-import-configure-companion"].exists)
     }
 
     /// R-67: Home Assistant imports stay disabled drafts. There is no dedicated
@@ -774,8 +800,8 @@ final class ExporterUITests: XCTestCase {
             notice.label,
             "This destination kind does not yet have an import setup path."
         )
-        XCTAssertFalse(app.buttons["Add credentials and test"].exists)
-        XCTAssertFalse(app.buttons["Add pairing and test"].exists)
+        XCTAssertFalse(app.buttons["configuration-import-configure-https"].exists)
+        XCTAssertFalse(app.buttons["configuration-import-configure-companion"].exists)
     }
 
     func testOTLPURLParseBackNamesWhitespaceAndHost() {
@@ -1544,9 +1570,9 @@ final class ExporterUITests: XCTestCase {
 
     /// Xcode 26 audits system-rendered empty SwiftUI text-field placeholders and
     /// disabled controls as low contrast, and audits content that system chrome draws
-    /// over: the navigation bar at the top, and the floating tab bar at the bottom,
-    /// whose scroll-edge effect fades the band of content just above its own frame.
-    /// Those findings are SDK-owned, so they are named rather than silently tolerated.
+    /// over: the navigation bar at the top, and the floating tab bar at the bottom.
+    /// Both bars fade a band of content just inside the scroll edge. Those findings
+    /// are SDK-owned, so they are named rather than silently tolerated.
     ///
     /// Both bars are measured at audit time. A hardcoded cutoff stops describing the
     /// chrome as soon as a device or SDK changes its bar heights, which turns an
@@ -1554,7 +1580,8 @@ final class ExporterUITests: XCTestCase {
     private func suppressionCause(for element: XCUIElement) -> String? {
         let frame = element.frame
         let navigationBar = app.navigationBars.firstMatch
-        if navigationBar.exists, frame.minY < navigationBar.frame.maxY {
+        if navigationBar.exists,
+           frame.minY < navigationBar.frame.maxY + Self.navigationScrollEdgeEffectHeight {
             return "behindNavigationBar"
         }
         let tabBar = app.tabBars.firstMatch
@@ -1604,9 +1631,12 @@ final class ExporterUITests: XCTestCase {
         "unhostedDynamicTypeLabel": trackingIssue,
     ]
 
-    /// The floating tab bar fades content above its own frame, so an intersection test
-    /// against the bar alone leaves that faded band reported as an app contrast defect.
+    /// The floating tab bar fades content above its own frame, and the navigation
+    /// bar (including large-title / scroll-edge material) fades a taller band below
+    /// its bar frame. Intersection against the bar frames alone leaves those faded
+    /// bands reported as app contrast defects.
     private static let scrollEdgeEffectHeight: CGFloat = 32
+    private static let navigationScrollEdgeEffectHeight: CGFloat = 56
 
     private func filterBrowserToHeartRate() {
         let search = scrollToHittable(app.textFields["browser-search"])
@@ -1719,20 +1749,51 @@ final class ExporterUITests: XCTestCase {
     @discardableResult
     private func scrollToHittable(_ element: XCUIElement) -> XCUIElement {
         dismissSettingsIfNeeded()
+        let names = ["status", "data", "destinations", "history"]
         for index in 0 ..< 4 {
             selectRootTab(index)
-            if isReachable(element, scrolls: 40) {
+            if isReachable(
+                element,
+                scrolls: 40,
+                preferredScroll: "root-scroll-\(names[index])"
+            ) {
                 return element
             }
         }
-        if openSettingsSheet(), isReachable(element, scrolls: 40) {
+        if openSettingsSheet(),
+           isReachable(element, scrolls: 40, preferredScroll: "settings-scroll") {
             return element
         }
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = "Element did not become hittable"
         attachment.lifetime = .keepAlways
         add(attachment)
-        XCTAssertTrue(isReachable(element, scrolls: 0), "control never became reachable")
+        XCTAssertTrue(
+            isReachable(element, scrolls: 0),
+            "control never became reachable"
+        )
+        return element
+    }
+
+    @discardableResult
+    private func scrollToHittable(_ element: XCUIElement, on tab: Int) -> XCUIElement {
+        dismissSettingsIfNeeded()
+        let names = ["status", "data", "destinations", "history"]
+        guard names.indices.contains(tab) else {
+            return scrollToHittable(element)
+        }
+        selectRootTab(tab)
+        if isReachable(
+            element,
+            scrolls: 40,
+            preferredScroll: "root-scroll-\(names[tab])"
+        ) {
+            return element
+        }
+        XCTAssertTrue(
+            elementIsCurrentlyReachable(element),
+            "control never became reachable on \(names[tab])"
+        )
         return element
     }
 
@@ -1748,12 +1809,22 @@ final class ExporterUITests: XCTestCase {
         return app.buttons["settings-close"].waitForExistence(timeout: uiWait)
     }
 
-    private func isReachable(_ element: XCUIElement, scrolls: Int) -> Bool {
+    private func isReachable(
+        _ element: XCUIElement,
+        scrolls: Int,
+        preferredScroll: String? = nil
+    ) -> Bool {
         if elementIsCurrentlyReachable(element) { return true }
         guard scrolls > 0 else { return false }
+        if preferredScroll == nil, !element.exists { return false }
+        if element.exists,
+           !elementBelongsToPreferredScroll(element, preferredScroll) {
+            return false
+        }
         for _ in 0 ..< scrolls {
-            swipeTowardContentBottom()
+            swipeTowardContentBottom(preferredScroll: preferredScroll)
             if elementIsCurrentlyReachable(element) { return true }
+            if preferredScroll == nil, !element.exists { return false }
         }
         return false
     }
@@ -1771,7 +1842,34 @@ final class ExporterUITests: XCTestCase {
         }
     }
 
-    private func swipeTowardContentBottom() {
+    /// Off-screen TabView pages can still report `exists`. Do not burn 40
+    /// swipes on Status when the control lives on Destinations.
+    private func elementBelongsToPreferredScroll(
+        _ element: XCUIElement,
+        _ preferredScroll: String?
+    ) -> Bool {
+        guard let preferredScroll else { return true }
+        let scroll = app.scrollViews[preferredScroll]
+        guard scroll.exists, element.exists else { return true }
+        let elementFrame = element.frame
+        let scrollFrame = scroll.frame
+        guard elementFrame.width > 0, elementFrame.height > 0, scrollFrame.width > 0 else {
+            return true
+        }
+        let overlapsHorizontally =
+            elementFrame.maxX > scrollFrame.minX && elementFrame.minX < scrollFrame.maxX
+        let notEntirelyAbove = elementFrame.maxY > scrollFrame.minY - 8
+        return overlapsHorizontally && notEntirelyAbove
+    }
+
+    private func swipeTowardContentBottom(preferredScroll: String? = nil) {
+        if let preferredScroll {
+            let preferred = app.scrollViews[preferredScroll]
+            if preferred.exists {
+                preferred.swipeUp()
+                return
+            }
+        }
         let settingsScroll = app.scrollViews["settings-scroll"]
         if settingsScroll.exists {
             settingsScroll.swipeUp()

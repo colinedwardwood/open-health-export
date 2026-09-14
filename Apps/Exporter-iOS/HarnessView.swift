@@ -589,10 +589,12 @@ struct HarnessView: View {
             Text("Open Health Exporter is locked")
                 .font(.headline)
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("privacy-gate-locked-title")
             Text("Unlocking protects this screen only. Background exports and destination delivery continue without a prompt.")
                 .font(.footnote)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("privacy-gate-background-scope")
             if appPrivacyGate.authenticationFailed {
                 Text("Authentication was not completed.")
                     .font(.footnote)
@@ -1119,7 +1121,18 @@ struct HarnessView: View {
                 .accessibilityIdentifier("destination-ledger-honesty")
             ConfigurationImportView(
                 refreshToken: importedDraftRefreshToken
-            ) { loadImportedDestinationDraft($0) }
+            ) { draft in
+                importedDestinationDraft = draft
+                loadImportedDestinationDraft(draft)
+            }
+            if let importedName = importedCompanionServiceName {
+                Text("Imported Mac name")
+                    .font(.footnote)
+                Text(importedName)
+                    .font(.footnote)
+                    .accessibilityIdentifier("pairing-imported-service-name")
+            }
+            companionPairingSection
             Button("Prepare credential-free configuration export") {
                 Task { await prepareConfigurationExport() }
             }
@@ -1662,17 +1675,15 @@ struct HarnessView: View {
                     }
                 }
             }
+        }
+        .buttonStyle(HarnessButtonStyle())
+        .controlSize(.large)
+    }
 
+    private var companionPairingSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
             Text("Companion pairing")
                 .font(.headline)
-            if let importedName = importedCompanionServiceName {
-                Text("Imported Mac name")
-                    .font(.footnote)
-                Text(importedName)
-                    .font(.footnote)
-                    .textSelection(.enabled)
-                    .accessibilityIdentifier("pairing-imported-service-name")
-            }
             if pairingImportMismatch {
                 Text("The pairing names a different Mac than the imported configuration.")
                     .font(.footnote)
@@ -1734,8 +1745,6 @@ struct HarnessView: View {
                 .font(.footnote)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .buttonStyle(HarnessButtonStyle())
-        .controlSize(.large)
     }
 
     private func buildDiagnostic() {
@@ -2867,11 +2876,11 @@ struct HarnessView: View {
             return
         }
         let slot = inputs.slotIdentifier
+        importedDestinationDraft = draft
         guard !HarnessExport.hasDestinationConfiguration(slot) else {
             status = "Import refused: the \(slot) destination slot already has a configuration. Disable and remove it before importing another."
             return
         }
-        importedDestinationDraft = draft
         scopeDestinationID = slot
         browserBaseline = []
         browserSelection = Set(draft.configuration.exportScope.metrics)

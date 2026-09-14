@@ -45,6 +45,8 @@ import Watchdog
     #expect(window.contains("settings-open-destinations"))
     #expect(window.contains("dataFlowExplainer"))
     #expect(window.contains("privacy-gate-enabled"))
+    #expect(view.contains("privacy-gate-locked-title"))
+    #expect(view.contains("privacy-gate-background-scope"))
     #expect(window.contains("app-privacy-heading"))
     #expect(window.contains("credential-no-reveal-policy"))
     #expect(window.contains("wipe-section-heading"))

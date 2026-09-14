@@ -67,4 +67,13 @@ import Testing
     #expect(importer.contains("Configuration refused: \\(error.localizedDescription)"))
     #expect(!harness.contains("Import refused: \\(error)."))
     #expect(!importer.contains("Configuration refused: \\(error)\""))
+    #expect(
+        importer.contains(
+            "configuration-import-configure-\\(draft.configuration.kind.rawValue)"
+        )
+    )
+    #expect(importer.contains("HarnessExport.resetCompanionSlotForUITests()"))
+    let importView = try #require(harness.range(of: "ConfigurationImportView("))
+    let pairing = try #require(harness.range(of: "companionPairingSection"))
+    #expect(importView.lowerBound < pairing.lowerBound)
 }

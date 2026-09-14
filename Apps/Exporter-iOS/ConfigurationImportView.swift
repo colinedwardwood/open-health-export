@@ -86,14 +86,14 @@ struct ConfigurationImportView: View {
                                 onConfigure(draft)
                             }
                             .accessibilityIdentifier(
-                                "configuration-import-configure-\(draft.localIdentifier)"
+                                "configuration-import-configure-\(draft.configuration.kind.rawValue)"
                             )
                         } else if draft.configuration.kind == .companion {
                             Button("Add pairing and test") {
                                 onConfigure(draft)
                             }
                             .accessibilityIdentifier(
-                                "configuration-import-configure-\(draft.localIdentifier)"
+                                "configuration-import-configure-\(draft.configuration.kind.rawValue)"
                             )
                         } else {
                             Text("This destination kind does not yet have an import setup path.")
@@ -249,6 +249,7 @@ enum ImportedDestinationDraftStore {
     }
 
     static func seedCompanionForUITests() throws {
+        HarnessExport.resetCompanionSlotForUITests()
         try replaceStore(
             with: try PortableDestinationConfiguration(
                 sourceIdentifier: "seed-companion",
