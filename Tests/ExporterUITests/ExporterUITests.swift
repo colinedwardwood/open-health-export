@@ -20,6 +20,9 @@ final class ExporterUITests: XCTestCase {
         continueAfterFailure = false
         app = XCUIApplication()
         app.terminate()
+        app.launchEnvironment = [
+            "OHE_RESET_SEEDED_SURFACES": "1",
+        ]
         app.launchArguments = [
             "-ohe.disclosureAcknowledged", "false",
             "-ohe.advisoryEnabled", "false",

@@ -322,6 +322,16 @@ struct HarnessView: View {
         .onAppear {
             appPrivacyGate.prepare(enabled: appPrivacyGateEnabled)
             timeToFirstFrameMS = LaunchMark.millisecondsToNow()
+            #if DEBUG
+            if ProcessInfo.processInfo.environment["OHE_RESET_SEEDED_SURFACES"] == "1" {
+                try? HarnessExport.resetSeededSurfacesForUITests()
+            }
+            if let scenario = ProcessInfo.processInfo
+                .environment["OHE_SEED_DESTINATION_STATUS"]
+            {
+                try? HarnessExport.seedDestinationStatusForUITests(scenario: scenario)
+            }
+            #endif
             refreshDestinationSurfaces()
             HealthKitPreferredDisplayUnits.startObserving()
             Task { await refreshHealthKitDisplayUnits() }
@@ -339,6 +349,17 @@ struct HarnessView: View {
                 status = "Ready."
             }
             Task {
+                #if DEBUG
+                if ProcessInfo.processInfo.environment["OHE_RESET_SEEDED_SURFACES"] == "1" {
+                    try? await HarnessExport.clearAnchorHoldsForUITests()
+                }
+                if let held = ProcessInfo.processInfo.environment["OHE_SEED_ANCHOR_HOLD"] {
+                    try? await HarnessExport.seedAnchorHoldForUITests(
+                        metric: MetricID(rawValue: held)
+                    )
+                    anchorHolds = (try? await HarnessExport.anchorHolds()) ?? []
+                }
+                #endif
                 await appPrivacyGate.authenticateIfNeeded(enabled: appPrivacyGateEnabled)
                 await loadDestinationScope(scopeDestinationID)
                 do {
@@ -352,13 +373,6 @@ struct HarnessView: View {
                 } catch {
                     status = "Failed to enforce queue expiry: \(error.localizedDescription)"
                 }
-                #if DEBUG
-                if let scenario = ProcessInfo.processInfo
-                    .environment["OHE_SEED_DESTINATION_STATUS"]
-                {
-                    try? HarnessExport.seedDestinationStatusForUITests(scenario: scenario)
-                }
-                #endif
                 try? await HarnessExport.recordNotificationSuppressionIfNeeded()
                 await restorePairing()
                 await refreshLedgerIntegrity()
@@ -366,11 +380,6 @@ struct HarnessView: View {
                 await refreshSecurityAdvisory()
                 #if DEBUG
                 refreshDestinationSurfaces()
-                if let held = ProcessInfo.processInfo.environment["OHE_SEED_ANCHOR_HOLD"] {
-                    try? await HarnessExport.seedAnchorHoldForUITests(
-                        metric: MetricID(rawValue: held)
-                    )
-                }
                 if let raw = ProcessInfo.processInfo.environment["OHE_OPEN_URL"],
                    let url = URL(string: raw)
                 {

@@ -1413,6 +1413,26 @@ enum HarnessExport {
     }
 
     #if DEBUG
+    /// Snapshot files and hold rows survive across XCUITest cases in one simulator.
+    /// Resetting them at launch is what keeps one case's banners off the next audit.
+    static func resetSeededSurfacesForUITests() throws {
+        if let directory = StatusSnapshotLocation.directory() {
+            try? FileManager.default.removeItem(at: directory)
+        }
+    }
+
+    static func clearAnchorHoldsForUITests() async throws {
+        let root = try applicationSupportRoot()
+        let store = try SQLiteStateStore(
+            path: root.appendingPathComponent("state.sqlite").path
+        )
+        try await store.transact { tx in
+            for hold in try tx.loadAnchorHolds() {
+                try tx.clearAnchorHold(metric: hold.metric)
+            }
+        }
+    }
+
     /// QA-14 wants the success, stale and failed surfaces asserted. Reaching them for
     /// real needs a destination, a network and a clock that has moved on by days, none
     /// of which a UI test has. Seeding the snapshot exercises the same read path the
