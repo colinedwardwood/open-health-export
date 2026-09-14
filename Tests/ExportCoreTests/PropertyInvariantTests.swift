@@ -558,6 +558,7 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
     #expect(checker.contains("metricByWireId"))
     #expect(checker.contains("NDJSONFieldScan"))
     #expect(checker.contains("ingested_lines="))
+    #expect(checker.contains("exportruncheck progress phase="))
     #expect(checker.contains("quantitySample(fromNDJSONLine: line, decoder: decoder)"))
     #expect(checker.contains("persistHistoryPayload: exerciseSidecars"))
     #expect(checker.contains("volumeReceiptCounts"))

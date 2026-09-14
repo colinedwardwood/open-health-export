@@ -86,9 +86,7 @@ struct ExportRunCheck {
                 }
             }
             if inputLines.isMultiple(of: 1_000_000) {
-                FileHandle.standardError.write(
-                    Data("exportruncheck ingested_lines=\(inputLines)\n".utf8)
-                )
+                emitProgress(phase: "ingest", extra: " ingested_lines=\(inputLines)")
             }
             switch record.kind {
             case "sample.quantity":
@@ -121,6 +119,10 @@ struct ExportRunCheck {
         for spool in spools.values {
             try spool.close()
         }
+        emitProgress(
+            phase: "ingested",
+            extra: " ingested_lines=\(inputLines) metrics=\(spools.count)"
+        )
         let work = spools.keys.sorted(by: { $0.rawValue < $1.rawValue }).enumerated().compactMap {
             ordinal, metric -> MetricWork? in
             spools[metric].map { MetricWork(ordinal: ordinal, metric: metric, url: $0.url) }
@@ -154,6 +156,10 @@ struct ExportRunCheck {
                 }
             }
         }
+        emitProgress(
+            phase: "exported",
+            extra: " submitted=\(submittedRecords) pages=\(pages)"
+        )
 
         guard headerRecords == 1, let declaredRecords else {
             throw CheckError.invalidProvenance
@@ -321,6 +327,20 @@ struct ExportRunCheck {
             result.acked += counts.1
         }
         return result
+    }
+
+    private static func emitProgress(phase: String, extra: String = "") {
+        #if os(Linux)
+        let rss: String
+        if let peakKiB = try? peakResidentMemoryKiB() {
+            rss = String(format: "%.1f", Double(peakKiB) / 1_024)
+        } else {
+            rss = "unknown"
+        }
+        print("exportruncheck progress phase=\(phase) peak_rss_mib=\(rss)\(extra)")
+        #else
+        print("exportruncheck progress phase=\(phase)\(extra)")
+        #endif
     }
 
     #if os(Linux)
