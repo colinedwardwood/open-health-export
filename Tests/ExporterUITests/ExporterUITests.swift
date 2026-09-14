@@ -987,12 +987,16 @@ final class ExporterUITests: XCTestCase {
         enterControls()
         selectRootTab(2)
         XCTAssertTrue(
-            scrollToHittable(app.staticTexts["pairing-paste-whitespace"]).waitForExistence(timeout: uiWait)
+            scrollToHittable(app.staticTexts["pairing-paste-whitespace"], on: 2)
+                .waitForExistence(timeout: uiWait)
         )
-        scrollToHittable(app.buttons["pairing-parse"]).tap()
+        scrollToHittable(app.buttons["pairing-parse"], on: 2).tap()
         let confirmation = app.staticTexts["pairing-confirmation"]
         XCTAssertTrue(confirmation.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
-        XCTAssertTrue(confirmation.label.contains("Confirmation:"), confirmation.label)
+        XCTAssertTrue(
+            confirmation.label.contains("Confirmation code"),
+            confirmation.label
+        )
         XCTAssertTrue(app.buttons["pairing-export"].isEnabled)
     }
 
@@ -1786,7 +1790,8 @@ final class ExporterUITests: XCTestCase {
         if isReachable(
             element,
             scrolls: 40,
-            preferredScroll: "root-scroll-\(names[tab])"
+            preferredScroll: "root-scroll-\(names[tab])",
+            huntIfMissing: true
         ) {
             return element
         }
@@ -1812,11 +1817,12 @@ final class ExporterUITests: XCTestCase {
     private func isReachable(
         _ element: XCUIElement,
         scrolls: Int,
-        preferredScroll: String? = nil
+        preferredScroll: String? = nil,
+        huntIfMissing: Bool = false
     ) -> Bool {
         if elementIsCurrentlyReachable(element) { return true }
         guard scrolls > 0 else { return false }
-        if preferredScroll == nil, !element.exists { return false }
+        if !huntIfMissing, !element.exists { return false }
         if element.exists,
            !elementBelongsToPreferredScroll(element, preferredScroll) {
             return false
@@ -1824,7 +1830,7 @@ final class ExporterUITests: XCTestCase {
         for _ in 0 ..< scrolls {
             swipeTowardContentBottom(preferredScroll: preferredScroll)
             if elementIsCurrentlyReachable(element) { return true }
-            if preferredScroll == nil, !element.exists { return false }
+            if !huntIfMissing, !element.exists { return false }
         }
         return false
     }
