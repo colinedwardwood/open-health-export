@@ -781,6 +781,10 @@ struct HarnessView: View {
                                 rootTab = .destinations
                             }
                             .accessibilityIdentifier("status-open-destinations")
+                            Button("Settings") {
+                                showSettings = true
+                            }
+                            .accessibilityIdentifier("status-open-settings")
                             statusOperations
                             measurements
                         case .data:

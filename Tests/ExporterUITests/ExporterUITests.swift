@@ -61,7 +61,7 @@ final class ExporterUITests: XCTestCase {
             app.staticTexts["about-disclaimer"].label,
             "This is not a medical device. It does not diagnose or treat anything."
         )
-        XCTAssertTrue(scrollToHittable(app.buttons["history-load"]).exists)
+        XCTAssertTrue(scrollHistory(app.buttons["history-load"]).exists)
         XCTAssertEqual(
             app.staticTexts["shortcut-export"].label,
             "Shortcuts can run one page to the local archive after you enable it."
@@ -117,23 +117,23 @@ final class ExporterUITests: XCTestCase {
         enterControls()
         XCTAssertTrue(app.buttons["health-request"].waitForExistence(timeout: uiWait))
         XCTAssertEqual(
-            scrollToHittable(app.staticTexts["app-privacy-heading"]).label,
+            scrollSettings(app.staticTexts["app-privacy-heading"]).label,
             "App privacy"
         )
         XCTAssertEqual(
-            scrollToHittable(app.staticTexts["hide-lock-heading"]).label,
+            scrollSettings(app.staticTexts["hide-lock-heading"]).label,
             "If someone else set this up"
         )
         XCTAssertTrue(
-            scrollToHittable(app.staticTexts["hide-lock-body"]).label.contains("Hidden Apps")
+            scrollSettings(app.staticTexts["hide-lock-body"]).label.contains("Hidden Apps")
         )
-        let wipe = scrollToHittable(app.buttons["wipe-everything"])
+        let wipe = scrollSettings(app.buttons["wipe-everything"])
         XCTAssertEqual(
-            scrollToHittable(app.staticTexts["wipe-section-heading"]).label,
+            scrollSettings(app.staticTexts["wipe-section-heading"]).label,
             "Stop and delete"
         )
         XCTAssertEqual(wipe.label, "Delete everything on this device")
-        XCTAssertTrue(scrollToHittable(app.staticTexts["wipe-received-limit"]).exists)
+        XCTAssertTrue(scrollSettings(app.staticTexts["wipe-received-limit"]).exists)
         XCTAssertEqual(
             app.staticTexts["wipe-received-limit"].label,
             "We cannot delete data your destinations already received."
@@ -143,11 +143,11 @@ final class ExporterUITests: XCTestCase {
             "We cannot turn off our own Health access."
         )
         XCTAssertEqual(
-            scrollToHittable(app.staticTexts["wipe-health-path"]).label,
+            scrollSettings(app.staticTexts["wipe-health-path"]).label,
             "To turn access off: Health → your profile picture → Privacy → Apps → Open Health Exporter."
         )
         XCTAssertEqual(
-            scrollToHittable(app.staticTexts["wipe-mac-limit"]).label,
+            scrollSettings(app.staticTexts["wipe-mac-limit"]).label,
             "A Mac companion keeps its own copy. Use Delete everything received there. Deleting here does not reach it."
         )
         wipe.tap()
@@ -218,7 +218,7 @@ final class ExporterUITests: XCTestCase {
     /// authentication protects the app screen but never makes credentials legible.
     func testStoredCredentialsHaveNoRevealControl() {
         enterControls()
-        let policy = scrollToHittable(app.staticTexts["credential-no-reveal-policy"])
+        let policy = scrollSettings(app.staticTexts["credential-no-reveal-policy"])
         XCTAssertTrue(policy.label.contains("never shown"), policy.label)
         XCTAssertFalse(app.buttons["credential-reveal-https"].exists)
         XCTAssertFalse(app.buttons["credential-reveal-mqtt"].exists)
@@ -254,15 +254,15 @@ final class ExporterUITests: XCTestCase {
     }
 
     func testBrowserEmptyAndDetailStatesPassAccessibilityAudit() throws {
-        enterControls()
-        let search = scrollToHittable(app.textFields["browser-search"])
+        enterData()
+        let search = scrollData(app.textFields["browser-search"])
         type("no-such-health-type", into: search)
         XCTAssertTrue(app.staticTexts["browser-empty"].waitForExistence(timeout: uiWait))
         dismissKeyboard()
         try performAccessibilityAudit()
         app.terminate()
         app.launch()
-        enterControls()
+        enterData()
         filterBrowserToHeartRate()
         let row = app.descendants(matching: .any)["browser-row-heartRate"]
         XCTAssertTrue(
@@ -319,12 +319,12 @@ final class ExporterUITests: XCTestCase {
             "available identifiers: \(visibleIdentifiers())"
         )
         enterControls()
-        let explanation = scrollToHittable(app.staticTexts["anchor-hold-explanation-0"])
+        let explanation = scrollStatus(app.staticTexts["anchor-hold-explanation-0"])
         XCTAssertTrue(explanation.exists)
         XCTAssertTrue(explanation.label.contains("2026-09-08"), explanation.label)
 
         XCTAssertTrue(app.buttons["anchor-hold-reexport-0"].exists)
-        let stop = scrollToHittable(app.buttons["anchor-hold-stop-0"])
+        let stop = scrollStatus(app.buttons["anchor-hold-stop-0"])
         stop.tap()
 
         // Deciding is what clears it. The banner going away proves the decision was
@@ -413,9 +413,9 @@ final class ExporterUITests: XCTestCase {
         app.launchEnvironment["OHE_SEED_DESTINATION_STATUS"] = "failed"
         app.launch()
         enterControls()
-        let row = scrollToHittable(destinationStatusElement(0))
+        let row = scrollStatus(destinationStatusElement(0))
         row.tap()
-        let part0 = scrollToHittable(app.staticTexts["error-part-0"])
+        let part0 = scrollStatus(app.staticTexts["error-part-0"])
         XCTAssertTrue(
             part0.waitForExistence(timeout: uiWait),
             visibleIdentifiers().joined(separator: ",")
@@ -429,7 +429,7 @@ final class ExporterUITests: XCTestCase {
         app.launchEnvironment["OHE_SEED_DESTINATION_STATUS"] = scenario
         app.launch()
         enterControls()
-        let refresh = scrollToHittable(app.buttons["destination-refresh"])
+        let refresh = scrollStatus(app.buttons["destination-refresh"])
         refresh.tap()
         let line = destinationStatusElement(0)
         XCTAssertTrue(
@@ -441,7 +441,7 @@ final class ExporterUITests: XCTestCase {
 
     func testDiagnosticShareExistsOnlyPastTheBundlesLastLine() {
         enterControls()
-        let build = scrollToHittable(app.buttons["diagnostic-build"])
+        let build = scrollSettings(app.buttons["diagnostic-build"])
         XCTAssertFalse(app.buttons["diagnostic-share"].exists)
         build.tap()
 
@@ -451,7 +451,7 @@ final class ExporterUITests: XCTestCase {
         // off-screen absence keeps the test honest when a short bundle fits on one screen.
         let end = app.staticTexts["diagnostic-end"]
         XCTAssertTrue(end.waitForExistence(timeout: uiWait))
-        scrollToHittable(end)
+        scrollSettings(end)
 
         // The reveal is driven by the end marker's scroll visibility, and a marker that
         // has only just become hittable can sit far enough off the edge that no
@@ -472,12 +472,12 @@ final class ExporterUITests: XCTestCase {
     /// SEC-64: the keychain is device-only, so the cost of that shows up before the
     /// user types a secret, not after a restore has already lost it.
     func testCredentialDisclosurePrecedesEveryCredentialField() {
-        enterControls()
+        enterDestinations()
         for (disclosure, field) in [
             ("credential-disclosure-https", "https-bearer"),
             ("credential-disclosure-mqtt", "mqtt-password"),
         ] {
-            let copy = scrollToHittable(app.staticTexts[disclosure])
+            let copy = scrollDestinations(app.staticTexts[disclosure])
             XCTAssertTrue(
                 copy.waitForExistence(timeout: uiWait),
                 "no \(disclosure); available: \(visibleIdentifiers())"
@@ -542,7 +542,7 @@ final class ExporterUITests: XCTestCase {
         app.launchEnvironment["OHE_SEED_SHARE_ACK"] = "clear"
         app.launch()
         enterControls()
-        scrollToHittable(app.buttons["diagnostic-build"]).tap()
+        scrollSettings(app.buttons["diagnostic-build"]).tap()
         XCTAssertTrue(app.staticTexts["diagnostic-preview"].waitForExistence(timeout: uiWait))
         XCTAssertFalse(app.staticTexts["diagnostic-preview"].label.isEmpty)
 
@@ -550,7 +550,7 @@ final class ExporterUITests: XCTestCase {
         // the bundle's last line has been traversed.
         let end = app.staticTexts["diagnostic-end"]
         XCTAssertTrue(end.waitForExistence(timeout: uiWait))
-        scrollToHittable(end)
+        scrollSettings(end)
         let warning = app.staticTexts["share-protection-warning"]
         for _ in 0 ..< 10 where !warning.exists {
             app.swipeUp()
@@ -561,7 +561,7 @@ final class ExporterUITests: XCTestCase {
         XCTAssertFalse(app.buttons["diagnostic-share"].exists, "share was reachable before the warning")
         try performAccessibilityAudit("diagnostic-preview-share-warning")
 
-        scrollToHittable(app.buttons["share-protection-continue"]).tap()
+        scrollSettings(app.buttons["share-protection-continue"]).tap()
         // Acknowledging replaces three lines of warning with one control, so the share
         // button lands below the fold and has to be traversed to like anything else.
         let revealed = app.buttons["diagnostic-share"]
@@ -578,9 +578,9 @@ final class ExporterUITests: XCTestCase {
         app.launchEnvironment["OHE_SEED_SHARE_ACK"] = "keep"
         app.launch()
         enterControls()
-        scrollToHittable(app.buttons["diagnostic-build"]).tap()
+        scrollSettings(app.buttons["diagnostic-build"]).tap()
         XCTAssertTrue(app.staticTexts["diagnostic-end"].waitForExistence(timeout: uiWait))
-        scrollToHittable(app.staticTexts["diagnostic-end"])
+        scrollSettings(app.staticTexts["diagnostic-end"])
         let share = app.buttons["diagnostic-share"]
         for _ in 0 ..< 10 where !share.exists {
             app.swipeUp()
@@ -592,7 +592,7 @@ final class ExporterUITests: XCTestCase {
 
     func testExplicitTypeStopRequiresTwoTaps() {
         enterControls()
-        let stop = scrollToHittable(app.buttons["stop-heart-rate"])
+        let stop = scrollSettings(app.buttons["stop-heart-rate"])
         stop.tap()
         let confirm = app.buttons["stop-heart-rate"]
         XCTAssertEqual(confirm.label, "Confirm: stop exporting heart rate")
@@ -605,7 +605,7 @@ final class ExporterUITests: XCTestCase {
 
     func testDeletionBehaviourStatesBestEffortAndNoCallback() {
         enterControls()
-        let explanation = scrollToHittable(app.staticTexts["deletion-behaviour"])
+        let explanation = scrollStatus(app.staticTexts["deletion-behaviour"])
         XCTAssertTrue(explanation.label.contains("no deletion callback"))
         XCTAssertTrue(explanation.label.contains("best-effort"))
         XCTAssertTrue(explanation.label.contains("full reconcile"))
@@ -613,7 +613,7 @@ final class ExporterUITests: XCTestCase {
 
     func testBackfillDisclosesOSTiersAndKeepsRawExplicit() {
         enterControls()
-        let disclosure = scrollToHittable(app.staticTexts["backfill-os-disclosure"])
+        let disclosure = scrollStatus(app.staticTexts["backfill-os-disclosure"])
         XCTAssertTrue(disclosure.label.contains("iOS 26"))
         XCTAssertTrue(disclosure.label.contains("iOS 18 through 25"))
         XCTAssertTrue(app.buttons["backfill-aggregate"].exists)
@@ -624,8 +624,8 @@ final class ExporterUITests: XCTestCase {
     }
 
     func testDataBrowserSelectAndEmptyMeasurementsAreVisibleAfterDisclosure() throws {
-        enterControls()
-        XCTAssertTrue(scrollToHittable(app.staticTexts["browser-title"]).exists)
+        enterData()
+        XCTAssertTrue(scrollData(app.staticTexts["browser-title"]).exists)
         XCTAssertEqual(app.staticTexts["browser-title"].label, "Data")
         XCTAssertTrue(app.buttons["browser-select"].exists)
         XCTAssertFalse(app.buttons["browser-review"].exists)
@@ -653,16 +653,16 @@ final class ExporterUITests: XCTestCase {
     }
 
     func testDestinationScopeStartsEmptyAndOffersAnExplicitPreset() {
-        enterControls()
+        enterData()
         let required = app.staticTexts["scope-required"]
-        XCTAssertTrue(scrollToHittable(required).exists)
+        XCTAssertTrue(scrollData(required).exists)
         XCTAssertTrue(app.descendants(matching: .any)["scope-destination"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["scope-start-date"].exists)
 
-        let select = scrollToHittable(app.buttons["browser-select"])
+        let select = scrollData(app.buttons["browser-select"])
         select.tap()
         XCTAssertTrue(
-            scrollToHittable(app.buttons["browser-core-daily"]).exists,
+            scrollData(app.buttons["browser-core-daily"]).exists,
             "Core Daily must be an explicit action, not a destination default."
         )
     }
@@ -828,7 +828,7 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(body.label.contains("OTLP/HTTP protobuf"), body.label)
         XCTAssertFalse(body.label.localizedCaseInsensitiveContains("heartRate"), body.label)
         XCTAssertFalse(body.label.contains("bpm"), body.label)
-        scrollToHittable(end)
+        scrollDestinations(end)
         for _ in 0 ..< 10 where !enable.isEnabled {
             app.swipeUp()
             _ = enable.waitForExistence(timeout: 2)
@@ -850,14 +850,13 @@ final class ExporterUITests: XCTestCase {
         let part0 = app.staticTexts["error-part-0"]
         XCTAssertTrue(part0.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
         XCTAssertTrue(part0.label.contains("Sent"), part0.label)
-        let fix = scrollToHittable(app.buttons["error-fix-setQoS1"])
+        let fix = scrollStatus(app.buttons["error-fix-setQoS1"])
         XCTAssertEqual(fix.label, "Set QoS to 1")
         fix.tap()
         XCTAssertTrue(
             app.staticTexts["status-line"].label.contains("Applied Set QoS to 1"),
             app.staticTexts["status-line"].label
         )
-        selectRootTab(2)
         let qos = scrollDestinations(app.descendants(matching: .any)["mqtt-qos"])
         XCTAssertTrue(qos.waitForExistence(timeout: uiWait))
         let shown = qos.label + ((qos.value as? String) ?? "")
@@ -875,14 +874,13 @@ final class ExporterUITests: XCTestCase {
         let part0 = app.staticTexts["error-part-0"]
         XCTAssertTrue(part0.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
         XCTAssertTrue(part0.label.contains("too large"), part0.label)
-        let fix = scrollToHittable(app.buttons["error-fix-shortenWindow"])
+        let fix = scrollStatus(app.buttons["error-fix-shortenWindow"])
         XCTAssertEqual(fix.label, "Shorten window")
         fix.tap()
         XCTAssertTrue(
             app.staticTexts["status-line"].label.contains("Applied Shorten window"),
             app.staticTexts["status-line"].label
         )
-        selectRootTab(2)
         let window = scrollDestinations(app.staticTexts["export-window-hours"])
         XCTAssertTrue(window.waitForExistence(timeout: uiWait))
         XCTAssertTrue(window.label.contains("6 hours"), window.label)
@@ -896,14 +894,13 @@ final class ExporterUITests: XCTestCase {
         let part0 = app.staticTexts["error-part-0"]
         XCTAssertTrue(part0.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
         XCTAssertTrue(part0.label.contains("slow down"), part0.label)
-        let fix = scrollToHittable(app.buttons["error-fix-lowerFreshness"])
+        let fix = scrollStatus(app.buttons["error-fix-lowerFreshness"])
         XCTAssertEqual(fix.label, "Choose a less frequent target")
         fix.tap()
         XCTAssertTrue(
             app.staticTexts["status-line"].label.contains("Applied Choose a less frequent target"),
             app.staticTexts["status-line"].label
         )
-        selectRootTab(2)
         let interval = scrollDestinations(app.staticTexts["freshness-interval-minutes"])
         XCTAssertTrue(interval.waitForExistence(timeout: uiWait))
         XCTAssertTrue(interval.label.contains("30 minutes"), interval.label)
@@ -1011,7 +1008,7 @@ final class ExporterUITests: XCTestCase {
         ]
         XCTAssertEqual(archetypes.count, 16)
         for name in archetypes {
-            let part0 = scrollToHittable(app.staticTexts["error-\(name)-part-0"])
+            let part0 = scrollStatus(app.staticTexts["error-\(name)-part-0"])
             XCTAssertTrue(
                 part0.waitForExistence(timeout: uiWait),
                 "missing \(name); available: \(visibleIdentifiers().joined(separator: ","))"
@@ -1024,9 +1021,9 @@ final class ExporterUITests: XCTestCase {
     }
 
     func testConfigurationExportIsExplicitAndCredentialFreeLabeled() {
-        enterControls()
+        enterDestinations()
         XCTAssertFalse(app.buttons["configuration-export-share"].exists)
-        scrollToHittable(
+        scrollDestinations(
             app.buttons["configuration-export-prepare"]
         ).tap()
         let share = app.buttons["configuration-export-share"]
@@ -1035,8 +1032,8 @@ final class ExporterUITests: XCTestCase {
     }
 
     func testDataBrowserShowsAnExplicitEmptySearchState() {
-        enterControls()
-        let search = scrollToHittable(app.textFields["browser-search"])
+        enterData()
+        let search = scrollData(app.textFields["browser-search"])
         type("no-such-health-type", into: search)
         XCTAssertTrue(app.staticTexts["browser-empty"].waitForExistence(timeout: uiWait))
         XCTAssertEqual(
@@ -1046,9 +1043,8 @@ final class ExporterUITests: XCTestCase {
     }
 
     func testDataBrowserSearchMatchesHealthKitIdentifierAndMoodSynonym() {
-        enterControls()
-        selectRootTab(1)
-        let search = scrollToHittable(app.textFields["browser-search"])
+        enterData()
+        let search = scrollData(app.textFields["browser-search"])
         type("HKQuantityTypeIdentifierStepCount", into: search)
         dismissKeyboard()
         XCTAssertTrue(
@@ -1059,9 +1055,8 @@ final class ExporterUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["browser-row-heartRate"].exists)
         app.terminate()
         app.launch()
-        enterControls()
-        selectRootTab(1)
-        let mood = scrollToHittable(app.textFields["browser-search"])
+        enterData()
+        let mood = scrollData(app.textFields["browser-search"])
         type("mood", into: mood)
         dismissKeyboard()
         XCTAssertTrue(
@@ -1071,9 +1066,8 @@ final class ExporterUITests: XCTestCase {
         )
         app.terminate()
         app.launch()
-        enterControls()
-        selectRootTab(1)
-        let cycle = scrollToHittable(app.textFields["browser-search"])
+        enterData()
+        let cycle = scrollData(app.textFields["browser-search"])
         type("pregnant", into: cycle)
         dismissKeyboard()
         XCTAssertTrue(
@@ -1084,7 +1078,7 @@ final class ExporterUITests: XCTestCase {
     }
 
     func testDataBrowserOpensMetricDetailAndOffersNavigationBack() {
-        enterControls()
+        enterData()
         filterBrowserToHeartRate()
         let row = app.descendants(matching: .any)["browser-row-heartRate"]
         XCTAssertTrue(
@@ -1099,7 +1093,7 @@ final class ExporterUITests: XCTestCase {
 
     func testDemoExportStaysDisabledUntilTypedConfirmation() {
         enterControls()
-        let export = scrollToHittable(app.buttons["demo-export"])
+        let export = scrollStatus(app.buttons["demo-export"])
         XCTAssertFalse(export.isEnabled)
         let field = app.textFields["demo-confirm"]
         XCTAssertTrue(field.waitForExistence(timeout: uiWait))
@@ -1109,7 +1103,7 @@ final class ExporterUITests: XCTestCase {
 
     func testDemoExportConfirmationStripsLeadingWhitespace() {
         enterControls()
-        let export = scrollToHittable(app.buttons["demo-export"])
+        let export = scrollStatus(app.buttons["demo-export"])
         XCTAssertFalse(export.isEnabled)
         let field = app.textFields["demo-confirm"]
         type(" local-file ", into: field)
@@ -1121,10 +1115,9 @@ final class ExporterUITests: XCTestCase {
     }
 
     func testSensitiveTypeRequiresTypedDestinationNameAndStripsPadding() {
-        enterControls()
-        selectRootTab(1)
-        scrollToHittable(app.buttons["browser-select"]).tap()
-        let search = scrollToHittable(app.textFields["browser-search"])
+        enterData()
+        scrollData(app.buttons["browser-select"]).tap()
+        let search = scrollData(app.textFields["browser-search"])
         type("weight", into: search)
         dismissKeyboard()
         let row = app.descendants(matching: .any)["browser-row-bodyMass"]
@@ -1159,7 +1152,7 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(field.waitForExistence(timeout: uiWait))
         type("local-file", into: field)
         dismissKeyboard()
-        let export = scrollToHittable(app.buttons["demo-export"])
+        let export = scrollStatus(app.buttons["demo-export"])
         XCTAssertTrue(export.isEnabled)
         export.tap()
         app.tap()
@@ -1215,7 +1208,7 @@ final class ExporterUITests: XCTestCase {
         app.launchEnvironment["OHE_SEED_DESTINATION_STATUS"] = "overdue"
         app.launch()
         enterControls()
-        let refresh = scrollToHittable(app.buttons["destination-refresh"])
+        let refresh = scrollStatus(app.buttons["destination-refresh"])
         refresh.tap()
         let banner = app.descendants(matching: .any)["export-overdue-banner"]
         XCTAssertTrue(
@@ -1242,9 +1235,9 @@ final class ExporterUITests: XCTestCase {
         )
         _ = scrollDestinations(app.textFields["https-url"])
         selectRootTab(0)
-        XCTAssertTrue(scrollToHittable(app.buttons["destination-refresh"]).exists)
+        XCTAssertTrue(scrollStatus(app.buttons["destination-refresh"]).exists)
         XCTAssertEqual(
-            scrollToHittable(app.staticTexts["destination-empty"]).label,
+            scrollStatus(app.staticTexts["destination-empty"]).label,
             "No destination snapshots yet."
         )
         XCTAssertFalse(app.otherElements["destination-change-banner"].exists)
@@ -1267,8 +1260,8 @@ final class ExporterUITests: XCTestCase {
             "-ohe.browserOnlyWithData", "false",
         ]
         app.launch()
-        enterControls()
-        let row = scrollToHittable(app.descendants(matching: .any)["browser-row-heartRate"])
+        enterData()
+        let row = scrollData(app.descendants(matching: .any)["browser-row-heartRate"])
         try performAccessibilityAudit("browser-permission-limited")
 
         row.tap()
@@ -1288,7 +1281,7 @@ final class ExporterUITests: XCTestCase {
             app.launchEnvironment["OHE_SEED_DESTINATION_STATUS"] = scenario
             app.launch()
             enterControls()
-            let refresh = scrollToHittable(app.buttons["destination-refresh"])
+            let refresh = scrollStatus(app.buttons["destination-refresh"])
             refresh.tap()
             let line = destinationStatusElement(0)
             XCTAssertTrue(
@@ -1305,7 +1298,7 @@ final class ExporterUITests: XCTestCase {
             app.launchEnvironment["OHE_SEED_DESTINATION_STATUS"] = scenario
             app.launch()
             enterControls()
-            let refresh = scrollToHittable(app.buttons["destination-refresh"])
+            let refresh = scrollStatus(app.buttons["destination-refresh"])
             refresh.tap()
             XCTAssertTrue(
                 destinationStatusElement(0)
@@ -1327,11 +1320,11 @@ final class ExporterUITests: XCTestCase {
         app.launchEnvironment["OHE_SEED_DESTINATION_STATUS"] = "all-states"
         app.launch()
         enterControls()
-        let refresh = scrollToHittable(app.buttons["destination-refresh"])
+        let refresh = scrollStatus(app.buttons["destination-refresh"])
         refresh.tap()
         var labels: [String] = []
         for index in 0 ..< 15 {
-            let line = scrollToHittable(destinationStatusElement(index))
+            let line = scrollStatus(destinationStatusElement(index))
             XCTAssertTrue(
                 line.waitForExistence(timeout: uiWait),
                 "no destination line \(index); available: \(visibleIdentifiers())"
@@ -1367,7 +1360,7 @@ final class ExporterUITests: XCTestCase {
         app.launchEnvironment["OHE_SEED_NOTIFICATION_AUTHORIZATION"] = "denied"
         app.launch()
         enterControls()
-        let refresh = scrollToHittable(app.buttons["destination-refresh"])
+        let refresh = scrollStatus(app.buttons["destination-refresh"])
         refresh.tap()
         XCTAssertTrue(
             app.descendants(matching: .any)["destination-change-banner"]
@@ -1391,11 +1384,11 @@ final class ExporterUITests: XCTestCase {
 
     func testStatusExportAndNoticeControlsAreIdentifiable() {
         enterControls()
-        XCTAssertTrue(scrollToHittable(app.buttons["r70-run"]).exists)
-        XCTAssertTrue(scrollToHittable(app.buttons["local-file-export"]).exists)
-        XCTAssertTrue(scrollToHittable(app.buttons["destination-enabled-notice"]).exists)
+        XCTAssertTrue(scrollStatus(app.buttons["r70-run"]).exists)
+        XCTAssertTrue(scrollStatus(app.buttons["local-file-export"]).exists)
+        XCTAssertTrue(scrollStatus(app.buttons["destination-enabled-notice"]).exists)
         XCTAssertTrue(
-            scrollToHittable(app.descendants(matching: .any)["advisory-fetch"]).exists
+            scrollStatus(app.descendants(matching: .any)["advisory-fetch"]).exists
         )
     }
 
@@ -1412,7 +1405,7 @@ final class ExporterUITests: XCTestCase {
         )
         try performAccessibilityAudit("anchor-hold-banner")
         enterControls()
-        _ = scrollToHittable(app.staticTexts["anchor-hold-explanation-0"])
+        _ = scrollStatus(app.staticTexts["anchor-hold-explanation-0"])
         try performAccessibilityAudit("anchor-hold-explanation")
     }
 
@@ -1456,6 +1449,16 @@ final class ExporterUITests: XCTestCase {
         selectRootTab(2)
     }
 
+    private func enterData() {
+        enterControls()
+        selectRootTab(1)
+    }
+
+    private func enterHistory() {
+        enterControls()
+        selectRootTab(3)
+    }
+
     /// QA-27 exercises structure and accessibility under localization expansion and
     /// mirrored layout. It intentionally avoids pixel snapshots: identifiers and
     /// accessibility audits remain stable across SDK font/rasterization changes while
@@ -1490,8 +1493,8 @@ final class ExporterUITests: XCTestCase {
         _ configuration: String
     ) throws {
         launchLocalized(arguments)
-        enterControls()
-        let search = scrollToHittable(app.textFields["browser-search"])
+        enterData()
+        let search = scrollData(app.textFields["browser-search"])
         type("no-such-health-type", into: search)
         XCTAssertTrue(app.staticTexts["browser-empty"].waitForExistence(timeout: uiWait))
         dismissKeyboard()
@@ -1507,7 +1510,7 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(scrollDestinations(app.staticTexts["destination-title"]).exists)
         try performAccessibilityAudit("\(configuration)-destinations")
         selectRootTab(3)
-        XCTAssertTrue(scrollToHittable(app.buttons["history-load"]).exists)
+        XCTAssertTrue(scrollHistory(app.buttons["history-load"]).exists)
         app.buttons["history-load"].tap()
         try performAccessibilityAudit("\(configuration)-history")
     }
@@ -1633,7 +1636,7 @@ final class ExporterUITests: XCTestCase {
     private static let navigationScrollEdgeEffectHeight: CGFloat = 56
 
     private func filterBrowserToHeartRate() {
-        let search = scrollToHittable(app.textFields["browser-search"])
+        let search = scrollData(app.textFields["browser-search"])
         type("heart", into: search)
         dismissKeyboard()
     }
@@ -1733,8 +1736,12 @@ final class ExporterUITests: XCTestCase {
         }
     }
 
+    private func settingsCloseControl() -> XCUIElement {
+        app.descendants(matching: .any)["settings-close"]
+    }
+
     private func dismissSettingsIfNeeded() {
-        let close = app.buttons["settings-close"]
+        let close = settingsCloseControl()
         if close.exists, close.isHittable {
             close.tap()
         }
@@ -1798,15 +1805,48 @@ final class ExporterUITests: XCTestCase {
     }
 
     @discardableResult
-    private func openSettingsSheet() -> Bool {
-        if app.buttons["settings-close"].exists { return true }
-        selectRootTab(0)
-        let settings = app.buttons["status-settings"]
-        guard settings.waitForExistence(timeout: uiWait), settings.isHittable else {
-            return false
+    private func scrollData(_ element: XCUIElement) -> XCUIElement {
+        scrollToHittable(element, on: 1)
+    }
+
+    @discardableResult
+    private func scrollStatus(_ element: XCUIElement) -> XCUIElement {
+        scrollToHittable(element, on: 0)
+    }
+
+    @discardableResult
+    private func scrollHistory(_ element: XCUIElement) -> XCUIElement {
+        scrollToHittable(element, on: 3)
+    }
+
+    @discardableResult
+    private func scrollSettings(_ element: XCUIElement) -> XCUIElement {
+        XCTAssertTrue(openSettingsSheet(), "settings did not open")
+        if isReachable(
+            element,
+            scrolls: 40,
+            preferredScroll: "settings-scroll",
+            huntIfMissing: true
+        ) {
+            return element
         }
+        XCTAssertTrue(
+            elementIsCurrentlyReachable(element),
+            "control never became reachable in Settings"
+        )
+        return element
+    }
+
+    @discardableResult
+    private func openSettingsSheet() -> Bool {
+        if settingsCloseControl().exists { return true }
+        if app.scrollViews["settings-scroll"].exists { return true }
+        selectRootTab(0)
+        let settings = scrollStatus(app.buttons["status-open-settings"])
+        guard settings.exists else { return false }
         settings.tap()
-        return app.buttons["settings-close"].waitForExistence(timeout: uiWait)
+        return settingsCloseControl().waitForExistence(timeout: uiWait)
+            || app.scrollViews["settings-scroll"].waitForExistence(timeout: uiWait)
     }
 
     private func isReachable(
