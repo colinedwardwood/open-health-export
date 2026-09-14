@@ -22,7 +22,9 @@ struct ExportRunCheck {
         do {
             try await run()
         } catch {
-            FileHandle.standardError.write(Data("exportruncheck failed: \(error)\n".utf8))
+            let message = "exportruncheck failed: \(error)\n"
+            FileHandle.standardError.write(Data(message.utf8))
+            FileHandle.standardOutput.write(Data(message.utf8))
             exit(1)
         }
     }
