@@ -229,11 +229,19 @@ final class ExporterUITests: XCTestCase {
         app.launchEnvironment["OHE_SEED_HISTORY_PAYLOAD"] = "1"
         app.launchEnvironment["OHE_HISTORY_PAYLOAD_AUTH"] = "skip"
         app.launch()
-        enterControls()
-        let load = scrollToHittable(app.buttons["history-load"])
+        enterHistory()
+        let load = scrollHistory(app.buttons["history-load"])
         load.tap()
         let reveal = app.buttons["history-reveal-payload-0"]
-        XCTAssertTrue(reveal.waitForExistence(timeout: uiWait))
+        for _ in 0 ..< 8 where !reveal.waitForExistence(timeout: 2) {
+            if load.exists, load.isHittable {
+                load.tap()
+            }
+        }
+        XCTAssertTrue(
+            reveal.waitForExistence(timeout: uiWait),
+            visibleIdentifiers().joined(separator: ",")
+        )
         XCTAssertFalse(
             app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")).firstMatch.exists
         )

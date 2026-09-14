@@ -1535,7 +1535,7 @@ enum HarnessExport {
             samplesRead: 4,
             samplesCommitted: 4,
             samplesAcked: 0,
-            wallTimeEpoch: 100,
+            wallTimeEpoch: Date().timeIntervalSince1970,
             errorClass: "destinationUnreachable",
             facts: RunHistoryFacts(
                 destinationID: "https",

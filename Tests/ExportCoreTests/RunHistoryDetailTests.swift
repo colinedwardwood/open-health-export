@@ -84,6 +84,7 @@ import Testing
     #expect(view.contains("revealPayload: revealed"))
     #expect(view.contains("LocalAuthenticationAdapter()"))
     #expect(export.contains("prepareHistoryPayloadSeedForUITests"))
+    #expect(export.contains("wallTimeEpoch: Date().timeIntervalSince1970"))
 }
 
 @Test func runHistoryFactsRoundTripThroughJSON() {
