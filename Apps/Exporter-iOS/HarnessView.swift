@@ -1540,6 +1540,7 @@ struct HarnessView: View {
                 Text(WipeCopy.noneReceived)
                     .font(.footnote)
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("wipe-none-received")
             } else {
                 ForEach(Array(wipeInventory.received.enumerated()), id: \.offset) { index, range in
                     Text(WipeCopy.receivedLine(range))
@@ -1555,9 +1556,11 @@ struct HarnessView: View {
             Text(WipeCopy.healthPath)
                 .font(.footnote)
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("wipe-health-path")
             Text(WipeCopy.macLimit)
                 .font(.footnote)
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("wipe-mac-limit")
             Button(stopHeartRateArmed ? "Confirm: stop exporting heart rate" : "Stop exporting heart rate") {
                 if stopHeartRateArmed {
                     Task { await stopHeartRate() }

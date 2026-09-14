@@ -127,13 +127,13 @@ final class ExporterUITests: XCTestCase {
             app.staticTexts["wipe-health-limit"].label,
             "We cannot turn off our own Health access."
         )
-        XCTAssertTrue(
-            app.staticTexts.containing(
-                NSPredicate(
-                    format: "label CONTAINS %@",
-                    "Health → your profile picture → Privacy → Apps"
-                )
-            ).firstMatch.exists
+        XCTAssertEqual(
+            scrollToHittable(app.staticTexts["wipe-health-path"]).label,
+            "To turn access off: Health → your profile picture → Privacy → Apps → Open Health Exporter."
+        )
+        XCTAssertEqual(
+            scrollToHittable(app.staticTexts["wipe-mac-limit"]).label,
+            "A Mac companion keeps its own copy. Use Delete everything received there. Deleting here does not reach it."
         )
         wipe.tap()
         XCTAssertTrue(app.buttons["health-request"].exists)
