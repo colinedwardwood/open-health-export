@@ -1631,10 +1631,18 @@ final class ExporterUITests: XCTestCase {
     /// SDK-owned finding into an unexplained contrast failure on one simulator only.
     private func suppressionCause(for element: XCUIElement) -> String? {
         let frame = element.frame
+        let navigationFade = app.scrollViews["settings-scroll"].exists
+            ? Self.settingsNavigationScrollEdgeEffectHeight
+            : Self.navigationScrollEdgeEffectHeight
         for bar in app.navigationBars.allElementsBoundByIndex where bar.exists {
-            if frame.minY < bar.frame.maxY + Self.navigationScrollEdgeEffectHeight {
+            if frame.minY < bar.frame.maxY + navigationFade {
                 return "behindNavigationBar"
             }
+        }
+        if app.scrollViews["settings-scroll"].exists,
+           frame.minY < Self.settingsNavigationScrollEdgeEffectHeight
+        {
+            return "behindNavigationBar"
         }
         let tabBar = app.tabBars.firstMatch
         if tabBar.exists, frame.maxY > tabBar.frame.minY - Self.scrollEdgeEffectHeight {
@@ -1689,6 +1697,9 @@ final class ExporterUITests: XCTestCase {
     /// bands reported as app contrast defects.
     private static let scrollEdgeEffectHeight: CGFloat = 32
     private static let navigationScrollEdgeEffectHeight: CGFloat = 56
+    /// Presented Settings uses a taller scroll-edge material than the root Status
+    /// bar. JSON under that fade was scoring Contrast nearly passed at y≈248.
+    private static let settingsNavigationScrollEdgeEffectHeight: CGFloat = 200
 
     private func filterBrowserToHeartRate() {
         let search = scrollData(app.textFields["browser-search"])

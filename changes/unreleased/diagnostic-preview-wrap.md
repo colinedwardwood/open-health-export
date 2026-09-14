@@ -1,3 +1,2 @@
-The diagnostic JSON preview pretty-prints and wraps. Selectable monospace
-lines use primary color so the SEC-45 audit does not score them as nearly
-failing contrast.
+The diagnostic JSON preview pretty-prints and wraps. Settings-sheet audits
+use a taller navigation fade band than Status, matching the presented chrome.
