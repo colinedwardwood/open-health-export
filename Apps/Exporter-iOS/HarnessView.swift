@@ -276,10 +276,7 @@ struct HarnessView: View {
                         .font(.footnote)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
-                .background(.yellow)
-                .fixedSize(horizontal: false, vertical: true)
+                .attentionBanner()
                 .accessibilityIdentifier("export-overdue-banner")
             }
         }
@@ -293,10 +290,7 @@ struct HarnessView: View {
                         .font(.footnote)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
-                .background(.yellow)
-                .fixedSize(horizontal: false, vertical: true)
+                .attentionBanner()
                 .accessibilityIdentifier("destination-change-banner")
             }
         }
@@ -310,10 +304,7 @@ struct HarnessView: View {
                         .font(.footnote)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
-                .background(.yellow)
-                .fixedSize(horizontal: false, vertical: true)
+                .attentionBanner()
                 .accessibilityIdentifier("anchor-hold-banner")
             }
         }
@@ -1099,10 +1090,11 @@ struct HarnessView: View {
                             .foregroundStyle(.primary)
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .accessibilityElement(children: .combine)
                     .accessibilityIdentifier("destination-status-\(index)")
                     .accessibilityHint("Shows the error cause and fix when this destination needs attention.")
                 }
@@ -1569,6 +1561,8 @@ struct HarnessView: View {
             Text("Acknowledgements")
                 .font(.headline)
                 .foregroundStyle(.primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("acknowledgements-title")
             Text(acknowledgementsText)
                 .font(.footnote)
@@ -1755,7 +1749,6 @@ struct HarnessView: View {
             Button("Build diagnostic bundle") {
                 buildDiagnostic()
             }
-            .buttonStyle(.bordered)
             .frame(minHeight: 44)
             .foregroundStyle(.primary)
             .accessibilityIdentifier("diagnostic-build")
@@ -3924,5 +3917,17 @@ private struct HarnessButtonStyle: ButtonStyle {
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .contentShape(Rectangle())
             .opacity(configuration.isPressed ? 0.7 : 1)
+    }
+}
+
+private extension View {
+    func attentionBanner() -> some View {
+        self
+            .foregroundStyle(.black)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+            .background(Color(red: 1, green: 0.92, blue: 0.2))
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityElement(children: .combine)
     }
 }
