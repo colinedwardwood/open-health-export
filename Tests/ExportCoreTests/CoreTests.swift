@@ -50,6 +50,35 @@ private struct DeviceLockedSource: SampleSource {
     #expect(ErrorClassManifest.record(for: .budgetExhausted).scheduleFailure)
 }
 
+@Test func ar14BatchSequenceIsMonotonicAndScopedToTheExporter() async throws {
+    let memory = MemoryStateStore()
+    #expect(try await memory.transact {
+        try $0.reserveBatchSequence(exporterID: "a")
+    } == 1)
+    #expect(try await memory.transact {
+        try $0.reserveBatchSequence(exporterID: "a")
+    } == 2)
+    #expect(try await memory.transact {
+        try $0.reserveBatchSequence(exporterID: "b")
+    } == 1)
+
+    let path = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-sequence-\(UUID().uuidString).sqlite").path
+    defer { try? FileManager.default.removeItem(atPath: path) }
+    do {
+        let store = try SQLiteStateStore(path: path)
+        #expect(try await store.transact {
+            try $0.reserveBatchSequence(exporterID: "persistent")
+        } == 1)
+    }
+    do {
+        let reopened = try SQLiteStateStore(path: path)
+        #expect(try await reopened.transact {
+            try $0.reserveBatchSequence(exporterID: "persistent")
+        } == 2)
+    }
+}
+
 @Test func lockedStoreReadRecordsBlockedJournalOutcome() async throws {
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-store-locked-\(UUID().uuidString)")

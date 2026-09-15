@@ -569,8 +569,15 @@ public struct EmittedIndexRow: Sendable, Equatable {
     }
 }
 
+public enum BatchSequenceError: Error, Sendable, Equatable {
+    case exhausted
+}
+
 public protocol StateTransaction: AnyObject {
     func loadCursor(metric: MetricID) throws -> CursorSnapshot?
+    /// AR-14: durable, installation-scoped batch sequence. Gaps are permitted;
+    /// reuse or reset is not.
+    func reserveBatchSequence(exporterID: String) throws -> Int
     func loadBackfillCheckpoint(jobID: String) throws -> Data?
     func upsertBackfillCheckpoint(jobID: String, bytes: Data) throws
     func enqueuePending(_ batch: PendingBatch) throws

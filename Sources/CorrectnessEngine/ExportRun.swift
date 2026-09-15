@@ -258,6 +258,9 @@ public struct ExportRun: Sendable {
             }
         )
         var wireEnvelope = envelope
+        wireEnvelope.seq = try await store.transact {
+            try $0.reserveBatchSequence(exporterID: envelope.exporterId)
+        }
         wireEnvelope.completeThrough = page.observedThrough.ISO8601Format()
         let horizonBound = try await store.transact { tx -> String? in
             let stored = try tx.loadVerifiedThroughDay(metric: metric)
@@ -788,13 +791,17 @@ public struct ExportRun: Sendable {
         }
         let identity = Data("ohe.characteristic.v1:\(snapshot.characteristicId):\(snapshot.value)".utf8)
         let batchID = NativeWire.batchID(metric: metric, anchorBlob: identity)
+        var wireEnvelope = envelope
+        wireEnvelope.seq = try await store.transact {
+            try $0.reserveBatchSequence(exporterID: envelope.exporterId)
+        }
         let payload = try NativeWire.encode(
             samples: [],
             tombstones: [],
             characteristics: [snapshot],
             metric: metric,
             batchID: batchID,
-            envelope: envelope
+            envelope: wireEnvelope
         )
         let payloadURL = scratchDirectory.appendingPathComponent(
             NativeWire.outputFileName(batchID: batchID, demo: envelope.demo)

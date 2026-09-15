@@ -257,6 +257,9 @@ public struct ReconcileSweep: Sendable {
 
         var wire = envelope
         wire.reason = reason
+        wire.seq = try await store.transact {
+            try $0.reserveBatchSequence(exporterID: envelope.exporterId)
+        }
         let horizonBound = try await store.transact { tx -> String? in
             let stored = try tx.loadVerifiedThroughDay(metric: metric)
             let horizon = try tx.loadIndexHorizonDay()

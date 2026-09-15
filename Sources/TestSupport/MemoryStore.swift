@@ -26,6 +26,7 @@ public final class MemoryTransaction: StateTransaction {
     public var destinationBreakers: [String: Data] = [:]
     public var freshnessLatencies: [RunFreshnessLatency] = []
     public var openRuns: [String: OpenRun] = [:]
+    public var batchSequences: [String: Int] = [:]
     private var pendingOrder: [BatchID] = []
 
     public init() {}
@@ -38,6 +39,14 @@ public final class MemoryTransaction: StateTransaction {
             epoch: checkpoint.epoch,
             anchorBlob: checkpoint.adapterAnchor
         )
+    }
+
+    public func reserveBatchSequence(exporterID: String) throws -> Int {
+        let (next, overflow) = (batchSequences[exporterID] ?? 0)
+            .addingReportingOverflow(1)
+        guard !overflow else { throw BatchSequenceError.exhausted }
+        batchSequences[exporterID] = next
+        return next
     }
 
     public func loadBackfillCheckpoint(jobID: String) throws -> Data? {
