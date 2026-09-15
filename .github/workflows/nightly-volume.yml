@@ -7,6 +7,13 @@ on:
   schedule:
     - cron: "41 5 * * *"
     - cron: "17 4 * * 0"
+
+concurrency:
+  # T2 is a six-hour job. A manual dispatch landing on top of the nightly run
+  # otherwise generated fifty million records twice at once. Queue instead of
+  # cancelling: the run already underway is the one closest to producing evidence.
+  group: nightly-volume-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   tier-one-corpus:
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '41 5 * * *'
