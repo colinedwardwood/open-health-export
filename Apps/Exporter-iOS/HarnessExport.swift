@@ -881,7 +881,12 @@ enum HarnessExport {
             )
         }
         if trigger == .appForeground || trigger == .launch {
-            lines.append(contentsOf: try await maybeScheduledFullReconcile(store: store))
+            lines.append(
+                contentsOf: try await maybeScheduledFullReconcile(
+                    store: store,
+                    trigger: trigger
+                )
+            )
         }
         for (destinationID, emission) in traceparentEmissions where emission.autoDisabled {
             if destinationID == "companion" {
@@ -916,7 +921,10 @@ enum HarnessExport {
 
     /// O-9: a low-priority full reconcile on a daily cadence, skipped when the
     /// queue is already in I6 Amber so live deltas are not evicted.
-    private static func maybeScheduledFullReconcile(store: any StateStore) async throws -> [String] {
+    private static func maybeScheduledFullReconcile(
+        store: any StateStore,
+        trigger: RunTrigger
+    ) async throws -> [String] {
         let queued = try await store.transact { try $0.queuedBytes() }
         if !CatchUpAdmission.allows(queuedBytes: queued) {
             return ["scheduled full reconcile skipped: catch_up_parked"]
@@ -928,7 +936,7 @@ enum HarnessExport {
         guard ScheduledReconcile.due(lastEpoch: lastEpoch, nowEpoch: nowEpoch) else {
             return []
         }
-        let lines = try await runFullReconcile()
+        let lines = try await runFullReconcile(trigger: trigger)
         defaults.set(nowEpoch, forKey: lastScheduledFullReconcileEpochKey)
         return ["scheduled full reconcile"] + lines
     }
@@ -1047,30 +1055,37 @@ enum HarnessExport {
         )
     }
 
+    /// R-08's history half. A full reconcile repairs what a delta cannot see, so
+    /// running it against the archive folder alone would leave every other sink with
+    /// history nobody ever repairs.
     static func runFullReconcile(
         metrics: [MetricID]? = nil,
+        trigger: RunTrigger = .manual,
         onProgress: (@Sendable (Int, Int) async -> Void)? = nil
     ) async throws -> [String] {
-        defer { synchronizeDestinationExportRole("local-file") }
-        let scope = try await destinationScope("local-file")
-        try ExportScopeGate.requireConfigured(scope)
-        let metrics = metrics ?? scope.metrics.sorted { $0.rawValue < $1.rawValue }
-        for metric in metrics {
-            try ExportScopeGate.require(metric: metric, scope: scope)
+        let plannedIDs = healthDestinationIDs.filter {
+            isDestinationEnabled($0) && allowsExport($0, trigger: trigger)
+        }
+        guard !plannedIDs.isEmpty else {
+            return [
+                "manualOnly: Full reconcile skipped. This installation allows explicit exports only."
+            ]
+        }
+        defer {
+            for destinationID in plannedIDs {
+                synchronizeDestinationExportRole(destinationID)
+            }
         }
         let root = try applicationSupportRoot()
-        let folderAccess = try localExportFolder(root: root)
+        var folderAccess: SecurityScopedAccess?
+        if plannedIDs.contains("local-file") {
+            folderAccess = try localExportFolder(root: root)
+        }
         defer { withExtendedLifetime(folderAccess) {} }
-        let dest = folderAccess.url
         let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
         let store = try SQLiteStateStore(
             path: root.appendingPathComponent("state.sqlite").path
         )
-        let (verified, events) = try verifiedLocalFile(
-            root: root,
-            destinationDirectory: dest
-        )
-        try await emitTrustNotices(events)
         let context = TemporalContext.utcHost
         let observations = HealthKitDayObservationSource(
             context: context,
@@ -1081,41 +1096,62 @@ enum HarnessExport {
         let exporterID = try installationID()
         let seal = ledgerHeadSeal()
         var lines: [String] = []
-        for (index, metric) in metrics.enumerated() {
-            await onProgress?(index + 1, metrics.count)
-            let outcome = try await ReconcileSweep(
-                observations: observations,
-                destination: verified,
-                store: store,
-                metric: metric,
-                scratchDirectory: scratch,
-                destinationName: "local-file",
-                envelope: WireEnvelope(
-                    exporterId: exporterID,
-                    seq: 1,
-                    emittedAt: now,
-                    observedAt: now
+        for destinationID in plannedIDs {
+            guard
+                let (destination, _) = try? await makeAutomaticRunDestination(
+                    destinationID,
+                    trigger: trigger,
+                    root: root,
+                    folderAccess: folderAccess
                 ),
-                temporal: context,
-                statistics: statistics,
-                trigger: .manual,
-                snapshotURL: StatusSnapshotLocation.url(destinationID: "local-file"),
-                externalStatusURL: dest.appendingPathComponent("status.json"),
-                ledgerHeadSeal: seal,
-                ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
-                scope: scope,
-                freshnessCadenceSeconds: freshnessCadenceSeconds(),
-            deferForLowPower: isLowPowerDeferred()
-            ).runFullHistory(throughDay: String(now.prefix(10)))
-            await notifyIfFailed(
-                outcome,
-                destinationID: "local-file",
-                destinationLabel: "Archive folder"
-            )
-            lines.append("\(metric.rawValue) full reconcile: \(outcome.kind.rawValue)")
+                // A sink with no transport in this context keeps its queued
+                // obligations; reconciling it here would have nowhere to send.
+                destination.attemptNow
+            else { continue }
+            let scope = try await destinationScope(destinationID)
+            let owed = metrics ?? scope.metrics.sorted { $0.rawValue < $1.rawValue }
+            for (index, metric) in owed.enumerated() {
+                guard scope.metrics.contains(metric) else { continue }
+                await onProgress?(index + 1, owed.count)
+                let outcome = try await ReconcileSweep(
+                    observations: observations,
+                    destination: destination.destination,
+                    store: store,
+                    metric: metric,
+                    scratchDirectory: scratch,
+                    destinationName: destinationID,
+                    envelope: WireEnvelope(
+                        exporterId: exporterID,
+                        seq: 1,
+                        emittedAt: now,
+                        observedAt: now
+                    ),
+                    temporal: context,
+                    statistics: statistics,
+                    trigger: trigger,
+                    snapshotURL: destination.snapshotURL,
+                    externalStatusURL: folderAccess?.url
+                        .appendingPathComponent("status.json"),
+                    ledgerHeadSeal: seal,
+                    ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
+                    scope: scope,
+                    freshnessCadenceSeconds: freshnessCadenceSeconds(),
+                    deferForLowPower: isLowPowerDeferred()
+                ).runFullHistory(throughDay: String(now.prefix(10)))
+                await notifyIfFailed(
+                    outcome,
+                    destinationID: destinationID,
+                    destinationLabel: destinationLabel(destinationID)
+                )
+                lines.append(
+                    "\(destinationID) \(metric.rawValue) full reconcile: \(outcome.kind.rawValue)"
+                )
+            }
         }
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
-        lines.append("Files: \(dest.path)")
+        if let dest = folderAccess?.url {
+            lines.append("Files: \(dest.path)")
+        }
         return lines
     }
 
