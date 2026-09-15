@@ -3921,6 +3921,10 @@ private struct HarnessButtonStyle: ButtonStyle {
 }
 
 private extension View {
+    /// Black on a deliberately light yellow. The banner has to clear the contrast
+    /// audit while still reading as a warning, and `.yellow` with default label
+    /// colour does not. Children stay individually addressable: the banners are
+    /// asserted by their inner copy, not only by the container identifier.
     func attentionBanner() -> some View {
         self
             .foregroundStyle(.black)
@@ -3928,6 +3932,5 @@ private extension View {
             .padding()
             .background(Color(red: 1, green: 0.92, blue: 0.2))
             .fixedSize(horizontal: false, vertical: true)
-            .accessibilityElement(children: .combine)
     }
 }
