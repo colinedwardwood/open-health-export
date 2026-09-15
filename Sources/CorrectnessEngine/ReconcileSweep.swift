@@ -39,6 +39,10 @@ public struct ReconcileSweep: Sendable {
     public var scope: DestinationExportScope?
     public var freshnessCadenceSeconds: TimeInterval
     public var deferForLowPower: Bool
+    /// AR-02 for the repair path. A day read once repairs every sink that was owed
+    /// it; sweeping per sink would read the same history N times and let the sinks
+    /// disagree about which observation they were repaired from.
+    public var destinations: [RunDestination]
 
     public init(
         observations: any DayObservationSource,
@@ -58,7 +62,8 @@ public struct ReconcileSweep: Sendable {
         ledgerSealURL: URL? = nil,
         scope: DestinationExportScope? = nil,
         freshnessCadenceSeconds: TimeInterval = FreshnessTarget.defaultCadenceSeconds,
-        deferForLowPower: Bool = false
+        deferForLowPower: Bool = false,
+        destinations: [RunDestination] = []
     ) {
         self.observations = observations
         self.destination = destination
@@ -78,6 +83,16 @@ public struct ReconcileSweep: Sendable {
         self.scope = scope
         self.freshnessCadenceSeconds = freshnessCadenceSeconds
         self.deferForLowPower = deferForLowPower
+        self.destinations = destinations.isEmpty
+            ? [
+                RunDestination(
+                    id: destinationName,
+                    destination: destination,
+                    scope: scope,
+                    snapshotURL: snapshotURL
+                ),
+            ]
+            : destinations
     }
 
     public func run(throughDay: String) async throws -> RunOutcome {
@@ -165,28 +180,18 @@ public struct ReconcileSweep: Sendable {
             try await record(outcome: outcome, tally: tally, receipt: nil)
             return outcome
         }
-        var permittedDays = days
-        if let scope {
-            try ExportScopeGate.require(metric: metric, scope: scope)
-            permittedDays = []
-            for day in days {
-                do {
-                    try ExportScopeGate.require(
-                        metric: metric,
-                        rangeStartDay: day,
-                        rangeEndDay: day,
-                        scope: scope
-                    )
-                    permittedDays.append(day)
-                } catch let violation as ExportScopeViolation {
-                    switch violation {
-                    case .rangeBeforeStart, .rangeAtOrAfterEnd:
-                        continue
-                    default:
-                        throw violation
-                    }
-                }
-            }
+        let owed = try owedDestinations()
+        if owed.isEmpty {
+            let tally = RunTally(nothingDue: true)
+            let outcome = RunOutcome.derive(from: tally)
+            try await record(outcome: outcome, tally: tally, receipt: nil)
+            return outcome
+        }
+        // The union of what the sinks asked for: one read covers all of them, and
+        // each sink's own window is applied again when its payload is projected.
+        var permittedDays: [String] = []
+        for day in days where owed.contains(where: { permits(day: day, scope: $0.scope) }) {
+            permittedDays.append(day)
         }
         if let status = try await store.transact({ try $0.loadTypeStatus(metric: metric) }),
            status.disabled {
@@ -306,13 +311,21 @@ public struct ReconcileSweep: Sendable {
                 incomingBytes: payload.count
             )
         )
-        let breaker = try await store.transact { tx in
-            RetryPolicy.age(
-                snapshot: try DestinationBreaker.load(from: tx, destinationID: destinationName),
-                now: clock.now()
-            )
+        // A parked sink keeps its obligation and is retried by the drain, so it no
+        // longer cancels the repair the other sinks are owed.
+        var attempting: [RunDestination] = []
+        for dest in owed where dest.attemptNow {
+            let breaker = try await store.transact { tx in
+                RetryPolicy.age(
+                    snapshot: try DestinationBreaker.load(from: tx, destinationID: dest.id),
+                    now: clock.now()
+                )
+            }
+            if CatchUpAdmission.allows(breaker: breaker) {
+                attempting.append(dest)
+            }
         }
-        if !CatchUpAdmission.allows(breaker: breaker) {
+        if attempting.isEmpty, owed.allSatisfy(\.attemptNow) {
             try? FileManager.default.removeItem(at: payloadURL)
             let tally = RunTally(
                 read: recordCount,
@@ -334,18 +347,32 @@ public struct ReconcileSweep: Sendable {
             try await record(outcome: outcome, tally: tally, receipt: nil)
             return outcome
         }
+        let extraStarts = aggregates.map(\.record.bucketStart)
+        let expectedByDestination = Dictionary(
+            uniqueKeysWithValues: owed.map {
+                (
+                    $0.id,
+                    FanoutPayload.expectedRecordCount(
+                        page: page,
+                        extraStarts: extraStarts,
+                        metric: metric,
+                        scope: $0.scope
+                    )
+                )
+            }
+        )
         let victims = try await store.transact { tx in
             let evicted = try QueueAdmission.makeRoom(for: pending.byteCount, on: tx)
             try tx.enqueueFanout(
                 pending,
-                destinations: [
+                destinations: try owed.map {
                     try FanoutObligation.destination(
-                        id: destinationName,
+                        id: $0.id,
                         metric: metric,
-                        expectedRecords: pending.expectedRecords,
-                        scope: scope
-                    ),
-                ]
+                        expectedRecords: expectedByDestination[$0.id] ?? pending.expectedRecords,
+                        scope: $0.scope
+                    )
+                }
             )
             try Census.replaceObserved(page: censusPage, days: permittedDays, to: tx)
             try EmittedIndex.record(
@@ -366,27 +393,137 @@ public struct ReconcileSweep: Sendable {
         for victim in victims {
             try? FileManager.default.removeItem(atPath: victim.payloadURL)
         }
-        let receipt = try await DeliveryExecutor.send(
-            batch: pending,
-            destination: destination,
-            destinationName: destinationName,
-            store: store,
-            clock: clock,
-            scope: scope
-        )
+        var accepted = 0
+        var unconfirmed = 0
+        var statusOnly = false
+        var failed = 0
+        var terminalError = ErrorClass.none
+        var partialCause: String?
+        var receipts: [(RunDestination, DeliveryReceipt)] = []
+        var expectedOfAttempts = 0
+        var firstError: DestinationSendError?
+        for dest in attempting {
+            let expected = expectedByDestination[dest.id] ?? recordCount
+            expectedOfAttempts += expected
+            do {
+                let receipt = try await deliver(
+                    pending: pending,
+                    dest: dest,
+                    expectedRecords: expected
+                )
+                receipts.append((dest, receipt))
+                accepted += receipt.accepted
+                unconfirmed += receipt.unconfirmed
+                statusOnly = statusOnly || receipt.statusOnly
+            } catch let error as DestinationSendError {
+                failed += 1
+                terminalError = error.errorClass
+                partialCause = error.errorClass.rawValue
+                firstError = firstError ?? error
+            }
+        }
+        // A repair nobody could attempt in this context is not a repair that
+        // happened: the obligations stay, and the run says so.
+        let attemptedExpected = attempting.isEmpty ? recordCount : expectedOfAttempts
         var tally = RunTally(
-            read: recordCount,
+            read: attemptedExpected,
             committed: recordCount,
-            acked: receipt.accepted,
-            unconfirmed: receipt.unconfirmed,
-            ackEvidenceStatusOnly: receipt.statusOnly
+            acked: attempting.isEmpty ? recordCount : accepted,
+            unconfirmed: unconfirmed,
+            failed: failed,
+            terminalError: terminalError,
+            ackEvidenceStatusOnly: statusOnly
         )
-        if receipt.accepted < recordCount, receipt.unconfirmed == 0 {
+        tally.partialCause = partialCause
+        if failed == 0, accepted < attemptedExpected, unconfirmed == 0, !attempting.isEmpty {
             tally.partialCause = "receipt_short"
         }
         let outcome = RunOutcome.derive(from: tally)
-        try await record(outcome: outcome, tally: tally, receipt: receipt)
+        try await record(outcome: outcome, tally: tally, receipts: receipts)
+        if let firstError, receipts.isEmpty, attempting.count == 1 {
+            // A single-sink sweep still surfaces its transport failure to the caller
+            // exactly as it always has.
+            throw firstError
+        }
         return outcome
+    }
+
+    /// Which sinks this sweep repairs. A lone sink keeps the old behaviour of
+    /// refusing loudly when the metric is outside its scope; among several, a sink
+    /// that never asked for this metric is simply not owed the repair.
+    private func owedDestinations() throws -> [RunDestination] {
+        let allowed = destinations.filter { $0.role.allows(trigger) }
+        var matching: [RunDestination] = []
+        var lastScopeError: Error?
+        for dest in allowed {
+            guard let scope = dest.scope else {
+                matching.append(dest)
+                continue
+            }
+            do {
+                try ExportScopeGate.require(metric: metric, scope: scope)
+                matching.append(dest)
+            } catch {
+                lastScopeError = error
+            }
+        }
+        if matching.isEmpty, destinations.count == 1, let error = lastScopeError {
+            throw error
+        }
+        return matching
+    }
+
+    private func permits(day: String, scope: DestinationExportScope?) -> Bool {
+        guard let scope else { return true }
+        do {
+            try ExportScopeGate.require(
+                metric: metric,
+                rangeStartDay: day,
+                rangeEndDay: day,
+                scope: scope
+            )
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private func deliver(
+        pending: PendingBatch,
+        dest: RunDestination,
+        expectedRecords: Int
+    ) async throws -> DeliveryReceipt {
+        if expectedRecords == 0 {
+            return DeliveryReceipt(
+                batchID: pending.id,
+                accepted: 0,
+                statusOnly: false
+            )
+        }
+        var attempt = pending
+        let url = try FanoutPayload.attemptURL(
+            canonical: pending,
+            destinationID: dest.id,
+            expectedRecords: expectedRecords,
+            scope: dest.scope,
+            scratchDirectory: scratchDirectory
+        )
+        attempt.payloadURL = url.path
+        attempt.expectedRecords = expectedRecords
+        defer {
+            if url.path != pending.payloadURL {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
+        return try await DeliveryExecutor.send(
+            batch: attempt,
+            destination: dest.destination,
+            destinationName: dest.id,
+            store: store,
+            clock: clock,
+            scope: dest.scope,
+            skipRangeGate: url.path != pending.payloadURL
+        )
     }
 
     private func drainPlans(
@@ -418,20 +555,39 @@ public struct ReconcileSweep: Sendable {
         )
     }
 
-    private func record(outcome: RunOutcome, tally: RunTally, receipt: DeliveryReceipt?) async throws {
+    private func record(
+        outcome: RunOutcome,
+        tally: RunTally,
+        receipt: DeliveryReceipt?
+    ) async throws {
+        try await record(
+            outcome: outcome,
+            tally: tally,
+            receipts: receipt.map { [(destinations[0], $0)] } ?? []
+        )
+    }
+
+    private func record(
+        outcome: RunOutcome,
+        tally: RunTally,
+        receipts: [(RunDestination, DeliveryReceipt)]
+    ) async throws {
         let nowEpoch = clock.now().timeIntervalSince1970
-        var settlement = DeliverySettlement(batchReleased: false)
+        let parentRunID = RunID(rawValue: "reconcile-\(metric.rawValue)")
+        var settlements: [DeliverySettlement] = []
         try await store.transact { tx in
-            if let receipt {
-                settlement = try FanoutObligation.settle(
-                    receipt: receipt,
-                    destinationID: destinationName,
-                    on: tx
+            for (dest, receipt) in receipts {
+                settlements.append(
+                    try FanoutObligation.settle(
+                        receipt: receipt,
+                        destinationID: dest.id,
+                        on: tx
+                    )
                 )
             }
             try tx.appendJournal(
                 RunEvent(
-                    runID: RunID(rawValue: "reconcile-\(metric.rawValue)"),
+                    runID: parentRunID,
                     outcomeKind: outcome.kind.rawValue,
                     detail: outcome.partialCause ?? "",
                     trigger: trigger,
@@ -444,16 +600,53 @@ public struct ReconcileSweep: Sendable {
                         : tally.terminalError.rawValue
                 )
             )
-            try tx.appendLedger(
-                EgressEntry(
-                    destination: destinationName,
-                    sampleCount: tally.committed,
-                    outcomeKind: "run:\(outcome.kind.rawValue)",
-                    wallTimeEpoch: nowEpoch
+            // A repair that fanned out says what each sink did with it, under one
+            // parent row. A lone sink keeps the flat single row it always had.
+            if destinations.count > 1 {
+                let accepted = Dictionary(
+                    receipts.map { ($0.0.id, $0.1) },
+                    uniquingKeysWith: { _, latest in latest }
                 )
-            )
+                for dest in destinations {
+                    let receipt = accepted[dest.id]
+                    try tx.appendJournal(
+                        RunEvent(
+                            runID: RunID(rawValue: "\(parentRunID.rawValue)-\(dest.id)"),
+                            outcomeKind: receipt == nil
+                                ? RunEvent.queuedOutcomeKind
+                                : outcome.kind.rawValue,
+                            detail: receipt == nil ? "" : (outcome.partialCause ?? ""),
+                            trigger: trigger,
+                            samplesRead: tally.read,
+                            samplesCommitted: tally.committed,
+                            samplesAcked: receipt?.accepted ?? 0,
+                            wallTimeEpoch: nowEpoch,
+                            errorClass: receipt == nil
+                                ? nil
+                                : (tally.terminalError == .none ? nil : tally.terminalError.rawValue),
+                            facts: RunHistoryFacts(
+                                destinationID: dest.id,
+                                metric: metric.rawValue,
+                                parentRunID: parentRunID.rawValue
+                            )
+                        )
+                    )
+                }
+            }
+            for dest in destinations {
+                try tx.appendLedger(
+                    EgressEntry(
+                        destination: dest.id,
+                        sampleCount: tally.committed,
+                        outcomeKind: "run:\(outcome.kind.rawValue)",
+                        wallTimeEpoch: nowEpoch
+                    )
+                )
+            }
         }
-        FanoutObligation.unlink(settlement)
+        for settlement in settlements {
+            FanoutObligation.unlink(settlement)
+        }
         let queued = try await store.transact { try $0.queuedBytes() }
         try writeSnapshot(
             outcome: outcome,

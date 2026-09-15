@@ -4883,6 +4883,88 @@ private func anchorHoldFixture(
     #expect(payload.contains(recent.key.uuid))
 }
 
+@Test func aFullReconcileRepairsEveryDestinationFromOneHistoryRead() async throws {
+    let metric = MetricCatalog.heartRate.id
+    var old = heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+    old.start = "2023-12-01T10:00:00Z"
+    old.end = old.start
+    var recent = heartSample("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+    recent.start = "2024-01-01T10:00:00Z"
+    recent.end = recent.start
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-reconcile-fanout-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let wideDir = root.appendingPathComponent("wide")
+    let narrowDir = root.appendingPathComponent("narrow")
+    for dir in [wideDir, narrowDir] {
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    }
+    let observations = CountingFixtureDays(
+        byDay: [
+            "2023-12-01": [old],
+            "2024-01-01": [recent],
+        ]
+    )
+    let wideScope = try DestinationExportScope(
+        destinationID: "wide",
+        metrics: [metric],
+        startInclusive: ExportScopeGate.dayStartUTC("2023-12-01")
+    )
+    let narrowScope = try DestinationExportScope(
+        destinationID: "narrow",
+        metrics: [metric],
+        startInclusive: ExportScopeGate.dayStartUTC("2024-01-01")
+    )
+    let store = MemoryStateStore()
+    let outcome = try await ReconcileSweep(
+        observations: observations,
+        destination: .testing(LocalFileSink(directory: wideDir)),
+        store: store,
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch"),
+        envelope: testEnvelope(),
+        destinations: [
+            RunDestination(
+                id: "wide",
+                destination: .testing(LocalFileSink(directory: wideDir)),
+                scope: wideScope
+            ),
+            RunDestination(
+                id: "narrow",
+                destination: .testing(LocalFileSink(directory: narrowDir)),
+                scope: narrowScope
+            ),
+        ]
+    ).runFullHistory(throughDay: "2024-01-01")
+
+    #expect(outcome.kind == .success)
+    // Thirty-two days from 2023-12-01 through 2024-01-01, each read exactly once
+    // for both destinations. A sweep per destination would read all of them twice.
+    let dayReads = await observations.dayReads
+    #expect(dayReads == 32, "day reads: \(dayReads)")
+    func delivered(_ directory: URL) throws -> String {
+        try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "ndjson" }
+            .map { try String(contentsOf: $0, encoding: .utf8) }
+            .joined()
+    }
+    let wide = try delivered(wideDir)
+    let narrow = try delivered(narrowDir)
+    #expect(wide.contains(old.key.uuid))
+    #expect(wide.contains(recent.key.uuid))
+    // The narrower window still repairs, but only over the days it asked for.
+    #expect(!narrow.contains(old.key.uuid))
+    #expect(narrow.contains(recent.key.uuid))
+    let history = try store.transaction.loadJournal()
+    let parents = history.filter { !$0.isDestinationChild }
+    let children = history.filter(\.isDestinationChild)
+    #expect(parents.count == 1)
+    #expect(Set(children.compactMap(\.facts.destinationID)) == ["wide", "narrow"])
+    #expect(children.allSatisfy { $0.facts.parentRunID == parents[0].runID.rawValue })
+    // Both obligations settled, so nothing is still owed for that batch.
+    #expect(try store.transaction.pendingBatches().isEmpty)
+}
+
 @Test func catchUpAdmissionStopsAtSixtyPercentOfCap() {
     let policy = QueuePolicy.production
     #expect(policy.catchUpLimit == policy.cap * 3 / 5)

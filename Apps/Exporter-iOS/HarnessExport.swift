@@ -180,8 +180,9 @@ private struct HealthBackfillProcessor: BackfillChunkProcessor {
     var observations: HealthKitDayObservationSource
     var statistics: HealthKitStatisticsSource
     /// Every sink this job was planned for. History is the one read a user waits
-    /// minutes for, so an archive-only backfill would leave the other sinks
-    /// holding today's data and nothing before it.
+    /// minutes for: it is read once and fans out, so an archive-only backfill would
+    /// leave the other sinks holding today's data and nothing before it, and a
+    /// sweep per sink would multiply the read the R-75 budget measures.
     var destinations: [RunDestination]
     var store: any StateStore
     var scratchDirectory: URL
@@ -196,48 +197,44 @@ private struct HealthBackfillProcessor: BackfillChunkProcessor {
         days: [String],
         mode: BackfillMode
     ) async throws -> BackfillChunkResult {
-        var samplesRead = 0
-        var batchesEnqueued = 0
-        for destination in destinations {
-            if let scope = destination.scope, !scope.metrics.contains(metric) { continue }
-            let counted = CountingBackfillObservations(base: observations)
-            let now = Date().ISO8601Format()
-            let outcome = try await ReconcileSweep(
-                observations: counted,
-                destination: destination.destination,
-                store: store,
-                metric: metric,
-                scratchDirectory: scratchDirectory,
-                destinationName: destination.id,
-                envelope: WireEnvelope(
-                    exporterId: exporterID,
-                    seq: 1,
-                    emittedAt: now,
-                    observedAt: now
-                ),
-                temporal: temporal,
-                statistics: statistics,
-                trigger: .manual,
-                snapshotURL: destination.snapshotURL
-                    ?? StatusSnapshotLocation.url(destinationID: destination.id),
-                externalStatusURL: externalStatusDirectory?
-                    .appendingPathComponent("status.json"),
-                ledgerHeadSeal: ledgerHeadSeal,
-                ledgerSealURL: ledgerSealURL,
-                scope: destination.scope,
-                freshnessCadenceSeconds: HarnessExport.freshnessCadenceSeconds(),
-                deferForLowPower: HarnessExport.isLowPowerDeferred()
-            ).runBackfill(days: days, mode: mode)
-            // One chunk is one day of history: the sinks all read the same day, so
-            // the widest pass is the count, not the sum of the passes.
-            samplesRead = max(samplesRead, await counted.count())
-            if outcome.kind != RunOutcome.Kind.successNothingDue {
-                batchesEnqueued += 1
-            }
+        let owed = destinations.filter {
+            $0.scope.map { $0.metrics.contains(metric) } ?? true
         }
+        guard !owed.isEmpty else {
+            return BackfillChunkResult(samplesRead: 0, batchesEnqueued: 0)
+        }
+        let counted = CountingBackfillObservations(base: observations)
+        let now = Date().ISO8601Format()
+        let outcome = try await ReconcileSweep(
+            observations: counted,
+            destination: owed[0].destination,
+            store: store,
+            metric: metric,
+            scratchDirectory: scratchDirectory,
+            destinationName: owed[0].id,
+            envelope: WireEnvelope(
+                exporterId: exporterID,
+                seq: 1,
+                emittedAt: now,
+                observedAt: now
+            ),
+            temporal: temporal,
+            statistics: statistics,
+            trigger: .manual,
+            snapshotURL: owed[0].snapshotURL
+                ?? StatusSnapshotLocation.url(destinationID: owed[0].id),
+            externalStatusURL: externalStatusDirectory?
+                .appendingPathComponent("status.json"),
+            ledgerHeadSeal: ledgerHeadSeal,
+            ledgerSealURL: ledgerSealURL,
+            scope: owed[0].scope,
+            freshnessCadenceSeconds: HarnessExport.freshnessCadenceSeconds(),
+            deferForLowPower: HarnessExport.isLowPowerDeferred(),
+            destinations: owed
+        ).runBackfill(days: days, mode: mode)
         return BackfillChunkResult(
-            samplesRead: samplesRead,
-            batchesEnqueued: batchesEnqueued
+            samplesRead: await counted.count(),
+            batchesEnqueued: outcome.kind == RunOutcome.Kind.successNothingDue ? 0 : 1
         )
     }
 }
@@ -1137,7 +1134,7 @@ enum HarnessExport {
         let now = Date().ISO8601Format()
         let exporterID = try installationID()
         let seal = ledgerHeadSeal()
-        var lines: [String] = []
+        var destinations: [RunDestination] = []
         for destinationID in plannedIDs {
             guard
                 let (destination, _) = try? await makeAutomaticRunDestination(
@@ -1150,45 +1147,60 @@ enum HarnessExport {
                 // obligations; reconciling it here would have nowhere to send.
                 destination.attemptNow
             else { continue }
-            let scope = try await destinationScope(destinationID)
-            let owed = metrics ?? scope.metrics.sorted { $0.rawValue < $1.rawValue }
-            for (index, metric) in owed.enumerated() {
-                guard scope.metrics.contains(metric) else { continue }
-                await onProgress?(index + 1, owed.count)
-                let outcome = try await ReconcileSweep(
-                    observations: observations,
-                    destination: destination.destination,
-                    store: store,
-                    metric: metric,
-                    scratchDirectory: scratch,
-                    destinationName: destinationID,
-                    envelope: WireEnvelope(
-                        exporterId: exporterID,
-                        seq: 1,
-                        emittedAt: now,
-                        observedAt: now
-                    ),
-                    temporal: context,
-                    statistics: statistics,
-                    trigger: trigger,
-                    snapshotURL: destination.snapshotURL,
-                    externalStatusURL: folderAccess?.url
-                        .appendingPathComponent("status.json"),
-                    ledgerHeadSeal: seal,
-                    ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
-                    scope: scope,
-                    freshnessCadenceSeconds: freshnessCadenceSeconds(),
-                    deferForLowPower: isLowPowerDeferred()
-                ).runFullHistory(throughDay: String(now.prefix(10)))
+            destinations.append(destination)
+        }
+        guard !destinations.isEmpty else {
+            return ["blocked: No destination could be reconstructed for this reconcile."]
+        }
+        var lines: [String] = []
+        // One history read repairs every sink that was owed it. Sweeping per sink
+        // read the same days once per destination and let two sinks be repaired
+        // from two different observations of the same day.
+        let owed = metrics
+            ?? Set(destinations.compactMap(\.scope).flatMap(\.metrics))
+                .sorted { $0.rawValue < $1.rawValue }
+        for (index, metric) in owed.enumerated() {
+            let covering = destinations.filter {
+                $0.scope.map { $0.metrics.contains(metric) } ?? true
+            }
+            guard !covering.isEmpty else { continue }
+            await onProgress?(index + 1, owed.count)
+            let outcome = try await ReconcileSweep(
+                observations: observations,
+                destination: covering[0].destination,
+                store: store,
+                metric: metric,
+                scratchDirectory: scratch,
+                destinationName: covering[0].id,
+                envelope: WireEnvelope(
+                    exporterId: exporterID,
+                    seq: 1,
+                    emittedAt: now,
+                    observedAt: now
+                ),
+                temporal: context,
+                statistics: statistics,
+                trigger: trigger,
+                snapshotURL: covering[0].snapshotURL,
+                externalStatusURL: folderAccess?.url
+                    .appendingPathComponent("status.json"),
+                ledgerHeadSeal: seal,
+                ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
+                scope: covering[0].scope,
+                freshnessCadenceSeconds: freshnessCadenceSeconds(),
+                deferForLowPower: isLowPowerDeferred(),
+                destinations: covering
+            ).runFullHistory(throughDay: String(now.prefix(10)))
+            for destination in covering {
                 await notifyIfFailed(
                     outcome,
-                    destinationID: destinationID,
-                    destinationLabel: destinationLabel(destinationID)
-                )
-                lines.append(
-                    "\(destinationID) \(metric.rawValue) full reconcile: \(outcome.kind.rawValue)"
+                    destinationID: destination.id,
+                    destinationLabel: destinationLabel(destination.id)
                 )
             }
+            lines.append(
+                "\(covering.map(\.id).joined(separator: ",")) \(metric.rawValue) full reconcile: \(outcome.kind.rawValue)"
+            )
         }
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
         if let dest = folderAccess?.url {
@@ -1432,7 +1444,7 @@ enum HarnessExport {
         let context = TemporalContext.utcHost
         let now = Date().ISO8601Format()
         let exporterID = try installationID()
-        var kinds: [RunOutcome.Kind] = []
+        var owed: [RunDestination] = []
         for destinationID in plannedIDs {
             guard
                 let (destination, _) = try? await makeAutomaticRunDestination(
@@ -1444,45 +1456,49 @@ enum HarnessExport {
                 destination.attemptNow,
                 destination.scope?.metrics.contains(gap.metric) ?? true
             else { continue }
-            let outcome = try await ReconcileSweep(
-                observations: HealthKitDayObservationSource(
-                    context: context,
-                    limit: samplePageLimit()
-                ),
-                destination: destination.destination,
-                store: store,
-                metric: gap.metric,
-                scratchDirectory: scratch,
-                destinationName: destinationID,
-                envelope: WireEnvelope(
-                    exporterId: exporterID,
-                    seq: 1,
-                    emittedAt: now,
-                    observedAt: now
-                ),
-                temporal: context,
-                statistics: HealthKitStatisticsSource(context: context),
-                trigger: .manual,
-                snapshotURL: destination.snapshotURL,
-                externalStatusURL: folderAccess?.url
-                    .appendingPathComponent("status.json"),
-                ledgerHeadSeal: ledgerHeadSeal(),
-                ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
-                scope: destination.scope,
-                freshnessCadenceSeconds: freshnessCadenceSeconds(),
-                deferForLowPower: isLowPowerDeferred()
-            ).run(gap: gap)
+            owed.append(destination)
+        }
+        guard !owed.isEmpty else { return .successNothingDue }
+        // The gap is a range of days, not a destination's problem: read it once and
+        // re-export it to everyone who was owed it.
+        let outcome = try await ReconcileSweep(
+            observations: HealthKitDayObservationSource(
+                context: context,
+                limit: samplePageLimit()
+            ),
+            destination: owed[0].destination,
+            store: store,
+            metric: gap.metric,
+            scratchDirectory: scratch,
+            destinationName: owed[0].id,
+            envelope: WireEnvelope(
+                exporterId: exporterID,
+                seq: 1,
+                emittedAt: now,
+                observedAt: now
+            ),
+            temporal: context,
+            statistics: HealthKitStatisticsSource(context: context),
+            trigger: .manual,
+            snapshotURL: owed[0].snapshotURL,
+            externalStatusURL: folderAccess?.url
+                .appendingPathComponent("status.json"),
+            ledgerHeadSeal: ledgerHeadSeal(),
+            ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
+            scope: owed[0].scope,
+            freshnessCadenceSeconds: freshnessCadenceSeconds(),
+            deferForLowPower: isLowPowerDeferred(),
+            destinations: owed
+        ).run(gap: gap)
+        for destination in owed {
             await notifyIfFailed(
                 outcome,
-                destinationID: destinationID,
-                destinationLabel: destinationLabel(destinationID)
+                destinationID: destination.id,
+                destinationLabel: destinationLabel(destination.id)
             )
-            kinds.append(outcome.kind)
         }
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
-        // One line for a repair that had to satisfy several sinks: the worst result
-        // decides, so a sink that failed is not hidden by one that succeeded.
-        return CombinedExportSummary.kind(kinds)
+        return outcome.kind
     }
 
     static func runDemoDataset(typedDestinationName: String) async throws -> [String] {

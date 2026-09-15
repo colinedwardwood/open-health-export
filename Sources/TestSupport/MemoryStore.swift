@@ -605,6 +605,35 @@ public struct FixtureDays: BoundedDayObservationSource, Sendable {
     }
 }
 
+private actor ReadCounter {
+    var count = 0
+    func increment() { count += 1 }
+}
+
+/// Counts day reads so a fan-out repair can prove it read the history once for
+/// all of its destinations rather than once per destination.
+public final class CountingFixtureDays: BoundedDayObservationSource, @unchecked Sendable {
+    public let base: FixtureDays
+    private let counter = ReadCounter()
+
+    public init(byDay: [String: [SampleRecord]]) {
+        self.base = FixtureDays(byDay: byDay)
+    }
+
+    public var dayReads: Int {
+        get async { await counter.count }
+    }
+
+    public func samples(metric: MetricID, day: String) async throws -> [SampleRecord] {
+        await counter.increment()
+        return try await base.samples(metric: metric, day: day)
+    }
+
+    public func availableDayRange(metric: MetricID) async throws -> ClosedRange<String>? {
+        try await base.availableDayRange(metric: metric)
+    }
+}
+
 public struct FixtureStatistics: StatisticsSource, Sendable {
     public var byDay: [String: AggregateRecord]
     public init(byDay: [String: AggregateRecord]) { self.byDay = byDay }
