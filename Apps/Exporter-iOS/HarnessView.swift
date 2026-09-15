@@ -3041,9 +3041,9 @@ struct HarnessView: View {
         phase = .working
         status = NamedWorkProgress.reexport(current: 1, total: 1)
         do {
-            let outcome = try await HarnessExport.reExportQueueGap(gap)
+            let kind = try await HarnessExport.reExportQueueGap(gap)
             await refreshLedgerIntegrity()
-            status = "Ready. Gap re-export finished: \(outcome.kind.rawValue)."
+            status = "Ready. Gap re-export finished: \(kind.rawValue)."
         } catch {
             status = "Failed: \(error.localizedDescription)"
         }

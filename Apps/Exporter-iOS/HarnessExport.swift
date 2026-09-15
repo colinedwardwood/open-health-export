@@ -1327,50 +1327,77 @@ enum HarnessExport {
         WidgetCenter.shared.reloadAllTimelines()
     }
 
-    static func reExportQueueGap(_ gap: GapRecord) async throws -> RunOutcome {
+    /// An evicted batch was owed to every destination that was planned when it was
+    /// read, so re-exporting the gap to the archive folder alone would leave the other
+    /// sinks permanently short those records.
+    static func reExportQueueGap(_ gap: GapRecord) async throws -> RunOutcome.Kind {
+        let plannedIDs = healthDestinationIDs.filter {
+            isDestinationEnabled($0) && allowsExport($0, trigger: .manual)
+        }
         let root = try applicationSupportRoot()
-        let folderAccess = try localExportFolder(root: root)
+        var folderAccess: SecurityScopedAccess?
+        if plannedIDs.contains("local-file") {
+            folderAccess = try localExportFolder(root: root)
+        }
         defer { withExtendedLifetime(folderAccess) {} }
-        let dest = folderAccess.url
         let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
         let store = try SQLiteStateStore(
             path: root.appendingPathComponent("state.sqlite").path
         )
-        let (verified, events) = try verifiedLocalFile(
-            root: root,
-            destinationDirectory: dest
-        )
-        try await emitTrustNotices(events)
         let context = TemporalContext.utcHost
         let now = Date().ISO8601Format()
-        let outcome = try await ReconcileSweep(
-            observations: HealthKitDayObservationSource(
-                context: context,
-                limit: samplePageLimit()
-            ),
-            destination: verified,
-            store: store,
-            metric: gap.metric,
-            scratchDirectory: scratch,
-            destinationName: "local-file",
-            envelope: WireEnvelope(
-                exporterId: try installationID(),
-                seq: 1,
-                emittedAt: now,
-                observedAt: now
-            ),
-            temporal: context,
-            statistics: HealthKitStatisticsSource(context: context),
-            trigger: .manual,
-            snapshotURL: StatusSnapshotLocation.url(destinationID: "local-file"),
-            externalStatusURL: dest.appendingPathComponent("status.json"),
-            ledgerHeadSeal: ledgerHeadSeal(),
-            ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
-            freshnessCadenceSeconds: freshnessCadenceSeconds(),
-            deferForLowPower: isLowPowerDeferred()
-        ).run(gap: gap)
+        let exporterID = try installationID()
+        var kinds: [RunOutcome.Kind] = []
+        for destinationID in plannedIDs {
+            guard
+                let (destination, _) = try? await makeAutomaticRunDestination(
+                    destinationID,
+                    trigger: .manual,
+                    root: root,
+                    folderAccess: folderAccess
+                ),
+                destination.attemptNow,
+                destination.scope?.metrics.contains(gap.metric) ?? true
+            else { continue }
+            let outcome = try await ReconcileSweep(
+                observations: HealthKitDayObservationSource(
+                    context: context,
+                    limit: samplePageLimit()
+                ),
+                destination: destination.destination,
+                store: store,
+                metric: gap.metric,
+                scratchDirectory: scratch,
+                destinationName: destinationID,
+                envelope: WireEnvelope(
+                    exporterId: exporterID,
+                    seq: 1,
+                    emittedAt: now,
+                    observedAt: now
+                ),
+                temporal: context,
+                statistics: HealthKitStatisticsSource(context: context),
+                trigger: .manual,
+                snapshotURL: destination.snapshotURL,
+                externalStatusURL: folderAccess?.url
+                    .appendingPathComponent("status.json"),
+                ledgerHeadSeal: ledgerHeadSeal(),
+                ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
+                scope: destination.scope,
+                freshnessCadenceSeconds: freshnessCadenceSeconds(),
+                deferForLowPower: isLowPowerDeferred()
+            ).run(gap: gap)
+            await notifyIfFailed(
+                outcome,
+                destinationID: destinationID,
+                destinationLabel: destinationLabel(destinationID)
+            )
+            kinds.append(outcome.kind)
+        }
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
-        return outcome
+        // One line for a repair that had to satisfy several sinks: the worst result
+        // decides, so a sink that failed is not hidden by one that succeeded.
+        return CombinedExportSummary.kind(kinds)
     }
 
     static func runDemoDataset(typedDestinationName: String) async throws -> [String] {
