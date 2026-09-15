@@ -411,15 +411,6 @@ private final class SQLiteTransaction: StateTransaction {
         )
     }
 
-    func reserveBatchSequence(exporterID: String) throws -> UInt64 {
-        let key = "batchSequence:\(exporterID)"
-        let current = try loadStateMeta(key).flatMap(UInt64.init) ?? 0
-        let (next, overflow) = current.addingReportingOverflow(1)
-        guard !overflow else { throw BatchSequenceError.exhausted }
-        try upsertStateMeta(key, value: String(next))
-        return next
-    }
-
     func reserveBatchSequence(exporterID: String) throws -> Int {
         let key = "batchSequence:\(exporterID)"
         let prior = try loadStateMeta(key).flatMap(Int.init) ?? 0
