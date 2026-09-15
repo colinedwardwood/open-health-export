@@ -6,6 +6,7 @@ import json
 import re
 import subprocess
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).parents[2]
@@ -30,6 +31,7 @@ def load_tool(name, filename):
 coverage = load("coverage_report", "coverage-report.py")
 flakes = load("nightly_flake_rate", "nightly-flake-rate.py")
 release = load("validate_release", "validate-release.py")
+canary = load("upstream_canary_status", "upstream-canary-status.py")
 
 
 class CoverageTests(unittest.TestCase):
@@ -153,6 +155,61 @@ class ReleaseTests(unittest.TestCase):
             ["required check is not successful: export-core"],
         )
 
+    def test_release_rejects_an_unacceptable_canary_report(self):
+        self.assertEqual(release.check_canary({"acceptable": True}), [])
+        self.assertEqual(
+            release.check_canary({
+                "acceptable": False,
+                "problems": ["red without a tracking issue"],
+            }),
+            ["upstream canary: red without a tracking issue"],
+        )
+
+    def test_old_red_canary_requires_its_tracking_issue(self):
+        now = datetime(2026, 9, 15, 18, tzinfo=timezone.utc)
+        run_url = "https://example.invalid/actions/runs/42"
+        runs = {
+            "workflow_runs": [{
+                "id": 42,
+                "event": "schedule",
+                "status": "completed",
+                "conclusion": "failure",
+                "updated_at": (now - timedelta(hours=25)).isoformat(),
+                "html_url": run_url,
+            }]
+        }
+        untracked = canary.evaluate(runs, [], now)
+        self.assertFalse(untracked["acceptable"])
+        tracked = canary.evaluate(
+            runs,
+            [{
+                "number": 7,
+                "state": "open",
+                "title": "QA-22 canary: Home Assistant contract divergence",
+                "body": f"Workflow run: {run_url}",
+                "html_url": "https://example.invalid/issues/7",
+            }],
+            now,
+        )
+        self.assertTrue(tracked["acceptable"])
+
+    def test_stale_canary_evidence_fails_closed(self):
+        now = datetime(2026, 9, 15, 18, tzinfo=timezone.utc)
+        report = canary.evaluate(
+            {"workflow_runs": [{
+                "id": 1,
+                "event": "schedule",
+                "status": "completed",
+                "conclusion": "success",
+                "updated_at": (now - timedelta(hours=49)).isoformat(),
+                "html_url": "https://example.invalid/actions/runs/1",
+            }]},
+            [],
+            now,
+        )
+        self.assertFalse(report["acceptable"])
+        self.assertIn("49.0 hours old", report["problems"][0])
+
     def test_every_determinism_matrix_leg_must_succeed(self):
         required = [
             "utc-fixed-offset (ubuntu-latest, true)",
@@ -182,6 +239,23 @@ class ReleaseTests(unittest.TestCase):
             ]
         }
         self.assertEqual(release.check_runs(all_green, required), [])
+
+    def test_every_ios_ui_shard_must_succeed(self):
+        required = [
+            f"ios-ui ({shard}, {family})"
+            for shard in range(3)
+            for family in ("iPhone", "iPad")
+        ]
+        five_green = {
+            "check_runs": [
+                {"name": name, "status": "completed", "conclusion": "success"}
+                for name in required[:-1]
+            ]
+        }
+        self.assertEqual(
+            release.check_runs(five_green, required),
+            [f"required check is not successful: {required[-1]}"],
+        )
 
     def test_both_accessibility_device_matrices_must_succeed(self):
         required = [

@@ -87,6 +87,12 @@ def check_runs(payload: dict, required: list[str]) -> list[str]:
         if not any(observed == name or observed.startswith(name + " ") or observed.startswith(name + " (") for observed in successful)
     ]
 
+def check_canary(report: dict) -> list[str]:
+    if report.get("acceptable", False):
+        return []
+    details = report.get("problems") or ["report did not permit release"]
+    return [f"upstream canary: {detail}" for detail in details]
+
 
 def main() -> int:
     parser = argparse.ArgumentParser()
@@ -95,6 +101,7 @@ def main() -> int:
     parser.add_argument("--issue-body", type=Path, required=True)
     parser.add_argument("--checks", type=Path, required=True)
     parser.add_argument("--flake-report", type=Path, required=True)
+    parser.add_argument("--canary-report", type=Path, required=True)
     parser.add_argument("--tag")
     args = parser.parse_args()
 
@@ -113,6 +120,8 @@ def main() -> int:
             f"nightly flake proxy {flake.get('ratePercent')}% exceeds "
             f"{policy['flakeRateMaximum']}%"
         )
+    canary = json.loads(args.canary_report.read_text())
+    problems += check_canary(canary)
     if problems:
         print("release refused:\n- " + "\n- ".join(problems), file=sys.stderr)
         return 1

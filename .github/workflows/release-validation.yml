@@ -92,6 +92,15 @@ jobs:
             --repository "${GITHUB_REPOSITORY}" \
             --json-output nightly-flake-rate.json \
             --markdown nightly-flake-rate.md
+          gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/upstream-canary.yml/runs?event=schedule&status=completed&per_page=20" \
+            > upstream-canary-runs.json
+          gh api "repos/${GITHUB_REPOSITORY}/issues?state=open&per_page=100" \
+            > open-issues.json
+          python3 scripts/upstream-canary-status.py \
+            --runs-json upstream-canary-runs.json \
+            --issues-json open-issues.json \
+            --json-output upstream-canary-status.json
       - name: Enforce QA, status, OS, and compliance gates
         run: |
           python3 qa/validate-nfr-mapping.py
@@ -100,7 +109,8 @@ jobs:
             --tag "${{ inputs.tag }}" \
             --issue-body release-issue.md \
             --checks release-checks.json \
-            --flake-report nightly-flake-rate.json
+            --flake-report nightly-flake-rate.json \
+            --canary-report upstream-canary-status.json
           cat nightly-flake-rate.md >> "${GITHUB_STEP_SUMMARY}"
       - name: Keep validation evidence
         if: always()
@@ -113,5 +123,6 @@ jobs:
             release-checks.json
             nightly-flake-rate.json
             nightly-flake-rate.md
+            upstream-canary-status.json
           if-no-files-found: warn
           retention-days: 90
