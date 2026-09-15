@@ -1095,8 +1095,9 @@ enum HarnessExport {
         )
         envelope.reason = "manual"
         let source = DemoSampleSource(seed: 1, samplesPerMetric: 4)
+        let characteristics = DemoCharacteristicSource()
         var lines: [String] = ["DEMO MODE — synthetic data, not HealthKit"]
-        for declaration in MetricCatalog.all {
+        for declaration in MetricCatalog.selectable {
             let run = ExportRun(
                 source: source,
                 destination: verified,
@@ -1106,9 +1107,10 @@ enum HarnessExport {
                 destinationName: "local-file",
                 envelope: envelope,
                 temporal: context,
+                characteristics: characteristics,
                 trigger: .manual,
                 freshnessCadenceSeconds: freshnessCadenceSeconds(),
-            deferForLowPower: isLowPowerDeferred()
+                deferForLowPower: isLowPowerDeferred()
             )
             let outcome = try await run.run()
             lines.append("\(declaration.id.rawValue): \(outcome.kind.rawValue) (demo)")

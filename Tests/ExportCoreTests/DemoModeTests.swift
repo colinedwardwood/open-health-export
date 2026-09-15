@@ -31,24 +31,30 @@ import WireFormat
     try DemoExportGate.confirmSending(to: "local-file", typed: " local-file\n")
 }
 
-@Test func demoSourceCoversEveryCatalogueMetricAndPrefixesFiles() async throws {
+@Test func shippedDemoExportCoversEverySelectableAndWireFamily() async throws {
     try DemoExportGate.confirmSending(to: "local-file", typed: "local-file")
-    let dest = FileManager.default.temporaryDirectory.appendingPathComponent("ohe-demo-\(UUID().uuidString)")
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-demo-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let dest = root.appendingPathComponent("destination")
+    let scratch = root.appendingPathComponent("scratch")
     try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
     let source = DemoSampleSource(seed: 1, samplesPerMetric: 2)
+    let characteristics = DemoCharacteristicSource()
     var envelope = testEnvelope()
     envelope.demo = true
     var exported = Set<MetricID>()
-    for declaration in MetricCatalog.all {
-        let store = MemoryStateStore()
+    let store = MemoryStateStore()
+    for declaration in MetricCatalog.selectable {
         let run = ExportRun(
             source: source,
             destination: .testing(LocalFileSink(directory: dest)),
             store: store,
             metric: declaration.id,
-            scratchDirectory: dest.appendingPathComponent("scratch-\(declaration.id.rawValue)"),
+            scratchDirectory: scratch,
             destinationName: "local-file",
-            envelope: envelope
+            envelope: envelope,
+            characteristics: characteristics
         )
         let outcome = try await run.run()
         #expect(outcome.kind == .success)
@@ -56,13 +62,79 @@ import WireFormat
         #expect(try store.transaction.loadJournal().last?.detail == "demo")
         #expect(try store.transaction.loadLedger().last?.outcomeKind == "run:success:demo")
     }
-    #expect(exported == Set(MetricCatalog.all.map(\.id)))
+    #expect(exported == Set(MetricCatalog.selectable.map(\.id)))
+
     let files = try FileManager.default.contentsOfDirectory(atPath: dest.path)
         .filter { $0.hasSuffix(".ndjson") }
     #expect(files.allSatisfy { $0.hasPrefix(NativeWire.demoFilePrefix) })
-    #expect(files.count == MetricCatalog.all.count)
-    let sample = try Data(contentsOf: dest.appendingPathComponent(files[0]))
-    #expect(NativeWire.payloadIsDemo(sample))
+    #expect(files.count == MetricCatalog.selectable.count)
+
+    var records: [[String: Any]] = []
+    for file in files {
+        let payload = try Data(contentsOf: dest.appendingPathComponent(file))
+        #expect(NativeWire.payloadIsDemo(payload))
+        let text = String(decoding: payload, as: UTF8.self)
+        for line in text.split(whereSeparator: \.isNewline) {
+            let object = try #require(
+                JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
+            )
+            if object["kind"] as? String != "batch.footer" {
+                #expect(object["demo"] as? Bool == true)
+            }
+            records.append(object)
+        }
+    }
+
+    let emittedKinds = Set(records.compactMap { object -> String? in
+        guard let kind = object["kind"] as? String, !kind.hasPrefix("batch.") else {
+            return nil
+        }
+        return kind
+    })
+    let expectedKinds: Set<String> = [
+        "aggregate",
+        "characteristic",
+        "medicationDose",
+        "sample.audiogram",
+        "sample.category",
+        "sample.correlation",
+        "sample.ecg",
+        "sample.quantity",
+        "sample.stateOfMind",
+        "series.ecgVoltage",
+        "series.heartbeat",
+        "series.workoutMetric",
+        "series.workoutRoute",
+        "tombstone",
+        "workout",
+    ]
+    #expect(emittedKinds == expectedKinds)
+
+    let quantityMetricIDs = Set(records.compactMap { object -> String? in
+        object["kind"] as? String == "sample.quantity"
+            ? object["metricId"] as? String
+            : nil
+    })
+    #expect(quantityMetricIDs == Set(MetricCatalog.all.map(\.wireId)))
+
+    let categoryMetricIDs = Set(records.compactMap { object -> String? in
+        object["kind"] as? String == "sample.category"
+            ? object["metricId"] as? String
+            : nil
+    })
+    let selectableCategoryIDs = Set(
+        MetricCatalog.structural
+            .filter { $0.kind == "sample.category" }
+            .map { $0.id.rawValue }
+    )
+    #expect(categoryMetricIDs == selectableCategoryIDs)
+
+    let characteristicIDs = Set(records.compactMap { object -> String? in
+        object["kind"] as? String == "characteristic"
+            ? object["characteristicId"] as? String
+            : nil
+    })
+    #expect(characteristicIDs == Set(MetricCatalog.characteristics.compactMap(\.characteristicId)))
 }
 
 @Test func demoCorpusMatchesTheShippedGenerator() {
