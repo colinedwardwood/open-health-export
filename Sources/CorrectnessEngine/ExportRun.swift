@@ -39,6 +39,16 @@ public struct RunDestination: Sendable {
     }
 }
 
+/// What one destination did with a read, for the history row that hangs under it.
+struct DestinationRunRow: Sendable {
+    var destinationID: String
+    var outcomeKind: String
+    var detail: String
+    var expectedRecords: Int
+    var acceptedRecords: Int
+    var errorClass: String?
+}
+
 public struct ExportRun: Sendable {
     public var source: any SampleSource
     public var destination: VerifiedDestination
@@ -453,6 +463,7 @@ public struct ExportRun: Sendable {
         var partialCause: String?
         var lastReceipt: DeliveryReceipt?
         var receipts: [(RunDestination, DeliveryReceipt)] = []
+        var failures: [String: DestinationSendError] = [:]
         for dest in owed where dest.attemptNow {
             do {
                 receipts.append(
@@ -469,6 +480,7 @@ public struct ExportRun: Sendable {
                 failed += 1
                 terminalError = error.errorClass
                 partialCause = error.errorClass.rawValue
+                failures[dest.id] = error
             }
         }
         mark("send")
@@ -525,10 +537,75 @@ public struct ExportRun: Sendable {
             freshnessTiming: freshnessTiming,
             startedAt: startedAt,
             timings: timings,
-            pending: pending
+            pending: pending,
+            children: destinationRows(
+                owed: owed,
+                expectedByDestination: expectedByDestination,
+                receipts: receipts,
+                failures: failures,
+                fallbackExpected: recordCount
+            )
         )
         try await sweepUndatable(enqueue.undatable)
         return outcome
+    }
+
+    /// A history row per destination that was owed this read. A single-destination run
+    /// keeps the flat one-row history it has always had, so these appear only where the
+    /// parent row would otherwise hide what happened per sink.
+    private func destinationRows(
+        owed: [RunDestination],
+        expectedByDestination: [String: Int],
+        receipts: [(RunDestination, DeliveryReceipt)],
+        failures: [String: DestinationSendError],
+        fallbackExpected: Int
+    ) -> [DestinationRunRow] {
+        guard owed.count > 1 else { return [] }
+        let accepted = Dictionary(
+            receipts.map { ($0.0.id, $0.1) },
+            uniquingKeysWith: { _, latest in latest }
+        )
+        return owed.map { dest in
+            let expected = expectedByDestination[dest.id] ?? fallbackExpected
+            guard dest.attemptNow else {
+                return DestinationRunRow(
+                    destinationID: dest.id,
+                    outcomeKind: RunEvent.queuedOutcomeKind,
+                    detail: "",
+                    expectedRecords: expected,
+                    acceptedRecords: 0,
+                    errorClass: nil
+                )
+            }
+            if let error = failures[dest.id] {
+                return DestinationRunRow(
+                    destinationID: dest.id,
+                    outcomeKind: RunOutcome.Kind.failed.rawValue,
+                    detail: error.errorClass.rawValue,
+                    expectedRecords: expected,
+                    acceptedRecords: 0,
+                    errorClass: error.errorClass.rawValue
+                )
+            }
+            let receipt = accepted[dest.id]
+            let outcome = RunOutcome.derive(
+                from: RunTally(
+                    read: expected,
+                    committed: expected,
+                    acked: receipt?.accepted ?? 0,
+                    unconfirmed: receipt?.unconfirmed ?? 0,
+                    ackEvidenceStatusOnly: receipt?.statusOnly ?? false
+                )
+            )
+            return DestinationRunRow(
+                destinationID: dest.id,
+                outcomeKind: outcome.kind.rawValue,
+                detail: outcome.partialCause ?? "",
+                expectedRecords: expected,
+                acceptedRecords: receipt?.accepted ?? 0,
+                errorClass: nil
+            )
+        }
     }
 
     private func sweepUndatable(_ uuids: [String]) async throws {
@@ -638,7 +715,8 @@ public struct ExportRun: Sendable {
         )? = nil,
         startedAt: Date? = nil,
         timings: [RunStepTiming] = [],
-        pending: PendingBatch? = nil
+        pending: PendingBatch? = nil,
+        children: [DestinationRunRow] = []
     ) async throws {
         let nowEpoch = clock.now().timeIntervalSince1970
         let runID = RunID(rawValue: "run-\(metric.rawValue)")
@@ -720,6 +798,30 @@ public struct ExportRun: Sendable {
                     facts: facts
                 )
             )
+            // One read, N sinks: the parent row above is the read, and each child row
+            // below is what a single destination did with it.
+            for child in children {
+                try tx.appendJournal(
+                    RunEvent(
+                        runID: RunID(rawValue: "\(runID.rawValue)|\(child.destinationID)"),
+                        outcomeKind: child.outcomeKind,
+                        detail: child.detail,
+                        trigger: trigger,
+                        samplesRead: child.expectedRecords,
+                        samplesCommitted: child.expectedRecords,
+                        samplesAcked: child.acceptedRecords,
+                        wallTimeEpoch: nowEpoch,
+                        errorClass: child.errorClass,
+                        facts: RunHistoryFacts(
+                            destinationID: child.destinationID,
+                            metric: metric.rawValue,
+                            windowStartDay: pending?.rangeStartDay,
+                            windowEndDay: pending?.rangeEndDay,
+                            parentRunID: runID.rawValue
+                        )
+                    )
+                )
+            }
             try tx.closeOpenRun(destinationID: destinationName, metric: metric)
             try tx.appendLedger(
                 EgressEntry(

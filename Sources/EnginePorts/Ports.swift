@@ -467,6 +467,9 @@ public struct RunHistoryFacts: Sendable, Equatable, Codable {
     public var payloadSHA256: String?
     public var redactedPayload: String?
     public var payloadPath: String?
+    /// Set on the per-destination rows that hang under one read's parent row.
+    /// `nil` on a parent, and on every row written before fan-out existed.
+    public var parentRunID: String?
 
     public static let empty = RunHistoryFacts()
 
@@ -480,7 +483,8 @@ public struct RunHistoryFacts: Sendable, Equatable, Codable {
         stepTimings: [RunStepTiming] = [],
         payloadSHA256: String? = nil,
         redactedPayload: String? = nil,
-        payloadPath: String? = nil
+        payloadPath: String? = nil,
+        parentRunID: String? = nil
     ) {
         self.destinationID = destinationID
         self.metric = metric
@@ -492,6 +496,7 @@ public struct RunHistoryFacts: Sendable, Equatable, Codable {
         self.payloadSHA256 = payloadSHA256
         self.redactedPayload = redactedPayload
         self.payloadPath = payloadPath
+        self.parentRunID = parentRunID
     }
 
     public var isEmpty: Bool { self == .empty }
@@ -588,24 +593,58 @@ public struct RunEvent: Sendable, Equatable {
 
     public var isProblemOutcome: Bool {
         switch outcomeKind {
-        case "success", "successNothingDue":
+        case "success", "successNothingDue", RunEvent.queuedOutcomeKind:
             false
         default:
             true
         }
     }
+
+    /// A destination that was owed this batch but is not attempted from this trigger,
+    /// so it is waiting rather than failing. Only ever used on a child row.
+    public static let queuedOutcomeKind = "queued"
+
+    /// One of the per-destination rows written under a parent read.
+    public var isDestinationChild: Bool {
+        facts.parentRunID?.isEmpty == false
+    }
 }
 
 /// Newest problems first, then remaining runs newest-first. Caps the on-device history list.
+/// Ranking applies to parent rows; a read's per-destination children stay with their
+/// parent rather than competing with it for the cap.
 public enum RunHistory {
     public static func problemsFirst(_ events: [RunEvent], limit: Int = 50) -> [RunEvent] {
-        let ranked = events.enumerated().sorted { lhs, rhs in
+        let parents = events.enumerated().filter { !$0.element.isDestinationChild }
+        let ranked = parents.sorted { lhs, rhs in
             if lhs.element.isProblemOutcome != rhs.element.isProblemOutcome {
                 return lhs.element.isProblemOutcome
             }
             return lhs.offset > rhs.offset
         }
-        return Array(ranked.prefix(limit).map(\.element))
+        var childrenByParent: [String: [(offset: Int, element: RunEvent)]] = [:]
+        for entry in events.enumerated() where entry.element.isDestinationChild {
+            guard let parent = entry.element.facts.parentRunID else { continue }
+            childrenByParent[
+                childKey(runID: parent, wallTimeEpoch: entry.element.wallTimeEpoch),
+                default: []
+            ].append((entry.offset, entry.element))
+        }
+        var rows: [RunEvent] = []
+        for parent in ranked.prefix(limit).map(\.element) {
+            rows.append(parent)
+            let key = childKey(
+                runID: parent.runID.rawValue,
+                wallTimeEpoch: parent.wallTimeEpoch
+            )
+            let children = childrenByParent[key] ?? []
+            rows.append(contentsOf: children.sorted { $0.offset < $1.offset }.map(\.element))
+        }
+        return rows
+    }
+
+    private static func childKey(runID: String, wallTimeEpoch: TimeInterval) -> String {
+        "\(runID)|\(Int(wallTimeEpoch))"
     }
 }
 

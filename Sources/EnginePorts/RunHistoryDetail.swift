@@ -32,6 +32,18 @@ public enum RunHistoryDetail {
 
     public static func lines(for event: RunEvent, revealPayload: Bool = false) -> [String] {
         let facts = event.facts
+        // A child row says what one destination did with the parent's single read.
+        // The window, payload, and timings belong to the read, so they are not repeated.
+        if event.isDestinationChild {
+            var lines = [childLine(event)]
+            if let errorClass = event.errorClass, !errorClass.isEmpty {
+                lines.append("    error: \(errorClass)")
+                if !event.detail.isEmpty {
+                    lines.append("    error detail: \(event.detail)")
+                }
+            }
+            return lines
+        }
         var lines: [String] = []
         lines.append(listLine(event))
         lines.append("outcome: \(event.outcomeKind)")
@@ -73,6 +85,14 @@ public enum RunHistoryDetail {
             lines.append("payload: none")
         }
         return lines
+    }
+
+    public static func childLine(_ event: RunEvent) -> String {
+        let destination = event.facts.destinationID ?? "unknown destination"
+        let state = event.outcomeKind == RunEvent.queuedOutcomeKind
+            ? "queued for later"
+            : "\(event.outcomeKind) · \(event.samplesAcked)/\(event.samplesRead) acknowledged"
+        return "  ↳ \(destination): \(state)"
     }
 
     public static func listLine(_ event: RunEvent) -> String {

@@ -8,10 +8,15 @@ import NetEgress
 public struct OTLPBacklogSelection: Sendable, Equatable {
     public var events: [RunEvent]
     public var dropped: [RunEvent]
+    /// Per-destination child rows. They describe the same read as their parent span,
+    /// so sending them would multiply one run into several. Callers mark them
+    /// projected without emitting them, and without recording a drop.
+    public var localOnly: [RunEvent]
 
-    public init(events: [RunEvent], dropped: [RunEvent]) {
+    public init(events: [RunEvent], dropped: [RunEvent], localOnly: [RunEvent] = []) {
         self.events = events
         self.dropped = dropped
+        self.localOnly = localOnly
     }
 }
 
@@ -28,7 +33,9 @@ public enum OTLPBacklog {
         maxAgeSeconds: TimeInterval = maxAgeSeconds
     ) -> OTLPBacklogSelection {
         let cutoff = nowEpoch - maxAgeSeconds
-        let unprojected = events.filter { $0.projectedAtEpoch == nil }
+        let candidates = events.filter { $0.projectedAtEpoch == nil }
+        let localOnly = candidates.filter(\.isDestinationChild)
+        let unprojected = candidates.filter { !$0.isDestinationChild }
         var dropped: [RunEvent] = []
         var remaining: [RunEvent] = []
         remaining.reserveCapacity(unprojected.count)
@@ -44,7 +51,11 @@ public enum OTLPBacklog {
             dropped.append(contentsOf: remaining.prefix(overflow))
             remaining = Array(remaining.suffix(cap))
         }
-        return OTLPBacklogSelection(events: remaining, dropped: dropped)
+        return OTLPBacklogSelection(
+            events: remaining,
+            dropped: dropped,
+            localOnly: localOnly
+        )
     }
 }
 

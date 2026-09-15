@@ -608,6 +608,26 @@ private struct DeviceLockedSource: SampleSource {
         )
     }
     #expect(companionOwed.count == 1)
+
+    // History reads as one parent run with a row per destination underneath, so the
+    // queued companion is visible rather than hidden behind the delivered sink.
+    let events = RunHistory.problemsFirst(try await store.transact { try $0.loadJournal() })
+    let parents = events.filter { !$0.isDestinationChild }
+    #expect(parents.count == 1)
+    let parent = try #require(parents.first)
+    let children = events.filter { $0.isDestinationChild }
+    #expect(children.allSatisfy { $0.facts.parentRunID == parent.runID.rawValue })
+    #expect(children.map { $0.facts.destinationID } == ["live", "companion"])
+    #expect(children.map(\.outcomeKind) == ["success", "queued"])
+    // A child stays with its parent instead of being ranked against it.
+    #expect(events.map(\.isDestinationChild) == [false, true, true])
+    // Queued is a waiting destination, not a failure to surface first.
+    #expect(children.allSatisfy { !$0.isProblemOutcome })
+    #expect(
+        RunHistoryDetail.lines(for: children[1])
+            == ["  ↳ companion: queued for later"]
+    )
+    #expect(RunHistoryDetail.lines(for: children[0]).first?.contains("live: success") == true)
 }
 
 @Test func lockedStoreReadRecordsBlockedJournalOutcome() async throws {

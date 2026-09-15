@@ -3213,6 +3213,15 @@ enum HarnessExport {
         let selection = try await store.transact { tx in
             OTLPBacklog.select(events: try tx.loadJournal(), nowEpoch: now)
         }
+        if !selection.localOnly.isEmpty {
+            // The parent row carries the run; its per-destination children stay local.
+            try await store.transact { tx in
+                try tx.markJournalProjected(
+                    runIDs: selection.localOnly.map(\.runID),
+                    atEpoch: now
+                )
+            }
+        }
         if !selection.dropped.isEmpty {
             try await store.transact { tx in
                 try tx.markJournalProjected(

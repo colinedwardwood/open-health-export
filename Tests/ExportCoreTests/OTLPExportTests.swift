@@ -524,6 +524,31 @@ import Testing
     #expect(Set(selection.dropped.map(\.runID.rawValue)) == Set(["old", "overflow-0", "overflow-1", "overflow-2"]))
 }
 
+/// A fan-out read writes a parent row plus one row per destination. Sending the
+/// children would turn one export into several spans, so they are marked projected
+/// without being emitted, and without being recorded as a backlog drop.
+@Test func otlpBacklogKeepsPerDestinationChildRowsOnDevice() {
+    let now: TimeInterval = 2_000_000_000
+    let parent = otlpRunEvent(id: "run-heartRate", wall: now)
+    let children = ["local-file", "companion"].map { destination in
+        RunEvent(
+            runID: RunID(rawValue: "run-heartRate|\(destination)"),
+            outcomeKind: "success",
+            detail: "",
+            trigger: .bgProcessing,
+            wallTimeEpoch: now,
+            facts: RunHistoryFacts(
+                destinationID: destination,
+                parentRunID: parent.runID.rawValue
+            )
+        )
+    }
+    let selection = OTLPBacklog.select(events: [parent] + children, nowEpoch: now)
+    #expect(selection.events == [parent])
+    #expect(selection.dropped.isEmpty)
+    #expect(selection.localOnly.map(\.runID.rawValue) == children.map(\.runID.rawValue))
+}
+
 @Test func otlpPreviewBytesContainOnlyAllowlistedAttributes() {
     let payload = OTLPPreview.payload(events: [otlpRunEvent()])
     let text = OTLPPreview.text(payload: payload)
