@@ -64,10 +64,17 @@ https://github.com/colinedwardwood/open-health-export/actions/runs/34883238541
 concluded success (fifty million records, `pipelinecheck lines=50000001`), and
 again on
 https://github.com/colinedwardwood/open-health-export/actions/runs/34973680714.
-T2 is not verified until `tier-two-exportrun` also concludes success; that leg
-has not yet finished on any dispatch. It exercises the same page path T1 does,
-so it is expected to clear the ceiling now that the page streams, but expected
-is not measured.
+The T2 ExportRun leg is now measured rather than expected. A `swift:6.3.3`
+container ran `exportruncheck` over the full fifty-million-record corpus in
+2h43m and concluded `outcome=success` at **61.1 MiB** peak `VmHWM` against the
+100 MiB ceiling: `declared_records=50000000`, `submitted_records=46894942`,
+`structural_records=3105058`, 4,700 pages of 10,000, `samples_read` and
+`samples_acked` equal at 57,029,122, and all five formats. Ingest held 27.2 MiB
+flat from one million lines to fifty million, so the peak is the page path, as
+T1 predicted. The remote `tier-two-exportrun` leg of
+[`nightly-volume` run 34999124577](https://github.com/colinedwardwood/open-health-export/actions/runs/34999124577)
+is still executing and is what the release gate reads by check name; the local
+container run is the measurement, not a substitute for that gate.
 
 The two earlier remote dispatches of `tier-one-corpus` predate the streaming
 fix and recorded the old failure (`peak resident memory 145044 KiB exceeded
