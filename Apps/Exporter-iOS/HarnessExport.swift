@@ -770,14 +770,16 @@ enum HarnessExport {
             let (_, events) = try verifiedLocalFile(root: root, destinationDirectory: dest)
             try await emitTrustNotices(events)
         }
-        if trigger.attemptsCompanionTransport,
-           let companion = destinations.first(where: { $0.id == "companion" })
-        {
+        // Anything still owed from an earlier read goes before this one. A failed
+        // attempt leaves a durable obligation, and without this only the queue's
+        // time-to-live would ever clear it.
+        for destination in destinations where destination.attemptNow {
             try await drainPendingDeliveries(
-                destination: companion.destination,
-                destinationName: companion.id,
+                destination: destination.destination,
+                destinationName: destination.id,
                 store: store,
-                scope: companion.scope
+                scope: destination.scope,
+                limit: drainLimit(trigger: trigger)
             )
         }
         let context = TemporalContext.utcHost
@@ -2451,13 +2453,25 @@ enum HarnessExport {
         return nil
     }
 
+    /// A background wake has seconds, not minutes, and the read it was woken for
+    /// matters more than an old obligation. A foreground run can afford the backlog.
+    private static func drainLimit(trigger: RunTrigger) -> Int {
+        switch trigger {
+        case .manual, .widgetControl, .appForeground, .launch:
+            32
+        case .observerQuery, .bgAppRefresh, .bgProcessing, .shortcut:
+            4
+        }
+    }
+
     private static func drainPendingDeliveries(
         destination: VerifiedDestination,
         destinationName: String,
         store: SQLiteStateStore,
-        scope: DestinationExportScope?
+        scope: DestinationExportScope?,
+        limit: Int = 32
     ) async throws {
-        for _ in 0..<32 {
+        for _ in 0..<max(1, limit) {
             let receipts = try await PendingDeliveryRunner(
                 destination: destination,
                 store: store,
