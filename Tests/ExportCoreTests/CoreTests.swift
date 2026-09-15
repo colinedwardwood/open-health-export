@@ -248,6 +248,70 @@ private struct DeviceLockedSource: SampleSource {
     #expect(settlement.payloadPathsToUnlink == [batch.payloadURL])
 }
 
+@Test func pendingDeliveryRunnerDoesNotSendAnotherDestinationObligation() async throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-fanout-runner-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let sample = heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+    let batchID = BatchID(rawValue: "0192f3c1-0000-7000-8000-000000000004")
+    let payload = root.appendingPathComponent("batch.ndjson")
+    try NativeWire.encode(
+        samples: [sample],
+        tombstones: [],
+        metric: sample.metric,
+        batchID: batchID,
+        envelope: testEnvelope()
+    ).write(to: payload)
+    let store = MemoryStateStore()
+    let batch = PendingBatch(
+        id: batchID,
+        payloadURL: payload.path,
+        expectedRecords: 1
+    )
+    let https = DestinationID(rawValue: "https")
+    let mqtt = DestinationID(rawValue: "mqtt")
+    try await store.transact {
+        try $0.enqueueFanout(
+            batch,
+            destinations: [
+                try FanoutObligation.destination(
+                    id: https.rawValue,
+                    metric: sample.metric,
+                    expectedRecords: 1,
+                    scope: nil
+                ),
+                try FanoutObligation.destination(
+                    id: mqtt.rawValue,
+                    metric: sample.metric,
+                    expectedRecords: 1,
+                    scope: nil
+                ),
+            ]
+        )
+    }
+
+    let mqttDir = root.appendingPathComponent("mqtt")
+    try FileManager.default.createDirectory(at: mqttDir, withIntermediateDirectories: true)
+    let skipped = try await PendingDeliveryRunner(
+        destination: .testing(LocalFileSink(directory: mqttDir)),
+        store: store,
+        destinationName: mqtt.rawValue
+    ).runOnce()
+    #expect(skipped.map(\.accepted) == [1])
+    #expect(try await store.transact { try $0.pendingBatches().count } == 1)
+
+    let httpsDir = root.appendingPathComponent("https")
+    try FileManager.default.createDirectory(at: httpsDir, withIntermediateDirectories: true)
+    let remaining = try await PendingDeliveryRunner(
+        destination: .testing(LocalFileSink(directory: httpsDir)),
+        store: store,
+        destinationName: https.rawValue
+    ).runOnce()
+    #expect(remaining.map(\.accepted) == [1])
+    #expect(try await store.transact { try $0.pendingBatches().isEmpty })
+}
+
 @Test func lockedStoreReadRecordsBlockedJournalOutcome() async throws {
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-store-locked-\(UUID().uuidString)")

@@ -694,6 +694,7 @@ public protocol StateTransaction: AnyObject {
         destinationID: DestinationID,
         limit: Int
     ) throws -> [PendingDelivery]
+    func hasDeliveryObligations(batchID: BatchID) throws -> Bool
     func settleDelivery(_ receipt: DestinationDeliveryReceipt) throws -> DeliverySettlement
     /// Batches survive process death until a receipt confirms every expected record.
     func pendingBatches() throws -> [PendingBatch]

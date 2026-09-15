@@ -132,6 +132,10 @@ public final class MemoryTransaction: StateTransaction {
         .map { $0 }
     }
 
+    public func hasDeliveryObligations(batchID: BatchID) throws -> Bool {
+        fanoutDeliveries.keys.contains { $0.batchID == batchID }
+    }
+
     public func settleDelivery(
         _ receipt: DestinationDeliveryReceipt
     ) throws -> DeliverySettlement {
@@ -200,12 +204,16 @@ public final class MemoryTransaction: StateTransaction {
 
     public func recordDelivery(_ receipt: DeliveryReceipt) throws {
         deliveries[receipt.batchID] = receipt
-        if let batch = pending[receipt.batchID],
-           receipt.unconfirmed == 0,
-           receipt.accepted >= batch.expectedRecords {
-            pending.removeValue(forKey: receipt.batchID)
-            pendingOrder.removeAll { $0 == receipt.batchID }
+        let hasFanout = fanoutDeliveries.keys.contains {
+            $0.batchID == receipt.batchID
         }
+        guard !hasFanout,
+              let batch = pending[receipt.batchID],
+              receipt.unconfirmed == 0,
+              receipt.accepted >= batch.expectedRecords
+        else { return }
+        pending.removeValue(forKey: receipt.batchID)
+        pendingOrder.removeAll { $0 == receipt.batchID }
     }
 
     public func deliveredAccepted() throws -> Int {

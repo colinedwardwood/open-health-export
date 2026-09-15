@@ -600,6 +600,16 @@ private final class SQLiteTransaction: StateTransaction {
         return deliveries
     }
 
+    func hasDeliveryObligations(batchID: BatchID) throws -> Bool {
+        let stmt = try store.prepare(
+            "SELECT COUNT(*) FROM delivery_obligations WHERE batch_id = ?;"
+        )
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, batchID.rawValue)
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return false }
+        return sqlite3_column_int64(stmt, 0) > 0
+    }
+
     func settleDelivery(
         _ receipt: DestinationDeliveryReceipt
     ) throws -> DeliverySettlement {
@@ -749,6 +759,14 @@ private final class SQLiteTransaction: StateTransaction {
         sqlite3_bind_int64(stmt, 2, sqlite3_int64(receipt.accepted))
         try stepDone(stmt)
         guard receipt.unconfirmed == 0 else { return }
+        let owed = try store.prepare(
+            "SELECT COUNT(*) FROM delivery_obligations WHERE batch_id = ?;"
+        )
+        defer { sqlite3_finalize(owed) }
+        bindText(owed, 1, receipt.batchID.rawValue)
+        if sqlite3_step(owed) == SQLITE_ROW, sqlite3_column_int64(owed, 0) > 0 {
+            return
+        }
         let delete = try store.prepare(
             "DELETE FROM pending_batches WHERE batch_id = ? AND expected_records <= ?;"
         )

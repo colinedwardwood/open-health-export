@@ -336,7 +336,17 @@ public struct ReconcileSweep: Sendable {
         }
         let victims = try await store.transact { tx in
             let evicted = try QueueAdmission.makeRoom(for: pending.byteCount, on: tx)
-            try tx.enqueuePending(pending)
+            try tx.enqueueFanout(
+                pending,
+                destinations: [
+                    try FanoutObligation.destination(
+                        id: destinationName,
+                        metric: metric,
+                        expectedRecords: pending.expectedRecords,
+                        scope: scope
+                    ),
+                ]
+            )
             try Census.replaceObserved(page: censusPage, days: permittedDays, to: tx)
             try EmittedIndex.record(
                 page: page,
@@ -412,7 +422,11 @@ public struct ReconcileSweep: Sendable {
         let nowEpoch = clock.now().timeIntervalSince1970
         try await store.transact { tx in
             if let receipt {
-                try tx.recordDelivery(receipt)
+                _ = try FanoutObligation.settle(
+                    receipt: receipt,
+                    destinationID: destinationName,
+                    on: tx
+                )
             }
             try tx.appendJournal(
                 RunEvent(

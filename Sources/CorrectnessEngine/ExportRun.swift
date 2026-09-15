@@ -331,8 +331,16 @@ public struct ExportRun: Sendable {
         )
         let enqueue = try await store.transact { tx -> (victims: [PendingBatch], undatable: [String]) in
             let evicted = try QueueAdmission.makeRoom(for: pending.byteCount, on: tx)
-            try tx.commitBatch(
+            try tx.commitFanout(
                 pending,
+                destinations: [
+                    try FanoutObligation.destination(
+                        id: destinationName,
+                        metric: metric,
+                        expectedRecords: pending.expectedRecords,
+                        scope: scope
+                    ),
+                ],
                 advancing: CursorAdvance(
                     page: page,
                     epoch: effectiveEpoch,
@@ -608,7 +616,11 @@ public struct ExportRun: Sendable {
         }
         try await store.transact { tx in
             if let receipt {
-                try tx.recordDelivery(receipt)
+                _ = try FanoutObligation.settle(
+                    receipt: receipt,
+                    destinationID: destinationName,
+                    on: tx
+                )
             }
             if let freshnessLatency {
                 try tx.appendFreshnessLatency(freshnessLatency)
@@ -823,8 +835,16 @@ public struct ExportRun: Sendable {
         )
         try await store.transact { tx in
             _ = try QueueAdmission.makeRoom(for: pending.byteCount, on: tx)
-            try tx.commitBatch(
+            try tx.commitFanout(
                 pending,
+                destinations: [
+                    try FanoutObligation.destination(
+                        id: destinationName,
+                        metric: metric,
+                        expectedRecords: pending.expectedRecords,
+                        scope: scope
+                    ),
+                ],
                 advancing: CursorAdvance(
                     page: dummyPage,
                     epoch: epoch,
