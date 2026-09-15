@@ -630,6 +630,49 @@ private struct DeviceLockedSource: SampleSource {
     #expect(RunHistoryDetail.lines(for: children[0]).first?.contains("live: success") == true)
 }
 
+/// The queued copy exists so a batch survives process death until it is owed to
+/// nobody. Once every destination has settled, keeping it is keeping health data on
+/// disk for no reason.
+@Test func aSettledBatchLeavesNoQueuedPayloadBehind() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let page = SamplePage(
+        samples: [heartSample("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee")],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0xE1]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-settled-unlink-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let archive = root.appendingPathComponent("archive")
+    let second = root.appendingPathComponent("second")
+    for dir in [archive, second] {
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    }
+    let scratch = root.appendingPathComponent("scratch")
+    let store = MemoryStateStore()
+    let run = ExportRun(
+        source: ReadCountingSource(page: page),
+        destination: .testing(LocalFileSink(directory: archive)),
+        store: store,
+        metric: metric,
+        scratchDirectory: scratch,
+        envelope: testEnvelope(),
+        destinations: [
+            RunDestination(id: "archive", destination: .testing(LocalFileSink(directory: archive))),
+            RunDestination(id: "second", destination: .testing(LocalFileSink(directory: second))),
+        ]
+    )
+    #expect(try await run.run().kind == .success)
+    #expect(try await store.transact { try $0.pendingBatches() }.isEmpty)
+    let leftover = (try? FileManager.default.contentsOfDirectory(atPath: scratch.path)) ?? []
+    #expect(leftover.filter { $0.hasSuffix(".ndjson") } == [], "scratch kept \(leftover)")
+    // Both sinks still have their copy; only the queued original is gone.
+    #expect(try FileManager.default.contentsOfDirectory(atPath: archive.path).count >= 1)
+    #expect(try FileManager.default.contentsOfDirectory(atPath: second.path).count >= 1)
+}
+
 @Test func lockedStoreReadRecordsBlockedJournalOutcome() async throws {
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-store-locked-\(UUID().uuidString)")

@@ -764,7 +764,13 @@ public protocol StateTransaction: AnyObject {
     func queuedBytes() throws -> Int
     func loadGaps() throws -> [GapRecord]
     func evict(_ batchID: BatchID, recording: GapRecord) throws
-    func recordDelivery(_ receipt: DeliveryReceipt, destinationID: DestinationID) throws
+    /// Records the audit row. Reports a release when this receipt alone retires a batch
+    /// that carries no per-destination obligations, so the caller can unlink the payload.
+    @discardableResult
+    func recordDelivery(
+        _ receipt: DeliveryReceipt,
+        destinationID: DestinationID
+    ) throws -> DeliverySettlement
     /// Sum of `accepted` on stored receipts. Used with gaps and pending for
     /// `delivered ∪ gap ⊇ read`.
     func deliveredAccepted() throws -> Int

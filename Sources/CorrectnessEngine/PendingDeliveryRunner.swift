@@ -84,13 +84,14 @@ public struct PendingDeliveryRunner: Sendable {
                 accepted: 0,
                 statusOnly: false
             )
-            try await store.transact { tx in
-                _ = try FanoutObligation.settle(
+            let settlement = try await store.transact { tx in
+                try FanoutObligation.settle(
                     receipt: receipt,
                     destinationID: destinationName,
                     on: tx
                 )
             }
+            FanoutObligation.unlink(settlement)
             return [receipt]
         }
         var attempt = batch
@@ -138,13 +139,14 @@ public struct PendingDeliveryRunner: Sendable {
         #if DEBUG
         try faults.hit(.afterAckBeforeRelease)
         #endif
-        try await store.transact { tx in
-            _ = try FanoutObligation.settle(
+        let settlement = try await store.transact { tx in
+            try FanoutObligation.settle(
                 receipt: receipt,
                 destinationID: destinationName,
                 on: tx
             )
         }
+        FanoutObligation.unlink(settlement)
         return [receipt]
     }
 }

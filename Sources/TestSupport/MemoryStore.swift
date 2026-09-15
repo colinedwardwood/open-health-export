@@ -205,7 +205,11 @@ public final class MemoryTransaction: StateTransaction {
         gaps.append(recording)
     }
 
-    public func recordDelivery(_ receipt: DeliveryReceipt, destinationID: DestinationID) throws {
+    @discardableResult
+    public func recordDelivery(
+        _ receipt: DeliveryReceipt,
+        destinationID: DestinationID
+    ) throws -> DeliverySettlement {
         deliveries[DeliveryID(batchID: receipt.batchID, destinationID: destinationID)] = receipt
         let hasFanout = fanoutDeliveries.keys.contains {
             $0.batchID == receipt.batchID
@@ -214,9 +218,13 @@ public final class MemoryTransaction: StateTransaction {
               let batch = pending[receipt.batchID],
               receipt.unconfirmed == 0,
               receipt.accepted >= batch.expectedRecords
-        else { return }
+        else { return DeliverySettlement(batchReleased: false) }
         pending.removeValue(forKey: receipt.batchID)
         pendingOrder.removeAll { $0 == receipt.batchID }
+        return DeliverySettlement(
+            batchReleased: true,
+            payloadPathsToUnlink: [batch.payloadURL]
+        )
     }
 
     public func deliveredAccepted() throws -> Int {

@@ -794,7 +794,11 @@ private final class SQLiteTransaction: StateTransaction {
         try stepDone(stmt)
     }
 
-    func recordDelivery(_ receipt: DeliveryReceipt, destinationID: DestinationID) throws {
+    @discardableResult
+    func recordDelivery(
+        _ receipt: DeliveryReceipt,
+        destinationID: DestinationID
+    ) throws -> DeliverySettlement {
         let stmt = try store.prepare(
             """
             INSERT INTO deliveries (batch_id, destination_id, accepted, unconfirmed)
@@ -810,15 +814,27 @@ private final class SQLiteTransaction: StateTransaction {
         sqlite3_bind_int64(stmt, 3, sqlite3_int64(receipt.accepted))
         sqlite3_bind_int64(stmt, 4, sqlite3_int64(receipt.unconfirmed))
         try stepDone(stmt)
-        guard receipt.unconfirmed == 0 else { return }
+        guard receipt.unconfirmed == 0 else {
+            return DeliverySettlement(batchReleased: false)
+        }
         let owed = try store.prepare(
             "SELECT COUNT(*) FROM delivery_obligations WHERE batch_id = ?;"
         )
         defer { sqlite3_finalize(owed) }
         bindText(owed, 1, receipt.batchID.rawValue)
         if sqlite3_step(owed) == SQLITE_ROW, sqlite3_column_int64(owed, 0) > 0 {
-            return
+            return DeliverySettlement(batchReleased: false)
         }
+        let payload = try store.prepare(
+            "SELECT payload_url FROM pending_batches WHERE batch_id = ? AND expected_records <= ? LIMIT 1;"
+        )
+        defer { sqlite3_finalize(payload) }
+        bindText(payload, 1, receipt.batchID.rawValue)
+        sqlite3_bind_int64(payload, 2, sqlite3_int64(receipt.accepted))
+        guard sqlite3_step(payload) == SQLITE_ROW else {
+            return DeliverySettlement(batchReleased: false)
+        }
+        let path = text(payload, 0)
         let delete = try store.prepare(
             "DELETE FROM pending_batches WHERE batch_id = ? AND expected_records <= ?;"
         )
@@ -826,6 +842,7 @@ private final class SQLiteTransaction: StateTransaction {
         bindText(delete, 1, receipt.batchID.rawValue)
         sqlite3_bind_int64(delete, 2, sqlite3_int64(receipt.accepted))
         try stepDone(delete)
+        return DeliverySettlement(batchReleased: true, payloadPathsToUnlink: [path])
     }
 
     func deliveredAccepted() throws -> Int {

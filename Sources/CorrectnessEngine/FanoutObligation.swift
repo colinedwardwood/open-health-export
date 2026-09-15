@@ -31,8 +31,11 @@ enum FanoutObligation {
         destinationID: String,
         on tx: any StateTransaction
     ) throws -> DeliverySettlement {
-        try tx.recordDelivery(receipt, destinationID: DestinationID(rawValue: destinationID))
-        return try tx.settleDelivery(
+        let audited = try tx.recordDelivery(
+            receipt,
+            destinationID: DestinationID(rawValue: destinationID)
+        )
+        let settled = try tx.settleDelivery(
             DestinationDeliveryReceipt(
                 deliveryID: DeliveryID(
                     batchID: receipt.batchID,
@@ -42,6 +45,21 @@ enum FanoutObligation {
                 unconfirmed: receipt.unconfirmed
             )
         )
+        // A batch with obligations is released by the last one to settle; a batch
+        // without them is released by the receipt itself. Either way the queued copy
+        // has no reader left.
+        return DeliverySettlement(
+            batchReleased: audited.batchReleased || settled.batchReleased,
+            payloadPathsToUnlink: audited.payloadPathsToUnlink + settled.payloadPathsToUnlink
+        )
+    }
+
+    /// Removes the queued copies a settlement retired. Runs outside the transaction:
+    /// a crash between commit and unlink leaves a stray file, not a lost batch.
+    static func unlink(_ settlement: DeliverySettlement) {
+        for path in settlement.payloadPathsToUnlink {
+            try? FileManager.default.removeItem(atPath: path)
+        }
     }
 
     private static func digest(_ scope: DestinationExportScope) -> String {

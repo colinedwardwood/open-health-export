@@ -464,6 +464,7 @@ public struct ExportRun: Sendable {
         var lastReceipt: DeliveryReceipt?
         var receipts: [(RunDestination, DeliveryReceipt)] = []
         var failures: [String: DestinationSendError] = [:]
+        var releasedPayloads: [DeliverySettlement] = []
         for dest in owed where dest.attemptNow {
             do {
                 receipts.append(
@@ -489,13 +490,16 @@ public struct ExportRun: Sendable {
             try faults.hit(.afterAckBeforeRelease)
             #endif
             for (dest, receipt) in receipts {
-                try await store.transact { tx in
-                    _ = try FanoutObligation.settle(
+                let settlement = try await store.transact { tx in
+                    try FanoutObligation.settle(
                         receipt: receipt,
                         destinationID: dest.id,
                         on: tx
                     )
                 }
+                // Unlinked after the run records: the history copy and the digest are
+                // still taken from the queued payload.
+                releasedPayloads.append(settlement)
                 accepted += receipt.accepted
                 unconfirmed += receipt.unconfirmed
                 statusOnly = statusOnly || receipt.statusOnly
@@ -546,6 +550,9 @@ public struct ExportRun: Sendable {
                 fallbackExpected: recordCount
             )
         )
+        for settlement in releasedPayloads {
+            FanoutObligation.unlink(settlement)
+        }
         try await sweepUndatable(enqueue.undatable)
         return outcome
     }
@@ -769,9 +776,10 @@ public struct ExportRun: Sendable {
         } else {
             freshnessLatency = nil
         }
+        var settlement = DeliverySettlement(batchReleased: false)
         try await store.transact { tx in
             if let receipt, destinations.count == 1 {
-                _ = try FanoutObligation.settle(
+                settlement = try FanoutObligation.settle(
                     receipt: receipt,
                     destinationID: destinationName,
                     on: tx
@@ -834,6 +842,7 @@ public struct ExportRun: Sendable {
                 )
             )
         }
+        FanoutObligation.unlink(settlement)
         var freshnessEstimates: [FreshnessClass: LocalFreshnessEstimate] = [:]
         var queueOccupancy = QueueOccupancy.green.snapshotToken
         if snapshotURL != nil {

@@ -15,7 +15,12 @@ import WireFormat
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-characteristic-\(UUID().uuidString)")
     defer { try? FileManager.default.removeItem(at: root) }
-    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    // The queued copy is deleted once the destination has it, so the scratch directory
+    // has to be somewhere other than the archive folder being inspected.
+    let scratch = root.appendingPathComponent("scratch")
+    for dir in [root, scratch] {
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    }
     let store = MemoryStateStore()
     let snapshot = CharacteristicRecord(
         characteristicId: "biologicalSex",
@@ -27,7 +32,7 @@ import WireFormat
         destination: .testing(LocalFileSink(directory: root)),
         store: store,
         metric: MetricCatalog.biologicalSex.id,
-        scratchDirectory: root,
+        scratchDirectory: scratch,
         envelope: testEnvelope(),
         characteristics: FixtureCharacteristicSource(records: [
             MetricCatalog.biologicalSex.id: snapshot

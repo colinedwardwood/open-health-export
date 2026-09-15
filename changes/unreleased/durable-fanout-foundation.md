@@ -15,4 +15,6 @@ batch clears the obligations that were owed on its payload. Run history shows a
 fan-out read as one parent run with a row per destination underneath, so a
 queued Mac companion is visible beside a destination that already delivered;
 those child rows stay on the device rather than multiplying one run into
-several telemetry spans.
+several telemetry spans. A queued payload is now deleted once every destination
+has settled it, instead of being left in the export scratch directory after the
+batch was retired.

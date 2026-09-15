@@ -420,9 +420,10 @@ public struct ReconcileSweep: Sendable {
 
     private func record(outcome: RunOutcome, tally: RunTally, receipt: DeliveryReceipt?) async throws {
         let nowEpoch = clock.now().timeIntervalSince1970
+        var settlement = DeliverySettlement(batchReleased: false)
         try await store.transact { tx in
             if let receipt {
-                _ = try FanoutObligation.settle(
+                settlement = try FanoutObligation.settle(
                     receipt: receipt,
                     destinationID: destinationName,
                     on: tx
@@ -452,6 +453,7 @@ public struct ReconcileSweep: Sendable {
                 )
             )
         }
+        FanoutObligation.unlink(settlement)
         let queued = try await store.transact { try $0.queuedBytes() }
         try writeSnapshot(
             outcome: outcome,
