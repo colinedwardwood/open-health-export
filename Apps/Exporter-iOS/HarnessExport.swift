@@ -179,49 +179,65 @@ private actor CountingBackfillObservations: DayObservationSource {
 private struct HealthBackfillProcessor: BackfillChunkProcessor {
     var observations: HealthKitDayObservationSource
     var statistics: HealthKitStatisticsSource
-    var destination: VerifiedDestination
+    /// Every sink this job was planned for. History is the one read a user waits
+    /// minutes for, so an archive-only backfill would leave the other sinks
+    /// holding today's data and nothing before it.
+    var destinations: [RunDestination]
     var store: any StateStore
     var scratchDirectory: URL
     var exporterID: String
     var temporal: TemporalContext
     var ledgerHeadSeal: any LedgerHeadSeal
     var ledgerSealURL: URL
-    var externalStatusDirectory: URL
+    var externalStatusDirectory: URL?
 
     func process(
         metric: MetricID,
         days: [String],
         mode: BackfillMode
     ) async throws -> BackfillChunkResult {
-        let counted = CountingBackfillObservations(base: observations)
-        let now = Date().ISO8601Format()
-        let outcome = try await ReconcileSweep(
-            observations: counted,
-            destination: destination,
-            store: store,
-            metric: metric,
-            scratchDirectory: scratchDirectory,
-            destinationName: "local-file",
-            envelope: WireEnvelope(
-                exporterId: exporterID,
-                seq: 1,
-                emittedAt: now,
-                observedAt: now
-            ),
-            temporal: temporal,
-            statistics: statistics,
-            trigger: .manual,
-            snapshotURL: StatusSnapshotLocation.url(destinationID: "local-file"),
-            externalStatusURL: externalStatusDirectory
-                .appendingPathComponent("status.json"),
-            ledgerHeadSeal: ledgerHeadSeal,
-            ledgerSealURL: ledgerSealURL,
-            freshnessCadenceSeconds: HarnessExport.freshnessCadenceSeconds(),
-            deferForLowPower: HarnessExport.isLowPowerDeferred()
-        ).runBackfill(days: days, mode: mode)
+        var samplesRead = 0
+        var batchesEnqueued = 0
+        for destination in destinations {
+            if let scope = destination.scope, !scope.metrics.contains(metric) { continue }
+            let counted = CountingBackfillObservations(base: observations)
+            let now = Date().ISO8601Format()
+            let outcome = try await ReconcileSweep(
+                observations: counted,
+                destination: destination.destination,
+                store: store,
+                metric: metric,
+                scratchDirectory: scratchDirectory,
+                destinationName: destination.id,
+                envelope: WireEnvelope(
+                    exporterId: exporterID,
+                    seq: 1,
+                    emittedAt: now,
+                    observedAt: now
+                ),
+                temporal: temporal,
+                statistics: statistics,
+                trigger: .manual,
+                snapshotURL: destination.snapshotURL
+                    ?? StatusSnapshotLocation.url(destinationID: destination.id),
+                externalStatusURL: externalStatusDirectory?
+                    .appendingPathComponent("status.json"),
+                ledgerHeadSeal: ledgerHeadSeal,
+                ledgerSealURL: ledgerSealURL,
+                scope: destination.scope,
+                freshnessCadenceSeconds: HarnessExport.freshnessCadenceSeconds(),
+                deferForLowPower: HarnessExport.isLowPowerDeferred()
+            ).runBackfill(days: days, mode: mode)
+            // One chunk is one day of history: the sinks all read the same day, so
+            // the widest pass is the count, not the sum of the passes.
+            samplesRead = max(samplesRead, await counted.count())
+            if outcome.kind != RunOutcome.Kind.successNothingDue {
+                batchesEnqueued += 1
+            }
+        }
         return BackfillChunkResult(
-            samplesRead: await counted.count(),
-            batchesEnqueued: outcome.kind == RunOutcome.Kind.successNothingDue ? 0 : 1
+            samplesRead: samplesRead,
+            batchesEnqueued: batchesEnqueued
         )
     }
 }
@@ -1161,62 +1177,100 @@ enum HarnessExport {
         mode: BackfillMode,
         onProgress: (@Sendable (String) async -> Void)? = nil
     ) async throws -> [String] {
-        defer { synchronizeDestinationExportRole("local-file") }
+        // Backfill is an explicit user action (R-11/O-5), so manual-only sinks count.
+        let plannedIDs = healthDestinationIDs.filter { isDestinationEnabled($0) }
+        guard !plannedIDs.isEmpty else {
+            return ["No destination is enabled, so there is nowhere to send history."]
+        }
+        defer {
+            for destinationID in plannedIDs {
+                synchronizeDestinationExportRole(destinationID)
+            }
+        }
         let root = try applicationSupportRoot()
-        let folderAccess = try localExportFolder(root: root)
+        var folderAccess: SecurityScopedAccess?
+        if plannedIDs.contains("local-file") {
+            folderAccess = try localExportFolder(root: root)
+        }
         defer { withExtendedLifetime(folderAccess) {} }
-        let destinationDirectory = folderAccess.url
         let scratch = try protectedPayloadDirectory(named: "backfill-scratch", under: root)
         let store = try SQLiteStateStore(
             path: root.appendingPathComponent("state.sqlite").path
         )
-        let (destination, events) = try verifiedLocalFile(
-            root: root,
-            destinationDirectory: destinationDirectory
-        )
-        try await emitTrustNotices(events)
         let context = TemporalContext.utcHost
         let observations = HealthKitDayObservationSource(context: context, limit: samplePageLimit())
-        let scope = try await destinationScope("local-file")
-        try ExportScopeGate.requireConfigured(scope)
-        let scopeStartDay = String(
-            (scope.startInclusive ?? .distantFuture).ISO8601Format().prefix(10)
+
+        let checkpointURL = root.appendingPathComponent(
+            mode == .raw ? "backfill-raw.json" : "backfill-aggregate.json"
         )
-        let scopeEndDay = scope.endExclusive.map {
-            String($0.addingTimeInterval(-1).ISO8601Format().prefix(10))
+        // A resumed job keeps the sinks it was planned for: a day marked complete
+        // means complete for those, and a sink enabled mid-job would silently
+        // inherit that completion. It gets its own job once this one finishes.
+        let resumed = try? BackfillCheckpoint.read(from: checkpointURL)
+        let owedIDs = resumed.map { checkpoint in
+            plannedIDs.filter { checkpoint.plan.destinations.contains($0) }
+        } ?? plannedIDs
+
+        var destinations: [RunDestination] = []
+        for destinationID in owedIDs {
+            guard
+                let (destination, _) = try? await makeAutomaticRunDestination(
+                    destinationID,
+                    trigger: .manual,
+                    root: root,
+                    folderAccess: folderAccess
+                ),
+                destination.attemptNow
+            else { continue }
+            destinations.append(destination)
+        }
+        guard !destinations.isEmpty else {
+            return ["blocked: No destination could be reconstructed for this backfill."]
+        }
+        let scopes = destinations.compactMap(\.scope)
+        for scope in scopes {
+            try ExportScopeGate.requireConfigured(scope)
         }
         var metrics: [MetricID] = []
         var firstDay: String?
         var lastDay: String?
-        for metric in scope.metrics.sorted(by: { $0.rawValue < $1.rawValue }) {
+        let owedMetrics = Set(scopes.flatMap(\.metrics)).sorted { $0.rawValue < $1.rawValue }
+        for metric in owedMetrics {
             guard let range = try? await observations.availableDayRange(metric: metric) else {
                 continue
             }
-            let lower = max(range.lowerBound, scopeStartDay)
-            let upper = min(range.upperBound, scopeEndDay ?? range.upperBound)
-            guard lower <= upper else { continue }
-            metrics.append(metric)
-            firstDay = min(firstDay ?? lower, lower)
-            lastDay = max(lastDay ?? upper, upper)
+            // Each sink carries its own window, so the job spans their union and
+            // the per-sink sweep drops the days that sink never asked for.
+            for scope in scopes where scope.metrics.contains(metric) {
+                let scopeStartDay = String(
+                    (scope.startInclusive ?? .distantFuture).ISO8601Format().prefix(10)
+                )
+                let scopeEndDay = scope.endExclusive.map {
+                    String($0.addingTimeInterval(-1).ISO8601Format().prefix(10))
+                }
+                let lower = max(range.lowerBound, scopeStartDay)
+                let upper = min(range.upperBound, scopeEndDay ?? range.upperBound)
+                guard lower <= upper else { continue }
+                if !metrics.contains(metric) { metrics.append(metric) }
+                firstDay = min(firstDay ?? lower, lower)
+                lastDay = max(lastDay ?? upper, upper)
+            }
         }
         guard let firstDay, let lastDay, !metrics.isEmpty else {
             return ["No supported Health history is available for backfill."]
         }
 
-        let checkpointURL = root.appendingPathComponent(
-            mode == .raw ? "backfill-raw.json" : "backfill-aggregate.json"
-        )
         let processor = HealthBackfillProcessor(
             observations: observations,
             statistics: HealthKitStatisticsSource(context: context),
-            destination: destination,
+            destinations: destinations,
             store: store,
             scratchDirectory: scratch,
             exporterID: try installationID(),
             temporal: context,
             ledgerHeadSeal: ledgerHeadSeal(),
             ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
-            externalStatusDirectory: destinationDirectory
+            externalStatusDirectory: folderAccess?.url
         )
         let job = BackfillJob(
             checkpointURL: checkpointURL,
@@ -1237,7 +1291,7 @@ enum HarnessExport {
                         windowEndDay: lastDay,
                         mode: mode,
                         metrics: metrics,
-                        destinations: ["local-file"]
+                        destinations: destinations.map(\.id)
                     )
                 )
             )
@@ -1253,16 +1307,21 @@ enum HarnessExport {
                 "Checkpoint: \(checkpointURL.path)",
             ]
         }
-        let manifest = ArchiveCompletionManifest.make(from: completed)
-        let published = destinationDirectory.appendingPathComponent("archive-manifest.json")
-        try manifest.write(to: published)
-        return [
+        var lines = [
             "\(mode.rawValue) backfill complete",
+            "Destinations: \(destinations.map(\.id).joined(separator: ", "))",
             "Samples read: \(completed.progress.samplesRead)",
             "Batches enqueued: \(completed.progress.batchesEnqueued)",
             "Checkpoint: \(checkpointURL.path)",
-            "Manifest: \(published.path)",
         ]
+        // The completion manifest describes the archive folder, so it is published
+        // only where there is a folder to publish it into.
+        if let destinationDirectory = folderAccess?.url {
+            let published = destinationDirectory.appendingPathComponent("archive-manifest.json")
+            try ArchiveCompletionManifest.make(from: completed).write(to: published)
+            lines.append("Manifest: \(published.path)")
+        }
+        return lines
     }
 
     static func queueEvictionGaps() async throws -> [GapRecord] {
