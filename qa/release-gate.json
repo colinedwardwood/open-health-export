@@ -48,7 +48,10 @@
     "home-assistant-oldest",
     "otlp-http",
     "gitleaks",
-    "signed-off-by"
+    "signed-off-by",
+    "utc-fixed-offset (ubuntu-latest, true)",
+    "utc-fixed-offset (ubuntu-24.04-arm, true)",
+    "utc-fixed-offset (macos-26, false)"
   ],
   "requiredMatrix": {
     "iOS": "18.0",

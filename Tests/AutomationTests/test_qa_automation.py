@@ -130,6 +130,36 @@ class ReleaseTests(unittest.TestCase):
             ["required check is not successful: export-core"],
         )
 
+    def test_every_determinism_matrix_leg_must_succeed(self):
+        required = [
+            "utc-fixed-offset (ubuntu-latest, true)",
+            "utc-fixed-offset (ubuntu-24.04-arm, true)",
+            "utc-fixed-offset (macos-26, false)",
+        ]
+        one_green = {
+            "check_runs": [
+                {
+                    "name": required[0],
+                    "status": "completed",
+                    "conclusion": "success",
+                }
+            ]
+        }
+        self.assertEqual(
+            release.check_runs(one_green, required),
+            [
+                f"required check is not successful: {required[1]}",
+                f"required check is not successful: {required[2]}",
+            ],
+        )
+        all_green = {
+            "check_runs": [
+                {"name": name, "status": "completed", "conclusion": "success"}
+                for name in required
+            ]
+        }
+        self.assertEqual(release.check_runs(all_green, required), [])
+
 
 class UpstreamPublishableTests(unittest.TestCase):
     def test_mosquitto_ignores_alpine_and_moving_tags(self):
