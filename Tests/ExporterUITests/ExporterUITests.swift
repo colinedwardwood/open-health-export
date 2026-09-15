@@ -792,30 +792,37 @@ final class ExporterUITests: XCTestCase {
         XCTAssertFalse(app.buttons["configuration-import-configure-companion"].exists)
     }
 
-    /// R-67: Home Assistant imports stay disabled drafts. There is no dedicated
-    /// setup editor, and the UI says so rather than folding HA into HTTPS.
-    func testImportedHomeAssistantDraftHasNoSetupPath() {
+    /// R-67: Home Assistant imports load only non-secret preset fields. The
+    /// webhook ID stays empty and the draft remains disabled until a real test.
+    func testImportedHomeAssistantDraftLoadsDedicatedSetupPath() {
         app.terminate()
         app.launchEnvironment["OHE_SEED_IMPORTED_DRAFT"] = "home-assistant"
         app.launch()
         enterDestinations()
-        let notice = app.staticTexts["configuration-import-unsupported-homeAssistant"]
-        if !notice.waitForExistence(timeout: uiWait) {
+        let configure = app.buttons[
+            "configuration-import-configure-homeAssistant"
+        ]
+        if !configure.waitForExistence(timeout: uiWait) {
             for _ in 0 ..< 12 {
                 app.scrollViews["root-scroll-destinations"].swipeUp()
-                if notice.exists { break }
+                if configure.exists { break }
             }
         }
         XCTAssertTrue(
-            notice.waitForExistence(timeout: uiWait),
+            configure.waitForExistence(timeout: uiWait),
             visibleIdentifiers().joined(separator: ",")
         )
-        XCTAssertEqual(
-            notice.label,
-            "This destination kind does not yet have an import setup path."
+        configure.tap()
+        let baseURL = scrollDestinations(
+            app.textFields["home-assistant-url"]
         )
-        XCTAssertFalse(app.buttons["configuration-import-configure-https"].exists)
-        XCTAssertFalse(app.buttons["configuration-import-configure-companion"].exists)
+        XCTAssertTrue(baseURL.waitForExistence(timeout: uiWait))
+        XCTAssertEqual(baseURL.value as? String, "http://homeassistant.local:8123")
+        XCTAssertEqual(
+            app.secureTextFields["home-assistant-webhook-id"].value as? String,
+            "Webhook ID"
+        )
+        XCTAssertFalse(app.buttons["home-assistant-enable"].isEnabled)
     }
 
     func testOTLPURLParseBackNamesWhitespaceAndHost() {

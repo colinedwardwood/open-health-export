@@ -1,6 +1,6 @@
 # R-67 / SEC-18 configuration portability
 
-Status: local file contract implemented; signed QR transport deferred.
+Status: credential-free file contract implemented; signed QR transport deferred.
 
 `CoreDomain` owns a versioned, deterministic `.tributary` JSON representation for
 destination configuration. The representation is credential-free by construction:
@@ -14,20 +14,20 @@ destination configuration. The representation is credential-free by construction
 File import is a two-step API. Parsing produces inert review data. Exact typed
 confirmation produces only new `disabledRequiresTest` drafts, with no operation that
 can update an existing local destination or enable a draft. The app allocates fresh
-local identifiers and persists the disabled drafts. HTTPS and MQTT drafts can be
-loaded into their existing setup editors only when that kind's local slot is empty;
+local identifiers and persists the disabled drafts. HTTPS, Home Assistant webhook,
+and MQTT drafts can be loaded into their existing setup editors only when that kind's local slot is empty;
 unsupported settings are refused rather than dropped. Companion drafts load the
 Bonjour Mac name into pairing setup without enabling the destination; a pairing
 payload for a different Mac is refused. The user must supply omitted
 credentials or pairing material and pass the existing probe, identity-confirmation, scope, and enablement
-path before the draft is consumed. Local-file and Home Assistant imports
-remain disabled drafts because their runtime setup paths cannot yet preserve the
-portable endpoint/settings contract.
+path before the draft is consumed. Local-file imports remain disabled drafts because
+a portable document cannot preserve a security-scoped Files bookmark.
 
-The app can export enabled HTTPS and MQTT destinations back to a deterministic
-`.tributary` document. It includes the imported local identity when present,
-endpoint, supported non-secret settings, and metric/date scope. Credential
-material and credential-presence flags are never represented in the document.
+The app can export enabled HTTPS, Home Assistant webhook, MQTT, and companion
+destinations back to a deterministic `.tributary` document. It includes the imported
+local identity when present, endpoint, supported non-secret settings, and metric/date
+scope. Credential material and credential-presence flags are never represented in
+the document.
 
 Signed QR import remains a **Should** and is intentionally deferred. The product has
 not selected a signing authority, trust bootstrap, key rotation/revocation policy, or

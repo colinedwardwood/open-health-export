@@ -81,6 +81,7 @@ struct ConfigurationImportView: View {
                         Text("Disabled — destination test required")
                             .font(.footnote)
                         if draft.configuration.kind == .https
+                            || draft.configuration.kind == .homeAssistant
                             || draft.configuration.kind == .mqtt {
                             Button("Add credentials and test") {
                                 onConfigure(draft)
@@ -279,7 +280,11 @@ enum ImportedDestinationDraftStore {
             sourceIdentifier: "seed-home-assistant",
             displayName: "Imported Home Assistant",
             kind: .homeAssistant,
-            endpoint: "http://homeassistant.local:8123"
+            endpoint: "http://homeassistant.local:8123",
+            settings: [
+                "allowInsecureHTTP": "true",
+                "mode": "webhook",
+            ]
         )
     }
 
@@ -287,7 +292,8 @@ enum ImportedDestinationDraftStore {
         sourceIdentifier: String,
         displayName: String,
         kind: PortableDestinationKind,
-        endpoint: String
+        endpoint: String,
+        settings: [String: String] = [:]
     ) throws {
         try replaceStore(
             with: try PortableDestinationConfiguration(
@@ -295,6 +301,7 @@ enum ImportedDestinationDraftStore {
                 displayName: displayName,
                 kind: kind,
                 endpoint: endpoint,
+                settings: settings,
                 exportScope: PortableDestinationExportScope(
                     metrics: [MetricID(rawValue: "heart_rate")],
                     startInclusive: Date(timeIntervalSince1970: 1)
