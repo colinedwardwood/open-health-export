@@ -16,6 +16,7 @@ public final class MemoryTransaction: StateTransaction {
     public var dirty: [MetricID: Set<String>] = [:]
     public var deliveries: [BatchID: DeliveryReceipt] = [:]
     public var pending: [BatchID: PendingBatch] = [:]
+    public var fanoutDeliveries: [DeliveryID: PendingDelivery] = [:]
     public var emittedIndex: [String: EmittedIndexRow] = [:]
     public var indexHorizonDay: String?
     public var verifiedThroughDays: [MetricID: String] = [:]
@@ -67,6 +68,106 @@ public final class MemoryTransaction: StateTransaction {
 
     public func commitBatch(_ batch: PendingBatch, advancing: CursorAdvance) throws {
         try enqueuePending(batch)
+        try advanceCursor(advancing)
+    }
+
+    public func enqueueFanout(
+        _ batch: PendingBatch,
+        destinations: [BatchDestination]
+    ) throws {
+        guard !destinations.isEmpty else { return }
+        guard pending[batch.id] == nil else {
+            throw BatchIdentityError.duplicate(batch.id)
+        }
+        var destinationIDs: Set<DestinationID> = []
+        for destination in destinations {
+            guard destinationIDs.insert(destination.destinationID).inserted else {
+                throw FanoutStateError.duplicateDestination(destination.destinationID)
+            }
+            guard destination.scopeSnapshot.destinationID == destination.destinationID.rawValue else {
+                throw FanoutStateError.scopeDestinationMismatch(destination.destinationID)
+            }
+            guard destination.expectedRecords >= 0 else {
+                throw FanoutStateError.negativeExpectedRecords(destination.destinationID)
+            }
+        }
+        pendingOrder.append(batch.id)
+        pending[batch.id] = batch
+        for destination in destinations {
+            let id = DeliveryID(
+                batchID: batch.id,
+                destinationID: destination.destinationID
+            )
+            fanoutDeliveries[id] = PendingDelivery(
+                id: id,
+                batch: batch,
+                expectedRecords: destination.expectedRecords,
+                scopeSnapshot: destination.scopeSnapshot,
+                scopeDigest: destination.scopeDigest
+            )
+        }
+    }
+
+    public func commitFanout(
+        _ batch: PendingBatch,
+        destinations: [BatchDestination],
+        advancing: CursorAdvance
+    ) throws {
+        try enqueueFanout(batch, destinations: destinations)
+        try advanceCursor(advancing)
+    }
+
+    public func pendingDeliveries(
+        destinationID: DestinationID,
+        limit: Int
+    ) throws -> [PendingDelivery] {
+        guard limit > 0 else { return [] }
+        return pendingOrder.compactMap { batchID in
+            fanoutDeliveries[
+                DeliveryID(batchID: batchID, destinationID: destinationID)
+            ]
+        }
+        .filter { $0.state == .pending || $0.state == .retryWaiting }
+        .prefix(limit)
+        .map { $0 }
+    }
+
+    public func settleDelivery(
+        _ receipt: DestinationDeliveryReceipt
+    ) throws -> DeliverySettlement {
+        guard var delivery = fanoutDeliveries[receipt.deliveryID] else {
+            return DeliverySettlement(batchReleased: false)
+        }
+        guard !delivery.state.releasesObligation else {
+            return DeliverySettlement(
+                batchReleased: pending[receipt.deliveryID.batchID] == nil
+            )
+        }
+        if receipt.unconfirmed > 0,
+           receipt.accepted + receipt.unconfirmed >= delivery.expectedRecords {
+            delivery.state = .sentUnconfirmed
+        } else if receipt.accepted >= delivery.expectedRecords {
+            delivery.state = .acknowledged
+        } else {
+            return DeliverySettlement(batchReleased: false)
+        }
+        fanoutDeliveries[receipt.deliveryID] = delivery
+        let stillOwed = fanoutDeliveries.values.contains {
+            $0.id.batchID == receipt.deliveryID.batchID && !$0.state.releasesObligation
+        }
+        guard !stillOwed,
+              let batch = pending.removeValue(forKey: receipt.deliveryID.batchID)
+        else {
+            return DeliverySettlement(batchReleased: false)
+        }
+        pendingOrder.removeAll { $0 == receipt.deliveryID.batchID }
+        return DeliverySettlement(
+            batchReleased: true,
+            payloadPathsToUnlink: [batch.payloadURL]
+        )
+    }
+
+    private func advanceCursor(_ advancing: CursorAdvance) throws {
         let envelope = CheckpointEnvelope(
             tzDatabaseVersion: advancing.tzDatabaseVersion,
             epoch: advancing.epoch,

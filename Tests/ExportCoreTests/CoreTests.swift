@@ -114,6 +114,140 @@ private struct DeviceLockedSource: SampleSource {
     }
 }
 
+@Test func fanoutRetainsPayloadUntilEveryDestinationSettles() async throws {
+    let store = MemoryStateStore()
+    let batch = PendingBatch(
+        id: BatchID(rawValue: "0192f3c1-0000-7000-8000-000000000002"),
+        payloadURL: "/tmp/fanout",
+        expectedRecords: 4
+    )
+    let scopeA = try DestinationExportScope(
+        destinationID: "a",
+        metrics: [MetricCatalog.heartRate.id],
+        startInclusive: Date(timeIntervalSince1970: 1)
+    )
+    let scopeB = try DestinationExportScope(
+        destinationID: "b",
+        metrics: [MetricCatalog.heartRate.id],
+        startInclusive: Date(timeIntervalSince1970: 1)
+    )
+    let destinations = [
+        BatchDestination(
+            destinationID: DestinationID(rawValue: "a"),
+            expectedRecords: 4,
+            scopeSnapshot: scopeA,
+            scopeDigest: "scope-a"
+        ),
+        BatchDestination(
+            destinationID: DestinationID(rawValue: "b"),
+            expectedRecords: 4,
+            scopeSnapshot: scopeB,
+            scopeDigest: "scope-b"
+        ),
+    ]
+    try await store.transact {
+        try $0.enqueueFanout(batch, destinations: destinations)
+    }
+
+    let onlyA = try await store.transact {
+        try $0.pendingDeliveries(destinationID: DestinationID(rawValue: "a"), limit: 1)
+    }
+    #expect(onlyA.count == 1)
+    #expect(onlyA.first?.id.destinationID == DestinationID(rawValue: "a"))
+
+    let first = try await store.transact {
+        try $0.settleDelivery(
+            DestinationDeliveryReceipt(
+                deliveryID: DeliveryID(
+                    batchID: batch.id,
+                    destinationID: destinations[0].destinationID
+                ),
+                accepted: 4
+            )
+        )
+    }
+    #expect(!first.batchReleased)
+    #expect(try await store.transact { try $0.pendingBatches() }.count == 1)
+    let replay = try await store.transact {
+        try $0.settleDelivery(
+            DestinationDeliveryReceipt(
+                deliveryID: DeliveryID(
+                    batchID: batch.id,
+                    destinationID: destinations[0].destinationID
+                ),
+                accepted: 4
+            )
+        )
+    }
+    #expect(!replay.batchReleased)
+    #expect(try await store.transact { try $0.pendingBatches() }.count == 1)
+
+    let final = try await store.transact {
+        try $0.settleDelivery(
+            DestinationDeliveryReceipt(
+                deliveryID: DeliveryID(
+                    batchID: batch.id,
+                    destinationID: destinations[1].destinationID
+                ),
+                accepted: 4
+            )
+        )
+    }
+    #expect(final.batchReleased)
+    #expect(final.payloadPathsToUnlink == [batch.payloadURL])
+    #expect(try await store.transact { try $0.pendingBatches() }.isEmpty)
+}
+
+@Test func fanoutObligationsSurviveSQLiteReopen() async throws {
+    let path = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-fanout-\(UUID().uuidString).sqlite").path
+    defer { try? FileManager.default.removeItem(atPath: path) }
+    let batch = PendingBatch(
+        id: BatchID(rawValue: "0192f3c1-0000-7000-8000-000000000003"),
+        payloadURL: "/tmp/sqlite-fanout",
+        expectedRecords: 2
+    )
+    let destinationID = DestinationID(rawValue: "https")
+    let scope = try DestinationExportScope(
+        destinationID: destinationID.rawValue,
+        metrics: [MetricCatalog.stepCount.id],
+        startInclusive: Date(timeIntervalSince1970: 1)
+    )
+    do {
+        let store = try SQLiteStateStore(path: path)
+        try await store.transact {
+            try $0.enqueueFanout(
+                batch,
+                destinations: [
+                    BatchDestination(
+                        destinationID: destinationID,
+                        expectedRecords: 2,
+                        scopeSnapshot: scope,
+                        scopeDigest: "scope"
+                    ),
+                ]
+            )
+        }
+    }
+
+    let reopened = try SQLiteStateStore(path: path)
+    let pending = try await reopened.transact {
+        try $0.pendingDeliveries(destinationID: destinationID, limit: 1)
+    }
+    #expect(pending.count == 1)
+    #expect(pending.first?.scopeSnapshot == scope)
+    let settlement = try await reopened.transact {
+        try $0.settleDelivery(
+            DestinationDeliveryReceipt(
+                deliveryID: DeliveryID(batchID: batch.id, destinationID: destinationID),
+                accepted: 2
+            )
+        )
+    }
+    #expect(settlement.batchReleased)
+    #expect(settlement.payloadPathsToUnlink == [batch.payloadURL])
+}
+
 @Test func lockedStoreReadRecordsBlockedJournalOutcome() async throws {
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-store-locked-\(UUID().uuidString)")

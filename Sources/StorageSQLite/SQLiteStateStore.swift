@@ -170,6 +170,21 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 batch_id TEXT PRIMARY KEY,
                 accepted INTEGER NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS delivery_obligations (
+                batch_id TEXT NOT NULL,
+                destination_id TEXT NOT NULL,
+                state TEXT NOT NULL,
+                expected_records INTEGER NOT NULL,
+                accepted_records INTEGER NOT NULL DEFAULT 0,
+                unconfirmed_records INTEGER NOT NULL DEFAULT 0,
+                attempt INTEGER NOT NULL DEFAULT 0,
+                next_earliest_at REAL,
+                scope_snapshot BLOB NOT NULL,
+                scope_digest TEXT NOT NULL,
+                PRIMARY KEY (batch_id, destination_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_delivery_obligations_due
+                ON delivery_obligations (destination_id, state, next_earliest_at, batch_id);
             CREATE TABLE IF NOT EXISTS gaps (
                 batch_id TEXT PRIMARY KEY,
                 range_description TEXT NOT NULL,
@@ -245,7 +260,7 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
 
     /// The version this build's `migrate()` leaves behind. Interpolated into the migration
     /// itself so the constant and the stamp cannot drift apart.
-    public static let expectedSchemaVersion = 18
+    public static let expectedSchemaVersion = 19
 
     /// Reads the stamp without opening the store proper, so a caller (or a test) can ask
     /// what is on disk without triggering the migration it is asking about.
@@ -463,7 +478,54 @@ private final class SQLiteTransaction: StateTransaction {
 
     func commitBatch(_ batch: PendingBatch, advancing: CursorAdvance) throws {
         try enqueuePending(batch)
+        try advanceCursor(advancing)
+    }
 
+    func enqueueFanout(
+        _ batch: PendingBatch,
+        destinations: [BatchDestination]
+    ) throws {
+        guard !destinations.isEmpty else { return }
+        var destinationIDs: Set<DestinationID> = []
+        for destination in destinations {
+            guard destinationIDs.insert(destination.destinationID).inserted else {
+                throw FanoutStateError.duplicateDestination(destination.destinationID)
+            }
+            guard destination.scopeSnapshot.destinationID == destination.destinationID.rawValue else {
+                throw FanoutStateError.scopeDestinationMismatch(destination.destinationID)
+            }
+            guard destination.expectedRecords >= 0 else {
+                throw FanoutStateError.negativeExpectedRecords(destination.destinationID)
+            }
+        }
+        try enqueuePending(batch)
+        let stmt = try store.prepare(
+            "INSERT INTO delivery_obligations (batch_id, destination_id, state, expected_records, scope_snapshot, scope_digest) VALUES (?, ?, ?, ?, ?, ?);"
+        )
+        defer { sqlite3_finalize(stmt) }
+        for destination in destinations {
+            sqlite3_reset(stmt)
+            sqlite3_clear_bindings(stmt)
+            bindText(stmt, 1, batch.id.rawValue)
+            bindText(stmt, 2, destination.destinationID.rawValue)
+            bindText(stmt, 3, DeliveryState.pending.rawValue)
+            sqlite3_bind_int64(stmt, 4, sqlite3_int64(destination.expectedRecords))
+            bindBlob(stmt, 5, try JSONEncoder().encode(destination.scopeSnapshot))
+            bindText(stmt, 6, destination.scopeDigest)
+            try stepDone(stmt)
+        }
+    }
+
+    func commitFanout(
+        _ batch: PendingBatch,
+        destinations: [BatchDestination],
+        advancing: CursorAdvance
+    ) throws {
+        try enqueueFanout(batch, destinations: destinations)
+        try advanceCursor(advancing)
+    }
+
+    private func advanceCursor(_ advancing: CursorAdvance) throws {
         let snap = advancing.snapshot
         let envelope = CheckpointEnvelope(
             tzDatabaseVersion: advancing.tzDatabaseVersion,
@@ -478,6 +540,127 @@ private final class SQLiteTransaction: StateTransaction {
         sqlite3_bind_int64(stmt, 2, sqlite3_int64(snap.epoch))
         bindBlob(stmt, 3, envelope.encoded())
         try stepDone(stmt)
+    }
+
+    func pendingDeliveries(
+        destinationID: DestinationID,
+        limit: Int
+    ) throws -> [PendingDelivery] {
+        guard limit > 0 else { return [] }
+        let stmt = try store.prepare(
+            """
+            SELECT p.batch_id, p.payload_url, p.expected_records, p.byte_count,
+                   p.metric, p.created_at_epoch, p.range_start_day, p.range_end_day,
+                   p.eviction_class, d.expected_records, d.scope_snapshot,
+                   d.scope_digest, d.attempt, d.state, d.next_earliest_at
+            FROM delivery_obligations d
+            JOIN pending_batches p ON p.batch_id = d.batch_id
+            WHERE d.destination_id = ?
+              AND d.state IN ('pending', 'retryWaiting')
+            ORDER BY p.rowid
+            LIMIT ?;
+            """
+        )
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, destinationID.rawValue)
+        sqlite3_bind_int64(stmt, 2, sqlite3_int64(limit))
+        var deliveries: [PendingDelivery] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let batch = PendingBatch(
+                id: BatchID(rawValue: text(stmt, 0)),
+                payloadURL: text(stmt, 1),
+                expectedRecords: Int(sqlite3_column_int64(stmt, 2)),
+                byteCount: Int(sqlite3_column_int64(stmt, 3)),
+                metric: MetricID(rawValue: text(stmt, 4)),
+                createdAtEpoch: sqlite3_column_type(stmt, 5) == SQLITE_NULL
+                    ? nil
+                    : sqlite3_column_double(stmt, 5),
+                rangeStartDay: optionalText(stmt, 6),
+                rangeEndDay: optionalText(stmt, 7),
+                evictionClass: QueueEvictionClass(rawValue: text(stmt, 8)) ?? .normal
+            )
+            deliveries.append(
+                PendingDelivery(
+                    id: DeliveryID(batchID: batch.id, destinationID: destinationID),
+                    batch: batch,
+                    expectedRecords: Int(sqlite3_column_int64(stmt, 9)),
+                    scopeSnapshot: try JSONDecoder().decode(
+                        DestinationExportScope.self,
+                        from: blob(stmt, 10)
+                    ),
+                    scopeDigest: text(stmt, 11),
+                    attempt: Int(sqlite3_column_int64(stmt, 12)),
+                    state: DeliveryState(rawValue: text(stmt, 13)) ?? .blockedNeedsUser,
+                    nextEarliestAt: sqlite3_column_type(stmt, 14) == SQLITE_NULL
+                        ? nil
+                        : sqlite3_column_double(stmt, 14)
+                )
+            )
+        }
+        return deliveries
+    }
+
+    func settleDelivery(
+        _ receipt: DestinationDeliveryReceipt
+    ) throws -> DeliverySettlement {
+        let lookup = try store.prepare(
+            "SELECT expected_records, state FROM delivery_obligations WHERE batch_id = ? AND destination_id = ? LIMIT 1;"
+        )
+        defer { sqlite3_finalize(lookup) }
+        bindText(lookup, 1, receipt.deliveryID.batchID.rawValue)
+        bindText(lookup, 2, receipt.deliveryID.destinationID.rawValue)
+        guard sqlite3_step(lookup) == SQLITE_ROW else {
+            return DeliverySettlement(batchReleased: false)
+        }
+        let expected = Int(sqlite3_column_int64(lookup, 0))
+        let prior = DeliveryState(rawValue: text(lookup, 1)) ?? .blockedNeedsUser
+        guard !prior.releasesObligation else {
+            return DeliverySettlement(batchReleased: false)
+        }
+        let state: DeliveryState
+        if receipt.unconfirmed > 0,
+           receipt.accepted + receipt.unconfirmed >= expected {
+            state = .sentUnconfirmed
+        } else if receipt.accepted >= expected {
+            state = .acknowledged
+        } else {
+            return DeliverySettlement(batchReleased: false)
+        }
+        let update = try store.prepare(
+            "UPDATE delivery_obligations SET state = ?, accepted_records = ?, unconfirmed_records = ? WHERE batch_id = ? AND destination_id = ?;"
+        )
+        defer { sqlite3_finalize(update) }
+        bindText(update, 1, state.rawValue)
+        sqlite3_bind_int64(update, 2, sqlite3_int64(receipt.accepted))
+        sqlite3_bind_int64(update, 3, sqlite3_int64(receipt.unconfirmed))
+        bindText(update, 4, receipt.deliveryID.batchID.rawValue)
+        bindText(update, 5, receipt.deliveryID.destinationID.rawValue)
+        try stepDone(update)
+
+        let owed = try store.prepare(
+            "SELECT COUNT(*) FROM delivery_obligations WHERE batch_id = ? AND state IN ('pending', 'inFlight', 'retryWaiting', 'blockedNeedsUser');"
+        )
+        defer { sqlite3_finalize(owed) }
+        bindText(owed, 1, receipt.deliveryID.batchID.rawValue)
+        guard sqlite3_step(owed) == SQLITE_ROW,
+              sqlite3_column_int64(owed, 0) == 0
+        else {
+            return DeliverySettlement(batchReleased: false)
+        }
+        let payload = try store.prepare(
+            "SELECT payload_url FROM pending_batches WHERE batch_id = ? LIMIT 1;"
+        )
+        defer { sqlite3_finalize(payload) }
+        bindText(payload, 1, receipt.deliveryID.batchID.rawValue)
+        guard sqlite3_step(payload) == SQLITE_ROW else {
+            return DeliverySettlement(batchReleased: true)
+        }
+        let path = text(payload, 0)
+        let delete = try store.prepare("DELETE FROM pending_batches WHERE batch_id = ?;")
+        defer { sqlite3_finalize(delete) }
+        bindText(delete, 1, receipt.deliveryID.batchID.rawValue)
+        try stepDone(delete)
+        return DeliverySettlement(batchReleased: true, payloadPathsToUnlink: [path])
     }
 
     func pendingBatches() throws -> [PendingBatch] {

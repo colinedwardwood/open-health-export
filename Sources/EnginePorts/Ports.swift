@@ -167,6 +167,98 @@ public struct PendingBatch: Sendable, Equatable {
     }
 }
 
+public enum DeliveryState: String, Sendable, Codable, Equatable {
+    case pending
+    case inFlight
+    case retryWaiting
+    case blockedNeedsUser
+    case acknowledged
+    case sentUnconfirmed
+    case gapped
+    case purged
+
+    public var releasesObligation: Bool {
+        switch self {
+        case .acknowledged, .sentUnconfirmed, .gapped, .purged:
+            true
+        case .pending, .inFlight, .retryWaiting, .blockedNeedsUser:
+            false
+        }
+    }
+}
+
+public struct BatchDestination: Sendable, Equatable {
+    public var destinationID: DestinationID
+    public var expectedRecords: Int
+    public var scopeSnapshot: DestinationExportScope
+    public var scopeDigest: String
+
+    public init(
+        destinationID: DestinationID,
+        expectedRecords: Int,
+        scopeSnapshot: DestinationExportScope,
+        scopeDigest: String
+    ) {
+        self.destinationID = destinationID
+        self.expectedRecords = expectedRecords
+        self.scopeSnapshot = scopeSnapshot
+        self.scopeDigest = scopeDigest
+    }
+}
+
+public struct PendingDelivery: Sendable, Equatable {
+    public var id: DeliveryID
+    public var batch: PendingBatch
+    public var expectedRecords: Int
+    public var scopeSnapshot: DestinationExportScope
+    public var scopeDigest: String
+    public var attempt: Int
+    public var state: DeliveryState
+    public var nextEarliestAt: TimeInterval?
+
+    public init(
+        id: DeliveryID,
+        batch: PendingBatch,
+        expectedRecords: Int,
+        scopeSnapshot: DestinationExportScope,
+        scopeDigest: String,
+        attempt: Int = 0,
+        state: DeliveryState = .pending,
+        nextEarliestAt: TimeInterval? = nil
+    ) {
+        self.id = id
+        self.batch = batch
+        self.expectedRecords = expectedRecords
+        self.scopeSnapshot = scopeSnapshot
+        self.scopeDigest = scopeDigest
+        self.attempt = attempt
+        self.state = state
+        self.nextEarliestAt = nextEarliestAt
+    }
+}
+
+public struct DestinationDeliveryReceipt: Sendable, Equatable {
+    public var deliveryID: DeliveryID
+    public var accepted: Int
+    public var unconfirmed: Int
+
+    public init(deliveryID: DeliveryID, accepted: Int, unconfirmed: Int = 0) {
+        self.deliveryID = deliveryID
+        self.accepted = accepted
+        self.unconfirmed = unconfirmed
+    }
+}
+
+public struct DeliverySettlement: Sendable, Equatable {
+    public var batchReleased: Bool
+    public var payloadPathsToUnlink: [String]
+
+    public init(batchReleased: Bool, payloadPathsToUnlink: [String] = []) {
+        self.batchReleased = batchReleased
+        self.payloadPathsToUnlink = payloadPathsToUnlink
+    }
+}
+
 public enum TypeDisableReason {
     public static let authorizationRevoked = "authorization_revoked"
     public static let historyClipped = "history_clipped"
@@ -577,6 +669,12 @@ public enum BatchIdentityError: Error, Sendable, Equatable {
     case duplicate(BatchID)
 }
 
+public enum FanoutStateError: Error, Sendable, Equatable {
+    case duplicateDestination(DestinationID)
+    case scopeDestinationMismatch(DestinationID)
+    case negativeExpectedRecords(DestinationID)
+}
+
 public protocol StateTransaction: AnyObject {
     func loadCursor(metric: MetricID) throws -> CursorSnapshot?
     /// AR-14: durable, installation-scoped batch sequence. Gaps are permitted;
@@ -586,6 +684,17 @@ public protocol StateTransaction: AnyObject {
     func upsertBackfillCheckpoint(jobID: String, bytes: Data) throws
     func enqueuePending(_ batch: PendingBatch) throws
     func commitBatch(_ batch: PendingBatch, advancing: CursorAdvance) throws
+    func enqueueFanout(_ batch: PendingBatch, destinations: [BatchDestination]) throws
+    func commitFanout(
+        _ batch: PendingBatch,
+        destinations: [BatchDestination],
+        advancing: CursorAdvance
+    ) throws
+    func pendingDeliveries(
+        destinationID: DestinationID,
+        limit: Int
+    ) throws -> [PendingDelivery]
+    func settleDelivery(_ receipt: DestinationDeliveryReceipt) throws -> DeliverySettlement
     /// Batches survive process death until a receipt confirms every expected record.
     func pendingBatches() throws -> [PendingBatch]
     func queuedBytes() throws -> Int

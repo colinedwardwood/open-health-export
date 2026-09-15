@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "priorSchemaVersion": 1,
-  "targetSchemaVersion": 18,
+  "targetSchemaVersion": 19,
   "firstRelease": true,
   "fixture": "programmatic:Sources/TestSupport/SQLiteV1Fixture.swift",
   "ciCheck": "export-core",

@@ -17,6 +17,21 @@ public struct BatchID: Hashable, Sendable, Codable {
     public init(rawValue: String) { self.rawValue = rawValue }
 }
 
+public struct DestinationID: Hashable, Sendable, Codable, RawRepresentable {
+    public var rawValue: String
+    public init(rawValue: String) { self.rawValue = rawValue }
+}
+
+public struct DeliveryID: Hashable, Sendable, Codable {
+    public var batchID: BatchID
+    public var destinationID: DestinationID
+
+    public init(batchID: BatchID, destinationID: DestinationID) {
+        self.batchID = batchID
+        self.destinationID = destinationID
+    }
+}
+
 public struct RunID: Hashable, Sendable, Codable {
     public var rawValue: String
     public init(rawValue: String) { self.rawValue = rawValue }
