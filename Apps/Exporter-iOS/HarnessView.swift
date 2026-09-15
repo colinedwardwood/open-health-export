@@ -1120,10 +1120,7 @@ struct HarnessView: View {
                                             destinationID: snapshot.destinationID
                                         )
                                         refreshDestinationSurfaces()
-                                        if snapshot.destinationID == "local-file" {
-                                            AppLifecycleCoordinator.shared.stopObservers()
-                                            Task { await startHealthObserversIfEligible() }
-                                        }
+                                        Task { await reevaluateAutomaticExport() }
                                     }
                                 )
                             ) {
@@ -3386,6 +3383,7 @@ struct HarnessView: View {
             confirmationKind = nil
             publicAddressConfirmation = ""
             refreshDestinationSurfaces()
+            await reevaluateAutomaticExport()
             await refreshLedgerIntegrity()
         } catch {
             status = "Failed: \(error.localizedDescription)"
@@ -3817,6 +3815,7 @@ struct HarnessView: View {
                 }
             }
             refreshDestinationSurfaces()
+            await reevaluateAutomaticExport()
             if let draft = importedDestinationDraft,
                draft.configuration.kind == .companion,
                pairing.serviceName == importedCompanionServiceName {
@@ -3865,6 +3864,7 @@ struct HarnessView: View {
             sas = ""
             pairingPaste = ""
             refreshDestinationSurfaces()
+            await reevaluateAutomaticExport()
             status = "Ready. Companion pairing forgotten and its destination disabled."
         } catch {
             status = "Failed: \(error.localizedDescription)"
@@ -3955,6 +3955,17 @@ struct HarnessView: View {
         } catch {
             status = "Background Health delivery registration failed: \(error.localizedDescription)"
         }
+    }
+
+    /// Whether automatic export is possible at all depends on the whole set of
+    /// destinations, so enabling or disabling any one of them re-decides the
+    /// observers. Only the archive folder used to do this, which left a user whose
+    /// single destination was HTTPS, MQTT, Home Assistant or the Mac companion with
+    /// no wake source until the next launch.
+    @MainActor
+    private func reevaluateAutomaticExport() async {
+        AppLifecycleCoordinator.shared.stopObservers()
+        await startHealthObserversIfEligible()
     }
 }
 
