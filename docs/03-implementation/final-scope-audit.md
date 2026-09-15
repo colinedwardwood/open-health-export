@@ -28,16 +28,37 @@ This file separates repository-complete engineering work from evidence that cann
 
 ## Pending automated run
 
-Tier-1 remote `ExportRun` (10 million records, 100 MiB RSS) succeeded on
-https://github.com/colinedwardwood/open-health-export/actions/runs/34667824738.
+Tier-1 `ExportRun` over all ten million records passes the 100 MiB RSS ceiling
+with margin. Measured peak is 51.5 MiB (`outcome=success`, `pages=960`,
+`page_size=10000`, `submitted_records=9000000`, all five formats), read from
+Linux `VmHWM` in a `swift:6.3.3` container.
+
+Getting there took two fixes. A full page was held three times at once — as the
+encoded line strings, as the concatenated body, and as the assembled payload —
+and then rebuilt a fourth time by the sidecar writers, which read the page back
+off disk into records, CSV rows and a `CanonicalJSON` tree. Sidecars alone were
+about 50 MiB of a 141 MiB peak. Both paths now stream, and the streaming writers
+are pinned byte-identical to the in-memory encoders they replaced.
+
+The measurement is page-size bound, not corpus bound: ingest stays near 36 MiB
+from 1.4 million records to 10 million, so a smaller corpus with full 10k pages
+reproduces the same peak and is the cheap way to re-check this.
 
 T2 tombstone accounting is on `main` (`volumeStructuralKinds` includes `tombstone`;
 `exportruncheck --page-size 10000`). `tier-two-pathologies` on
 https://github.com/colinedwardwood/open-health-export/actions/runs/34883238541
-concluded success (fifty million records, `pipelinecheck lines=50000001`). T2
-`ExportRun` on that dispatch is still running. T1 `ExportRun` on the same
-dispatch failed; the failure line is not downloadable until the workflow
-finishes. T2 is not verified until `tier-two-exportrun` also concludes success.
+concluded success (fifty million records, `pipelinecheck lines=50000001`), and
+again on
+https://github.com/colinedwardwood/open-health-export/actions/runs/34973680714.
+T2 is not verified until `tier-two-exportrun` also concludes success; that leg
+has not yet finished on any dispatch. It exercises the same page path T1 does,
+so it is expected to clear the ceiling now that the page streams, but expected
+is not measured.
+
+Both remote dispatches of `tier-one-corpus` predate the streaming fix and
+recorded the old failure (`peak resident memory 145044 KiB exceeded 102400
+KiB`). The 51.5 MiB figure above is a local Linux container run; a remote
+`nightly-volume` dispatch should confirm it on GitHub's runner.
 
 Weekly mutation (`qa/mutants.json`) and flake-quarantine skip citations are
 wired. Linux kills hostless mutants; macOS kills Darwin-hosted mutants.
