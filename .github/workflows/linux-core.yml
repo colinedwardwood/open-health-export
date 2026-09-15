@@ -6,13 +6,10 @@ on:
   push:
   pull_request:
 concurrency:
-  # Each commit on main gets its own concurrency group, so runs never contend and
-  # none is left marked cancelled. Grouping by ref is not enough: with
-  # cancel-in-progress false GitHub still cancels the *pending* run when a newer
-  # one queues, so a run could only ever be superseded rather than completed.
-  # Off main, superseding is exactly what we want.
-  group: linux-core-${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # A newer commit is the evidence candidate for this ref. Retaining superseded
+  # main SHAs duplicated the full Linux suite during implementation slices.
+  group: linux-core-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   # OSS-15. Kept separate from export-core so a licence-header slip reports as a
   # licence failure rather than hiding inside a 90-minute test job.

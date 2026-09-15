@@ -7,6 +7,11 @@ on:
   pull_request:
   schedule:
     - cron: "17 6 * * *"
+concurrency:
+  # Scheduled canaries are independent evidence. Push/PR runs keep only the
+  # newest commit for their ref.
+  group: container-contracts-${{ github.event_name == 'schedule' && github.run_id || github.ref }}
+  cancel-in-progress: true
 jobs:
   mosquitto:
     runs-on: ubuntu-latest

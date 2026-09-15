@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: security-sensitive-diff-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   detect:
     runs-on: ubuntu-24.04

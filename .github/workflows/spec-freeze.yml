@@ -9,6 +9,9 @@ on:
   push:
     paths:
       - spec/v1.0.0/**
+concurrency:
+  group: spec-freeze-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   freeze:
     runs-on: ubuntu-latest
