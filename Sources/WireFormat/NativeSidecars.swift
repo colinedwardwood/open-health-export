@@ -68,36 +68,110 @@ public enum NativeSidecars {
         try write(fromNDJSONAt: staging, beside: ndjsonURL)
     }
 
+    /// Every sidecar is derived from the NDJSON already on disk, so none of them needs
+    /// the page in memory. Re-reading the file per encoding costs IO the OS caches;
+    /// holding a 10k-record page as records, CSV rows and a `CanonicalJSON` tree at the
+    /// same time cost roughly 50 MiB of R-74's 100 MiB ceiling.
     public static func write(fromNDJSONAt url: URL, beside ndjsonURL: URL) throws {
-        var parsed = try parse(at: url)
+        let scan = try scan(at: url)
         let encodings = ndjsonURL.deletingPathExtension().appendingPathExtension("encodings")
         try FileManager.default.createDirectory(at: encodings, withIntermediateDirectories: true)
-        let csv = try NativeCSV.quantityFiles(
-            samples: parsed.samples,
-            envelope: parsed.envelope,
-            headerLine: parsed.headerLine,
-            footerLine: parsed.footerLine
+        try NativeCSV.writeQuantityFiles(
+            scan: scan,
+            readingSamplesFrom: url,
+            into: encodings
         )
-        try csv.quantity.write(to: encodings.appendingPathComponent(csv.fileName), options: .atomic)
-        for extra in csv.extra {
-            try extra.0.write(to: encodings.appendingPathComponent(extra.1), options: .atomic)
-        }
-        try csv.meta.write(to: encodings.appendingPathComponent("_meta.json"), options: .atomic)
-        if parsed.haeEligible, let metric = parsed.metric {
-            let hae = try HAEWire.encode(
-                samples: parsed.samples,
-                tombstones: [],
+        if scan.haeEligible, let metric = scan.metric {
+            try HAEWire.write(
+                readingSamplesFrom: url,
                 metric: metric,
+                to: encodings.appendingPathComponent("batch.hae.json"),
                 acknowledgingLoss: HAELossAccepted()
             )
-            try hae.write(to: encodings.appendingPathComponent("batch.hae.json"), options: .atomic)
         }
-        parsed.samples = []
         try NativeJSON.writeDocuments(
             fromNDJSONAt: url,
             canonical: encodings.appendingPathComponent("batch.json"),
             pretty: encodings.appendingPathComponent("batch.pretty.json")
         )
+    }
+
+    /// Batch framing plus the counts and window the sidecars need, and not one sample.
+    /// The wire body is already ordered by `(start, uuid)`, so the first and last
+    /// quantity lines give the CSV window without sorting anything.
+    struct Scan {
+        var envelope = WireEnvelope(exporterId: "", seq: 1, emittedAt: "", observedAt: "")
+        var metric: MetricID?
+        var quantityCount = 0
+        var firstStart = ""
+        var lastEnd = ""
+        var headerLine = ""
+        var footerLine = ""
+        var sawTombstone = false
+
+        var haeEligible: Bool { !sawTombstone && quantityCount > 0 }
+    }
+
+    static func scan(at url: URL) throws -> Scan {
+        var scan = Scan()
+        var sawHeader = false
+        try forEachLine(at: url) { kind, line, object in
+            switch kind {
+            case "batch.header":
+                sawHeader = true
+                scan.headerLine = String(decoding: line, as: UTF8.self)
+                scan.envelope = WireEnvelope(
+                    exporterId: object["exporterId"] as? String ?? "",
+                    seq: (object["seq"] as? NSNumber)?.intValue ?? 1,
+                    emittedAt: object["emittedAt"] as? String ?? "",
+                    observedAt: object["emittedAt"] as? String ?? "",
+                    completeThrough: object["completeThrough"] as? String,
+                    verifiedThrough: object["verifiedThrough"] as? String,
+                    tzDatabaseVersion: object["tzDatabaseVersion"] as? String
+                )
+            case "batch.footer":
+                scan.footerLine = String(decoding: line, as: UTF8.self)
+            case "sample.quantity":
+                let sample = try quantitySample(fromNDJSONLine: line)
+                if scan.metric == nil { scan.metric = sample.metric }
+                if scan.quantityCount == 0 { scan.firstStart = sample.start }
+                scan.lastEnd = sample.end
+                scan.quantityCount += 1
+            case "tombstone":
+                scan.sawTombstone = true
+            default:
+                break
+            }
+        }
+        guard sawHeader else { throw WireError.utf8 }
+        return scan
+    }
+
+    static func forEachQuantitySample(
+        at url: URL,
+        _ body: (SampleRecord) throws -> Void
+    ) throws {
+        try forEachLine(at: url) { kind, line, _ in
+            guard kind == "sample.quantity" else { return }
+            try body(try quantitySample(fromNDJSONLine: line))
+        }
+    }
+
+    private static func forEachLine(
+        at url: URL,
+        _ body: (String, Data, [String: Any]) throws -> Void
+    ) throws {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        var reader = NDJSONLineReader(handle: handle)
+        while let line = try reader.next() {
+            guard let object = try JSONSerialization.jsonObject(with: line) as? [String: Any],
+                  let kind = object["kind"] as? String
+            else {
+                throw WireError.utf8
+            }
+            try body(kind, line, object)
+        }
     }
 
     static func parse(_ data: Data) throws -> (

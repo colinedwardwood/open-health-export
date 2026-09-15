@@ -2655,6 +2655,102 @@ private func runUntilProcessExitSeam() async throws {
     #expect(names.contains { $0.hasPrefix("ohe1-quantity-") })
 }
 
+/// The streaming sidecar writers exist only to keep a full page out of memory, so they
+/// must emit what the in-memory encoders emitted. Byte equality is the whole contract:
+/// a silent divergence here would change an archive format nobody is watching.
+@Test func streamedSidecarsMatchTheInMemoryEncodersByte() throws {
+    let samples = (1 ... 25).map { index in
+        heartSample(
+            String(format: "00000000-0000-0000-0000-%012d", index),
+            start: String(format: "2024-01-%02dT00:%02d:00Z", (index % 28) + 1, index % 60)
+        )
+    }
+    let batchID = BatchID(rawValue: "0192f3c1-0000-0000-0000-0000000000ff")
+    let envelope = testEnvelope()
+    let ndjson = try NativeWire.encode(
+        samples: samples,
+        tombstones: [],
+        metric: MetricID(rawValue: "heartRate"),
+        batchID: batchID,
+        envelope: envelope
+    )
+    let dir = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-sidecar-equiv-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let payload = dir.appendingPathComponent("batch.ndjson")
+    try ndjson.write(to: payload)
+
+    try NativeSidecars.write(fromNDJSONAt: payload, beside: payload)
+    let encodings = payload.deletingPathExtension().appendingPathExtension("encodings")
+
+    let parsed = try NativeSidecars.parse(at: payload)
+    let expectedCSV = try NativeCSV.quantityFiles(
+        samples: parsed.samples,
+        envelope: parsed.envelope,
+        headerLine: parsed.headerLine,
+        footerLine: parsed.footerLine
+    )
+    #expect(expectedCSV.extra.isEmpty)
+    #expect(
+        try Data(contentsOf: encodings.appendingPathComponent(expectedCSV.fileName))
+            == expectedCSV.quantity
+    )
+    #expect(
+        try Data(contentsOf: encodings.appendingPathComponent("_meta.json"))
+            == expectedCSV.meta
+    )
+
+    let expectedHAE = try HAEWire.encode(
+        samples: parsed.samples,
+        tombstones: [],
+        metric: MetricID(rawValue: "heartRate"),
+        acknowledgingLoss: HAELossAccepted()
+    )
+    #expect(
+        try Data(contentsOf: encodings.appendingPathComponent("batch.hae.json")) == expectedHAE
+    )
+}
+
+/// The `Data` and `FileHandle` encoders share one implementation; this pins that they
+/// stay byte-identical, because only the streaming one is on the delivery path.
+@Test func streamedWireEncodeMatchesTheDataEncoderByte() throws {
+    let samples = (1 ... 40).map { index in
+        heartSample(
+            String(format: "00000000-0000-0000-0000-%012d", index),
+            start: String(format: "2024-02-%02dT00:%02d:00Z", (index % 28) + 1, index % 60)
+        )
+    }
+    let batchID = BatchID(rawValue: "0192f3c1-0000-0000-0000-0000000000fe")
+    let envelope = testEnvelope()
+    let metric = MetricID(rawValue: "heartRate")
+    let expected = try NativeWire.encode(
+        samples: samples,
+        tombstones: [],
+        metric: metric,
+        batchID: batchID,
+        envelope: envelope
+    )
+    let dir = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-wire-stream-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let destination = dir.appendingPathComponent("streamed.ndjson")
+    try Data().write(to: destination)
+    let handle = try FileHandle(forWritingTo: destination)
+    let reported = try NativeWire.encode(
+        samples: samples,
+        tombstones: [],
+        metric: metric,
+        batchID: batchID,
+        envelope: envelope,
+        to: handle
+    )
+    try handle.close()
+    #expect(try Data(contentsOf: destination) == expected)
+    #expect(reported == expected.count)
+}
+
 @Test func nativeWireHeaderCarriesDeclaredTzDatabaseVersion() throws {
     let envelope = WireEnvelope(
         exporterId: "exp",

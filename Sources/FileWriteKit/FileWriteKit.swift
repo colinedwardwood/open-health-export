@@ -59,6 +59,40 @@ public enum FileWriteKit {
         }
     }
 
+    /// Atomic write for producers that emit their bytes incrementally. The closure is
+    /// handed a handle on the temp file, so a full T1 page is never held as `Data` on
+    /// either side of the rename. Same crash contract as the `Data` overload.
+    public static func writeAtomically(
+        to destination: URL,
+        body: (FileHandle) throws -> Void
+    ) throws {
+        let directory = destination.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let temp = directory.appendingPathComponent(".\(destination.lastPathComponent).tmp-\(UUID().uuidString)")
+        do {
+            try Data().write(to: temp, options: .withoutOverwriting)
+            let handle = try FileHandle(forWritingTo: temp)
+            do {
+                try body(handle)
+            } catch {
+                try? handle.close()
+                throw error
+            }
+            try handle.close()
+        } catch {
+            try? FileManager.default.removeItem(at: temp)
+            throw error
+        }
+        #if DEBUG
+        try injectStreamingWriteFault(temp: temp)
+        #endif
+        if rename(temp.path, destination.path) != 0 {
+            let code = Int(errno)
+            try? FileManager.default.removeItem(at: temp)
+            throw NSError(domain: NSPOSIXErrorDomain, code: code)
+        }
+    }
+
     private static let copyChunkBytes = 64 * 1_024
 
     /// Copy a payload file without materialising it. R-74 forbids `Data(contentsOf:)`
@@ -127,6 +161,23 @@ public enum FileWriteKit {
     }
 
     #if DEBUG
+    /// Truncates in place rather than re-reading the payload, so injecting a torn-write
+    /// fault does not itself allocate the page the streaming path exists to avoid.
+    private static func injectStreamingWriteFault(temp: URL) throws {
+        switch fault {
+        case .none:
+            return
+        case .abortBeforeRename:
+            try? FileManager.default.removeItem(at: temp)
+            throw FileWriteError.injectedFault
+        case .abortAfterTruncatingTemp(let count):
+            let handle = try FileHandle(forWritingTo: temp)
+            try handle.truncate(atOffset: UInt64(max(0, count)))
+            try handle.close()
+            throw FileWriteError.injectedFault
+        }
+    }
+
     private static func injectWriteFault(temp: URL, intended: Data) throws {
         switch fault {
         case .none:

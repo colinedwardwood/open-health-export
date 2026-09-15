@@ -57,13 +57,7 @@ public enum HAEWire {
         guard let declaration = MetricCatalog.declaration(for: metric) else {
             throw HAEError.unknownMetric
         }
-        let points: [CanonicalJSON] = samples.map { sample in
-            .object([
-                "qty": .number(sample.value),
-                "date": .string(haeDate(sample.start)),
-                "source": .string("iPhone"),
-            ])
-        }
+        let points: [CanonicalJSON] = samples.map { point(for: $0) }
         let metricObject: CanonicalJSON = .object([
             "name": .string(declaration.wireId),
             "units": .string(declaration.wireUnit),
@@ -82,6 +76,65 @@ public enum HAEWire {
             ])
         ])
         return Data(try root.serialized().utf8)
+    }
+
+    /// Streams the bytes `encode` returns, reading samples from the NDJSON on disk one
+    /// at a time. `CanonicalJSON` serializes object keys in sorted order, so the fixed
+    /// skeleton below is the same byte sequence the in-memory tree produced; each point
+    /// still goes through `CanonicalJSON` so number and escape handling is unchanged.
+    static func write(
+        readingSamplesFrom url: URL,
+        metric: MetricID,
+        to destination: URL,
+        acknowledgingLoss: HAELossAccepted
+    ) throws {
+        _ = acknowledgingLoss
+        guard let declaration = MetricCatalog.declaration(for: metric) else {
+            throw HAEError.unknownMetric
+        }
+        try Data().write(to: destination)
+        let handle = try FileHandle(forWritingTo: destination)
+        defer { try? handle.close() }
+
+        var buffer = Data()
+        buffer.reserveCapacity(flushBytes + 1_024)
+
+        func append(_ text: String) throws {
+            buffer.append(contentsOf: text.utf8)
+            if buffer.count >= flushBytes {
+                try handle.write(contentsOf: buffer)
+                buffer.removeAll(keepingCapacity: true)
+            }
+        }
+
+        try append(
+            "{\"data\":{\"cycleTracking\":[],\"ecg\":[],\"heartRateNotifications\":[],"
+                + "\"medications\":[],\"metrics\":[{\"data\":["
+        )
+        var wrotePoint = false
+        try NativeSidecars.forEachQuantitySample(at: url) { sample in
+            if wrotePoint { try append(",") }
+            wrotePoint = true
+            try append(try point(for: sample).serialized())
+        }
+        try append(
+            "],\"name\":" + (try CanonicalJSON.string(declaration.wireId).serialized())
+                + ",\"units\":" + (try CanonicalJSON.string(declaration.wireUnit).serialized())
+                + "}],\"stateOfMind\":[],\"symptoms\":[],\"workouts\":[]}}"
+        )
+        if !buffer.isEmpty {
+            try handle.write(contentsOf: buffer)
+        }
+    }
+
+    private static let flushBytes = 64 * 1_024
+
+    private static func point(for sample: SampleRecord) -> CanonicalJSON {
+        .object([
+            "qty": .number(sample.value),
+            "date": .string(haeDate(sample.start)),
+            "source": .string("iPhone"),
+        ])
     }
 
     /// HAE's locale-dependent clock is a known hazard. We emit a fixed 24-hour `+0000` form so

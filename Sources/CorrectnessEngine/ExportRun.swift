@@ -276,29 +276,34 @@ public struct ExportRun: Sendable {
         {
             wireEnvelope.tzDatabaseVersion = temporal.tzDatabaseVersion
         }
-        let payload = try NativeWire.encode(
-            samples: page.samples,
-            categories: page.categories,
-            correlations: page.correlations,
-            workouts: page.workouts,
-            minds: page.minds,
-            electrocardiograms: page.electrocardiograms,
-            audiograms: page.audiograms,
-            medicationDoses: page.medicationDoses,
-            series: page.series,
-            tombstones: page.tombstones,
-            aggregates: aggregates.map(\.record),
-            metric: metric,
-            batchID: batchID,
-            envelope: wireEnvelope
-        )
-        #if DEBUG
-        try faults.hit(.afterTransform)
-        #endif
         let payloadURL = scratchDirectory.appendingPathComponent(
             NativeWire.outputFileName(batchID: batchID, demo: envelope.demo)
         )
-        try FileWriteKit.writeAtomically(payload, to: payloadURL)
+        // Encoded straight to the file. Holding the page's payload as `Data` cost three
+        // simultaneous copies of a full T1 page and broke R-74's 100 MiB ceiling.
+        var payloadBytes = 0
+        try FileWriteKit.writeAtomically(to: payloadURL) { handle in
+            payloadBytes = try NativeWire.encode(
+                samples: page.samples,
+                categories: page.categories,
+                correlations: page.correlations,
+                workouts: page.workouts,
+                minds: page.minds,
+                electrocardiograms: page.electrocardiograms,
+                audiograms: page.audiograms,
+                medicationDoses: page.medicationDoses,
+                series: page.series,
+                tombstones: page.tombstones,
+                aggregates: aggregates.map(\.record),
+                metric: metric,
+                batchID: batchID,
+                envelope: wireEnvelope,
+                to: handle
+            )
+        }
+        #if DEBUG
+        try faults.hit(.afterTransform)
+        #endif
         mark("transform")
 
         let recordCount = page.encodedRecordCount + aggregates.count
@@ -321,7 +326,7 @@ public struct ExportRun: Sendable {
             id: batchID,
             payloadURL: payloadURL.path,
             expectedRecords: recordCount,
-            byteCount: payload.count,
+            byteCount: payloadBytes,
             metric: metric,
             createdAtEpoch: applyEpoch,
             rangeStartDay: rangeDays.min() ?? fallbackDay,

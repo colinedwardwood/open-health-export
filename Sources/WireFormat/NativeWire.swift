@@ -225,115 +225,242 @@ public enum NativeWire {
         batchID: BatchID,
         envelope: WireEnvelope
     ) throws -> Data {
-        let sampleLines = try samples
-            .sorted { lhs, rhs in
-                (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
-            }
-            .map { try encodeQuantity($0, metric: $0.metric, envelope: envelope) }
-        let categoryLines = try categories
-            .sorted { lhs, rhs in
-                (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
-            }
-            .map { try encodeCategory($0, envelope: envelope) }
-        let correlationLines = try correlations
-            .sorted { $0.key.uuid.lowercased() < $1.key.uuid.lowercased() }
-            .map { try encodeCorrelation($0, envelope: envelope) }
-        let workoutLines = try workouts
-            .sorted { lhs, rhs in
-                (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
-            }
-            .map { try encodeWorkout($0, envelope: envelope) }
-        let mindLines = try minds
-            .sorted { lhs, rhs in
-                (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
-            }
-            .map { try encodeStateOfMind($0, envelope: envelope) }
-        let ecgLines = try electrocardiograms
-            .sorted { lhs, rhs in
-                (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
-            }
-            .map { try encodeECG($0, envelope: envelope) }
-        let audiogramLines = try audiograms
-            .sorted { lhs, rhs in
-                (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
-            }
-            .map { try encodeAudiogram($0, envelope: envelope) }
-        let doseLines = try medicationDoses
-            .sorted { lhs, rhs in
-                (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
-            }
-            .map { try encodeMedicationDose($0, envelope: envelope) }
-        let seriesLines = try series
-            .sorted { lhs, rhs in
-                (lhs.parentUUID.lowercased(), lhs.payload.wireKind, lhs.chunkIndex)
-                    < (rhs.parentUUID.lowercased(), rhs.payload.wireKind, rhs.chunkIndex)
-            }
-            .map { try encodeSeries($0, envelope: envelope) }
-        let tombLines = try tombstones
-            .sorted { $0.key.uuid.lowercased() < $1.key.uuid.lowercased() }
-            .map { try encodeTombstone($0, metric: metric, envelope: envelope) }
-        let aggregateLines = try aggregates
-            .sorted { lhs, rhs in
-                (lhs.bucketStart, lhs.bucketKey) < (rhs.bucketStart, rhs.bucketKey)
-            }
-            .map { try encodeAggregate($0, envelope: envelope) }
-        let characteristicLines = try characteristics
-            .sorted { $0.characteristicId < $1.characteristicId }
-            .map { try encodeCharacteristic($0, envelope: envelope) }
-        let records = sampleLines + categoryLines + correlationLines
-            + workoutLines + mindLines + ecgLines + audiogramLines + doseLines
-            + seriesLines + tombLines + aggregateLines + characteristicLines
-        var body = Data()
-        body.reserveCapacity(records.count * 320)
-        for line in records {
-            body.append(contentsOf: line.utf8)
-            body.append(0x0A)
-        }
-        let digest = "sha256:" + SHA256.hex(body)
-        let header = try encodeHeader(
+        var out = Data()
+        try writeEncoded(
+            samples: samples,
+            categories: categories,
+            correlations: correlations,
+            workouts: workouts,
+            minds: minds,
+            electrocardiograms: electrocardiograms,
+            audiograms: audiograms,
+            medicationDoses: medicationDoses,
+            series: series,
+            tombstones: tombstones,
+            aggregates: aggregates,
+            characteristics: characteristics,
+            metric: metric,
             batchID: batchID,
             envelope: envelope,
-            types: headerTypes(
-                metric: metric,
-                samples: samples,
-                categories: categories,
-                correlations: correlations,
-                workouts: workouts,
-                minds: minds,
-                electrocardiograms: electrocardiograms,
-                audiograms: audiograms,
-                medicationDoses: medicationDoses,
-                characteristics: characteristics
-            ),
-            recordCount: records.count
+            emit: { out.append($0) }
         )
-        let footer = try encodeFooter(
-            batchID: batchID,
-            sampleCount: samples.count,
-            categoryCount: categories.count,
-            correlationCount: correlations.count,
-            workoutCount: workouts.count,
-            mindCount: minds.count,
-            ecgCount: electrocardiograms.count,
-            audiogramCount: audiograms.count,
-            medicationCount: medicationDoses.count,
-            seriesCounts: Dictionary(
-                grouping: series,
-                by: { $0.payload.wireKind }
-            ).mapValues(\.count),
-            tombstoneCount: tombstones.count,
-            canaryCount: 0,
-            digest: digest,
-            aggregateCount: aggregates.count,
-            characteristicCount: characteristics.count
-        )
-        var out = Data()
-        out.append(contentsOf: header.utf8)
-        out.append(0x0A)
-        out.append(body)
-        out.append(contentsOf: footer.utf8)
-        out.append(0x0A)
         return out
+    }
+
+    /// Streams exactly the bytes the `Data` overload returns into `handle`, one record
+    /// at a time. A full T1 page encoded in memory costs three simultaneous copies of
+    /// itself — the `[String]` lines, the body, and the assembled payload — which is
+    /// what pushed R-74's 100 MiB ceiling to 141 MiB. Use this on the delivery path.
+    @discardableResult
+    public static func encode(
+        samples: [SampleRecord],
+        categories: [CategoryRecord] = [],
+        correlations: [CorrelationRecord] = [],
+        workouts: [WorkoutRecord] = [],
+        minds: [StateOfMindRecord] = [],
+        electrocardiograms: [ECGRecord] = [],
+        audiograms: [AudiogramRecord] = [],
+        medicationDoses: [MedicationDoseRecord] = [],
+        series: [SeriesRecord] = [],
+        tombstones: [TombstoneRecord],
+        aggregates: [AggregateRecord] = [],
+        characteristics: [CharacteristicRecord] = [],
+        metric: MetricID,
+        batchID: BatchID,
+        envelope: WireEnvelope,
+        to handle: FileHandle
+    ) throws -> Int {
+        try writeEncoded(
+            samples: samples,
+            categories: categories,
+            correlations: correlations,
+            workouts: workouts,
+            minds: minds,
+            electrocardiograms: electrocardiograms,
+            audiograms: audiograms,
+            medicationDoses: medicationDoses,
+            series: series,
+            tombstones: tombstones,
+            aggregates: aggregates,
+            characteristics: characteristics,
+            metric: metric,
+            batchID: batchID,
+            envelope: envelope,
+            emit: { try handle.write(contentsOf: $0) }
+        )
+    }
+
+    private static let encodeFlushBytes = 64 * 1_024
+
+    /// Single source of the wire bytes. `emit` receives them in order, in chunks; the
+    /// footer digest covers the record lines only, so it is hashed as it is written.
+    @discardableResult
+    private static func writeEncoded(
+        samples: [SampleRecord],
+        categories: [CategoryRecord],
+        correlations: [CorrelationRecord],
+        workouts: [WorkoutRecord],
+        minds: [StateOfMindRecord],
+        electrocardiograms: [ECGRecord],
+        audiograms: [AudiogramRecord],
+        medicationDoses: [MedicationDoseRecord],
+        series: [SeriesRecord],
+        tombstones: [TombstoneRecord],
+        aggregates: [AggregateRecord],
+        characteristics: [CharacteristicRecord],
+        metric: MetricID,
+        batchID: BatchID,
+        envelope: WireEnvelope,
+        emit: (Data) throws -> Void
+    ) throws -> Int {
+        let recordCount = samples.count + categories.count + correlations.count
+            + workouts.count + minds.count + electrocardiograms.count
+            + audiograms.count + medicationDoses.count + series.count
+            + tombstones.count + aggregates.count + characteristics.count
+
+        var buffer = Data()
+        buffer.reserveCapacity(encodeFlushBytes + 1_024)
+        var bodyHasher = SHA256.Hasher()
+        var byteCount = 0
+
+        func flush() throws {
+            guard !buffer.isEmpty else { return }
+            try emit(buffer)
+            buffer.removeAll(keepingCapacity: true)
+        }
+
+        func append(_ line: String, hashed: Bool) throws {
+            var data = Data(line.utf8)
+            data.append(0x0A)
+            if hashed { bodyHasher.update(data) }
+            byteCount += data.count
+            buffer.append(data)
+            if buffer.count >= encodeFlushBytes { try flush() }
+        }
+
+        /// Sorting a copy is the one array the page still pays for; the encoded lines
+        /// are no longer accumulated, which is where the real footprint was.
+        func appendRecords<T>(
+            _ items: [T],
+            by areInIncreasingOrder: (T, T) throws -> Bool,
+            line: (T) throws -> String
+        ) throws {
+            for item in try items.sorted(by: areInIncreasingOrder) {
+                try append(try line(item), hashed: true)
+            }
+        }
+
+        try append(
+            try encodeHeader(
+                batchID: batchID,
+                envelope: envelope,
+                types: headerTypes(
+                    metric: metric,
+                    samples: samples,
+                    categories: categories,
+                    correlations: correlations,
+                    workouts: workouts,
+                    minds: minds,
+                    electrocardiograms: electrocardiograms,
+                    audiograms: audiograms,
+                    medicationDoses: medicationDoses,
+                    characteristics: characteristics
+                ),
+                recordCount: recordCount
+            ),
+            hashed: false
+        )
+
+        try appendRecords(samples) { lhs, rhs in
+            (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
+        } line: {
+            try encodeQuantity($0, metric: $0.metric, envelope: envelope)
+        }
+        try appendRecords(categories) { lhs, rhs in
+            (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
+        } line: {
+            try encodeCategory($0, envelope: envelope)
+        }
+        try appendRecords(correlations) {
+            $0.key.uuid.lowercased() < $1.key.uuid.lowercased()
+        } line: {
+            try encodeCorrelation($0, envelope: envelope)
+        }
+        try appendRecords(workouts) { lhs, rhs in
+            (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
+        } line: {
+            try encodeWorkout($0, envelope: envelope)
+        }
+        try appendRecords(minds) { lhs, rhs in
+            (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
+        } line: {
+            try encodeStateOfMind($0, envelope: envelope)
+        }
+        try appendRecords(electrocardiograms) { lhs, rhs in
+            (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
+        } line: {
+            try encodeECG($0, envelope: envelope)
+        }
+        try appendRecords(audiograms) { lhs, rhs in
+            (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
+        } line: {
+            try encodeAudiogram($0, envelope: envelope)
+        }
+        try appendRecords(medicationDoses) { lhs, rhs in
+            (lhs.start, lhs.key.uuid.lowercased()) < (rhs.start, rhs.key.uuid.lowercased())
+        } line: {
+            try encodeMedicationDose($0, envelope: envelope)
+        }
+        try appendRecords(series) { lhs, rhs in
+            (lhs.parentUUID.lowercased(), lhs.payload.wireKind, lhs.chunkIndex)
+                < (rhs.parentUUID.lowercased(), rhs.payload.wireKind, rhs.chunkIndex)
+        } line: {
+            try encodeSeries($0, envelope: envelope)
+        }
+        try appendRecords(tombstones) {
+            $0.key.uuid.lowercased() < $1.key.uuid.lowercased()
+        } line: {
+            try encodeTombstone($0, metric: metric, envelope: envelope)
+        }
+        try appendRecords(aggregates) { lhs, rhs in
+            (lhs.bucketStart, lhs.bucketKey) < (rhs.bucketStart, rhs.bucketKey)
+        } line: {
+            try encodeAggregate($0, envelope: envelope)
+        }
+        try appendRecords(characteristics) {
+            $0.characteristicId < $1.characteristicId
+        } line: {
+            try encodeCharacteristic($0, envelope: envelope)
+        }
+
+        let digest = "sha256:" + bodyHasher.finalize()
+            .map { String(format: "%02x", $0) }
+            .joined()
+        try append(
+            try encodeFooter(
+                batchID: batchID,
+                sampleCount: samples.count,
+                categoryCount: categories.count,
+                correlationCount: correlations.count,
+                workoutCount: workouts.count,
+                mindCount: minds.count,
+                ecgCount: electrocardiograms.count,
+                audiogramCount: audiograms.count,
+                medicationCount: medicationDoses.count,
+                seriesCounts: Dictionary(
+                    grouping: series,
+                    by: { $0.payload.wireKind }
+                ).mapValues(\.count),
+                tombstoneCount: tombstones.count,
+                canaryCount: 0,
+                digest: digest,
+                aggregateCount: aggregates.count,
+                characteristicCount: characteristics.count
+            ),
+            hashed: false
+        )
+        try flush()
+        return byteCount
     }
 
     public static func encode(_ sample: SampleRecord, envelope: WireEnvelope) throws -> String {

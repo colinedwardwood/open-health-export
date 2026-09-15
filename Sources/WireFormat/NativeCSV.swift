@@ -54,6 +54,104 @@ enum NativeCSV {
         return (chunks[0].quantity, Data(meta.utf8), chunks[0].fileName, extra)
     }
 
+    /// Writes the same files `quantityFiles` returns, streaming rows straight from the
+    /// NDJSON on disk. The row count and window come from the scan, so part filenames
+    /// are known before the first row is written.
+    static func writeQuantityFiles(
+        scan: NativeSidecars.Scan,
+        readingSamplesFrom url: URL,
+        into encodings: URL,
+        rowLimit: Int = spreadsheetDataRowLimit
+    ) throws {
+        let limit = max(1, rowLimit)
+        let fallback = scan.envelope.emittedAt
+        let windowStart = compactDay(scan.quantityCount == 0 ? fallback : scan.firstStart)
+        let windowEnd = compactDay(scan.quantityCount == 0 ? fallback : scan.lastEnd)
+        let parts = (max(scan.quantityCount, 1) + limit - 1) / limit
+        let many = parts > 1
+
+        func partName(_ index: Int) -> String {
+            many
+                ? String(format: "ohe1-quantity-\(windowStart)-\(windowEnd)-part%02d.csv", index + 1)
+                : "ohe1-quantity-\(windowStart)-\(windowEnd).csv"
+        }
+
+        let meta = "{\"csvDropsMetadata\":true,\"footer\":\(scan.footerLine),\"header\":\(scan.headerLine)}\n"
+        try Data(meta.utf8).write(to: encodings.appendingPathComponent("_meta.json"), options: .atomic)
+
+        var partIndex = 0
+        var rowsInPart = 0
+        var buffer = Data()
+        buffer.reserveCapacity(flushBytes + 1_024)
+        var handle: FileHandle?
+
+        func closePart() throws {
+            if !buffer.isEmpty, let handle {
+                try handle.write(contentsOf: buffer)
+            }
+            buffer.removeAll(keepingCapacity: true)
+            try handle?.close()
+            handle = nil
+        }
+
+        func openPart() throws {
+            let destination = encodings.appendingPathComponent(partName(partIndex))
+            try Data().write(to: destination)
+            handle = try FileHandle(forWritingTo: destination)
+            rowsInPart = 0
+            try appendRow(quantityColumns.joined(separator: ","))
+        }
+
+        func appendRow(_ row: String) throws {
+            buffer.append(contentsOf: row.utf8)
+            buffer.append(contentsOf: "\r\n".utf8)
+            if buffer.count >= flushBytes, let handle {
+                try handle.write(contentsOf: buffer)
+                buffer.removeAll(keepingCapacity: true)
+            }
+        }
+
+        try openPart()
+        try NativeSidecars.forEachQuantitySample(at: url) { sample in
+            if rowsInPart == limit {
+                try closePart()
+                partIndex += 1
+                try openPart()
+            }
+            try appendRow(row(for: sample, envelope: scan.envelope))
+            rowsInPart += 1
+        }
+        try closePart()
+    }
+
+    private static let flushBytes = 64 * 1_024
+
+    private static func row(for sample: SampleRecord, envelope: WireEnvelope) -> String {
+        let decl = MetricCatalog.declaration(for: sample.metric)
+        return [
+            field(sample.key.uuid.lowercased()),
+            field(decl?.wireId ?? sample.metric.rawValue),
+            field(decl?.hkIdentifier ?? sample.metric.rawValue),
+            field(decl == nil ? "unmapped" : "curated"),
+            field(sample.start),
+            field(sample.end),
+            field(String(sample.timeZoneOffsetMinutes)),
+            field(""),
+            field(sample.timeZoneSource.rawValue),
+            field(csvNumber(sample.value)),
+            field(decl?.wireUnit ?? sample.unit.symbol),
+            field(""),
+            field(sample.source?.name ?? ""),
+            field(sample.source?.bundleIdentifier ?? ""),
+            field(sample.device?.name ?? ""),
+            field(sample.wasUserEntered.map { $0 ? "true" : "false" } ?? ""),
+            field(""),
+            field(sample.observedAt),
+            field(envelope.exporterId),
+            field(String(envelope.seq)),
+        ].joined(separator: ",")
+    }
+
     static func quantityChunks(
         samples: [SampleRecord],
         envelope: WireEnvelope,
@@ -81,31 +179,7 @@ enum NativeCSV {
             }
             var rows = [quantityColumns.joined(separator: ",")]
             for sample in slice {
-                let decl = MetricCatalog.declaration(for: sample.metric)
-                rows.append(
-                    [
-                        field(sample.key.uuid.lowercased()),
-                        field(decl?.wireId ?? sample.metric.rawValue),
-                        field(decl?.hkIdentifier ?? sample.metric.rawValue),
-                        field(decl == nil ? "unmapped" : "curated"),
-                        field(sample.start),
-                        field(sample.end),
-                        field(String(sample.timeZoneOffsetMinutes)),
-                        field(""),
-                        field(sample.timeZoneSource.rawValue),
-                        field(csvNumber(sample.value)),
-                        field(decl?.wireUnit ?? sample.unit.symbol),
-                        field(""),
-                        field(sample.source?.name ?? ""),
-                        field(sample.source?.bundleIdentifier ?? ""),
-                        field(sample.device?.name ?? ""),
-                        field(sample.wasUserEntered.map { $0 ? "true" : "false" } ?? ""),
-                        field(""),
-                        field(sample.observedAt),
-                        field(envelope.exporterId),
-                        field(String(envelope.seq)),
-                    ].joined(separator: ",")
-                )
+                rows.append(row(for: sample, envelope: envelope))
             }
             return (
                 quantity: Data((rows.joined(separator: "\r\n") + "\r\n").utf8),
