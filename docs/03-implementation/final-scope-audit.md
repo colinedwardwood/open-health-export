@@ -25,7 +25,7 @@ This file separates repository-complete engineering work from evidence that cann
 - T1 generation and pipeline validation cover all ten million records. The full quantity stream is passed through bounded `ExportRun` pages with exact parsed/submitted accounting and a 100 MiB Linux RSS gate. T2 generation covers fifty million deterministic pathological records (R-82, QA-04, QA-19, QA-24).
 - Release policy checks cover localization completeness, pseudo/RTL UI suites, privacy manifests and egress inventory, sponsor gating, release issue evidence, flake reporting, focused coverage, and explicit state-transition test evidence (QA-26–QA-33, R-107–R-110).
 - Credential-free `.tributary` configuration documents reject unknown/secret fields and can only produce disabled, test-required drafts after exact typed confirmation (R-67, SEC-18).
-- A revoked Local Network grant is detected and reported as itself rather than as an unreachable Mac. The companion browser reads its own state, so the mDNS policy error a denial produces is not mistaken for an empty network, and `EPERM` counts as a denial only on a dial that needed the grant. Transport failures normalize onto closed `DestinationSendError` values at the companion pipe, so a denial is not retried as transient (R-21, TA-01, FIX-A07). Revoking the grant on hardware remains a later gate; the simulator cannot produce the condition.
+- A revoked Local Network grant is detected and reported as itself rather than as an unreachable Mac. The companion browser reads its own state, so the mDNS policy error a denial produces is not mistaken for an empty network, and `EPERM` counts as a denial only on a dial that needed the grant. Companion, MQTT, and HTTPS connection failures normalize onto closed `DestinationSendError` values at their transport boundaries, so a denial or unreachable peer is not left as an unclassified transient error. HTTP status, Retry-After, pin, and cancellation failures retain their dedicated types (R-21, TA-01, FIX-A07). Revoking the grant on hardware remains a later gate; the simulator cannot produce the condition.
 - Background wakes never migrate the store. A wake opens under a policy that forbids migration and, when the on-disk `user_version` is not this build's, journals `migrationPending` and returns before touching a table; the next foreground launch migrates (ADR-R8). The outcome is in the closed R-21 set and counts as benign for R-22, because an unrecognised journal outcome would otherwise be attributed to us as an execution failure.
 - The R-88 soak gate measures the duplicate rate against 0.1% alongside unexplained loss, deriving the rate from `cellsCompared` rather than a self-reported figure, so zero loss bought by duplicating everything cannot sign off clean (TA-06). The validator's own gate is asserted by `policycheck` via a self-test.
 
@@ -35,6 +35,13 @@ Tier-1 `ExportRun` over all ten million records passes the 100 MiB RSS ceiling
 with margin. Measured peak is 51.5 MiB (`outcome=success`, `pages=960`,
 `page_size=10000`, `submitted_records=9000000`, all five formats), read from
 Linux `VmHWM` in a `swift:6.3.3` container.
+
+GitHub-hosted Linux independently confirms the fix at 66.3 MiB in
+[`nightly-volume` run 34999124577](https://github.com/colinedwardwood/open-health-export/actions/runs/34999124577):
+`outcome=success`, ten million declared records, nine million submitted,
+960 pages of up to 10,000 records, and all five formats under the 100 MiB
+ceiling. This is post-fix remote evidence; the failed 145 MiB runs below are
+retained as the before measurement.
 
 Getting there took two fixes. A full page was held three times at once — as the
 encoded line strings, as the concatenated body, and as the assembled payload —
@@ -58,10 +65,9 @@ has not yet finished on any dispatch. It exercises the same page path T1 does,
 so it is expected to clear the ceiling now that the page streams, but expected
 is not measured.
 
-Both remote dispatches of `tier-one-corpus` predate the streaming fix and
-recorded the old failure (`peak resident memory 145044 KiB exceeded 102400
-KiB`). The 51.5 MiB figure above is a local Linux container run; a remote
-`nightly-volume` dispatch should confirm it on GitHub's runner.
+The two earlier remote dispatches of `tier-one-corpus` predate the streaming
+fix and recorded the old failure (`peak resident memory 145044 KiB exceeded
+102400 KiB`). They are superseded by the 66.3 MiB green run above.
 
 Weekly mutation (`qa/mutants.json`) and flake-quarantine skip citations are
 wired. Linux kills hostless mutants; macOS kills Darwin-hosted mutants.
