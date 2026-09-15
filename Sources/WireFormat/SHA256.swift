@@ -7,6 +7,7 @@ import Foundation
 public enum ContentSHA256 {
     public static func bytes(_ data: Data) -> Data { SHA256.hash(data) }
     public static func hex(_ data: Data) -> String { SHA256.hex(data) }
+    public static func hex(file url: URL) throws -> String { try SHA256.hex(file: url) }
     public static func digest(_ data: Data) -> String { "sha256:" + hex(data) }
 }
 
@@ -20,6 +21,18 @@ enum SHA256 {
 
     static func hex(_ data: Data) -> String {
         hash(data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    static func hex(file url: URL) throws -> String {
+        var hasher = Hasher()
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        while true {
+            let chunk = try handle.read(upToCount: 64 * 1_024) ?? Data()
+            if chunk.isEmpty { break }
+            hasher.update(chunk)
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
     struct Hasher {

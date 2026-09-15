@@ -106,6 +106,14 @@ public enum NativeWire {
         return first.contains("\"demo\":true")
     }
 
+    public static func payloadIsDemo(at url: URL) throws -> Bool {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        var reader = NDJSONLineReader(handle: handle)
+        guard let first = try reader.next() else { return false }
+        return payloadIsDemo(first)
+    }
+
     public static func countRecords(in text: String) -> Int {
         text.split(whereSeparator: \.isNewline).filter { line in
             if line.isEmpty { return false }
@@ -147,6 +155,31 @@ public enum NativeWire {
         return (quantityRecords, acceptedRecords)
     }
 
+    public static func volumeReceiptCounts(at url: URL) throws -> (
+        quantityRecords: Int,
+        acceptedRecords: Int
+    ) {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        var reader = NDJSONLineReader(handle: handle)
+        var quantityRecords = 0
+        var acceptedRecords = 0
+        while let line = try reader.next() {
+            guard !line.isEmpty else { continue }
+            if line.range(of: headerKind) != nil { continue }
+            if line.range(of: footerKind) != nil { continue }
+            acceptedRecords += 1
+            if line.range(of: quantityKind) != nil {
+                quantityRecords += 1
+            }
+        }
+        return (quantityRecords, acceptedRecords)
+    }
+
+    public static func countRecords(at url: URL) throws -> Int {
+        try volumeReceiptCounts(at: url).acceptedRecords
+    }
+
     private static let headerKind = Data(#""kind":"batch.header""#.utf8)
     private static let footerKind = Data(#""kind":"batch.footer""#.utf8)
     private static let quantityKind = Data(#""kind":"sample.quantity""#.utf8)
@@ -170,7 +203,7 @@ public enum NativeWire {
             if line.last == 0x0D {
                 line = line.dropLast()
             }
-            body(Data(line))
+            body(line)
             start = end < data.endIndex ? data.index(after: end) : end
         }
     }

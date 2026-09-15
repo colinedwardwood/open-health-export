@@ -5,7 +5,7 @@ import CoreDomain
 import Foundation
 import MetricCatalog
 import Testing
-import WireFormat
+@testable import WireFormat
 
 @Test func ndjsonLineReaderStreamsAcrossChunkBoundariesAndAcceptsFinalLine() throws {
     let pipe = Pipe()
@@ -172,4 +172,78 @@ import WireFormat
         .map(String.init) ?? ""
     #expect(header.contains("\"heart_rate\""))
     #expect(header.contains("\"step_count\""))
+}
+
+@Test func volumeReceiptCountsFromFileMatchInMemory() throws {
+    let sample = SampleRecord(
+        key: RecordKey(uuid: "82000000-0000-4000-8000-000000000004"),
+        metric: MetricCatalog.heartRate.id,
+        start: "2026-09-11T00:00:00Z",
+        end: "2026-09-11T00:00:00Z",
+        timeZoneOffsetMinutes: 0,
+        timeZoneSource: .unknown,
+        value: 72,
+        unit: CanonicalUnit(symbol: "count/min"),
+        observedAt: "2026-09-11T00:00:00Z"
+    )
+    let batch = try NativeWire.encode(
+        samples: [sample],
+        tombstones: [],
+        metric: sample.metric,
+        batchID: BatchID(rawValue: "82000000-0000-4000-8000-000000000005"),
+        envelope: WireEnvelope(
+            exporterId: "00000000-0000-4000-8000-000000000082",
+            seq: 1,
+            emittedAt: sample.observedAt,
+            observedAt: sample.observedAt
+        )
+    )
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-receipt-\(UUID().uuidString).ndjson")
+    try batch.write(to: url)
+    defer { try? FileManager.default.removeItem(at: url) }
+    let fromFile = try NativeWire.volumeReceiptCounts(at: url)
+    let fromMemory = NativeWire.volumeReceiptCounts(in: batch)
+    #expect(fromFile.quantityRecords == fromMemory.quantityRecords)
+    #expect(fromFile.acceptedRecords == fromMemory.acceptedRecords)
+    #expect(try NativeWire.countRecords(at: url) == NativeWire.countRecords(in: batch))
+    #expect(try NativeWire.payloadIsDemo(at: url) == NativeWire.payloadIsDemo(batch))
+}
+
+@Test func streamedJSONSidecarsMatchTheInMemoryDocument() throws {
+    let sample = SampleRecord(
+        key: RecordKey(uuid: "82000000-0000-4000-8000-000000000006"),
+        metric: MetricCatalog.heartRate.id,
+        start: "2026-09-11T00:00:00Z",
+        end: "2026-09-11T00:00:00Z",
+        timeZoneOffsetMinutes: 0,
+        timeZoneSource: .unknown,
+        value: 64,
+        unit: CanonicalUnit(symbol: "count/min"),
+        observedAt: "2026-09-11T00:00:00Z"
+    )
+    let batch = try NativeWire.encode(
+        samples: [sample],
+        tombstones: [],
+        metric: sample.metric,
+        batchID: BatchID(rawValue: "82000000-0000-4000-8000-000000000007"),
+        envelope: WireEnvelope(
+            exporterId: "00000000-0000-4000-8000-000000000082",
+            seq: 1,
+            emittedAt: sample.observedAt,
+            observedAt: sample.observedAt
+        )
+    )
+    let expected = try NativeJSON.document(fromNDJSON: batch)
+    let dir = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-json-stream-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let canonical = dir.appendingPathComponent("batch.json")
+    let pretty = dir.appendingPathComponent("batch.pretty.json")
+    let source = dir.appendingPathComponent("batch.ndjson")
+    try batch.write(to: source)
+    try NativeJSON.writeDocuments(fromNDJSONAt: source, canonical: canonical, pretty: pretty)
+    #expect(try Data(contentsOf: canonical) == expected.canonical)
+    #expect(try Data(contentsOf: pretty) == expected.pretty)
 }

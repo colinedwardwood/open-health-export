@@ -61,54 +61,80 @@ public enum NativeSidecars {
     }
 
     public static func write(fromNDJSON data: Data, beside ndjsonURL: URL) throws {
-        let parsed = try parse(data)
-        let jsonPair = try NativeJSON.document(fromNDJSON: data)
+        let staging = ndjsonURL.deletingLastPathComponent()
+            .appendingPathComponent(".\(UUID().uuidString).ndjson")
+        try data.write(to: staging, options: .withoutOverwriting)
+        defer { try? FileManager.default.removeItem(at: staging) }
+        try write(fromNDJSONAt: staging, beside: ndjsonURL)
+    }
+
+    public static func write(fromNDJSONAt url: URL, beside ndjsonURL: URL) throws {
+        var parsed = try parse(at: url)
         let encodings = ndjsonURL.deletingPathExtension().appendingPathExtension("encodings")
         try FileManager.default.createDirectory(at: encodings, withIntermediateDirectories: true)
-        try jsonPair.canonical.write(
-            to: encodings.appendingPathComponent("batch.json"),
-            options: .atomic
-        )
-        try jsonPair.pretty.write(
-            to: encodings.appendingPathComponent("batch.pretty.json"),
-            options: .atomic
-        )
         let csv = try NativeCSV.quantityFiles(
             samples: parsed.samples,
             envelope: parsed.envelope,
-            ndjson: data
+            headerLine: parsed.headerLine,
+            footerLine: parsed.footerLine
         )
         try csv.quantity.write(to: encodings.appendingPathComponent(csv.fileName), options: .atomic)
         for extra in csv.extra {
             try extra.0.write(to: encodings.appendingPathComponent(extra.1), options: .atomic)
         }
         try csv.meta.write(to: encodings.appendingPathComponent("_meta.json"), options: .atomic)
-        guard parsed.haeEligible, let metric = parsed.metric else { return }
-        let hae = try HAEWire.encode(
-            samples: parsed.samples,
-            tombstones: [],
-            metric: metric,
-            acknowledgingLoss: HAELossAccepted()
+        if parsed.haeEligible, let metric = parsed.metric {
+            let hae = try HAEWire.encode(
+                samples: parsed.samples,
+                tombstones: [],
+                metric: metric,
+                acknowledgingLoss: HAELossAccepted()
+            )
+            try hae.write(to: encodings.appendingPathComponent("batch.hae.json"), options: .atomic)
+        }
+        parsed.samples = []
+        try NativeJSON.writeDocuments(
+            fromNDJSONAt: url,
+            canonical: encodings.appendingPathComponent("batch.json"),
+            pretty: encodings.appendingPathComponent("batch.pretty.json")
         )
-        try hae.write(to: encodings.appendingPathComponent("batch.hae.json"), options: .atomic)
     }
 
     static func parse(_ data: Data) throws -> (
         envelope: WireEnvelope,
         samples: [SampleRecord],
         metric: MetricID?,
-        haeEligible: Bool
+        haeEligible: Bool,
+        headerLine: String,
+        footerLine: String
     ) {
-        let text = String(decoding: data, as: UTF8.self)
-        let lines = text.split(omittingEmptySubsequences: true, whereSeparator: \.isNewline)
-            .map(String.init)
+        let staging = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ohe-sidecar-parse-\(UUID().uuidString).ndjson")
+        try data.write(to: staging, options: .withoutOverwriting)
+        defer { try? FileManager.default.removeItem(at: staging) }
+        return try parse(at: staging)
+    }
+
+    static func parse(at url: URL) throws -> (
+        envelope: WireEnvelope,
+        samples: [SampleRecord],
+        metric: MetricID?,
+        haeEligible: Bool,
+        headerLine: String,
+        footerLine: String
+    ) {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        var reader = NDJSONLineReader(handle: handle)
         var envelope = WireEnvelope(exporterId: "", seq: 1, emittedAt: "", observedAt: "")
         var samples: [SampleRecord] = []
         var metric: MetricID?
         var tombstones = false
         var sawHeader = false
-        for line in lines {
-            guard let object = try JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
+        var headerLine = ""
+        var footerLine = ""
+        while let line = try reader.next() {
+            guard let object = try JSONSerialization.jsonObject(with: line) as? [String: Any],
                   let kind = object["kind"] as? String
             else {
                 throw WireError.utf8
@@ -116,6 +142,7 @@ public enum NativeSidecars {
             switch kind {
             case "batch.header":
                 sawHeader = true
+                headerLine = String(decoding: line, as: UTF8.self)
                 envelope = WireEnvelope(
                     exporterId: object["exporterId"] as? String ?? "",
                     seq: (object["seq"] as? NSNumber)?.intValue ?? 1,
@@ -125,8 +152,10 @@ public enum NativeSidecars {
                     verifiedThrough: object["verifiedThrough"] as? String,
                     tzDatabaseVersion: object["tzDatabaseVersion"] as? String
                 )
+            case "batch.footer":
+                footerLine = String(decoding: line, as: UTF8.self)
             case "sample.quantity":
-                let sample = try quantitySample(fromNDJSONLine: Data(line.utf8))
+                let sample = try quantitySample(fromNDJSONLine: line)
                 let resolved = sample.metric
                 if metric == nil { metric = resolved }
                 samples.append(sample)
@@ -137,6 +166,6 @@ public enum NativeSidecars {
             }
         }
         guard sawHeader else { throw WireError.utf8 }
-        return (envelope, samples, metric, !tombstones && !samples.isEmpty)
+        return (envelope, samples, metric, !tombstones && !samples.isEmpty, headerLine, footerLine)
     }
 }

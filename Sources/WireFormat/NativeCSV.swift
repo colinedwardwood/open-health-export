@@ -20,11 +20,6 @@ enum NativeCSV {
         ndjson: Data,
         rowLimit: Int = spreadsheetDataRowLimit
     ) throws -> (quantity: Data, meta: Data, fileName: String, extra: [(Data, String)]) {
-        let chunks = try quantityChunks(
-            samples: samples,
-            envelope: envelope,
-            rowLimit: rowLimit
-        )
         let text = String(decoding: ndjson, as: UTF8.self)
         let lines = text.split(omittingEmptySubsequences: true, whereSeparator: \.isNewline).map(String.init)
         var headerLine = ""
@@ -33,6 +28,27 @@ enum NativeCSV {
             if line.contains("\"kind\":\"batch.header\"") { headerLine = line }
             if line.contains("\"kind\":\"batch.footer\"") { footerLine = line }
         }
+        return try quantityFiles(
+            samples: samples,
+            envelope: envelope,
+            headerLine: headerLine,
+            footerLine: footerLine,
+            rowLimit: rowLimit
+        )
+    }
+
+    static func quantityFiles(
+        samples: [SampleRecord],
+        envelope: WireEnvelope,
+        headerLine: String,
+        footerLine: String,
+        rowLimit: Int = spreadsheetDataRowLimit
+    ) throws -> (quantity: Data, meta: Data, fileName: String, extra: [(Data, String)]) {
+        let chunks = try quantityChunks(
+            samples: samples,
+            envelope: envelope,
+            rowLimit: rowLimit
+        )
         let meta = "{\"csvDropsMetadata\":true,\"footer\":\(footerLine),\"header\":\(headerLine)}\n"
         let extra = Array(chunks.dropFirst())
         return (chunks[0].quantity, Data(meta.utf8), chunks[0].fileName, extra)

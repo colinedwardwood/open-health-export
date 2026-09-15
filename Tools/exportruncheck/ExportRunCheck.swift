@@ -193,23 +193,23 @@ struct ExportRunCheck {
         let memoryResult = "unsupported"
         #endif
 
-        print(
+        let summary =
             "exportruncheck outcome=success"
-                + " metrics=\(spools.count)"
-                + " pages=\(pages)"
-                + " page_size=\(pageSize)"
-                + " exportable_records=\(exportableRecords)"
-                + " submitted_records=\(submittedRecords)"
-                + " structural_records=\(structuralRecords)"
-                + " header_records=\(headerRecords)"
-                + " declared_records=\(declaredRecords)"
-                + " samples_read=\(totalRead)"
-                + " samples_acked=\(totalAcked)"
-                + " input_lines=\(inputLines)"
-                + " peak_rss_mib=\(memoryResult)"
-                + " limit_mib=\(memoryLimitMiB)"
-                + " formats=native-ndjson,native-json,native-json-pretty,csv,hae"
-        )
+            + " metrics=\(spools.count)"
+            + " pages=\(pages)"
+            + " page_size=\(pageSize)"
+            + " exportable_records=\(exportableRecords)"
+            + " submitted_records=\(submittedRecords)"
+            + " structural_records=\(structuralRecords)"
+            + " header_records=\(headerRecords)"
+            + " declared_records=\(declaredRecords)"
+            + " samples_read=\(totalRead)"
+            + " samples_acked=\(totalAcked)"
+            + " input_lines=\(inputLines)"
+            + " peak_rss_mib=\(memoryResult)"
+            + " limit_mib=\(memoryLimitMiB)"
+            + " formats=native-ndjson,native-json,native-json-pretty,csv,hae"
+        print(summary)
     }
 
     private static func parsePageSize() throws -> Int {
@@ -443,8 +443,7 @@ private struct AuditingSink: DestinationSink {
 
     func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt {
         let payloadURL = URL(fileURLWithPath: fileHandle)
-        let data = try Data(contentsOf: payloadURL)
-        let counts = NativeWire.volumeReceiptCounts(in: data)
+        let counts = try NativeWire.volumeReceiptCounts(at: payloadURL)
         guard counts.quantityRecords == expectedQuantityRecords else {
             throw CheckError.payloadQuantityMismatch(
                 expected: expectedQuantityRecords,
@@ -452,7 +451,7 @@ private struct AuditingSink: DestinationSink {
             )
         }
         if exerciseSidecars {
-            try NativeSidecars.write(fromNDJSON: data, beside: payloadURL)
+            try NativeSidecars.write(fromNDJSONAt: payloadURL, beside: payloadURL)
             let encodings = payloadURL.deletingPathExtension().appendingPathExtension("encodings")
             let names = Set(
                 try FileManager.default.contentsOfDirectory(atPath: encodings.path)

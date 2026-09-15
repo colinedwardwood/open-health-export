@@ -411,8 +411,7 @@ public struct ExportRun: Sendable {
                 receipt: nil,
                 startedAt: startedAt,
                 timings: timings,
-                pending: pending,
-                payload: payload
+                pending: pending
             )
             try await sweepUndatable(enqueue.undatable)
             return outcome
@@ -439,8 +438,7 @@ public struct ExportRun: Sendable {
             freshnessTiming: freshnessTiming,
             startedAt: startedAt,
             timings: timings,
-            pending: pending,
-            payload: payload
+            pending: pending
         )
         try await sweepUndatable(enqueue.undatable)
         return outcome
@@ -553,8 +551,7 @@ public struct ExportRun: Sendable {
         )? = nil,
         startedAt: Date? = nil,
         timings: [RunStepTiming] = [],
-        pending: PendingBatch? = nil,
-        payload: Data? = nil
+        pending: PendingBatch? = nil
     ) async throws {
         let nowEpoch = clock.now().timeIntervalSince1970
         let runID = RunID(rawValue: "run-\(metric.rawValue)")
@@ -563,27 +560,28 @@ public struct ExportRun: Sendable {
         } ?? 0
         var payloadPath: String?
         var payloadSHA: String?
-        if let payload, persistHistoryPayload {
+        if persistHistoryPayload, let pending {
             let dir = scratchDirectory.appendingPathComponent("history-payloads", isDirectory: true)
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             let url = dir.appendingPathComponent("\(metric.rawValue)-\(Int(nowEpoch)).ndjson")
-            try FileWriteKit.writeAtomically(payload, to: url)
+            let source = URL(fileURLWithPath: pending.payloadURL)
+            try FileWriteKit.copyAtomically(from: source, to: url)
             payloadPath = url.path
-            payloadSHA = ContentSHA256.hex(payload)
+            payloadSHA = try ContentSHA256.hex(file: source)
         }
         let facts = RunHistoryFacts(
             destinationID: destinationName,
             metric: metric.rawValue,
             windowStartDay: pending?.rangeStartDay,
             windowEndDay: pending?.rangeEndDay,
-            byteCount: pending?.byteCount ?? payload?.count ?? 0,
+            byteCount: pending?.byteCount ?? 0,
             durationMillis: durationMillis,
             stepTimings: timings,
             payloadSHA256: payloadSHA,
             redactedPayload: RunHistoryDetail.redactedPayload(
                 metric: metric.rawValue,
                 records: tally.committed,
-                byteCount: pending?.byteCount ?? payload?.count ?? 0,
+                byteCount: pending?.byteCount ?? 0,
                 windowStartDay: pending?.rangeStartDay,
                 windowEndDay: pending?.rangeEndDay
             ),
@@ -865,8 +863,7 @@ public struct ExportRun: Sendable {
                 tally: tally,
                 receipt: nil,
                 startedAt: startedAt,
-                pending: pending,
-                payload: payload
+                pending: pending
             )
             return outcome
         }
@@ -887,8 +884,7 @@ public struct ExportRun: Sendable {
             tally: tally,
             receipt: receipt,
             startedAt: startedAt,
-            pending: pending,
-            payload: payload
+            pending: pending
         )
         return outcome
     }

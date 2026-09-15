@@ -84,6 +84,86 @@ enum CanonicalJSON {
         return out
     }
 
+    /// Stream pretty-print so canonical and pretty documents are never both resident.
+    static func prettyPrint(_ compact: Data, to handle: FileHandle) throws {
+        var source = compact
+        while source.first == 0x0A || source.first == 0x0D {
+            source = source.dropFirst()
+        }
+        while source.last == 0x0A || source.last == 0x0D {
+            source = source.dropLast()
+        }
+        var indent = 0
+        var inString = false
+        var escape = false
+        var buffer = Data()
+        buffer.reserveCapacity(64 * 1_024)
+
+        func flush() throws {
+            guard !buffer.isEmpty else { return }
+            try handle.write(contentsOf: buffer)
+            buffer.removeAll(keepingCapacity: true)
+        }
+
+        var i = source.startIndex
+        while i < source.endIndex {
+            let ch = source[i]
+            if inString {
+                buffer.append(ch)
+                if escape {
+                    escape = false
+                } else if ch == 0x5C {
+                    escape = true
+                } else if ch == 0x22 {
+                    inString = false
+                }
+            } else {
+                switch ch {
+                case 0x22:
+                    inString = true
+                    buffer.append(ch)
+                case 0x7B, 0x5B:
+                    buffer.append(ch)
+                    let next = source.index(after: i)
+                    if next < source.endIndex {
+                        let closer: UInt8 = ch == 0x7B ? 0x7D : 0x5D
+                        if source[next] != closer {
+                            indent += 2
+                            buffer.append(0x0A)
+                            buffer.append(contentsOf: [UInt8](repeating: 0x20, count: indent))
+                        }
+                    }
+                case 0x7D, 0x5D:
+                    let opened: UInt8 = ch == 0x7D ? 0x7B : 0x5B
+                    if buffer.last == opened {
+                        buffer.append(ch)
+                    } else {
+                        indent = max(0, indent - 2)
+                        buffer.append(0x0A)
+                        buffer.append(contentsOf: [UInt8](repeating: 0x20, count: indent))
+                        buffer.append(ch)
+                    }
+                case 0x3A:
+                    buffer.append(contentsOf: [0x3A, 0x20])
+                case 0x2C:
+                    buffer.append(0x2C)
+                    buffer.append(0x0A)
+                    buffer.append(contentsOf: [UInt8](repeating: 0x20, count: indent))
+                default:
+                    buffer.append(ch)
+                }
+            }
+            i = source.index(after: i)
+            if buffer.count >= 64 * 1_024 {
+                try flush()
+            }
+        }
+        if buffer.last != 0x0A {
+            buffer.append(0x0A)
+        }
+        try flush()
+    }
+
     static func parse(_ value: Any) throws -> CanonicalJSON {
         if value is NSNull { return .null }
         if let string = value as? String { return .string(string) }

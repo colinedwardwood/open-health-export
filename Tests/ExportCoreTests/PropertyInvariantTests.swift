@@ -562,14 +562,16 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
     #expect(checker.contains("maximumConcurrentMetrics = 1"))
     #expect(checker.contains("quantitySample(fromNDJSONLine: line, decoder: decoder)"))
     #expect(checker.contains("persistHistoryPayload: exerciseSidecars"))
-    #expect(checker.contains("volumeReceiptCounts"))
+    #expect(checker.contains("volumeReceiptCounts(at:"))
+    #expect(!checker.contains("Data(contentsOf: payloadURL)"))
     #expect(checker.contains("flushBytes"))
     let nativeWire = try String(
         contentsOf: root.appendingPathComponent("Sources/WireFormat/NativeWire.swift"),
         encoding: .utf8
     )
     #expect(nativeWire.contains("countQuantityRecords"))
-    #expect(nativeWire.contains("volumeReceiptCounts"))
+    #expect(nativeWire.contains("volumeReceiptCounts(at url:"))
+    #expect(nativeWire.contains("payloadIsDemo(at url:"))
     #expect(nativeWire.contains("headerTypes("))
     #expect(!nativeWire.contains("samples.map { wireMetricID"))
     let sha = try String(
@@ -589,7 +591,27 @@ private func statefulExportTrace(seed: Int, steps: Int = 24) async throws -> Sta
         encoding: .utf8
     )
     #expect(sidecars.contains("metricByWireId"))
+    #expect(sidecars.contains("fromNDJSONAt"))
     #expect(!sidecars.contains("MetricCatalog.all.first { $0.wireId == wireId }"))
+    let localSink = try String(
+        contentsOf: root.appendingPathComponent("Sources/SinkLocalFile/LocalFileSink.swift"),
+        encoding: .utf8
+    )
+    #expect(localSink.contains("copyAtomically"))
+    #expect(localSink.contains("contentsEqual"))
+    #expect(!localSink.contains("Data(contentsOf: source)"))
+    let fileWrite = try String(
+        contentsOf: root.appendingPathComponent("Sources/FileWriteKit/FileWriteKit.swift"),
+        encoding: .utf8
+    )
+    #expect(fileWrite.contains("copyStreaming"))
+    #expect(fileWrite.contains("copyChunkBytes"))
+    let engine = try String(
+        contentsOf: root.appendingPathComponent("Sources/CorrectnessEngine/ExportRun.swift"),
+        encoding: .utf8
+    )
+    #expect(engine.contains("ContentSHA256.hex(file:"))
+    #expect(!engine.contains("payload: payload"))
     let pipeline = try String(
         contentsOf: root.appendingPathComponent("Tools/pipelinecheck/PipelineCheck.swift"),
         encoding: .utf8

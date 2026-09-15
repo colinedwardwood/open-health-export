@@ -59,9 +59,71 @@ public enum FileWriteKit {
         }
     }
 
+    private static let copyChunkBytes = 64 * 1_024
+
+    /// Copy a payload file without materialising it. R-74 forbids `Data(contentsOf:)`
+    /// on the delivery path: a 10k-record page plus sidecars already saturates the
+    /// background ceiling if the NDJSON is held as bytes.
     public static func copyAtomically(from source: URL, to destination: URL) throws {
-        let data = try Data(contentsOf: source)
-        try writeAtomically(data, to: destination)
+        let directory = destination.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let temp = directory.appendingPathComponent(".\(destination.lastPathComponent).tmp-\(UUID().uuidString)")
+        do {
+            try copyStreaming(from: source, to: temp)
+        } catch {
+            try? FileManager.default.removeItem(at: temp)
+            throw error
+        }
+        #if DEBUG
+        switch fault {
+        case .none:
+            break
+        case .abortBeforeRename, .abortAfterTruncatingTemp:
+            try injectWriteFault(temp: temp, intended: try Data(contentsOf: source))
+        }
+        #endif
+        if rename(temp.path, destination.path) != 0 {
+            let code = Int(errno)
+            try? FileManager.default.removeItem(at: temp)
+            throw NSError(domain: NSPOSIXErrorDomain, code: code)
+        }
+    }
+
+    public static func contentsEqual(_ lhs: URL, _ rhs: URL) throws -> Bool {
+        let leftAttrs = try FileManager.default.attributesOfItem(atPath: lhs.path)
+        let rightAttrs = try FileManager.default.attributesOfItem(atPath: rhs.path)
+        guard (leftAttrs[.size] as? NSNumber)?.int64Value
+            == (rightAttrs[.size] as? NSNumber)?.int64Value
+        else {
+            return false
+        }
+        let left = try FileHandle(forReadingFrom: lhs)
+        let right = try FileHandle(forReadingFrom: rhs)
+        defer {
+            try? left.close()
+            try? right.close()
+        }
+        while true {
+            let a = try left.read(upToCount: copyChunkBytes) ?? Data()
+            let b = try right.read(upToCount: copyChunkBytes) ?? Data()
+            if a != b { return false }
+            if a.isEmpty { return true }
+        }
+    }
+
+    private static func copyStreaming(from source: URL, to destination: URL) throws {
+        FileManager.default.createFile(atPath: destination.path, contents: nil)
+        let input = try FileHandle(forReadingFrom: source)
+        let output = try FileHandle(forWritingTo: destination)
+        defer {
+            try? input.close()
+            try? output.close()
+        }
+        while true {
+            let chunk = try input.read(upToCount: copyChunkBytes) ?? Data()
+            if chunk.isEmpty { break }
+            try output.write(contentsOf: chunk)
+        }
     }
 
     #if DEBUG

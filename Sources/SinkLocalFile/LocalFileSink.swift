@@ -20,25 +20,23 @@ public struct LocalFileSink: DestinationSink, Sendable {
 
     public func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt {
         let source = URL(fileURLWithPath: fileHandle)
-        let sourceData = try Data(contentsOf: source)
         let destination = directory.appendingPathComponent(
             NativeWire.outputFileName(
                 batchID: idempotencyKey,
-                demo: NativeWire.payloadIsDemo(sourceData)
+                demo: try NativeWire.payloadIsDemo(at: source)
             )
         )
         if FileManager.default.fileExists(atPath: destination.path) {
-            guard try Data(contentsOf: destination) == sourceData else {
+            guard try FileWriteKit.contentsEqual(destination, source) else {
                 throw LocalFileSinkError.idempotencyConflict
             }
         } else {
-            try FileWriteKit.writeAtomically(sourceData, to: destination)
+            try FileWriteKit.copyAtomically(from: source, to: destination)
         }
-        try? NativeSidecars.write(fromNDJSON: sourceData, beside: destination)
-        let text = String(decoding: sourceData, as: UTF8.self)
+        try? NativeSidecars.write(fromNDJSONAt: destination, beside: destination)
         return DeliveryReceipt(
             batchID: idempotencyKey,
-            accepted: NativeWire.countRecords(in: text),
+            accepted: try NativeWire.countRecords(at: destination),
             statusOnly: false
         )
     }
