@@ -13,13 +13,21 @@ public struct ByteStreamCompanionPipe: CompanionBytePipe {
         self.stream = stream
     }
 
+    /// The socket's `StreamError` is normalized here, at the boundary where it leaves the
+    /// transport: `DeliveryExecutor` only classifies `DestinationSendError` and treats
+    /// anything else as transient, so an un-normalized Local Network denial would be
+    /// retried forever instead of telling the user to change a setting (R-21).
     public func send(_ data: Data) async throws {
-        try await stream.open()
-        try await stream.send(data)
+        try await TransportFault.normalizing {
+            try await stream.open()
+            try await stream.send(data)
+        }
     }
 
     public func receive(max: Int) async throws -> Data {
-        try await stream.open()
-        return try await stream.receive(max: max)
+        try await TransportFault.normalizing {
+            try await stream.open()
+            return try await stream.receive(max: max)
+        }
     }
 }

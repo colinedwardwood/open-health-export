@@ -16,6 +16,10 @@ public enum StreamError: Error, Equatable, LocalizedError {
     case badServiceName
     case badPreSharedKey
     case serviceNotFound
+    /// R-21: the Local Network grant is off, so we cannot see the Mac at all. Distinct from
+    /// `serviceNotFound`, which says we looked and it was not there — the Mac can be awake,
+    /// on the right network and advertising, and this still happens.
+    case localNetworkDenied
     case unsupportedPlatform
     /// SEC-15: a destination approved for local/private egress resolved outside that class.
     case addressClassViolation(host: String, address: String, addressClass: AddressClass)
@@ -44,6 +48,8 @@ public enum StreamError: Error, Equatable, LocalizedError {
             "The pairing secret is invalid."
         case .serviceNotFound:
             "The paired companion was not found."
+        case .localNetworkDenied:
+            "Local Network access is off, so the companion cannot be found."
         case .unsupportedPlatform:
             "This connection is not supported on this platform."
         }

@@ -12,6 +12,10 @@ public actor CompanionDiscovery {
     private var browser: NWBrowser?
     private var waiters: [CheckedContinuation<[String], Error>] = []
     private var seen: Set<String> = []
+    /// R-21: set when the browser reports the Local Network grant is off. Without this a
+    /// denial is indistinguishable from an empty network and reports `serviceNotFound`,
+    /// which tells the user to wake a Mac that was never the problem.
+    private var denial: StreamError?
 
     public init() {}
 
@@ -52,6 +56,18 @@ public actor CompanionDiscovery {
             }
             Task { await self?.record(names: names) }
         }
+        browser.stateUpdateHandler = { [weak self] state in
+            // A denied grant surfaces here, not as an empty result set. Browsing always
+            // needs the grant, so the DNS policy error is conclusive on its own.
+            let error: NWError?
+            switch state {
+            case .failed(let failure): error = failure
+            case .waiting(let failure): error = failure
+            default: error = nil
+            }
+            guard let error, LocalNetworkDenial.isDenial(error, needsLocalGrant: true) else { return }
+            Task { await self?.recordDenial() }
+        }
         browser.start(queue: queue)
         self.browser = browser
     }
@@ -59,6 +75,13 @@ public actor CompanionDiscovery {
     private func record(names: [String]) {
         seen.formUnion(names)
         guard !seen.isEmpty else { return }
+        deliver()
+    }
+
+    /// Delivered without waiting out the browse window: once the grant is known to be off,
+    /// nothing can arrive and holding the user on a spinner adds no information.
+    private func recordDenial() {
+        denial = .localNetworkDenied
         deliver()
     }
 
@@ -75,7 +98,11 @@ public actor CompanionDiscovery {
         let pending = waiters
         waiters.removeAll()
         for waiter in pending {
-            waiter.resume(returning: names)
+            if let denial {
+                waiter.resume(throwing: denial)
+            } else {
+                waiter.resume(returning: names)
+            }
         }
     }
 }

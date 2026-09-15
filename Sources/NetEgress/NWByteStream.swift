@@ -237,7 +237,21 @@ public actor NWByteStream: ByteStream {
                 return StreamError.pinMismatch
             }
         }
+        if LocalNetworkDenial.isDenial(error, needsLocalGrant: dialNeedsLocalNetworkGrant) {
+            return StreamError.localNetworkDenied
+        }
         return StreamError.transport(String(describing: error))
+    }
+
+    /// Only a dial that needs the Local Network grant can be refused for want of it. A
+    /// companion is always local; a host/port endpoint is local when it was approved as such.
+    private var dialNeedsLocalNetworkGrant: Bool {
+        switch target {
+        case .bonjour:
+            true
+        case .hostPort(let endpoint):
+            endpoint.addressPolicy == .requireLocal
+        }
     }
 
     private func finishOpen(_ error: Error?) {

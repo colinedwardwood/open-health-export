@@ -8,6 +8,9 @@ import FileWriteKit
 import Foundation
 import MQTTCodec
 import NetEgress
+#if canImport(Network)
+import Network
+#endif
 import SinkCompanion
 import SinkMQTT
 import TestSupport
@@ -146,6 +149,86 @@ import WireFormat
     await stream.close()
 }
 #endif
+
+/// R-21 / FIX-A07: the product ships copy that names a revoked Local Network grant and
+/// says it is "different from the Mac being asleep or on another network". Nothing could
+/// produce that outcome before this: a denial arrived as `serviceNotFound` and rendered
+/// the unreachable copy, so the app told the user to wake a Mac that was never asleep.
+@Test func transportFaultsNormalizeOntoClosedDestinationOutcomes() {
+    #expect(TransportFault.normalize(StreamError.localNetworkDenied) == .localNetworkDenied)
+    // The whole point of the case: it must not collapse back into unreachable.
+    #expect(TransportFault.normalize(StreamError.localNetworkDenied) != .destinationUnreachable)
+    for unreachable: StreamError in [.serviceNotFound, .closedByPeer, .connectTimeout, .readTimeout,
+                                     .notOpen, .transport("refused")] {
+        #expect(TransportFault.normalize(unreachable) == .destinationUnreachable)
+    }
+    #expect(TransportFault.normalize(StreamError.badPort) == .internalFault("badPort"))
+    // A trust event and a SEC-15 stop are worse than unreachable and own their own paths.
+    #expect(TransportFault.normalize(StreamError.pinMismatch) == nil)
+    #expect(
+        TransportFault.normalize(
+            StreamError.addressClassViolation(host: "h", address: "1.2.3.4", addressClass: .publicUnicast)
+        ) == nil
+    )
+    // Already-closed errors pass through rather than being swallowed.
+    #expect(TransportFault.normalize(DestinationSendError.deviceLocked) == .deviceLocked)
+}
+
+/// `DeliveryExecutor` classifies `DestinationSendError` and nothing else, treating the
+/// remainder as transient. An un-normalized denial would therefore be retried forever
+/// against a permission that only the user can change in Settings.
+@Test func companionPipeSurfacesLocalNetworkDenialRatherThanRetryingIt() async {
+    let pipe = ByteStreamCompanionPipe(stream: RefusingByteStream(failure: .localNetworkDenied))
+    await #expect(throws: DestinationSendError.localNetworkDenied) {
+        try await pipe.send(Data([0x01]))
+    }
+    await #expect(throws: DestinationSendError.localNetworkDenied) {
+        _ = try await pipe.receive(max: 16)
+    }
+    // The outcome the journal records has to be the distinct one, not the generic one.
+    #expect(DestinationSendError.localNetworkDenied.errorClass == .localNetworkDenied)
+}
+
+/// A Mac that is genuinely absent must keep reporting absence. If both sides of the
+/// distinction do not hold, the honesty claim is worth nothing.
+@Test func anAbsentCompanionStillReportsUnreachable() async {
+    let pipe = ByteStreamCompanionPipe(stream: RefusingByteStream(failure: .serviceNotFound))
+    await #expect(throws: DestinationSendError.destinationUnreachable) {
+        try await pipe.send(Data([0x01]))
+    }
+}
+
+/// mDNS answers a browse under a denied grant with a policy error, not an empty result
+/// set. Pinning the codes so a neighbouring DNS failure is not read as a denial.
+@Test func onlyThePolicyDNSCodesCountAsDenial() {
+    #expect(LocalNetworkDenial.isDenial(dnsCode: -65570)) // kDNSServiceErr_PolicyDenied
+    #expect(LocalNetworkDenial.isDenial(dnsCode: -65571)) // kDNSServiceErr_NotPermitted
+    #expect(!LocalNetworkDenial.isDenial(dnsCode: -65568)) // Timeout
+    #expect(!LocalNetworkDenial.isDenial(dnsCode: -65538)) // NoSuchName
+    #expect(!LocalNetworkDenial.isDenial(dnsCode: 0))
+}
+
+#if canImport(Network)
+/// `EPERM` is a Local Network verdict only on a dial that needed the grant. Reading it as
+/// one on public unicast would invent a permission problem out of an unrelated refusal.
+@Test func permissionErrorsCountAsDenialOnlyOnLocalDials() {
+    #expect(LocalNetworkDenial.isDenial(NWError.posix(.EPERM), needsLocalGrant: true))
+    #expect(!LocalNetworkDenial.isDenial(NWError.posix(.EPERM), needsLocalGrant: false))
+    #expect(!LocalNetworkDenial.isDenial(NWError.posix(.ECONNREFUSED), needsLocalGrant: true))
+    // Browsing always needs the grant, so a policy code stands on its own.
+    #expect(LocalNetworkDenial.isDenial(NWError.dns(-65570), needsLocalGrant: false))
+}
+#endif
+
+private struct RefusingByteStream: ByteStream {
+    let failure: StreamError
+
+    func open() async throws { throw failure }
+    func send(_ data: Data) async throws { throw failure }
+    func receive(max: Int) async throws -> Data { throw failure }
+    func close() async {}
+    func identity() async -> TLSIdentity? { nil }
+}
 
 private func writeStreamPayload(uuid: String) throws -> (URL, BatchID) {
     let batchID = BatchID(rawValue: "0192f3c1-0000-0000-0000-0000000000b0")
