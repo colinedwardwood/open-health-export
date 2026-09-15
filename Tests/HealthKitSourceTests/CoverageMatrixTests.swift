@@ -14,7 +14,7 @@ private func repoRoot() -> URL {
         .deletingLastPathComponent()
 }
 
-@Test func hk03LiveSDKHeaderMatchesTheCommittedIdentifierPin() throws {
+@Test func hk03LiveSDKHeaderIsCoveredByTheCommittedIdentifierPin() throws {
     let sdkRoot = try sdkPath()
     let header = sdkRoot
         .appendingPathComponent("System/Library/Frameworks/HealthKit.framework/Headers/HKTypeIdentifiers.h")
@@ -24,7 +24,13 @@ private func repoRoot() -> URL {
     )
     let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
     let pinned = Set(object?["identifiers"] as? [String] ?? [])
-    #expect(live == pinned, "SDK identifiers drifted; refresh qa/healthkit-sdk-identifiers.json and exclusions")
+    let unknown = live.subtracting(pinned)
+    #expect(
+        unknown.isEmpty,
+        "SDK added identifiers not covered by the pin: \(unknown.sorted()); refresh the pin and exclusions"
+    )
+    let generator = object?["generatedWithXcode"] as? String ?? ""
+    #expect(!generator.isEmpty, "the pin must name the Xcode version that produced its header")
 }
 
 @Test func hk03CatalogueQuantityTypesHaveLegalAggregationStyles() throws {

@@ -1,5 +1,6 @@
 {
   "source": "HKTypeIdentifiers.h",
+  "generatedWithXcode": "Xcode 27.0 (27A266a), macOS SDK 27.0",
   "identifiers": [
     "HKCategoryTypeIdentifierAbdominalCramps",
     "HKCategoryTypeIdentifierAcne",
