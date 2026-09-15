@@ -1497,6 +1497,24 @@ enum HarnessExport {
     #if DEBUG
     /// Snapshot files and hold rows survive across XCUITest cases in one simulator.
     /// Resetting them at launch is what keeps one case's banners off the next audit.
+    /// R-114's demo quickstart needs a configured archive folder, and the only way to get
+    /// one in the product is the Files picker, which XCUITest cannot drive. Without this
+    /// the quickstart test could never reach the export at all: it failed on
+    /// `LocalExportFolderError.notSelected` in milliseconds and then sat waiting out its
+    /// ten-minute budget, so the budget it exists to prove was never measured.
+    ///
+    /// Seeds a real directory inside the app container and records a real bookmark for it,
+    /// so everything past folder selection is the production path.
+    static func seedLocalExportFolderForUITests() throws -> String {
+        let root = try applicationSupportRoot()
+        let folder = root.appendingPathComponent("seeded-archive", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let bookmark = try SecurityScopedBookmark.create(fromAccessibleURL: folder)
+        try FileWriteKit.writeAtomically(bookmark, to: localExportFolderBookmarkURL(root: root))
+        try? FileManager.default.removeItem(at: localFileTestReportURL(root: root))
+        return folder.lastPathComponent
+    }
+
     static func resetSeededSurfacesForUITests() throws {
         if let directory = StatusSnapshotLocation.directory() {
             try? FileManager.default.removeItem(at: directory)
@@ -3217,11 +3235,26 @@ enum HarnessExport {
         }
         let resolved = try SecurityScopedBookmark.resolve(bookmark)
         let access: SecurityScopedAccess
+        #if DEBUG
+        // A seeded folder lives inside the app container and therefore has no scope to
+        // start. Narrowed to that case so a genuinely inaccessible picked folder still
+        // reports as inaccessible in DEBUG builds.
+        if resolved.url.path.hasPrefix(root.path) {
+            access = SecurityScopedAccess.unscoped(url: resolved.url)
+        } else {
+            do {
+                access = try SecurityScopedAccess(url: resolved.url)
+            } catch {
+                throw LocalExportFolderError.inaccessible
+            }
+        }
+        #else
         do {
             access = try SecurityScopedAccess(url: resolved.url)
         } catch {
             throw LocalExportFolderError.inaccessible
         }
+        #endif
         if resolved.isStale {
             let refreshed = try SecurityScopedBookmark.create(
                 fromAccessibleURL: access.url

@@ -333,6 +333,11 @@ struct HarnessView: View {
                 try? HarnessExport.seedDestinationStatusForUITests(scenario: scenario)
             }
             seedUserFacingErrorsFromLaunchEnvironment()
+            // Ordered after the reset, which deletes the bookmark, and before the folder
+            // name is read below.
+            if ProcessInfo.processInfo.environment["OHE_SEED_LOCAL_EXPORT_FOLDER"] == "1" {
+                _ = try? HarnessExport.seedLocalExportFolderForUITests()
+            }
             #endif
             localExportFolderName = HarnessExport.localExportFolderName()
             refreshDestinationSurfaces()

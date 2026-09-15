@@ -26,6 +26,21 @@ public final class SecurityScopedAccess: @unchecked Sendable {
         self.active = active
     }
 
+    private init(url: URL, active: Bool) {
+        self.url = url
+        self.active = active
+    }
+
+    #if DEBUG
+    /// A folder the app already owns has no security scope to start, so the real
+    /// initializer refuses it. UI tests cannot drive the Files picker, which is the only
+    /// way to obtain a scoped folder, so a seeded archive folder inside the app container
+    /// needs this. R-83 keeps it out of release builds.
+    public static func unscoped(url: URL) -> SecurityScopedAccess {
+        SecurityScopedAccess(url: url, active: false)
+    }
+    #endif
+
     deinit {
         if active {
             url.stopAccessingSecurityScopedResource()

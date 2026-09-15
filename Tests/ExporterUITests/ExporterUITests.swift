@@ -1213,6 +1213,13 @@ final class ExporterUITests: XCTestCase {
     }
 
     func testR114DemoQuickstartCompletesAFullExportWithinTenMinutes() {
+        // The demo export writes to the local archive folder, and `setUp` deletes the
+        // bookmark for it. Without a seeded folder this case fails on "no folder
+        // selected" in milliseconds and then waits out the full ten minutes below,
+        // reporting a timing failure for something that never started.
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_LOCAL_EXPORT_FOLDER"] = "1"
+        app.launch()
         let started = Date()
         addUIInterruptionMonitor(withDescription: "Notification permission") { alert in
             let allow = alert.buttons["Allow"]
