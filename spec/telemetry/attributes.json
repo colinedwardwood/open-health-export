@@ -30,7 +30,8 @@
         "blockedDeviceLocked",
         "localNetworkDenied",
         "blockedLowPower",
-        "blockedUnmetered"
+        "blockedUnmetered",
+        "migrationPending"
       ],
       "justification": "Projects the closed journal outcome without free-form detail."
     },

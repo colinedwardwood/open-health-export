@@ -207,6 +207,13 @@ enum BackgroundTaskCoordinator {
         AppLifecycleCoordinator.shared.recordWake(trigger)
         let work = Task {
             do {
+                // ADR-R8: reported as a successful wake, because it is one. Telling iOS the
+                // wake failed would make it back off scheduling over a deferral we chose.
+                if HarnessExport.deferWakeIfMigrationPending(trigger: trigger) {
+                    task.setTaskCompleted(success: true)
+                    submit()
+                    return
+                }
                 try await AppLifecycleCoordinator.shared.startObserversIfEligible()
                 if HarnessExport.isLocalFileEnabled() {
                     _ = try await HarnessExport.runOnePageEachMetric(trigger: trigger)

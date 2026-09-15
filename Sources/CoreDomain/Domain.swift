@@ -487,6 +487,10 @@ public struct RunOutcome: Sendable, Equatable, CustomStringConvertible {
         case localNetworkDenied
         case blockedLowPower
         case blockedUnmetered
+        /// ADR-R8: the on-disk schema is not the one this build expects, and a migration
+        /// is not something to run inside a thirty-second wake. Nothing was read and
+        /// nothing failed; the next foreground launch migrates.
+        case migrationPending
     }
 
     public let kind: Kind
@@ -506,6 +510,11 @@ public struct RunOutcome: Sendable, Equatable, CustomStringConvertible {
     }
 
     public var description: String { kind.rawValue }
+
+    /// ADR-R8's deferral is decided before any read, so there is no tally to derive from.
+    /// This is the one outcome a call site may name, and it is exposed as a value rather
+    /// than a case so the rest of the set keeps its "only `derive`" rule.
+    public static let migrationPending = RunOutcome(kind: .migrationPending)
 
     /// The only way to obtain a `RunOutcome`.
     public static func derive(from tally: RunTally) -> RunOutcome {

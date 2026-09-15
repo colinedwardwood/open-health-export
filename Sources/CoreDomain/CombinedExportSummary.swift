@@ -11,6 +11,8 @@ public enum CombinedExportSummary {
     public static func kind(_ outcomes: [RunOutcome.Kind]) -> RunOutcome.Kind {
         guard !outcomes.isEmpty else { return .successNothingDue }
         if outcomes.contains(.failed) { return .failed }
+        // ADR-R8: nothing ran, so this explains the absence of every other result.
+        if outcomes.contains(.migrationPending) { return .migrationPending }
         if outcomes.contains(.localNetworkDenied) { return .localNetworkDenied }
         if outcomes.contains(.blockedDeviceLocked) { return .blockedDeviceLocked }
         if outcomes.contains(.abandonedNoBudget) { return .abandonedNoBudget }
@@ -40,6 +42,7 @@ public enum CombinedExportSummary {
             || outcomes.contains(.cancelledBySystem)
             || outcomes.contains(.blockedLowPower)
             || outcomes.contains(.blockedUnmetered)
+            || outcomes.contains(.migrationPending)
         {
             return "deferred"
         }
@@ -52,7 +55,7 @@ public enum CombinedExportSummary {
         case .localNetworkDenied: return "blocked"
         case .unknownAck: return "sentUnconfirmed"
         case .blockedDeviceLocked, .abandonedNoBudget, .cancelledBySystem, .blockedLowPower,
-             .blockedUnmetered:
+             .blockedUnmetered, .migrationPending:
             return "deferred"
         }
     }
@@ -74,6 +77,10 @@ public enum CombinedExportSummary {
             return "Export deferred."
         case .localNetworkDenied:
             return "Export is waiting for Local Network access."
+        case .migrationPending:
+            // Says what to do about it: the migration runs on a foreground launch, so
+            // waiting for another background wake would wait forever.
+            return "Export deferred. Open the app to finish a database update."
         case .unknownAck:
             return "Sent, unconfirmed."
         }

@@ -12,7 +12,7 @@ elapses. On the socket, `EPERM` counts as a denial only on a dial that needed th
 because the same code on public unicast means something else.
 
 Transport failures are also normalized onto closed `DestinationSendError` values at the
-companion pipe. `DeliveryExecutor` classifies `DestinationSendError` and treats anything
+companion pipe. `DeliveryExecutor` classifies `DestinationSendError` and regards anything
 else as transient, so before this a denial would have been retried indefinitely against
 a permission only the user can change. A pin mismatch and a SEC-15 address-class stop
 are deliberately left unmapped: both are worse than unreachable and own their own paths.

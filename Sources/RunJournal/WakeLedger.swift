@@ -92,6 +92,10 @@ public enum WakeAttribution {
             || lastJournal.outcomeKind == "blockedDeviceLocked"
             || lastJournal.outcomeKind == "blockedLowPower"
             || lastJournal.outcomeKind == "blockedUnmetered"
+            // ADR-R8: a deferred migration is the wake behaving correctly. Calling it an
+            // execution failure would tell the user "this one is ours" about a wake that
+            // did exactly what it was designed to do.
+            || lastJournal.outcomeKind == "migrationPending"
         {
             return .none
         }

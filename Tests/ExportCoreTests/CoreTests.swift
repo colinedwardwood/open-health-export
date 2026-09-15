@@ -590,7 +590,12 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
         (RunTally(terminalError: .lowPowerMode), .blockedLowPower),
         (RunTally(terminalError: .awaitingUnmetered), .blockedUnmetered),
     ]
-    #expect(Set(cases.map(\.1)) == Set(RunOutcome.Kind.allCases))
+    // ADR-R8's deferral is decided before anything is read, so there is no tally it could
+    // come from. It is the one documented exception, and it still has to be reachable --
+    // the point of this test is that no outcome in the set is dead vocabulary.
+    #expect(RunOutcome.migrationPending.kind == .migrationPending)
+    let derivable = Set(RunOutcome.Kind.allCases).subtracting([.migrationPending])
+    #expect(Set(cases.map(\.1)) == derivable)
     for (tally, kind) in cases {
         let outcome = RunOutcome.derive(from: tally)
         #expect(outcome.kind == kind)
@@ -2508,6 +2513,115 @@ private func runUntilProcessExitSeam() async throws {
     #expect(try await reopened.transact { try $0.pendingBatches() }.isEmpty)
 }
 #endif
+
+/// ADR-R8: a wake that may not migrate must find out before it touches a table, and it
+/// must leave the on-disk schema exactly as it found it. A half-applied migration inside a
+/// wake that then expires is the outage this rule exists to prevent.
+@Test func aBackgroundWakeRefusesToMigrateAndLeavesTheSchemaAlone() async throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-adr-r8-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let path = root.appendingPathComponent("state.sqlite").path
+    try SQLiteV1Fixture.write(
+        path: path,
+        metric: MetricCatalog.heartRate.id,
+        checkpoint: CheckpointEnvelope(tzDatabaseVersion: "2024a", epoch: 3, adapterAnchor: Data([0x09])),
+        runID: "adr-r8-prior"
+    )
+
+    #expect(throws: StorageError.migrationPending(onDisk: 1, expected: SQLiteStateStore.expectedSchemaVersion)) {
+        _ = try SQLiteStateStore(path: path, policy: SQLiteOpenPolicy(allowsSchemaMigration: false))
+    }
+    #expect(try SQLiteStateStore.onDiskSchemaVersion(path: path) == 1)
+
+    // The deferral is recorded using only columns every schema version has carried.
+    try SQLiteStateStore.journalMigrationPending(path: path, runID: "adr-r8-wake", onDisk: 1)
+
+    // A foreground launch is where the migration belongs, and it must still work after
+    // the wake wrote into the old schema.
+    let store = try SQLiteStateStore(path: path)
+    #expect(try SQLiteStateStore.onDiskSchemaVersion(path: path) == SQLiteStateStore.expectedSchemaVersion)
+    let cursor = try await store.transact { try $0.loadCursor(metric: MetricCatalog.heartRate.id) }
+    // The QA-31 concern: upgrading must not silently reset the anchor.
+    #expect(cursor?.epoch == 3)
+    #expect(cursor?.anchorBlob == Data([0x09]))
+    let journal = try await store.transact { try $0.loadJournal() }
+    #expect(journal.contains { $0.outcomeKind == RunOutcome.migrationPending.description })
+    #expect(journal.contains { $0.runID.rawValue == "adr-r8-wake" })
+}
+
+/// A foreground launch has always been allowed to migrate, and must stay that way.
+@Test func aForegroundLaunchStillMigrates() throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-adr-r8-fg-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let path = root.appendingPathComponent("state.sqlite").path
+    try SQLiteV1Fixture.write(
+        path: path,
+        metric: MetricCatalog.heartRate.id,
+        checkpoint: CheckpointEnvelope(tzDatabaseVersion: "2024a", epoch: 1, adapterAnchor: Data([0x01])),
+        runID: "adr-r8-fg"
+    )
+    let store = try SQLiteStateStore(path: path)
+    withExtendedLifetime(store) {}
+    #expect(try SQLiteStateStore.onDiskSchemaVersion(path: path) == SQLiteStateStore.expectedSchemaVersion)
+    // An already-current store opens under the wake policy without complaint, so the
+    // steady state is unaffected by the rule.
+    let again = try SQLiteStateStore(path: path, policy: SQLiteOpenPolicy(allowsSchemaMigration: false))
+    withExtendedLifetime(again) {}
+}
+
+/// R-22 is the reason this needed a real outcome rather than a journal note: without it
+/// the deferral reads as "the app woke on time and the export did not finish. This one is
+/// ours", which blames us for a wake that behaved exactly as designed.
+@Test func aDeferredMigrationIsNotAnExecutionFailure() {
+    let wake = WakeRecord(trigger: .bgAppRefresh, atEpoch: 200)
+    let deferred = RunEvent(
+        runID: RunID(rawValue: "r1"),
+        outcomeKind: RunOutcome.migrationPending.description,
+        detail: "on-disk schema 1, expected 18",
+        trigger: .bgAppRefresh,
+        wallTimeEpoch: 201
+    )
+    #expect(
+        WakeAttribution.classify(
+            wakes: [wake],
+            lastJournal: deferred,
+            nowEpoch: 300,
+            expectedWakeByEpoch: 100
+        ) == .none
+    )
+    // A genuine execution failure in the same window still reads as ours.
+    let failed = RunEvent(
+        runID: RunID(rawValue: "r2"),
+        outcomeKind: "failed",
+        detail: "",
+        trigger: .bgAppRefresh,
+        wallTimeEpoch: 201
+    )
+    #expect(
+        WakeAttribution.classify(
+            wakes: [wake],
+            lastJournal: failed,
+            nowEpoch: 300,
+            expectedWakeByEpoch: 100
+        ) == .execution
+    )
+}
+
+/// The copy has to say what the user can do about it. Waiting for another background wake
+/// would wait forever, because the migration only runs on a foreground launch.
+@Test func aDeferredMigrationTellsTheUserToOpenTheApp() {
+    #expect(CombinedExportSummary.kind([.migrationPending, .successNothingDue]) == .migrationPending)
+    #expect(CombinedExportSummary.shortcutKind([.migrationPending]) == "deferred")
+    let copy = CombinedExportSummary.copy([.migrationPending])
+    #expect(copy == "Export deferred. Open the app to finish a database update.")
+    // Not reported as a failure, and not as success either.
+    #expect(copy != CombinedExportSummary.copy([.failed]))
+    #expect(copy != CombinedExportSummary.copy([.successNothingDue]))
+}
 
 @Test func pendingDeliveryRunnerReplaysACommittedBatchAfterRestart() async throws {
     let metric = MetricID(rawValue: "heartRate")

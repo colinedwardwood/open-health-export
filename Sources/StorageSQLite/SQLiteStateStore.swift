@@ -9,8 +9,13 @@ import RunJournal
 
 public struct SQLiteOpenPolicy: Sendable {
     public var protectionClassFlag: Int32?
+    /// ADR-R8: false on a system-scheduled wake. A four-second migration inside a
+    /// thirty-second wake, retried on every wake, is a permanent outage that reads as a
+    /// scheduling problem. The wake defers instead; the next foreground launch migrates.
+    public var allowsSchemaMigration: Bool
 
     public init(
+        allowsSchemaMigration: Bool = true,
         protectionClassFlag: Int32? = {
             #if os(iOS) || os(macOS)
             SQLITE_OPEN_FILEPROTECTION_COMPLETEUNTILFIRSTUSERAUTHENTICATION
@@ -19,14 +24,18 @@ public struct SQLiteOpenPolicy: Sendable {
             #endif
         }()
     ) {
+        self.allowsSchemaMigration = allowsSchemaMigration
         self.protectionClassFlag = protectionClassFlag
     }
 }
 
-public enum StorageError: Error {
+public enum StorageError: Error, Equatable {
     case openFailed(String)
     case execFailed(String)
     case bindFailed
+    /// ADR-R8: the store was opened by a caller that may not migrate, and the on-disk
+    /// schema is not the expected one. Nothing was read and nothing is wrong.
+    case migrationPending(onDisk: Int, expected: Int)
 }
 
 private let sqliteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
@@ -52,6 +61,15 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
         try exec("PRAGMA busy_timeout=5000;")
         try exec("PRAGMA journal_size_limit=4194304;")
         try exec("PRAGMA wal_autocheckpoint=1000;")
+        // ADR-R8 phase R0: an integer compare, before any table is touched. A caller that
+        // may not migrate has to learn this here rather than part-way through a migration.
+        let onDisk = try Self.readUserVersion(db: handle)
+        if !policy.allowsSchemaMigration, onDisk != Self.expectedSchemaVersion {
+            // A throwing initializer does not run `deinit`, so the handle is closed here.
+            sqlite3_close(handle)
+            db = nil
+            throw StorageError.migrationPending(onDisk: onDisk, expected: Self.expectedSchemaVersion)
+        }
         try migrate()
         for sql in [
             "ALTER TABLE pending_batches ADD COLUMN byte_count INTEGER NOT NULL DEFAULT 0;",
@@ -221,8 +239,74 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
                 samples_acked INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (destination_id, metric)
             );
-            PRAGMA user_version = 18;
+            PRAGMA user_version = \(Self.expectedSchemaVersion);
             """)
+    }
+
+    /// The version this build's `migrate()` leaves behind. Interpolated into the migration
+    /// itself so the constant and the stamp cannot drift apart.
+    public static let expectedSchemaVersion = 18
+
+    /// Reads the stamp without opening the store proper, so a caller (or a test) can ask
+    /// what is on disk without triggering the migration it is asking about.
+    public static func onDiskSchemaVersion(path: String) throws -> Int {
+        var handle: OpaquePointer?
+        guard sqlite3_open_v2(path, &handle, SQLITE_OPEN_READONLY, nil) == SQLITE_OK,
+              let db = handle
+        else {
+            throw StorageError.openFailed("schema version probe")
+        }
+        defer { sqlite3_close(db) }
+        return try readUserVersion(db: db)
+    }
+
+    private static func readUserVersion(db: OpaquePointer) throws -> Int {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "PRAGMA user_version;", -1, &stmt, nil) == SQLITE_OK,
+              let stmt
+        else {
+            throw StorageError.execFailed("user_version")
+        }
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
+        return Int(sqlite3_column_int64(stmt, 0))
+    }
+
+    /// ADR-R8: records the deferral without migrating. Binds only the three columns the
+    /// journal table has carried in every schema version, because a schema we do not
+    /// recognise is the whole reason we are here. A database with no journal table at all
+    /// is a first-ever launch that a wake has nothing to say about, so it stays silent.
+    public static func journalMigrationPending(
+        path: String,
+        runID: String,
+        onDisk: Int,
+        expected: Int = SQLiteStateStore.expectedSchemaVersion
+    ) throws {
+        var handle: OpaquePointer?
+        guard sqlite3_open_v2(path, &handle, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK,
+              let db = handle
+        else {
+            throw StorageError.openFailed("migration-pending journal")
+        }
+        defer { sqlite3_close(db) }
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(
+            db,
+            "INSERT INTO journal (run_id, outcome, detail) VALUES (?, ?, ?);",
+            -1,
+            &stmt,
+            nil
+        ) == SQLITE_OK, let stmt else {
+            return
+        }
+        defer { sqlite3_finalize(stmt) }
+        let detail = "on-disk schema \(onDisk), expected \(expected); deferred to a foreground launch"
+        sqlite3_bind_text(stmt, 1, runID, -1, sqliteTransient)
+        sqlite3_bind_text(stmt, 2, RunOutcome.migrationPending.description, -1, sqliteTransient)
+        sqlite3_bind_text(stmt, 3, detail, -1, sqliteTransient)
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw StorageError.execFailed("migration-pending journal insert")
+        }
     }
 
     public func transact<T: Sendable>(

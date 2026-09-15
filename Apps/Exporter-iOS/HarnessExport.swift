@@ -508,6 +508,38 @@ enum HarnessExport {
         return id
     }
 
+    /// ADR-R8: a system-scheduled wake never migrates the store. It opens under a policy
+    /// that forbids migration, and if the on-disk schema is not this build's it journals
+    /// `migrationPending` and returns `true` so the caller finishes the wake without
+    /// exporting. Otherwise a multi-second migration runs inside a thirty-second wake and
+    /// is retried on every wake: a permanent outage that reads as a scheduling problem.
+    ///
+    /// Checked at the wake boundary rather than inside each store open, because the
+    /// decision belongs to the wake — the same migration on a foreground launch is fine.
+    static func deferWakeIfMigrationPending(trigger: RunTrigger) -> Bool {
+        guard let root = try? applicationSupportRoot() else { return false }
+        let path = root.appendingPathComponent("state.sqlite").path
+        do {
+            let probe = try SQLiteStateStore(
+                path: path,
+                policy: SQLiteOpenPolicy(allowsSchemaMigration: false)
+            )
+            withExtendedLifetime(probe) {}
+            return false
+        } catch StorageError.migrationPending(let onDisk, let expected) {
+            try? SQLiteStateStore.journalMigrationPending(
+                path: path,
+                runID: UUID().uuidString,
+                onDisk: onDisk,
+                expected: expected
+            )
+            return true
+        } catch {
+            // Any other open failure is the export path's problem to report, not ours.
+            return false
+        }
+    }
+
     static func runOnePageEachMetric(
         metrics: [MetricID]? = nil,
         trigger: RunTrigger = .manual,
