@@ -13,7 +13,9 @@ import WireFormat
 private let memoryLimitMiB = 100
 private let defaultPageSize = 10_000
 private let maximumPageSize = 10_000
-private let maximumConcurrentMetrics = 4
+// The app runs destination metrics serially. Parallel ExportRuns would measure
+// aggregate test-harness memory rather than the production per-run R-74 ceiling.
+private let maximumConcurrentMetrics = 1
 private let volumeStructuralKinds = NativeWire.volumeStructuralKinds
 
 @main
