@@ -139,12 +139,12 @@ enum ShortcutExportError: Error, LocalizedError {
         case .disclosureRequired:
             ShortcutExportAuthorization.denyReason(
                 disclosureAcknowledged: false,
-                localFileEnabled: true
+                destinationEnabled: true
             )
         case .destinationDisabled:
             ShortcutExportAuthorization.denyReason(
                 disclosureAcknowledged: true,
-                localFileEnabled: false
+                destinationEnabled: false
             )
         }
     }
@@ -153,14 +153,14 @@ enum ShortcutExportError: Error, LocalizedError {
 struct ExportOnePageIntent: AppIntent {
     static let title: LocalizedStringResource = "Export one page"
     static let description = IntentDescription(
-        "Runs one anchored page per selected type to the enabled local archive. Outcomes are kinds, not health values."
+        "Runs one anchored page per selected type to every enabled destination. Outcomes are kinds, not health values."
     )
     static let openAppWhenRun = false
 
     func perform() async throws -> some IntentResult & ReturnsValue<ShortcutExportKind> {
         if let reason = ShortcutExportAuthorization.denyReason(
             disclosureAcknowledged: UserDefaults.standard.bool(forKey: "ohe.disclosureAcknowledged"),
-            localFileEnabled: HarnessExport.isLocalFileEnabled()
+            destinationEnabled: HarnessExport.hasAutomaticExport(trigger: .shortcut)
         ) {
             if reason.contains("disclosure") {
                 throw ShortcutExportError.disclosureRequired
@@ -190,7 +190,7 @@ struct ExportTypeWindowIntent: AppIntent {
     func perform() async throws -> some IntentResult & ReturnsValue<ShortcutExportKind> {
         if let reason = ShortcutExportAuthorization.denyReason(
             disclosureAcknowledged: UserDefaults.standard.bool(forKey: "ohe.disclosureAcknowledged"),
-            localFileEnabled: HarnessExport.isLocalFileEnabled()
+            destinationEnabled: HarnessExport.hasAutomaticExport(trigger: .shortcut)
         ) {
             if reason.contains("disclosure") {
                 throw ShortcutExportError.disclosureRequired

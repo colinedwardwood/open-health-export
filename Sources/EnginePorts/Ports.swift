@@ -418,6 +418,17 @@ public enum RunTrigger: String, Sendable, Codable, Equatable, CaseIterable {
     case appForeground
     case widgetControl
     case launch
+
+    /// Companion Bonjour is interactive LAN. Background wakes and Shortcuts
+    /// enqueue the obligation; a foreground or Control Centre run delivers it.
+    public var attemptsCompanionTransport: Bool {
+        switch self {
+        case .manual, .widgetControl, .appForeground:
+            true
+        case .observerQuery, .bgAppRefresh, .bgProcessing, .shortcut, .launch:
+            false
+        }
+    }
 }
 
 public struct RunStepTiming: Sendable, Equatable, Codable {

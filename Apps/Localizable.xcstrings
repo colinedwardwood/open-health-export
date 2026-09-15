@@ -2620,13 +2620,13 @@
         }
       }
     },
-    "Runs one anchored page per selected type to the enabled local archive. Outcomes are kinds, not health values.": {
+    "Runs one anchored page per selected type to every enabled destination. Outcomes are kinds, not health values.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Runs one anchored page per selected type to the enabled local archive. Outcomes are kinds, not health values."
+            "value": "Runs one anchored page per selected type to every enabled destination. Outcomes are kinds, not health values."
           }
         }
       }

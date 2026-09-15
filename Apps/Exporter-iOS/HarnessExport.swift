@@ -435,7 +435,7 @@ enum HarnessExport {
 
     private static func makeAutomaticRunDestination(
         _ destinationID: String,
-        trigger _: RunTrigger,
+        trigger: RunTrigger,
         root: URL,
         folderAccess: SecurityScopedAccess?
     ) async throws -> (RunDestination, TraceparentEmission?) {
@@ -488,6 +488,23 @@ enum HarnessExport {
                 nil
             )
         case "companion":
+            if trigger.attemptsCompanionTransport {
+                let session = try await vault().load()
+                let (verified, emission) = try await verifiedCompanionDestination(
+                    session: session,
+                    root: root
+                )
+                return (
+                    RunDestination(
+                        id: destinationID,
+                        destination: verified,
+                        scope: scope,
+                        role: role,
+                        snapshotURL: snapshotURL
+                    ),
+                    emission
+                )
+            }
             return (
                 RunDestination(
                     id: destinationID,
@@ -710,7 +727,7 @@ enum HarnessExport {
         defer { withExtendedLifetime(folderAccess) {} }
 
         var destinations: [RunDestination] = []
-        var httpsEmissions: [(String, TraceparentEmission)] = []
+        var traceparentEmissions: [(String, TraceparentEmission)] = []
         for destinationID in plannedIDs {
             if let (destination, emission) = try? await makeAutomaticRunDestination(
                 destinationID,
@@ -720,7 +737,7 @@ enum HarnessExport {
             ) {
                 destinations.append(destination)
                 if let emission {
-                    httpsEmissions.append((destinationID, emission))
+                    traceparentEmissions.append((destinationID, emission))
                 }
             }
         }
@@ -752,6 +769,16 @@ enum HarnessExport {
         if let dest {
             let (_, events) = try verifiedLocalFile(root: root, destinationDirectory: dest)
             try await emitTrustNotices(events)
+        }
+        if trigger.attemptsCompanionTransport,
+           let companion = destinations.first(where: { $0.id == "companion" })
+        {
+            try await drainPendingDeliveries(
+                destination: companion.destination,
+                destinationName: companion.id,
+                store: store,
+                scope: companion.scope
+            )
         }
         let context = TemporalContext.utcHost
         let source = HealthKitAnchoredSource(
@@ -856,8 +883,12 @@ enum HarnessExport {
         if trigger == .appForeground || trigger == .launch {
             lines.append(contentsOf: try await maybeScheduledFullReconcile(store: store))
         }
-        for (destinationID, emission) in httpsEmissions where emission.autoDisabled {
-            try setHTTPSTraceparent(false, destinationID: destinationID)
+        for (destinationID, emission) in traceparentEmissions where emission.autoDisabled {
+            if destinationID == "companion" {
+                try setCompanionTraceparent(false)
+            } else {
+                try setHTTPSTraceparent(false, destinationID: destinationID)
+            }
             lines.append("traceparent auto-disabled after a header-plausible failure")
         }
         try await applyQueueRedIfNeeded(
@@ -1365,65 +1396,17 @@ enum HarnessExport {
         let sqliteURL = root.appendingPathComponent("state.sqlite")
         let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
         let store = try SQLiteStateStore(path: sqliteURL.path)
-        let psk = try CompanionPSK.preSharedKey(from: session.secret)
-        let discovered = try await CompanionDiscovery().find(pairedName: session.serviceName, for: .seconds(8))
-        let options = NWByteStream.Options(
-            requireTLS13: true,
-            failFastOnWaiting: true,
-            preSharedKey: psk
+        let (verified, emission) = try await verifiedCompanionDestination(
+            session: session,
+            root: root,
+            onTestProgress: onTestProgress
         )
-        let deliveryPipe = ByteStreamCompanionPipe(
-            stream: NWByteStream(service: discovered, options: options)
+        try await drainPendingDeliveries(
+            destination: verified,
+            destinationName: "companion",
+            store: store,
+            scope: scope
         )
-        let emission = TraceparentEmission(enabled: storedCompanionTraceparent())
-        let verified: VerifiedDestination
-        let verificationURL = companionTestReportURL(root: root)
-        if let data = try? Data(contentsOf: verificationURL),
-           let saved = try? JSONDecoder().decode(CompanionVerificationRecord.self, from: data),
-           saved.serviceName == session.serviceName,
-           saved.macInstallationID == session.macInstallationID,
-           saved.report.allowsEnablement {
-            verified = try CompanionDestinationEnable.resume(
-                deliveryPipe: deliveryPipe,
-                installationID: session.localInstallationID,
-                testReport: saved.report,
-                traceparent: emission,
-                meteredPolicy: .fromAllowsMetered(allowsMeteredNetwork(destinationID: "companion")),
-                pathConditions: networkPathConditions()
-            )
-        } else {
-            let testPipe = ByteStreamCompanionPipe(
-                stream: NWByteStream(service: discovered, options: options)
-            )
-            let completed = try await CompanionDestinationEnable.complete(
-                testPipe: testPipe,
-                deliveryPipe: deliveryPipe,
-                installationID: session.localInstallationID,
-                emittedAt: Date().ISO8601Format(),
-                traceparent: emission,
-                meteredPolicy: .fromAllowsMetered(allowsMeteredNetwork(destinationID: "companion")),
-                pathConditions: networkPathConditions(),
-                onProgress: onTestProgress
-            )
-            verified = completed.destination
-            let record = CompanionVerificationRecord(
-                serviceName: session.serviceName,
-                macInstallationID: session.macInstallationID,
-                report: completed.report,
-                propagateTraceparent: emission.header(seed: "preview") != nil
-            )
-            try JSONEncoder().encode(record).write(to: verificationURL, options: .atomic)
-            if let snapshotURL = StatusSnapshotLocation.url(destinationID: "companion") {
-                try DestinationSnapshotFile.recordSecurityEvents(
-                    completed.events.count,
-                    destinationID: "companion",
-                    destinationLabel: "Mac companion · \(session.serviceName)",
-                    writtenAtEpoch: Date().timeIntervalSince1970,
-                    at: snapshotURL
-                )
-            }
-            try await emitTrustNotices(completed.events, destination: session.serviceName)
-        }
         try await requestScopeAuthorizationIfConfigured("companion")
         let context = TemporalContext.utcHost
         let source = HealthKitAnchoredSource(
@@ -2403,6 +2386,96 @@ enum HarnessExport {
             return String(decoding: try await store.load(handle), as: UTF8.self)
         }
         return nil
+    }
+
+    private static func drainPendingDeliveries(
+        destination: VerifiedDestination,
+        destinationName: String,
+        store: SQLiteStateStore,
+        scope: DestinationExportScope?
+    ) async throws {
+        for _ in 0..<32 {
+            let receipts = try await PendingDeliveryRunner(
+                destination: destination,
+                store: store,
+                destinationName: destinationName,
+                scope: scope
+            ).runOnce()
+            if receipts.isEmpty { return }
+        }
+    }
+
+    private static func verifiedCompanionDestination(
+        session: PairingSession,
+        root: URL,
+        onTestProgress: DestinationTestProgress? = nil
+    ) async throws -> (VerifiedDestination, TraceparentEmission) {
+        let psk = try CompanionPSK.preSharedKey(from: session.secret)
+        let discovered = try await CompanionDiscovery().find(
+            pairedName: session.serviceName,
+            for: .seconds(8)
+        )
+        let options = NWByteStream.Options(
+            requireTLS13: true,
+            failFastOnWaiting: true,
+            preSharedKey: psk
+        )
+        let deliveryPipe = ByteStreamCompanionPipe(
+            stream: NWByteStream(service: discovered, options: options)
+        )
+        let emission = TraceparentEmission(enabled: storedCompanionTraceparent())
+        let verificationURL = companionTestReportURL(root: root)
+        if let data = try? Data(contentsOf: verificationURL),
+           let saved = try? JSONDecoder().decode(CompanionVerificationRecord.self, from: data),
+           saved.serviceName == session.serviceName,
+           saved.macInstallationID == session.macInstallationID,
+           saved.report.allowsEnablement
+        {
+            let verified = try CompanionDestinationEnable.resume(
+                deliveryPipe: deliveryPipe,
+                installationID: session.localInstallationID,
+                testReport: saved.report,
+                traceparent: emission,
+                meteredPolicy: .fromAllowsMetered(
+                    allowsMeteredNetwork(destinationID: "companion")
+                ),
+                pathConditions: networkPathConditions()
+            )
+            return (verified, emission)
+        }
+        let testPipe = ByteStreamCompanionPipe(
+            stream: NWByteStream(service: discovered, options: options)
+        )
+        let completed = try await CompanionDestinationEnable.complete(
+            testPipe: testPipe,
+            deliveryPipe: deliveryPipe,
+            installationID: session.localInstallationID,
+            emittedAt: Date().ISO8601Format(),
+            traceparent: emission,
+            meteredPolicy: .fromAllowsMetered(
+                allowsMeteredNetwork(destinationID: "companion")
+            ),
+            pathConditions: networkPathConditions(),
+            onProgress: onTestProgress
+        )
+        let record = CompanionVerificationRecord(
+            serviceName: session.serviceName,
+            macInstallationID: session.macInstallationID,
+            report: completed.report,
+            propagateTraceparent: emission.header(seed: "preview") != nil
+        )
+        try JSONEncoder().encode(record).write(to: verificationURL, options: .atomic)
+        if let snapshotURL = StatusSnapshotLocation.url(destinationID: "companion") {
+            try DestinationSnapshotFile.recordSecurityEvents(
+                completed.events.count,
+                destinationID: "companion",
+                destinationLabel: "Mac companion · \(session.serviceName)",
+                writtenAtEpoch: Date().timeIntervalSince1970,
+                at: snapshotURL
+            )
+        }
+        try await emitTrustNotices(completed.events, destination: session.serviceName)
+        return (completed.destination, emission)
     }
 
     private static func verifiedMQTTDestination(root: URL) async throws -> VerifiedDestination {

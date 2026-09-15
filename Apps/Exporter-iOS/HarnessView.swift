@@ -494,7 +494,7 @@ struct HarnessView: View {
                 await refreshCoverageWindows()
                 if disclosureAcknowledged,
                    !foregroundCatchUpStarted,
-                   HarnessExport.isLocalFileEnabled() {
+                   HarnessExport.hasAutomaticExport(trigger: .appForeground) {
                     foregroundCatchUpStarted = true
                     await runLocalExport(trigger: .appForeground)
                 }
@@ -937,10 +937,10 @@ struct HarnessView: View {
             }
             .disabled(phase == .working)
             .accessibilityIdentifier("r70-run")
-            Button("Export one page (local file)") {
+            Button("Export one page") {
                 Task { await runLocalExport() }
             }
-            .disabled(phase == .working || !HarnessExport.isLocalFileEnabled())
+            .disabled(phase == .working || !HarnessExport.hasAutomaticExport(trigger: .manual))
             .accessibilityIdentifier("local-file-export")
             .accessibilityHint("Writes NDJSON to the archive folder you chose in Files.")
             Text(SchedulingHonesty.shortcutsLine)

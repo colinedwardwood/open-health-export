@@ -409,6 +409,17 @@ private struct DeviceLockedSource: SampleSource {
     #expect(manualFiles.isEmpty)
 }
 
+@Test func companionTransportIsAttemptedOnlyFromForegroundOrExplicitUI() {
+    #expect(RunTrigger.manual.attemptsCompanionTransport)
+    #expect(RunTrigger.widgetControl.attemptsCompanionTransport)
+    #expect(RunTrigger.appForeground.attemptsCompanionTransport)
+    #expect(!RunTrigger.observerQuery.attemptsCompanionTransport)
+    #expect(!RunTrigger.bgAppRefresh.attemptsCompanionTransport)
+    #expect(!RunTrigger.bgProcessing.attemptsCompanionTransport)
+    #expect(!RunTrigger.shortcut.attemptsCompanionTransport)
+    #expect(!RunTrigger.launch.attemptsCompanionTransport)
+}
+
 @Test func backgroundFanoutQueuesADestinationWithoutAttemptingIt() async throws {
     let metric = MetricID(rawValue: "heartRate")
     let page = SamplePage(
