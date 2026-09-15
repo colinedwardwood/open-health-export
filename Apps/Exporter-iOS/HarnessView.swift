@@ -2904,11 +2904,8 @@ struct HarnessView: View {
             await refreshQueueGaps()
             status = results.first ?? "Ready. Local export finished."
         } catch {
-            await HarnessExport.notifyDestinationFailure(
-                destinationID: "local-file",
-                destinationLabel: "Archive folder"
-            )
-            presentUserFacingFailure(error, destinationLabel: "Archive folder")
+            let label = await HarnessExport.notifyRunFailure(trigger: trigger)
+            presentUserFacingFailure(error, destinationLabel: label ?? "Archive folder")
         }
         phase = .ready
     }
@@ -2928,10 +2925,7 @@ struct HarnessView: View {
             await refreshLedgerIntegrity()
             status = "Ready. Full reconciliation finished without advancing anchored cursors."
         } catch {
-            await HarnessExport.notifyDestinationFailure(
-                destinationID: "local-file",
-                destinationLabel: "Archive folder"
-            )
+            await HarnessExport.notifyRunFailure(trigger: .manual)
             status = "Failed: \(error.localizedDescription)"
         }
         phase = .ready
@@ -2967,10 +2961,7 @@ struct HarnessView: View {
             await refreshLedgerIntegrity()
             status = backfillFinishedStatus(results)
         } catch {
-            await HarnessExport.notifyDestinationFailure(
-                destinationID: "local-file",
-                destinationLabel: "Archive folder"
-            )
+            await HarnessExport.notifyRunFailure(trigger: .manual)
             status = "Failed: \(error.localizedDescription)"
         }
         phase = .ready

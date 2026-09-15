@@ -1056,6 +1056,30 @@ enum HarnessExport {
         )
     }
 
+    /// A run that threw before any destination could report for itself. Naming the
+    /// archive folder here was a guess: it told users the wrong destination had
+    /// failed, and told them anything at all when that folder was not even enabled.
+    /// One notice still goes out, against the destination that has evidence of the
+    /// failure, or the first one this trigger was allowed to use. Returns the label
+    /// that notice used, so on-screen text can say the same thing.
+    @discardableResult
+    static func notifyRunFailure(trigger: RunTrigger) async -> String? {
+        let planned = healthDestinationIDs.filter {
+            isDestinationEnabled($0) && allowsExport($0, trigger: trigger)
+        }
+        guard !planned.isEmpty else { return nil }
+        let failing = StatusSnapshotLocation.readAll().first {
+            planned.contains($0.destinationID) && $0.errorClass != nil
+        }?.destinationID
+        let destinationID = failing ?? planned[0]
+        let label = destinationLabel(destinationID)
+        await notifyDestinationFailure(
+            destinationID: destinationID,
+            destinationLabel: label
+        )
+        return label
+    }
+
     static func notifyDestinationFailure(
         destinationID: String,
         destinationLabel: String
