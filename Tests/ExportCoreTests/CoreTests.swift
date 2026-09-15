@@ -312,6 +312,103 @@ private struct DeviceLockedSource: SampleSource {
     #expect(try await store.transact { try $0.pendingBatches().isEmpty })
 }
 
+@Test func oneReadFansOutToTwoDestinations() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let page = SamplePage(
+        samples: [heartSample("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0xB1]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let source = ReadCountingSource(page: page)
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-fanout-read-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let firstDir = root.appendingPathComponent("first")
+    let secondDir = root.appendingPathComponent("second")
+    try FileManager.default.createDirectory(at: firstDir, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: secondDir, withIntermediateDirectories: true)
+    let store = MemoryStateStore()
+    let run = ExportRun(
+        source: source,
+        destination: .testing(LocalFileSink(directory: firstDir)),
+        store: store,
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch"),
+        envelope: testEnvelope(),
+        destinations: [
+            RunDestination(
+                id: "first",
+                destination: .testing(LocalFileSink(directory: firstDir))
+            ),
+            RunDestination(
+                id: "second",
+                destination: .testing(LocalFileSink(directory: secondDir))
+            ),
+        ]
+    )
+    let outcome = try await run.run()
+    #expect(outcome.kind == .success)
+    #expect(source.reads == 1)
+    #expect(try await store.transact { try $0.pendingBatches().isEmpty })
+    let firstFiles = try FileManager.default.contentsOfDirectory(atPath: firstDir.path)
+        .filter { $0.hasSuffix(".ndjson") }
+    let secondFiles = try FileManager.default.contentsOfDirectory(atPath: secondDir.path)
+        .filter { $0.hasSuffix(".ndjson") }
+    #expect(firstFiles.count == 1)
+    #expect(secondFiles.count == 1)
+}
+
+@Test func automaticFanoutSkipsManualOnlyDestinationsWithoutASecondRead() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let page = SamplePage(
+        samples: [heartSample("cccccccc-cccc-cccc-cccc-cccccccccccc")],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0xC1]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let source = ReadCountingSource(page: page)
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-fanout-role-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let designatedDir = root.appendingPathComponent("designated")
+    let manualDir = root.appendingPathComponent("manual")
+    try FileManager.default.createDirectory(at: designatedDir, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: manualDir, withIntermediateDirectories: true)
+    let store = MemoryStateStore()
+    let run = ExportRun(
+        source: source,
+        destination: .testing(LocalFileSink(directory: designatedDir)),
+        store: store,
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch"),
+        envelope: testEnvelope(),
+        trigger: .observerQuery,
+        destinations: [
+            RunDestination(
+                id: "designated",
+                destination: .testing(LocalFileSink(directory: designatedDir))
+            ),
+            RunDestination(
+                id: "manual",
+                destination: .testing(LocalFileSink(directory: manualDir)),
+                role: .manualOnly
+            ),
+        ]
+    )
+    let outcome = try await run.run()
+    #expect(outcome.kind == .success)
+    #expect(source.reads == 1)
+    let designatedFiles = try FileManager.default.contentsOfDirectory(atPath: designatedDir.path)
+        .filter { $0.hasSuffix(".ndjson") }
+    let manualFiles = try FileManager.default.contentsOfDirectory(atPath: manualDir.path)
+        .filter { $0.hasSuffix(".ndjson") }
+    #expect(designatedFiles.count == 1)
+    #expect(manualFiles.isEmpty)
+}
+
 @Test func lockedStoreReadRecordsBlockedJournalOutcome() async throws {
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-store-locked-\(UUID().uuidString)")

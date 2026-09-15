@@ -12,9 +12,32 @@ import RunJournal
 import Watchdog
 import WireFormat
 
+public struct RunDestination: Sendable {
+    public var id: String
+    public var destination: VerifiedDestination
+    public var scope: DestinationExportScope?
+    public var role: DestinationExportRole
+    public var snapshotURL: URL?
+
+    public init(
+        id: String,
+        destination: VerifiedDestination,
+        scope: DestinationExportScope? = nil,
+        role: DestinationExportRole = .designated,
+        snapshotURL: URL? = nil
+    ) {
+        self.id = id
+        self.destination = destination
+        self.scope = scope
+        self.role = role
+        self.snapshotURL = snapshotURL
+    }
+}
+
 public struct ExportRun: Sendable {
     public var source: any SampleSource
     public var destination: VerifiedDestination
+    public var destinations: [RunDestination]
     public var store: any StateStore
     public var metric: MetricID
     public var epoch: UInt32
@@ -67,10 +90,21 @@ public struct ExportRun: Sendable {
         replaySampleLimit: Int = AnchorGuard.implausibleDeltaSamples,
         freshnessCadenceSeconds: TimeInterval = FreshnessTarget.defaultCadenceSeconds,
         deferForLowPower: Bool = false,
-        persistHistoryPayload: Bool = true
+        persistHistoryPayload: Bool = true,
+        destinations: [RunDestination] = []
     ) {
         self.source = source
         self.destination = destination
+        self.destinations = destinations.isEmpty
+            ? [
+                RunDestination(
+                    id: destinationName,
+                    destination: destination,
+                    scope: scope,
+                    snapshotURL: snapshotURL
+                ),
+            ]
+            : destinations
         self.store = store
         self.metric = metric
         self.epoch = epoch
@@ -108,9 +142,6 @@ public struct ExportRun: Sendable {
             )
             lastMark = now
         }
-        if let scope {
-            try ExportScopeGate.require(metric: metric, scope: scope)
-        }
         if deferForLowPower {
             let tally = RunTally(
                 failed: 1,
@@ -136,6 +167,18 @@ public struct ExportRun: Sendable {
         }
         if MetricCatalog.isCharacteristic(metric) {
             return try await runCharacteristic(startedAt: startedAt, mark: mark)
+        }
+        let owed = try owedDestinations()
+        if owed.isEmpty {
+            let outcome = RunOutcome.derive(from: RunTally(nothingDue: true))
+            try await record(
+                outcome: outcome,
+                tally: RunTally(nothingDue: true),
+                receipt: nil,
+                startedAt: startedAt,
+                timings: timings
+            )
+            return outcome
         }
         let effectiveEpoch = max(epoch, typeStatus?.generation ?? epoch)
         let openHold = try await store.transact { try $0.loadAnchorHold(metric: metric) }
@@ -333,14 +376,14 @@ public struct ExportRun: Sendable {
             let evicted = try QueueAdmission.makeRoom(for: pending.byteCount, on: tx)
             try tx.commitFanout(
                 pending,
-                destinations: [
+                destinations: try owed.map {
                     try FanoutObligation.destination(
-                        id: destinationName,
+                        id: $0.id,
                         metric: metric,
                         expectedRecords: pending.expectedRecords,
-                        scope: scope
-                    ),
-                ],
+                        scope: $0.scope
+                    )
+                },
                 advancing: CursorAdvance(
                     page: page,
                     epoch: effectiveEpoch,
@@ -383,68 +426,70 @@ public struct ExportRun: Sendable {
         #if DEBUG
         try faults.hit(.afterEnqueueBeforeDestinationWrite)
         #endif
-        let receipt: DeliveryReceipt
-        do {
-            #if DEBUG
-            receipt = try await DeliveryExecutor.send(
-                batch: pending,
-                destination: destination,
-                destinationName: destinationName,
-                store: store,
-                faults: faults,
-                clock: clock,
-                scope: scope
-            )
-            #else
-            receipt = try await DeliveryExecutor.send(
-                batch: pending,
-                destination: destination,
-                destinationName: destinationName,
-                store: store,
-                clock: clock,
-                scope: scope
-            )
-            #endif
-        } catch let error as DestinationSendError {
-            mark("send")
-            let tally = RunTally(
-                read: recordCount,
-                committed: recordCount,
-                failed: 1,
-                terminalError: error.errorClass,
-                partialCause: error.errorClass.rawValue
-            )
-            let outcome = RunOutcome.derive(from: tally)
-            try await record(
-                outcome: outcome,
-                tally: tally,
-                receipt: nil,
-                startedAt: startedAt,
-                timings: timings,
-                pending: pending
-            )
-            try await sweepUndatable(enqueue.undatable)
-            return outcome
+        var accepted = 0
+        var unconfirmed = 0
+        var statusOnly = false
+        var failed = 0
+        var terminalError = ErrorClass.none
+        var partialCause: String?
+        var lastReceipt: DeliveryReceipt?
+        var receipts: [(RunDestination, DeliveryReceipt)] = []
+        for dest in owed {
+            do {
+                receipts.append((dest, try await deliver(pending: pending, dest: dest)))
+            } catch let error as DestinationSendError {
+                failed += 1
+                terminalError = error.errorClass
+                partialCause = error.errorClass.rawValue
+            }
         }
         mark("send")
-        #if DEBUG
-        try faults.hit(.afterAckBeforeRelease)
-        #endif
+        if !receipts.isEmpty {
+            #if DEBUG
+            try faults.hit(.afterAckBeforeRelease)
+            #endif
+            for (dest, receipt) in receipts {
+                try await store.transact { tx in
+                    _ = try FanoutObligation.settle(
+                        receipt: receipt,
+                        destinationID: dest.id,
+                        on: tx
+                    )
+                }
+                accepted += receipt.accepted
+                unconfirmed += receipt.unconfirmed
+                statusOnly = statusOnly || receipt.statusOnly
+                lastReceipt = receipt
+            }
+        }
         var tally = RunTally(
-            read: recordCount,
+            read: recordCount * owed.count,
             committed: recordCount,
-            acked: receipt.accepted,
-            unconfirmed: receipt.unconfirmed,
-            ackEvidenceStatusOnly: receipt.statusOnly
+            acked: accepted,
+            unconfirmed: unconfirmed,
+            failed: failed,
+            terminalError: terminalError,
+            ackEvidenceStatusOnly: statusOnly,
+            partialCause: partialCause
         )
-        if receipt.accepted < recordCount, receipt.unconfirmed == 0 {
+        if owed.count == 1, accepted < recordCount, unconfirmed == 0, failed == 0 {
             tally.partialCause = "receipt_short"
         }
         let outcome = RunOutcome.derive(from: tally)
+        let journalTally = RunTally(
+            read: recordCount,
+            committed: recordCount,
+            acked: lastReceipt?.accepted ?? 0,
+            unconfirmed: lastReceipt?.unconfirmed ?? 0,
+            failed: failed,
+            terminalError: terminalError,
+            ackEvidenceStatusOnly: statusOnly,
+            partialCause: tally.partialCause
+        )
         try await record(
             outcome: outcome,
-            tally: tally,
-            receipt: receipt,
+            tally: journalTally,
+            receipt: lastReceipt,
             freshnessTiming: freshnessTiming,
             startedAt: startedAt,
             timings: timings,
@@ -615,7 +660,7 @@ public struct ExportRun: Sendable {
             freshnessLatency = nil
         }
         try await store.transact { tx in
-            if let receipt {
+            if let receipt, destinations.count == 1 {
                 _ = try FanoutObligation.settle(
                     receipt: receipt,
                     destinationID: destinationName,
@@ -914,6 +959,59 @@ public struct ExportRun: Sendable {
             pending: pending
         )
         return outcome
+    }
+
+    private func owedDestinations() throws -> [RunDestination] {
+        let allowed = destinations.filter { $0.role.allows(trigger) }
+        var matching: [RunDestination] = []
+        var lastScopeError: Error?
+        for dest in allowed {
+            guard let scope = dest.scope else {
+                matching.append(dest)
+                continue
+            }
+            do {
+                try ExportScopeGate.require(metric: metric, scope: scope)
+                matching.append(dest)
+            } catch {
+                lastScopeError = error
+            }
+        }
+        if matching.isEmpty, destinations.count == 1, destinations[0].role.allows(trigger) {
+            if let error = lastScopeError {
+                throw error
+            }
+            if let scope = destinations[0].scope {
+                try ExportScopeGate.require(metric: metric, scope: scope)
+            }
+        }
+        return matching
+    }
+
+    private func deliver(
+        pending: PendingBatch,
+        dest: RunDestination
+    ) async throws -> DeliveryReceipt {
+        #if DEBUG
+        return try await DeliveryExecutor.send(
+            batch: pending,
+            destination: dest.destination,
+            destinationName: dest.id,
+            store: store,
+            faults: faults,
+            clock: clock,
+            scope: dest.scope
+        )
+        #else
+        return try await DeliveryExecutor.send(
+            batch: pending,
+            destination: dest.destination,
+            destinationName: dest.id,
+            store: store,
+            clock: clock,
+            scope: dest.scope
+        )
+        #endif
     }
 
     private func persistOpenRun(
