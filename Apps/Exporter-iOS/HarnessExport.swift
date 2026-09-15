@@ -63,6 +63,12 @@ private enum LocalExportFolderError: LocalizedError {
     }
 }
 
+private struct QueuedWithoutAttemptSink: DestinationSink {
+    func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt {
+        throw DestinationSendError.destinationUnreachable
+    }
+}
+
 #if !OHE_OBS25_SIZE_BASELINE
 private struct OTLPDestinationRecord: Codable {
     var urlString: String
@@ -226,7 +232,7 @@ private actor ObserverExportGate {
     private var running = false
 
     func enqueue(_ metric: MetricID) async {
-        guard HarnessExport.allowsExport("local-file", trigger: .observerQuery) else {
+        guard HarnessExport.hasAutomaticExport(trigger: .observerQuery) else {
             return
         }
         pending.insert(metric)
@@ -408,6 +414,94 @@ enum HarnessExport {
 
     static func allowsExport(_ destinationID: String, trigger: RunTrigger) -> Bool {
         destinationExportRole(destinationID).allows(trigger)
+    }
+
+    static func hasAutomaticExport(trigger: RunTrigger) -> Bool {
+        healthDestinationIDs.contains {
+            isDestinationEnabled($0) && allowsExport($0, trigger: trigger)
+        }
+    }
+
+    private static func destinationLabel(_ destinationID: String) -> String {
+        switch destinationID {
+        case "local-file": "Archive folder"
+        case "https": "HTTPS destination"
+        case "home-assistant": "Home Assistant"
+        case "mqtt": "MQTT destination"
+        case "companion": "Mac companion"
+        default: destinationID
+        }
+    }
+
+    private static func makeAutomaticRunDestination(
+        _ destinationID: String,
+        trigger _: RunTrigger,
+        root: URL,
+        folderAccess: SecurityScopedAccess?
+    ) async throws -> (RunDestination, TraceparentEmission?) {
+        let scope = try await destinationScope(destinationID)
+        let role = destinationExportRole(destinationID)
+        let snapshotURL = StatusSnapshotLocation.url(destinationID: destinationID)
+        switch destinationID {
+        case "local-file":
+            guard let folderAccess else {
+                throw LocalExportFolderError.notSelected
+            }
+            let (verified, _) = try verifiedLocalFile(
+                root: root,
+                destinationDirectory: folderAccess.url
+            )
+            return (
+                RunDestination(
+                    id: destinationID,
+                    destination: verified,
+                    scope: scope,
+                    role: role,
+                    snapshotURL: snapshotURL
+                ),
+                nil
+            )
+        case "https", "home-assistant":
+            let (verified, emission) = try await verifiedHTTPSDestination(
+                destinationID: destinationID,
+                root: root
+            )
+            return (
+                RunDestination(
+                    id: destinationID,
+                    destination: verified,
+                    scope: scope,
+                    role: role,
+                    snapshotURL: snapshotURL
+                ),
+                emission
+            )
+        case "mqtt":
+            return (
+                RunDestination(
+                    id: destinationID,
+                    destination: try await verifiedMQTTDestination(root: root),
+                    scope: scope,
+                    role: role,
+                    snapshotURL: snapshotURL
+                ),
+                nil
+            )
+        case "companion":
+            return (
+                RunDestination(
+                    id: destinationID,
+                    destination: .testing(QueuedWithoutAttemptSink()),
+                    scope: scope,
+                    role: role,
+                    snapshotURL: snapshotURL,
+                    attemptNow: false
+                ),
+                nil
+            )
+        default:
+            throw DestinationSendError.destinationUnreachable
+        }
     }
 
     static func setDestinationExportRole(
@@ -595,36 +689,75 @@ enum HarnessExport {
         trigger: RunTrigger = .manual,
         onProgress: (@Sendable (Int, Int) async -> Void)? = nil
     ) async throws -> [String] {
-        guard allowsExport("local-file", trigger: trigger) else {
+        let plannedIDs = healthDestinationIDs.filter {
+            isDestinationEnabled($0) && allowsExport($0, trigger: trigger)
+        }
+        guard !plannedIDs.isEmpty else {
             return [
                 "manualOnly: Automatic export skipped. This installation allows explicit exports only."
             ]
         }
-        defer { synchronizeDestinationExportRole("local-file") }
-        let scope = try await destinationScope("local-file")
-        try ExportScopeGate.requireConfigured(scope)
-        let metrics = metrics ?? scope.metrics.sorted { $0.rawValue < $1.rawValue }
-        for metric in metrics {
-            try ExportScopeGate.require(metric: metric, scope: scope)
+        defer {
+            for destinationID in plannedIDs {
+                synchronizeDestinationExportRole(destinationID)
+            }
         }
         let root = try applicationSupportRoot()
-        let sqliteURL = root.appendingPathComponent("state.sqlite")
-        let folderAccess = try localExportFolder(root: root)
+        var folderAccess: SecurityScopedAccess?
+        if plannedIDs.contains("local-file") {
+            folderAccess = try localExportFolder(root: root)
+        }
         defer { withExtendedLifetime(folderAccess) {} }
-        let dest = folderAccess.url
+
+        var destinations: [RunDestination] = []
+        var httpsEmissions: [(String, TraceparentEmission)] = []
+        for destinationID in plannedIDs {
+            if let (destination, emission) = try? await makeAutomaticRunDestination(
+                destinationID,
+                trigger: trigger,
+                root: root,
+                folderAccess: folderAccess
+            ) {
+                destinations.append(destination)
+                if let emission {
+                    httpsEmissions.append((destinationID, emission))
+                }
+            }
+        }
+        guard !destinations.isEmpty else {
+            return ["blocked: No destination could be reconstructed for this export."]
+        }
+        let scopes = destinations.compactMap(\.scope)
+        for scope in scopes {
+            try ExportScopeGate.requireConfigured(scope)
+        }
+        let metrics = metrics
+            ?? Set(scopes.flatMap(\.metrics)).sorted { $0.rawValue < $1.rawValue }
+        for metric in metrics {
+            guard scopes.contains(where: { $0.metrics.contains(metric) }) else {
+                throw ExportScopeViolation.metricNotSelected(
+                    destinationID: destinations[0].id,
+                    metric: metric
+                )
+            }
+        }
+        let sqliteURL = root.appendingPathComponent("state.sqlite")
+        let dest = folderAccess?.url
         let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
 
         let store = try SQLiteStateStore(path: sqliteURL.path)
         let gapIDsBefore = try await store.transact {
             Set(try $0.loadGaps().map(\.batchID))
         }
-        let (verified, events) = try verifiedLocalFile(root: root, destinationDirectory: dest)
-        try await emitTrustNotices(events)
+        if let dest {
+            let (_, events) = try verifiedLocalFile(root: root, destinationDirectory: dest)
+            try await emitTrustNotices(events)
+        }
         let context = TemporalContext.utcHost
         let source = HealthKitAnchoredSource(
             context: context,
             limit: samplePageLimit(),
-            window: HealthKitQueryWindow(scope: scope)
+            window: HealthKitQueryWindow(union: scopes)
         )
         let observations = HealthKitDayObservationSource(context: context, limit: samplePageLimit())
         let statistics = HealthKitStatisticsSource(context: context)
@@ -637,14 +770,14 @@ enum HarnessExport {
         var kinds: [RunOutcome.Kind] = []
         for (index, metric) in metrics.enumerated() {
             await onProgress?(index + 1, metrics.count)
-            let snapshotURL = StatusSnapshotLocation.url(destinationID: "local-file")
+            let primary = destinations[0]
             let run = ExportRun(
                 source: source,
-                destination: verified,
+                destination: primary.destination,
                 store: store,
                 metric: metric,
                 scratchDirectory: scratch,
-                destinationName: "local-file",
+                destinationName: primary.id,
                 envelope: WireEnvelope(
                     exporterId: exporterId,
                     seq: 1,
@@ -656,53 +789,58 @@ enum HarnessExport {
                 observations: observations,
                 characteristics: HealthKitCharacteristicSource(),
                 trigger: trigger,
-                snapshotURL: snapshotURL,
-                externalStatusURL: dest.appendingPathComponent("status.json"),
+                snapshotURL: primary.snapshotURL,
+                externalStatusURL: dest?.appendingPathComponent("status.json"),
                 ledgerHeadSeal: ledgerSeal,
                 ledgerSealURL: ledgerSealURL,
-                scope: scope,
+                scope: primary.scope,
                 freshnessCadenceSeconds: freshnessCadenceSeconds(),
-            deferForLowPower: isLowPowerDeferred()
+                deferForLowPower: isLowPowerDeferred(),
+                destinations: destinations
             )
             let outcome = try await run.run()
             kinds.append(outcome.kind)
-            await notifyIfFailed(
-                outcome,
-                destinationID: "local-file",
-                destinationLabel: "Archive folder"
-            )
+            for destination in destinations {
+                await notifyIfFailed(
+                    outcome,
+                    destinationID: destination.id,
+                    destinationLabel: destinationLabel(destination.id)
+                )
+                if (outcome.kind == .success || outcome.kind == .successNothingDue),
+                   let snapshotURL = destination.snapshotURL {
+                    await rescheduleOverdueNotification(snapshotURL: snapshotURL)
+                }
+            }
             WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
             lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
-            if (outcome.kind == .success || outcome.kind == .successNothingDue),
-               let snapshotURL {
-                await rescheduleOverdueNotification(snapshotURL: snapshotURL)
-            }
 
-            lines.append(
-                try await trailingReconcileAfterDelta(
-                    observations: observations,
-                    destination: verified,
-                    store: store,
-                    metric: metric,
-                    scratchDirectory: scratch,
-                    destinationID: "local-file",
-                    destinationLabel: "Archive folder",
-                    envelope: WireEnvelope(
-                        exporterId: exporterId,
-                        seq: 1,
-                        emittedAt: now,
-                        observedAt: now
-                    ),
-                    temporal: context,
-                    statistics: statistics,
-                    trigger: trigger,
-                    snapshotURL: snapshotURL,
-                    externalStatusURL: dest.appendingPathComponent("status.json"),
-                    ledgerHeadSeal: ledgerSeal,
-                    ledgerSealURL: ledgerSealURL,
-                    scope: scope
+            for destination in destinations where destination.attemptNow {
+                lines.append(
+                    try await trailingReconcileAfterDelta(
+                        observations: observations,
+                        destination: destination.destination,
+                        store: store,
+                        metric: metric,
+                        scratchDirectory: scratch,
+                        destinationID: destination.id,
+                        destinationLabel: destinationLabel(destination.id),
+                        envelope: WireEnvelope(
+                            exporterId: exporterId,
+                            seq: 1,
+                            emittedAt: now,
+                            observedAt: now
+                        ),
+                        temporal: context,
+                        statistics: statistics,
+                        trigger: trigger,
+                        snapshotURL: destination.snapshotURL,
+                        externalStatusURL: dest?.appendingPathComponent("status.json"),
+                        ledgerHeadSeal: ledgerSeal,
+                        ledgerSealURL: ledgerSealURL,
+                        scope: destination.scope
+                    )
                 )
-            )
+            }
         }
         let newQueueGap = try await store.transact {
             try $0.loadGaps().contains {
@@ -718,22 +856,28 @@ enum HarnessExport {
         if trigger == .appForeground || trigger == .launch {
             lines.append(contentsOf: try await maybeScheduledFullReconcile(store: store))
         }
+        for (destinationID, emission) in httpsEmissions where emission.autoDisabled {
+            try setHTTPSTraceparent(false, destinationID: destinationID)
+            lines.append("traceparent auto-disabled after a header-plausible failure")
+        }
         try await applyQueueRedIfNeeded(
             store: store,
             root: root,
-            destinationLabel: "Archive folder"
+            destinationLabel: destinationLabel(destinations[0].id)
         )
         let combined = CombinedExportSummary.kind(kinds)
-        if let snapshotURL = StatusSnapshotLocation.url(destinationID: "local-file"),
-           var snapshot = try? DestinationSnapshotFile.read(from: snapshotURL)
-        {
-            snapshot.applyLastOutcome(combined.rawValue)
-            snapshot.writtenAtEpoch = Date().timeIntervalSince1970
-            try DestinationSnapshotFile.write(snapshot, to: snapshotURL)
-            WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+        for destinationID in plannedIDs {
+            if let snapshotURL = StatusSnapshotLocation.url(destinationID: destinationID),
+               var snapshot = try? DestinationSnapshotFile.read(from: snapshotURL)
+            {
+                snapshot.applyLastOutcome(combined.rawValue)
+                snapshot.writtenAtEpoch = Date().timeIntervalSince1970
+                try DestinationSnapshotFile.write(snapshot, to: snapshotURL)
+            }
         }
+        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
         lines.insert(CombinedExportSummary.copy(kinds), at: 0)
-        lines.append("Files: \(dest.path)")
+        lines.append("Files: \(dest?.path ?? scratch.path)")
         return lines
     }
 
@@ -2261,11 +2405,7 @@ enum HarnessExport {
         return nil
     }
 
-    static func runMQTTDestination(
-        onProgress: (@Sendable (Int, Int) async -> Void)? = nil
-    ) async throws -> [String] {
-        defer { synchronizeDestinationExportRole("mqtt") }
-        let root = try applicationSupportRoot()
+    private static func verifiedMQTTDestination(root: URL) async throws -> VerifiedDestination {
         let data = try Data(
             contentsOf: root.appendingPathComponent("mqtt-destination.json")
         )
@@ -2313,7 +2453,15 @@ enum HarnessExport {
         sink.pathConditions = networkPathConditions()
         var setup = DestinationSetup()
         try setup.resumeEnabled(testReport: saved.report)
-        let verified = try setup.enable(sink: sink)
+        return try setup.enable(sink: sink)
+    }
+
+    static func runMQTTDestination(
+        onProgress: (@Sendable (Int, Int) async -> Void)? = nil
+    ) async throws -> [String] {
+        defer { synchronizeDestinationExportRole("mqtt") }
+        let root = try applicationSupportRoot()
+        let verified = try await verifiedMQTTDestination(root: root)
         let store = try SQLiteStateStore(
             path: root.appendingPathComponent("state.sqlite").path
         )
@@ -2413,12 +2561,10 @@ enum HarnessExport {
         }
     }
 
-    private static func runHTTPSDestinationUnscoped(
+    private static func verifiedHTTPSDestination(
         destinationID: String,
-        destinationLabel: String,
-        onProgress: (@Sendable (Int, Int) async -> Void)?
-    ) async throws -> [String] {
-        let root = try applicationSupportRoot()
+        root: URL
+    ) async throws -> (VerifiedDestination, TraceparentEmission) {
         let data = try Data(
             contentsOf: httpsDestinationRecordURL(
                 root: root,
@@ -2491,6 +2637,19 @@ enum HarnessExport {
                 ),
                 pathConditions: networkPathConditions()
             )
+        )
+        return (verified, emission)
+    }
+
+    private static func runHTTPSDestinationUnscoped(
+        destinationID: String,
+        destinationLabel: String,
+        onProgress: (@Sendable (Int, Int) async -> Void)?
+    ) async throws -> [String] {
+        let root = try applicationSupportRoot()
+        let (verified, emission) = try await verifiedHTTPSDestination(
+            destinationID: destinationID,
+            root: root
         )
         let store = try SQLiteStateStore(
             path: root.appendingPathComponent("state.sqlite").path
@@ -2568,7 +2727,7 @@ enum HarnessExport {
             )
         }
         if emission.autoDisabled {
-            try setHTTPSTraceparent(false)
+            try setHTTPSTraceparent(false, destinationID: destinationID)
             lines.append("traceparent auto-disabled after a header-plausible failure")
         }
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
@@ -2678,9 +2837,9 @@ enum HarnessExport {
         return record.propagateTraceparent ?? false
     }
 
-    static func setHTTPSTraceparent(_ enabled: Bool) throws {
+    static func setHTTPSTraceparent(_ enabled: Bool, destinationID: String = "https") throws {
         let root = try applicationSupportRoot()
-        let url = root.appendingPathComponent("https-destination.json")
+        let url = httpsDestinationRecordURL(root: root, destinationID: destinationID)
         guard let data = try? Data(contentsOf: url),
               var record = try? JSONDecoder().decode(HTTPSVerificationRecord.self, from: data)
         else {

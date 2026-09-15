@@ -49,8 +49,7 @@ final class AppLifecycleCoordinator {
             stopObservers()
             return
         }
-        guard HarnessExport.isLocalFileEnabled() else { return }
-        guard HarnessExport.allowsExport("local-file", trigger: .observerQuery) else {
+        guard HarnessExport.hasAutomaticExport(trigger: .observerQuery) else {
             stopObservers()
             return
         }
@@ -219,8 +218,7 @@ enum BackgroundTaskCoordinator {
                     return
                 }
                 try await AppLifecycleCoordinator.shared.startObserversIfEligible()
-                if HarnessExport.isLocalFileEnabled(),
-                   HarnessExport.allowsExport("local-file", trigger: trigger) {
+                if HarnessExport.hasAutomaticExport(trigger: trigger) {
                     _ = try await HarnessExport.runOnePageEachMetric(trigger: trigger)
                 }
                 task.setTaskCompleted(success: true)

@@ -768,6 +768,20 @@ public struct HealthKitQueryWindow: Sendable, Equatable {
         )
     }
 
+    /// Earliest start and latest end across configured grants. An open end on any
+    /// grant keeps the union open-ended so one HealthKit read covers every sink.
+    public init(union scopes: [DestinationExportScope]) {
+        let configured = scopes.filter(\.isConfigured)
+        guard !configured.isEmpty else {
+            self.init(startInclusive: .distantFuture)
+            return
+        }
+        let start = configured.compactMap(\.startInclusive).min()
+        let closedEnds = configured.compactMap(\.endExclusive)
+        let end = closedEnds.count == configured.count ? closedEnds.max() : nil
+        self.init(startInclusive: start, endExclusive: end)
+    }
+
     public var isUnbounded: Bool {
         startInclusive == nil && endExclusive == nil
     }

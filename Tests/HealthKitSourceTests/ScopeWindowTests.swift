@@ -112,6 +112,23 @@ private func heartRate(startingAt start: Date) -> HKQuantitySample {
     #expect(!deniedPredicate.evaluate(with: heartRate(startingAt: windowStart)))
 }
 
+@Test func unionQueryWindowUsesTheEarliestStartAndStaysOpenIfAnyGrantIsOpen() throws {
+    let early = try DestinationExportScope(
+        destinationID: "a",
+        metrics: [MetricCatalog.heartRate.id],
+        startInclusive: windowStart,
+        endExclusive: windowEnd
+    )
+    let open = try DestinationExportScope(
+        destinationID: "b",
+        metrics: [MetricCatalog.stepCount.id],
+        startInclusive: windowStart.addingTimeInterval(-3_600)
+    )
+    let window = HealthKitQueryWindow(union: [early, open])
+    #expect(window.startInclusive == windowStart.addingTimeInterval(-3_600))
+    #expect(window.endExclusive == nil)
+}
+
 @Test func anchoredSourcesKeepTheirUnscopedInitialisers() {
     let unscoped = HealthKitAnchoredSource(context: .utc, limit: 10)
     let scoped = HealthKitAnchoredSource(

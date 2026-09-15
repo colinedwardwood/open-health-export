@@ -409,6 +409,55 @@ private struct DeviceLockedSource: SampleSource {
     #expect(manualFiles.isEmpty)
 }
 
+@Test func backgroundFanoutQueuesADestinationWithoutAttemptingIt() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let page = SamplePage(
+        samples: [heartSample("dddddddd-dddd-4ddd-8ddd-dddddddddddd")],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0xD1]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let source = ReadCountingSource(page: page)
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-fanout-defer-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let liveDir = root.appendingPathComponent("live")
+    try FileManager.default.createDirectory(at: liveDir, withIntermediateDirectories: true)
+    let store = MemoryStateStore()
+    let run = ExportRun(
+        source: source,
+        destination: .testing(LocalFileSink(directory: liveDir)),
+        store: store,
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch"),
+        envelope: testEnvelope(),
+        trigger: .bgProcessing,
+        destinations: [
+            RunDestination(
+                id: "live",
+                destination: .testing(LocalFileSink(directory: liveDir))
+            ),
+            RunDestination(
+                id: "companion",
+                destination: .testing(LocalFileSink(directory: root.appendingPathComponent("unused"))),
+                attemptNow: false
+            ),
+        ]
+    )
+    let outcome = try await run.run()
+    #expect(outcome.kind == .success)
+    #expect(source.reads == 1)
+    #expect(try await store.transact { try $0.pendingBatches().count } == 1)
+    let companionOwed = try await store.transact {
+        try $0.pendingDeliveries(
+            destinationID: DestinationID(rawValue: "companion"),
+            limit: 1
+        )
+    }
+    #expect(companionOwed.count == 1)
+}
+
 @Test func lockedStoreReadRecordsBlockedJournalOutcome() async throws {
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-store-locked-\(UUID().uuidString)")

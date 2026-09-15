@@ -18,19 +18,24 @@ public struct RunDestination: Sendable {
     public var scope: DestinationExportScope?
     public var role: DestinationExportRole
     public var snapshotURL: URL?
+    /// False keeps the durable obligation without a transport attempt in this
+    /// execution context (background companion delivery).
+    public var attemptNow: Bool
 
     public init(
         id: String,
         destination: VerifiedDestination,
         scope: DestinationExportScope? = nil,
         role: DestinationExportRole = .designated,
-        snapshotURL: URL? = nil
+        snapshotURL: URL? = nil,
+        attemptNow: Bool = true
     ) {
         self.id = id
         self.destination = destination
         self.scope = scope
         self.role = role
         self.snapshotURL = snapshotURL
+        self.attemptNow = attemptNow
     }
 }
 
@@ -434,7 +439,7 @@ public struct ExportRun: Sendable {
         var partialCause: String?
         var lastReceipt: DeliveryReceipt?
         var receipts: [(RunDestination, DeliveryReceipt)] = []
-        for dest in owed {
+        for dest in owed where dest.attemptNow {
             do {
                 receipts.append((dest, try await deliver(pending: pending, dest: dest)))
             } catch let error as DestinationSendError {
@@ -462,17 +467,19 @@ public struct ExportRun: Sendable {
                 lastReceipt = receipt
             }
         }
+        let attemptedCount = owed.filter(\.attemptNow).count
+        let deriveCount = attemptedCount == 0 ? 1 : attemptedCount
         var tally = RunTally(
-            read: recordCount * owed.count,
+            read: recordCount * deriveCount,
             committed: recordCount,
-            acked: accepted,
+            acked: attemptedCount == 0 ? recordCount : accepted,
             unconfirmed: unconfirmed,
             failed: failed,
             terminalError: terminalError,
             ackEvidenceStatusOnly: statusOnly,
             partialCause: partialCause
         )
-        if owed.count == 1, accepted < recordCount, unconfirmed == 0, failed == 0 {
+        if attemptedCount == 1, accepted < recordCount, unconfirmed == 0, failed == 0 {
             tally.partialCause = "receipt_short"
         }
         let outcome = RunOutcome.derive(from: tally)

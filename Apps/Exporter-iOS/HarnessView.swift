@@ -3463,9 +3463,9 @@ struct HarnessView: View {
     }
 
     private func applyExportNowRoute() {
-        guard disclosureAcknowledged, HarnessExport.isLocalFileEnabled() else {
+        guard disclosureAcknowledged, HarnessExport.hasAutomaticExport(trigger: .widgetControl) else {
             status = disclosureAcknowledged
-                ? "Enable the local archive folder before exporting from Control Centre."
+                ? "Enable a destination before exporting from Control Centre."
                 : "Review the disclosure before exporting from Control Centre."
             return
         }
