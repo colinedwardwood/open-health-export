@@ -7,6 +7,12 @@ on:
   schedule:
     - cron: "23 3 * * 6"
 
+concurrency:
+  # A newer full matrix supersedes one that has not acquired macOS runners yet.
+  # Scheduled/manual overlap must not reserve two more long-lived runner slots.
+  group: accessibility-matrix-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   full-state-matrix:
     runs-on: macos-26

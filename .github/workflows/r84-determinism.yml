@@ -8,13 +8,11 @@ on:
 permissions:
   contents: read
 concurrency:
-  # Each commit on main gets its own concurrency group, so runs never contend and
-  # none is left marked cancelled. Grouping by ref is not enough: with
-  # cancel-in-progress false GitHub still cancels the *pending* run when a newer
-  # one queues, so a run could only ever be superseded rather than completed.
-  # Off main, superseding is exactly what we want.
-  group: r84-determinism-${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # The gate needs one complete result for the current ref. Preserving every
+  # intermediate main SHA queued an obsolete macos-26 leg for every push and
+  # competed with the primary Apple build for scarce hosted runners.
+  group: r84-determinism-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   utc-fixed-offset:
     # Hosted runners that GitHub currently provides for this gate. Linux x86_64,

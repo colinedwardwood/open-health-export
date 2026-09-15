@@ -6,13 +6,12 @@ on:
   push:
   pull_request:
 concurrency:
-  # Each commit on main gets its own concurrency group, so runs never contend and
-  # none is left marked cancelled. Grouping by ref is not enough: with
-  # cancel-in-progress false GitHub still cancels the *pending* run when a newer
-  # one queues, so a run could only ever be superseded rather than completed.
-  # Off main, superseding is exactly what we want.
-  group: macos-build-${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # CI establishes the state of the current ref, not every intermediate push.
+  # Keeping a per-SHA group on main accumulated an unbounded queue: every commit
+  # retained five build jobs followed by six 90-minute UI jobs. Obsolete runs
+  # then held all hosted macOS capacity while the commit we cared about waited.
+  group: macos-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   darwin-package:
     runs-on: macos-26
