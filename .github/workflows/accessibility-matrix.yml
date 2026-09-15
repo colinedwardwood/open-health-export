@@ -34,20 +34,10 @@ jobs:
           DEVICE_FAMILY: ${{ matrix.family }}
         run: |
           set -euo pipefail
-          destination="$(
-            xcrun simctl list devices available -j |
-              python3 -c '
-          import json, os, sys
-          family = os.environ["DEVICE_FAMILY"]
-          devices = json.load(sys.stdin)["devices"]
-          print(next(
-              item["udid"]
-              for runtime in devices.values()
-              for item in runtime
-              if family in item["name"]
-          ))
-          '
-          )"
+          # The pinned model, same as macos-build: contrast findings depend on where
+          # content lands relative to the bars, so auditing whichever device the image
+          # lists first makes a finding impossible to reproduce.
+          destination="$(bash scripts/ui-test-simulator.sh "$DEVICE_FAMILY")"
           # shellcheck disable=SC2046
           xcodebuild test \
             -project OpenHealthExporter.xcodeproj \
