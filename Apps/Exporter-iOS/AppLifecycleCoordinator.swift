@@ -50,6 +50,10 @@ final class AppLifecycleCoordinator {
             return
         }
         guard HarnessExport.isLocalFileEnabled() else { return }
+        guard HarnessExport.allowsExport("local-file", trigger: .observerQuery) else {
+            stopObservers()
+            return
+        }
         guard healthObservers == nil else { return }
         healthObservers = try await HarnessExport.startHealthObservers()
         BackgroundTaskCoordinator.submit()
@@ -215,7 +219,8 @@ enum BackgroundTaskCoordinator {
                     return
                 }
                 try await AppLifecycleCoordinator.shared.startObserversIfEligible()
-                if HarnessExport.isLocalFileEnabled() {
+                if HarnessExport.isLocalFileEnabled(),
+                   HarnessExport.allowsExport("local-file", trigger: trigger) {
                     _ = try await HarnessExport.runOnePageEachMetric(trigger: trigger)
                 }
                 task.setTaskCompleted(success: true)

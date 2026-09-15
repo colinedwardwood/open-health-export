@@ -1111,6 +1111,7 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     let snapshot = try DestinationSnapshotFile.read(from: url)
     #expect(snapshot.schemaVersion == 0)
     #expect(snapshot.destinationLabel == "companion")
+    #expect(snapshot.exportRole == .designated)
     #expect(snapshot.state == .sentUnconfirmed)
 }
 
@@ -1257,13 +1258,49 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     let snapshot = DestinationStatusSnapshot(
         destinationID: "manual",
         enabled: true,
-        state: .manualOnly,
+        exportRole: .manualOnly,
         writtenAtEpoch: 1_000
     )
     #expect(
         DestinationTimelinePlanner.entries(snapshots: [snapshot], nowEpoch: 2_000)
             .map(\.dateEpoch) == [2_000]
     )
+}
+
+@Test func ar15ManualOnlyRoleRejectsEveryAutomaticTrigger() {
+    let automatic: [RunTrigger] = [
+        .observerQuery, .bgAppRefresh, .bgProcessing, .appForeground, .launch,
+    ]
+    let explicit: [RunTrigger] = [.manual, .shortcut, .widgetControl]
+
+    #expect(automatic.allSatisfy { !DestinationExportRole.manualOnly.allows($0) })
+    #expect(explicit.allSatisfy { DestinationExportRole.manualOnly.allows($0) })
+    #expect(RunTrigger.allCases.allSatisfy { DestinationExportRole.designated.allows($0) })
+}
+
+@Test func ar15ManualOnlySnapshotSurvivesOutcomesAndRoundTrips() throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-ar15-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: url) }
+    var snapshot = DestinationStatusSnapshot(
+        destinationID: "local-file",
+        destinationLabel: "Archive folder",
+        enabled: true,
+        exportRole: .manualOnly,
+        writtenAtEpoch: 1
+    )
+    snapshot.applyLastOutcome(RunOutcome.Kind.success.rawValue)
+    #expect(snapshot.state == .manualOnly)
+    #expect(snapshot.state(at: 1_000_000) == .manualOnly)
+
+    try DestinationSnapshotFile.write(snapshot, to: url)
+    let decoded = try DestinationSnapshotFile.read(from: url)
+    #expect(decoded.exportRole == .manualOnly)
+    #expect(decoded.state == .manualOnly)
+
+    var designated = decoded
+    designated.applyExportRole(.designated)
+    #expect(designated.state == .healthy)
 }
 
 @Test func widgetSnapshotSecurityEventsPersistUntilExplicitAcknowledgement() throws {

@@ -446,6 +446,33 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(identified("error-part-3").waitForExistence(timeout: uiWait))
     }
 
+    func testNonDesignatedDestinationCanBeMadeManualOnly() {
+        app.terminate()
+        app.launchEnvironment["OHE_SEED_DESTINATION_STATUS"] = "success"
+        app.launch()
+        enterControls()
+
+        let role = scrollStatus(
+            identified("destination-export-role-home-assistant")
+        )
+        XCTAssertTrue(role.waitForExistence(timeout: uiWait))
+        XCTAssertTrue(
+            identified("destination-export-role-copy-home-assistant").label
+                .contains("designated automatic exporter")
+        )
+        role.tap()
+        app.buttons["Manual only"].tap()
+
+        let copy = identified("destination-export-role-copy-home-assistant")
+        XCTAssertTrue(copy.waitForExistence(timeout: uiWait))
+        XCTAssertTrue(copy.label.contains("only when you ask"), copy.label)
+        selectRootTab(0)
+        XCTAssertTrue(
+            destinationStatusElement(0).label.contains("manual_only"),
+            destinationStatusElement(0).label
+        )
+    }
+
     private func destinationLine(seeding scenario: String) -> String {
         app.terminate()
         app.launchEnvironment["OHE_SEED_DESTINATION_STATUS"] = scenario

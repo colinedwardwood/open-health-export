@@ -2,7 +2,26 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import CoreDomain
+import EnginePorts
 import Foundation
+
+/// AR-15: aggregate buckets deliberately converge across exporter IDs, so only one
+/// installation may run automatic exports to a destination. Other installations can
+/// still export when a person explicitly asks them to.
+public enum DestinationExportRole: String, Sendable, Equatable, Codable, CaseIterable {
+    case designated
+    case manualOnly = "manual_only"
+
+    public func allows(_ trigger: RunTrigger) -> Bool {
+        guard self == .manualOnly else { return true }
+        switch trigger {
+        case .manual, .shortcut, .widgetControl:
+            return true
+        case .observerQuery, .bgAppRefresh, .bgProcessing, .appForeground, .launch:
+            return false
+        }
+    }
+}
 
 public enum DestinationDisplayState: String, Sendable, Equatable, Codable, CaseIterable {
     case notSetUp = "not_set_up"
@@ -79,6 +98,7 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
     public var destinationID: String
     public var destinationLabel: String
     public var enabled: Bool
+    public var exportRole: DestinationExportRole
     public var state: DestinationDisplayState
     public var lastOutcome: String?
     public var lastSuccessEpoch: TimeInterval?
@@ -100,6 +120,7 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
         destinationID: String,
         destinationLabel: String? = nil,
         enabled: Bool,
+        exportRole: DestinationExportRole = .designated,
         state: DestinationDisplayState? = nil,
         lastOutcome: String? = nil,
         lastSuccessEpoch: TimeInterval? = nil,
@@ -116,11 +137,14 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
         unacknowledgedSecurityEventCount: Int = 0,
         writtenAtEpoch: TimeInterval
     ) {
-        self.schemaVersion = 2
+        self.schemaVersion = 3
         self.destinationID = destinationID
         self.destinationLabel = destinationLabel ?? destinationID
         self.enabled = enabled
-        self.state = state ?? Self.inferState(enabled: enabled, lastOutcome: lastOutcome)
+        self.exportRole = exportRole
+        self.state = exportRole == .manualOnly
+            ? .manualOnly
+            : (state ?? Self.inferState(enabled: enabled, lastOutcome: lastOutcome))
         self.lastOutcome = lastOutcome
         self.lastSuccessEpoch = lastSuccessEpoch
         self.lastConfirmedAckEpoch = lastConfirmedAckEpoch
@@ -141,7 +165,16 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
     /// combined kind so status is not the last type that happened to finish.
     public mutating func applyLastOutcome(_ outcome: String) {
         lastOutcome = outcome
-        state = Self.inferState(enabled: enabled, lastOutcome: outcome)
+        state = exportRole == .manualOnly
+            ? .manualOnly
+            : Self.inferState(enabled: enabled, lastOutcome: outcome)
+    }
+
+    public mutating func applyExportRole(_ role: DestinationExportRole) {
+        exportRole = role
+        state = role == .manualOnly
+            ? .manualOnly
+            : Self.inferState(enabled: enabled, lastOutcome: lastOutcome)
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -149,6 +182,7 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
         case destinationID
         case destinationLabel
         case enabled
+        case exportRole
         case state
         case lastOutcome
         case lastSuccessEpoch
@@ -174,8 +208,15 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
             ?? destinationID
         enabled = try values.decode(Bool.self, forKey: .enabled)
         lastOutcome = try values.decodeIfPresent(String.self, forKey: .lastOutcome)
-        state = try values.decodeIfPresent(DestinationDisplayState.self, forKey: .state)
-            ?? Self.inferState(enabled: enabled, lastOutcome: lastOutcome)
+        exportRole =
+            try values.decodeIfPresent(DestinationExportRole.self, forKey: .exportRole)
+            ?? .designated
+        state = exportRole == .manualOnly
+            ? .manualOnly
+            : (
+                try values.decodeIfPresent(DestinationDisplayState.self, forKey: .state)
+                    ?? Self.inferState(enabled: enabled, lastOutcome: lastOutcome)
+            )
         lastSuccessEpoch = try values.decodeIfPresent(TimeInterval.self, forKey: .lastSuccessEpoch)
         lastConfirmedAckEpoch = try values.decodeIfPresent(
             TimeInterval.self,
@@ -203,6 +244,7 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
     }
 
     public func state(at epoch: TimeInterval) -> DestinationDisplayState {
+        guard exportRole == .designated else { return .manualOnly }
         guard enabled, let lastSuccessEpoch else { return state }
         if let overdueThresholdSeconds,
            epoch >= lastSuccessEpoch + overdueThresholdSeconds {

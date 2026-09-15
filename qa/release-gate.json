@@ -52,8 +52,18 @@
     "utc-fixed-offset (ubuntu-latest, true)",
     "utc-fixed-offset (ubuntu-24.04-arm, true)",
     "utc-fixed-offset (macos-26, false)",
-    "full-state-matrix (iPhone)",
-    "full-state-matrix (iPad)"
+    "full-state-matrix (iPhone, 0)",
+    "full-state-matrix (iPhone, 1)",
+    "full-state-matrix (iPhone, 2)",
+    "full-state-matrix (iPhone, 3)",
+    "full-state-matrix (iPhone, 4)",
+    "full-state-matrix (iPhone, 5)",
+    "full-state-matrix (iPad, 0)",
+    "full-state-matrix (iPad, 1)",
+    "full-state-matrix (iPad, 2)",
+    "full-state-matrix (iPad, 3)",
+    "full-state-matrix (iPad, 4)",
+    "full-state-matrix (iPad, 5)"
   ],
   "requiredMatrix": {
     "iOS": "18.0",

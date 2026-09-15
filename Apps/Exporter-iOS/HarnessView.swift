@@ -1087,21 +1087,71 @@ struct HarnessView: View {
             } else {
                 ForEach(Array(destinationSnapshots.enumerated()), id: \.element.destinationID) { index, snapshot in
                     let line = destinationStatusLines[index]
-                    Button {
-                        presentErrorFromStatus(snapshot)
-                    } label: {
-                        Text(line)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Button {
+                            presentErrorFromStatus(snapshot)
+                        } label: {
+                            Text(line)
+                                .font(.footnote)
+                                .foregroundStyle(.primary)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("destination-status-\(index)")
+                        .accessibilityHint("Shows the error cause and fix when this destination needs attention.")
+
+                        if snapshot.enabled,
+                           HarnessExport.healthDestinationIDs.contains(snapshot.destinationID) {
+                            Picker(
+                                "Exports from this device",
+                                selection: Binding(
+                                    get: {
+                                        HarnessExport.destinationExportRole(
+                                            snapshot.destinationID
+                                        )
+                                    },
+                                    set: { role in
+                                        try? HarnessExport.setDestinationExportRole(
+                                            role,
+                                            destinationID: snapshot.destinationID
+                                        )
+                                        refreshDestinationSurfaces()
+                                        if snapshot.destinationID == "local-file" {
+                                            AppLifecycleCoordinator.shared.stopObservers()
+                                            Task { await startHealthObserversIfEligible() }
+                                        }
+                                    }
+                                )
+                            ) {
+                                Text("Automatic and manual").tag(
+                                    DestinationExportRole.designated
+                                )
+                                Text("Manual only").tag(
+                                    DestinationExportRole.manualOnly
+                                )
+                            }
+                            .pickerStyle(.menu)
+                            .frame(minHeight: 44)
+                            .accessibilityIdentifier(
+                                "destination-export-role-\(snapshot.destinationID)"
+                            )
+                            Text(
+                                HarnessExport.destinationExportRole(snapshot.destinationID)
+                                    == .manualOnly
+                                    ? "This device exports here only when you ask. Keep exactly one other device automatic for this destination."
+                                    : "This is the designated automatic exporter. Set every other device using this destination to Manual only."
+                            )
                             .font(.footnote)
-                            .foregroundStyle(.primary)
-                            .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier(
+                                "destination-export-role-copy-\(snapshot.destinationID)"
+                            )
+                        }
                     }
-                    .buttonStyle(.plain)
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .contentShape(Rectangle())
-                    .accessibilityElement(children: .combine)
-                    .accessibilityIdentifier("destination-status-\(index)")
-                    .accessibilityHint("Shows the error cause and fix when this destination needs attention.")
                 }
             }
         }
@@ -3447,6 +3497,7 @@ struct HarnessView: View {
     }
 
     private func refreshDestinationSurfaces() {
+        HarnessExport.synchronizeDestinationExportRoles()
         destinationSnapshots = StatusSnapshotLocation.readAll()
         let now = Date().timeIntervalSince1970
         destinationStatusLines = destinationSnapshots.isEmpty

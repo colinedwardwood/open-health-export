@@ -201,6 +201,8 @@ cd receiver && docker compose up
 
 To complete a synthetic simulator export without Health access, follow the
 [demo quickstart](docs/03-implementation/demo-quickstart.md).
+To send a real export to the primary Home Assistant destination, follow the
+[Home Assistant webhook quickstart](docs/03-implementation/home-assistant-quickstart.md).
 
 Build the iOS simulator app and Mac companion from a clean checkout: generate
 the project, then ad-hoc-sign both. Needs

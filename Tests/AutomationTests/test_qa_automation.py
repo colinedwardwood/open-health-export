@@ -4,6 +4,7 @@
 import importlib.util
 import json
 import re
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -184,22 +185,41 @@ class ReleaseTests(unittest.TestCase):
 
     def test_both_accessibility_device_matrices_must_succeed(self):
         required = [
-            "full-state-matrix (iPhone)",
-            "full-state-matrix (iPad)",
+            f"full-state-matrix ({family}, {shard})"
+            for family in ("iPhone", "iPad")
+            for shard in range(6)
         ]
         iphone_only = {
             "check_runs": [
                 {
-                    "name": required[0],
+                    "name": name,
                     "status": "completed",
                     "conclusion": "success",
                 }
+                for name in required[:6]
             ]
         }
         self.assertEqual(
             release.check_runs(iphone_only, required),
-            [f"required check is not successful: {required[1]}"],
+            [
+                f"required check is not successful: {name}"
+                for name in required[6:]
+            ],
         )
+
+    def test_accessibility_shards_cover_every_ui_test_once(self):
+        source = (ROOT / "Tests/ExporterUITests/ExporterUITests.swift").read_text()
+        expected = set(re.findall(r"^\s*func (test[A-Za-z0-9_]*)\(\)", source, re.MULTILINE))
+        selected = []
+        for shard in range(6):
+            output = subprocess.check_output(
+                ["bash", "scripts/ui-test-shard.sh", str(shard), "6"],
+                cwd=ROOT,
+                text=True,
+            )
+            selected.extend(line.rsplit("/", 1)[-1] for line in output.splitlines())
+        self.assertEqual(set(selected), expected)
+        self.assertEqual(len(selected), len(expected))
 
 
 class UpstreamPublishableTests(unittest.TestCase):

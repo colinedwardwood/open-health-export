@@ -2,6 +2,50 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
+    "Exports from this device": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exports from this device"
+          }
+        }
+      }
+    },
+    "Automatic and manual": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic and manual"
+          }
+        }
+      }
+    },
+    "This device exports here only when you ask. Keep exactly one other device automatic for this destination.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device exports here only when you ask. Keep exactly one other device automatic for this destination."
+          }
+        }
+      }
+    },
+    "This is the designated automatic exporter. Set every other device using this destination to Manual only.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This is the designated automatic exporter. Set every other device using this destination to Manual only."
+          }
+        }
+      }
+    },
     "Home Assistant webhook": {
       "extractionState": "manual",
       "localizations": {

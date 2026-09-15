@@ -126,6 +126,7 @@ public enum DestinationStatusUIFixtures {
             destinationID: "seed-\(state.rawValue)",
             destinationLabel: state.label,
             enabled: enabled,
+            exportRole: state == .manualOnly ? .manualOnly : .designated,
             state: state,
             lastOutcome: lastOutcome,
             lastSuccessEpoch: lastSuccess,

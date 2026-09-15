@@ -226,6 +226,9 @@ private actor ObserverExportGate {
     private var running = false
 
     func enqueue(_ metric: MetricID) async {
+        guard HarnessExport.allowsExport("local-file", trigger: .observerQuery) else {
+            return
+        }
         pending.insert(metric)
         guard !running else { return }
         running = true
@@ -390,6 +393,53 @@ enum HarnessExport {
         }
     }
 
+    static func destinationExportRole(_ destinationID: String) -> DestinationExportRole {
+        if let raw = UserDefaults.standard.string(
+            forKey: "ohe.\(destinationID).exportRole"
+        ), let stored = DestinationExportRole(rawValue: raw) {
+            return stored
+        }
+        if let snapshotURL = StatusSnapshotLocation.url(destinationID: destinationID),
+           let snapshot = try? DestinationSnapshotFile.read(from: snapshotURL) {
+            return snapshot.exportRole
+        }
+        return .designated
+    }
+
+    static func allowsExport(_ destinationID: String, trigger: RunTrigger) -> Bool {
+        destinationExportRole(destinationID).allows(trigger)
+    }
+
+    static func setDestinationExportRole(
+        _ role: DestinationExportRole,
+        destinationID: String
+    ) throws {
+        UserDefaults.standard.set(
+            role.rawValue,
+            forKey: "ohe.\(destinationID).exportRole"
+        )
+        guard let snapshotURL = StatusSnapshotLocation.url(destinationID: destinationID),
+              var snapshot = try? DestinationSnapshotFile.read(from: snapshotURL)
+        else { return }
+        snapshot.applyExportRole(role)
+        snapshot.writtenAtEpoch = Date().timeIntervalSince1970
+        try DestinationSnapshotFile.write(snapshot, to: snapshotURL)
+        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+    }
+
+    private static func synchronizeDestinationExportRole(_ destinationID: String) {
+        try? setDestinationExportRole(
+            destinationExportRole(destinationID),
+            destinationID: destinationID
+        )
+    }
+
+    static func synchronizeDestinationExportRoles() {
+        for destinationID in healthDestinationIDs {
+            synchronizeDestinationExportRole(destinationID)
+        }
+    }
+
     static func hasDestinationConfiguration(_ destinationID: String) -> Bool {
         guard let root = try? applicationSupportRoot() else { return false }
         let filename: String
@@ -545,6 +595,12 @@ enum HarnessExport {
         trigger: RunTrigger = .manual,
         onProgress: (@Sendable (Int, Int) async -> Void)? = nil
     ) async throws -> [String] {
+        guard allowsExport("local-file", trigger: trigger) else {
+            return [
+                "manualOnly: Automatic export skipped. This installation allows explicit exports only."
+            ]
+        }
+        defer { synchronizeDestinationExportRole("local-file") }
         let scope = try await destinationScope("local-file")
         try ExportScopeGate.requireConfigured(scope)
         let metrics = metrics ?? scope.metrics.sorted { $0.rawValue < $1.rawValue }
@@ -820,6 +876,7 @@ enum HarnessExport {
         metrics: [MetricID]? = nil,
         onProgress: (@Sendable (Int, Int) async -> Void)? = nil
     ) async throws -> [String] {
+        defer { synchronizeDestinationExportRole("local-file") }
         let scope = try await destinationScope("local-file")
         try ExportScopeGate.requireConfigured(scope)
         let metrics = metrics ?? scope.metrics.sorted { $0.rawValue < $1.rawValue }
@@ -891,6 +948,7 @@ enum HarnessExport {
         mode: BackfillMode,
         onProgress: (@Sendable (String) async -> Void)? = nil
     ) async throws -> [String] {
+        defer { synchronizeDestinationExportRole("local-file") }
         let root = try applicationSupportRoot()
         let folderAccess = try localExportFolder(root: root)
         defer { withExtendedLifetime(folderAccess) {} }
@@ -1156,6 +1214,7 @@ enum HarnessExport {
         onTestProgress: DestinationTestProgress? = nil,
         onProgress: (@Sendable (Int, Int) async -> Void)? = nil
     ) async throws -> [String] {
+        defer { synchronizeDestinationExportRole("companion") }
         let scope = try await destinationScope("companion")
         try ExportScopeGate.requireConfigured(scope)
         let root = try applicationSupportRoot()
@@ -1518,6 +1577,11 @@ enum HarnessExport {
     static func resetSeededSurfacesForUITests() throws {
         if let directory = StatusSnapshotLocation.directory() {
             try? FileManager.default.removeItem(at: directory)
+        }
+        for destinationID in healthDestinationIDs {
+            UserDefaults.standard.removeObject(
+                forKey: "ohe.\(destinationID).exportRole"
+            )
         }
         // Destination reports survive across XCUITest cases in one simulator.
         // Leaving them would put hops on first-run disclosure after a prior case
@@ -2200,6 +2264,7 @@ enum HarnessExport {
     static func runMQTTDestination(
         onProgress: (@Sendable (Int, Int) async -> Void)? = nil
     ) async throws -> [String] {
+        defer { synchronizeDestinationExportRole("mqtt") }
         let root = try applicationSupportRoot()
         let data = try Data(
             contentsOf: root.appendingPathComponent("mqtt-destination.json")
@@ -2338,7 +2403,8 @@ enum HarnessExport {
         destinationLabel: String = "HTTPS destination",
         onProgress: (@Sendable (Int, Int) async -> Void)? = nil
     ) async throws -> [String] {
-        try await withThermalCompression {
+        defer { synchronizeDestinationExportRole(destinationID) }
+        return try await withThermalCompression {
             try await runHTTPSDestinationUnscoped(
                 destinationID: destinationID,
                 destinationLabel: destinationLabel,

@@ -696,6 +696,7 @@ public struct ExportRun: Sendable {
                 destinationID: destinationName,
                 destinationLabel: prior?.destinationLabel ?? destinationName,
                 enabled: true,
+                exportRole: prior?.exportRole ?? .designated,
                 lastOutcome: outcome.kind.rawValue,
                 lastSuccessEpoch: succeeded ? now : prior?.lastSuccessEpoch,
                 lastConfirmedAckEpoch:
