@@ -79,6 +79,41 @@ private struct DeviceLockedSource: SampleSource {
     }
 }
 
+@Test func r03BatchIdentityIsUUIDv7AndTimeOrdered() throws {
+    let randomness = try #require(UUID(uuidString: "00112233-4455-6677-8899-aabbccddeeff"))
+    let first = NativeWire.mintBatchID(
+        at: Date(timeIntervalSince1970: 1_700_000_000),
+        randomness: randomness
+    )
+    let later = NativeWire.mintBatchID(
+        at: Date(timeIntervalSince1970: 1_700_000_001),
+        randomness: randomness
+    )
+
+    #expect(UUID(uuidString: first.rawValue) != nil)
+    #expect(first.rawValue.hasPrefix("018bcfe5-6800-"))
+    #expect(first.rawValue[first.rawValue.index(first.rawValue.startIndex, offsetBy: 14)] == "7")
+    let variant = first.rawValue[first.rawValue.index(first.rawValue.startIndex, offsetBy: 19)]
+    #expect(["8", "9", "a", "b"].contains(variant))
+    #expect(first.rawValue < later.rawValue)
+}
+
+@Test func r03PendingBatchIdentityCannotBeReused() async throws {
+    let store = MemoryStateStore()
+    let batch = PendingBatch(
+        id: BatchID(rawValue: "0192f3c1-0000-7000-8000-000000000001"),
+        payloadURL: "/tmp/original"
+    )
+    try await store.transact { try $0.enqueuePending(batch) }
+    await #expect(throws: BatchIdentityError.self) {
+        try await store.transact {
+            try $0.enqueuePending(
+                PendingBatch(id: batch.id, payloadURL: "/tmp/replacement")
+            )
+        }
+    }
+}
+
 @Test func lockedStoreReadRecordsBlockedJournalOutcome() async throws {
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-store-locked-\(UUID().uuidString)")

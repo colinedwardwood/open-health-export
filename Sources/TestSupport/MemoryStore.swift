@@ -58,9 +58,10 @@ public final class MemoryTransaction: StateTransaction {
     }
 
     public func enqueuePending(_ batch: PendingBatch) throws {
-        if pending[batch.id] == nil {
-            pendingOrder.append(batch.id)
+        guard pending[batch.id] == nil else {
+            throw BatchIdentityError.duplicate(batch.id)
         }
+        pendingOrder.append(batch.id)
         pending[batch.id] = batch
     }
 

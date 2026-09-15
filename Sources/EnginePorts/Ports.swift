@@ -573,6 +573,10 @@ public enum BatchSequenceError: Error, Sendable, Equatable {
     case exhausted
 }
 
+public enum BatchIdentityError: Error, Sendable, Equatable {
+    case duplicate(BatchID)
+}
+
 public protocol StateTransaction: AnyObject {
     func loadCursor(metric: MetricID) throws -> CursorSnapshot?
     /// AR-14: durable, installation-scoped batch sequence. Gaps are permitted;

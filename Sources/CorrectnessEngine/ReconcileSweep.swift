@@ -271,7 +271,7 @@ public struct ReconcileSweep: Sendable {
                 horizonDay: horizonBound
             )
         }
-        let batchID = NativeWire.batchID(metric: metric, anchorBlob: page.anchorBlob)
+        let batchID = NativeWire.mintBatchID(at: clock.now())
         let payload = try NativeWire.encode(
             samples: page.samples,
             tombstones: page.tombstones,

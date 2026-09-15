@@ -55,11 +55,42 @@ public struct WireEnvelope: Sendable, Equatable {
 }
 
 public enum NativeWire {
-    public static func batchID(metric: MetricID, anchorBlob: Data) -> BatchID {
-        batchID(metric: metric, anchorBlob: anchorBlob, aggregateVersions: [])
+    /// RFC 9562 UUIDv7 delivery identity. The clock and random UUID are inputs
+    /// so deterministic encoder tests do not need ambient time or randomness.
+    public static func mintBatchID(at date: Date, randomness: UUID = UUID()) -> BatchID {
+        let rawMilliseconds = date.timeIntervalSince1970 * 1_000
+        let milliseconds = UInt64(
+            max(0, min(rawMilliseconds, Double(0xffff_ffff_ffff)))
+        )
+        var bytes = withUnsafeBytes(of: randomness.uuid) { Array($0) }
+        bytes[0] = UInt8(truncatingIfNeeded: milliseconds >> 40)
+        bytes[1] = UInt8(truncatingIfNeeded: milliseconds >> 32)
+        bytes[2] = UInt8(truncatingIfNeeded: milliseconds >> 24)
+        bytes[3] = UInt8(truncatingIfNeeded: milliseconds >> 16)
+        bytes[4] = UInt8(truncatingIfNeeded: milliseconds >> 8)
+        bytes[5] = UInt8(truncatingIfNeeded: milliseconds)
+        bytes[6] = 0x70 | (bytes[6] & 0x0f)
+        bytes[8] = 0x80 | (bytes[8] & 0x3f)
+        let hex = bytes.map { String(format: "%02x", $0) }.joined()
+        return BatchID(
+            rawValue: "\(hex.prefix(8))-\(hex.dropFirst(8).prefix(4))-\(hex.dropFirst(12).prefix(4))-\(hex.dropFirst(16).prefix(4))-\(hex.dropFirst(20))"
+        )
     }
 
-    public static func batchID(
+    /// Stable fixture identity for tests that need repeatable encoder inputs.
+    /// Production delivery paths must use `mintBatchID(at:)`.
+    public static func deterministicFixtureBatchID(
+        metric: MetricID,
+        anchorBlob: Data
+    ) -> BatchID {
+        deterministicFixtureBatchID(
+            metric: metric,
+            anchorBlob: anchorBlob,
+            aggregateVersions: []
+        )
+    }
+
+    public static func deterministicFixtureBatchID(
         metric: MetricID,
         anchorBlob: Data,
         aggregateVersions: [String]

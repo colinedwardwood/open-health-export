@@ -425,7 +425,10 @@ enum FixWitness {
             samples: [sample],
             tombstones: [],
             metric: sample.metric,
-            batchID: NativeWire.batchID(metric: sample.metric, anchorBlob: Data([6])),
+            batchID: NativeWire.deterministicFixtureBatchID(
+                metric: sample.metric,
+                anchorBlob: Data([6])
+            ),
             envelope: testEnvelope()
         )
         var receiver = ReferenceReceiver()
@@ -938,10 +941,21 @@ enum FixWitness {
 
     static func v05() throws {
         let anchor = Data([5])
-        let heart = NativeWire.batchID(metric: MetricCatalog.heartRate.id, anchorBlob: anchor)
-        let steps = NativeWire.batchID(metric: MetricCatalog.stepCount.id, anchorBlob: anchor)
+        let heart = NativeWire.deterministicFixtureBatchID(
+            metric: MetricCatalog.heartRate.id,
+            anchorBlob: anchor
+        )
+        let steps = NativeWire.deterministicFixtureBatchID(
+            metric: MetricCatalog.stepCount.id,
+            anchorBlob: anchor
+        )
         #expect(heart != steps)
-        #expect(heart == NativeWire.batchID(metric: MetricCatalog.heartRate.id, anchorBlob: anchor))
+        #expect(
+            heart == NativeWire.deterministicFixtureBatchID(
+                metric: MetricCatalog.heartRate.id,
+                anchorBlob: anchor
+            )
+        )
     }
 
     static func v06() throws {
@@ -963,7 +977,10 @@ enum FixWitness {
 
     static func v07() throws {
         let sample = heartSample("77777777-7777-4777-8777-777777777777")
-        let key = NativeWire.batchID(metric: sample.metric, anchorBlob: Data([9]))
+        let key = NativeWire.deterministicFixtureBatchID(
+            metric: sample.metric,
+            anchorBlob: Data([9])
+        )
         let bytes = try NativeWire.encode(
             samples: [sample],
             tombstones: [],

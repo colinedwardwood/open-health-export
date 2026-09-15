@@ -442,7 +442,7 @@ private final class SQLiteTransaction: StateTransaction {
 
     func enqueuePending(_ batch: PendingBatch) throws {
         let pending = try store.prepare(
-            "INSERT INTO pending_batches (batch_id, payload_url, expected_records, byte_count, metric, created_at_epoch, range_start_day, range_end_day, eviction_class) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(batch_id) DO UPDATE SET payload_url = excluded.payload_url, expected_records = excluded.expected_records, byte_count = excluded.byte_count, metric = excluded.metric, created_at_epoch = COALESCE(pending_batches.created_at_epoch, excluded.created_at_epoch), range_start_day = excluded.range_start_day, range_end_day = excluded.range_end_day, eviction_class = excluded.eviction_class;"
+            "INSERT INTO pending_batches (batch_id, payload_url, expected_records, byte_count, metric, created_at_epoch, range_start_day, range_end_day, eviction_class) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);"
         )
         defer { sqlite3_finalize(pending) }
         bindText(pending, 1, batch.id.rawValue)

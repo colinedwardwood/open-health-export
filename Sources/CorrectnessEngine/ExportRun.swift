@@ -250,13 +250,7 @@ public struct ExportRun: Sendable {
             return outcome
         }
 
-        let batchID = NativeWire.batchID(
-            metric: metric,
-            anchorBlob: page.anchorBlob,
-            aggregateVersions: aggregates.map {
-                "\($0.record.bucketKey)#\($0.record.emitSeq)"
-            }
-        )
+        let batchID = NativeWire.mintBatchID(at: clock.now())
         var wireEnvelope = envelope
         wireEnvelope.seq = try await store.transact {
             try $0.reserveBatchSequence(exporterID: envelope.exporterId)
@@ -790,7 +784,7 @@ public struct ExportRun: Sendable {
             return outcome
         }
         let identity = Data("ohe.characteristic.v1:\(snapshot.characteristicId):\(snapshot.value)".utf8)
-        let batchID = NativeWire.batchID(metric: metric, anchorBlob: identity)
+        let batchID = NativeWire.mintBatchID(at: clock.now())
         var wireEnvelope = envelope
         wireEnvelope.seq = try await store.transact {
             try $0.reserveBatchSequence(exporterID: envelope.exporterId)
