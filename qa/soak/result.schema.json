@@ -18,7 +18,14 @@
     },
     "reconciliation": {
       "type": "object",
-      "required": ["completed", "cellsCompared", "discrepancies", "unexplained", "evidenceDigest"],
+      "required": [
+        "completed",
+        "cellsCompared",
+        "discrepancies",
+        "unexplained",
+        "duplicates",
+        "evidenceDigest"
+      ],
       "properties": {
         "completed": { "type": "boolean" },
         "cellsCompared": { "type": "integer", "minimum": 1 },
@@ -43,6 +50,7 @@
           }
         },
         "unexplained": { "type": "integer", "minimum": 0 },
+        "duplicates": { "type": "integer", "minimum": 0 },
         "evidenceDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
       },
       "additionalProperties": false

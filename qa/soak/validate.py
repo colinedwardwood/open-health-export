@@ -6,7 +6,9 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
+import tempfile
 import uuid
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -19,6 +21,8 @@ CLASSES = {
     "hae-profile-limitation",
 }
 PROFILES = {"local-file", "https", "mqtt", "companion", "hae"}
+# TA-06 measures the duplicate rate against this ceiling alongside zero unexplained loss.
+DUPLICATE_RATE_LIMIT = 0.001
 
 
 def read_json(path: Path) -> dict:
@@ -49,11 +53,64 @@ def valid_datetime(value: object) -> bool:
         return False
 
 
+def run_cli(script: Path, diary: Path, result: Path) -> int:
+    completed = subprocess.run(
+        [sys.executable, str(script), "--diary", str(diary), "--result", str(result)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return completed.returncode
+
+
+def self_test(root: Path) -> int:
+    """Prove the TA-06 duplicate gate actually rejects, so it cannot rot into a
+    field nobody reads. Exercises the real CLI rather than the inner functions."""
+    script = root / "qa/soak/validate.py"
+    diary = root / "qa/soak/diary.synthetic.json"
+    result = root / "qa/soak/result.synthetic.json"
+    failures: list[str] = []
+
+    if run_cli(script, diary, result) != 0:
+        failures.append("the committed synthetic fixtures must validate")
+
+    base = read_json(result)
+    with tempfile.TemporaryDirectory() as tmp:
+        over = json.loads(json.dumps(base))
+        cells = over["reconciliation"]["cellsCompared"]
+        over["reconciliation"]["duplicates"] = int(cells * DUPLICATE_RATE_LIMIT) + 1
+        # Zero unexplained loss, so only the duplicate rate can fail this fixture.
+        over["signoff"]["outcome"] = "fail"
+        over_path = Path(tmp) / "over-rate.json"
+        over_path.write_text(json.dumps(over), encoding="utf-8")
+        if run_cli(script, diary, over_path) == 0:
+            failures.append("a duplicate rate above the ceiling must not validate")
+
+        missing = json.loads(json.dumps(base))
+        del missing["reconciliation"]["duplicates"]
+        missing_path = Path(tmp) / "missing-duplicates.json"
+        missing_path.write_text(json.dumps(missing), encoding="utf-8")
+        if run_cli(script, diary, missing_path) == 0:
+            failures.append("an omitted duplicates count must not read as zero")
+
+    if failures:
+        print("soak-check self-test: FAILED\n- " + "\n- ".join(failures), file=sys.stderr)
+        return 1
+    print("soak-check self-test: ok")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--diary", required=True, type=Path)
-    parser.add_argument("--result", required=True, type=Path)
+    parser.add_argument("--diary", type=Path)
+    parser.add_argument("--result", type=Path)
+    parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--root", type=Path, default=Path.cwd())
     arguments = parser.parse_args()
+    if arguments.self_test:
+        return self_test(arguments.root)
+    if arguments.diary is None or arguments.result is None:
+        parser.error("--diary and --result are required")
     try:
         diary, result = read_json(arguments.diary), read_json(arguments.result)
     except (OSError, ValueError, json.JSONDecodeError) as error:
@@ -131,6 +188,19 @@ def main() -> int:
     unexplained = reconciliation.get("unexplained")
     require(isinstance(unexplained, int) and unexplained >= 0,
             "reconciliation.unexplained must be nonnegative", errors)
+    # TA-06: a design that achieves zero loss by duplicating everything is passing the
+    # wrong test. The rate is derived from cellsCompared rather than self-reported, so
+    # the gate cannot be satisfied by quoting a flattering percentage.
+    duplicates = reconciliation.get("duplicates")
+    require(isinstance(duplicates, int) and duplicates >= 0,
+            "reconciliation.duplicates must be nonnegative", errors)
+    cells = reconciliation.get("cellsCompared")
+    duplicate_rate: float | None = None
+    if isinstance(duplicates, int) and isinstance(cells, int) and cells > 0:
+        duplicate_rate = duplicates / cells
+        require(duplicate_rate <= DUPLICATE_RATE_LIMIT,
+                f"duplicate rate {duplicate_rate:.4%} exceeds the "
+                f"{DUPLICATE_RATE_LIMIT:.1%} TA-06 ceiling", errors)
     require(bool(re.fullmatch(r"sha256:[0-9a-f]{64}", reconciliation.get("evidenceDigest", ""))),
             "reconciliation.evidenceDigest must be sha256:<64 lowercase hex>", errors)
 
@@ -144,10 +214,13 @@ def main() -> int:
     if errors:
         print("soak: INVALID\n- " + "\n- ".join(errors), file=sys.stderr)
         return 1
+    rate = "n/a" if duplicate_rate is None else f"{duplicate_rate:.4%}"
     print(
         "soak: VALID STRUCTURE; "
         f"days={len(entries)}; explainedClasses={len(discrepancies)}; "
-        f"unexplained={unexplained}; recorded outcome={expected}; physical execution not attested"
+        f"unexplained={unexplained}; duplicates={duplicates} (rate={rate}, "
+        f"limit={DUPLICATE_RATE_LIMIT:.1%}); "
+        f"recorded outcome={expected}; physical execution not attested"
     )
     return 0
 

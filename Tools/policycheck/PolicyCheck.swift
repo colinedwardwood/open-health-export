@@ -1352,7 +1352,46 @@ struct PolicyCheck {
         print("policycheck governance artifacts: ok")
         try checkMutationCatalog(root: root)
         try checkFlakeQuarantinePolicy(root: root)
+        try checkSoakReconciliationGate(root: root)
         try checkLicenceTexts(root: root)
+    }
+
+    /// TA-06: the soak gate reads *unexplained* loss, which a design that duplicates
+    /// everything would pass. The duplicate rate is the other half of the criterion, so
+    /// the schema must demand the count and the validator must reject a rate above the
+    /// ceiling. The soak itself runs off-CI, which is exactly why the validator that
+    /// judges its result is asserted here.
+    static func checkSoakReconciliationGate(root: URL) throws {
+        let schemaURL = root.appendingPathComponent("qa/soak/result.schema.json")
+        guard
+            let data = try? Data(contentsOf: schemaURL),
+            let schema = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let properties = schema["properties"] as? [String: Any],
+            let reconciliation = properties["reconciliation"] as? [String: Any],
+            let required = reconciliation["required"] as? [String],
+            required.contains("duplicates"),
+            required.contains("unexplained")
+        else {
+            FileHandle.standardError.write(
+                Data("TA-06: result.schema.json must require reconciliation.duplicates\n".utf8)
+            )
+            exit(1)
+        }
+        let validator = root.appendingPathComponent("qa/soak/validate.py")
+        guard FileManager.default.isReadableFile(atPath: validator.path) else {
+            FileHandle.standardError.write(Data("TA-06: soak validator is missing\n".utf8))
+            exit(1)
+        }
+        let selfTest = Process()
+        selfTest.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        selfTest.arguments = [validator.path, "--self-test", "--root", root.path]
+        try selfTest.run()
+        selfTest.waitUntilExit()
+        guard selfTest.terminationStatus == 0 else {
+            FileHandle.standardError.write(Data("TA-06: soak validate.py --self-test failed\n".utf8))
+            exit(1)
+        }
+        print("policycheck soak reconciliation gate: ok")
     }
 
     /// QA-33: committed mutants must remain unique, weekly, and not a required PR check.

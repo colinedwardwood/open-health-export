@@ -10,6 +10,7 @@
     "cellsCompared": 21,
     "discrepancies": [],
     "unexplained": 0,
+    "duplicates": 0,
     "evidenceDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000088"
   },
   "signoff": {

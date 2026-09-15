@@ -36,9 +36,13 @@ opening the app to force a success does not prove background delivery.
    `healthkit-no-callback-deletion`, `r71-platform-cap`,
    `queue-eviction-with-gap`, or `hae-profile-limitation`.
 4. Any discrepancy not supported by one of those classes is unexplained and P1.
-5. Sign the result as `pass` only when the diary is continuous, reconciliation was
-   completed, and unexplained discrepancy count is zero.
-6. Validate:
+5. Record the duplicate total in `reconciliation.duplicates`. The validator derives the
+   rate against `cellsCompared` and rejects anything above 0.1% (TA-06): zero loss bought
+   by duplicating everything is passing the wrong test.
+6. Sign the result as `pass` only when the diary is continuous, reconciliation was
+   completed, unexplained discrepancy count is zero, and the duplicate rate is within
+   the ceiling.
+7. Validate:
 
    ```sh
    python3 qa/soak/validate.py \
