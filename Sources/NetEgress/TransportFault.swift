@@ -49,18 +49,48 @@ public enum TransportFault {
     /// send failure: a pin mismatch is an R-31/R-40 trust event and an address-class
     /// violation is a SEC-15 stop. Both are worse than unreachable and are handled elsewhere.
     public static func normalize(_ error: Error) -> DestinationSendError? {
-        guard let stream = error as? StreamError else { return error as? DestinationSendError }
-        switch stream {
-        case .localNetworkDenied:
-            return .localNetworkDenied
-        case .serviceNotFound, .closedByPeer, .connectTimeout, .readTimeout, .notOpen, .transport:
-            return .destinationUnreachable
-        case .badPort, .badServiceName, .badPreSharedKey, .unsupportedPlatform:
-            // Misconfiguration we produced, not a network verdict; never retried as one.
-            return .internalFault(String(describing: stream))
-        case .pinMismatch, .addressClassViolation:
-            return nil
+        if let closed = error as? DestinationSendError {
+            return closed
         }
+        if let stream = error as? StreamError {
+            switch stream {
+            case .localNetworkDenied:
+                return .localNetworkDenied
+            case .serviceNotFound, .closedByPeer, .connectTimeout, .readTimeout, .notOpen, .transport:
+                return .destinationUnreachable
+            case .badPort, .badServiceName, .badPreSharedKey, .unsupportedPlatform:
+                // Misconfiguration we produced, not a network verdict; never retried as one.
+                return .internalFault(String(describing: stream))
+            case .pinMismatch, .addressClassViolation:
+                return nil
+            }
+        }
+        if let egress = error as? EgressError {
+            switch egress {
+            case .transport:
+                return .destinationUnreachable
+            case .invalidURL, .credentialsInURL, .forbiddenScheme, .insecureHTTP,
+                 .notAllowlisted, .notHTTP:
+                return .internalFault(String(describing: egress))
+            case .httpStatus, .httpRetryAfter, .pinMismatch:
+                // A response from a reached peer, Retry-After (whose delay must survive),
+                // and trust failures all own dedicated paths.
+                return nil
+            }
+        }
+        if let url = error as? URLError {
+            switch url.code {
+            case .timedOut, .cannotFindHost, .cannotConnectToHost, .networkConnectionLost,
+                 .dnsLookupFailed, .notConnectedToInternet, .internationalRoamingOff,
+                 .callIsActive, .dataNotAllowed, .resourceUnavailable:
+                return .destinationUnreachable
+            default:
+                // Cancellation and TLS policy failures need more context than URLError
+                // carries here; keep their existing dedicated/raw paths.
+                return nil
+            }
+        }
+        return nil
     }
 
     /// Runs `body` and rethrows any transport failure as its closed equivalent, leaving the

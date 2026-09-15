@@ -75,6 +75,26 @@ import WireFormat
     #expect(requests[0].headers["baggage"] == nil)
 }
 
+/// A connection failure needs the closed outcome the engine journals. HTTP status and
+/// Retry-After responses remain typed EgressError values: the peer was reached, and
+/// flattening Retry-After would discard the delay.
+@Test func httpsNormalizesTransportFailuresBeforeTheyReachTheEngine() async throws {
+    let (file, batchID) = try writeHTTPSPayload()
+    let destination = try HTTPSDestination(
+        urlString: "https://ha.example/api/webhook/ohe",
+        allowedHosts: ["ha.example"]
+    )
+
+    let unreachable = RecordingHTTPTransport(
+        response: OutboundHTTPResponse(status: 204, body: Data()),
+        error: .transport("offline")
+    )
+    let unreachableSink = HTTPSSink(destination: destination, transport: unreachable)
+    await #expect(throws: DestinationSendError.destinationUnreachable) {
+        _ = try await unreachableSink.send(fileHandle: file.path, idempotencyKey: batchID)
+    }
+}
+
 @Test func httpsRefusesMeteredPathBeforeAnyTransportByte() async throws {
     let (file, batchID) = try writeHTTPSPayload()
     let transport = RecordingHTTPTransport(

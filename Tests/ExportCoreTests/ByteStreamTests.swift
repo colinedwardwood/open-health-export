@@ -172,6 +172,13 @@ import WireFormat
     )
     // Already-closed errors pass through rather than being swallowed.
     #expect(TransportFault.normalize(DestinationSendError.deviceLocked) == .deviceLocked)
+    #expect(TransportFault.normalize(EgressError.transport("offline")) == .destinationUnreachable)
+    #expect(TransportFault.normalize(EgressError.httpRetryAfter(status: 503, seconds: 10)) == nil)
+    #expect(TransportFault.normalize(EgressError.httpStatus(503)) == nil)
+    #expect(TransportFault.normalize(EgressError.httpStatus(401)) == nil)
+    #expect(TransportFault.normalize(EgressError.pinMismatch) == nil)
+    #expect(TransportFault.normalize(URLError(.cannotConnectToHost)) == .destinationUnreachable)
+    #expect(TransportFault.normalize(URLError(.cancelled)) == nil)
 }
 
 /// `DeliveryExecutor` classifies `DestinationSendError` and nothing else, treating the
@@ -195,6 +202,18 @@ import WireFormat
     let pipe = ByteStreamCompanionPipe(stream: RefusingByteStream(failure: .serviceNotFound))
     await #expect(throws: DestinationSendError.destinationUnreachable) {
         try await pipe.send(Data([0x01]))
+    }
+}
+
+/// MQTT rides the same socket as the companion. Leaving this adapter raw made the exact
+/// same transport failure closed for one destination and generic-transient for another.
+@Test func mqttPipeNormalizesTheSharedTransportFailures() async {
+    let pipe = ByteStreamMQTTPipe(stream: RefusingByteStream(failure: .connectTimeout))
+    await #expect(throws: DestinationSendError.destinationUnreachable) {
+        try await pipe.send(Data([0x10]))
+    }
+    await #expect(throws: DestinationSendError.destinationUnreachable) {
+        _ = try await pipe.receive(max: 16)
     }
 }
 

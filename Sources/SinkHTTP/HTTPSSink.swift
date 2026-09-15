@@ -91,10 +91,14 @@ public struct HTTPSSink: DestinationSink, Sendable {
             response = try await execute(headers: headers, bodyFile: gzipURL)
         } catch {
             guard emitted != nil, Traceparent.isHeaderPlausibleFailure(error) else {
-                throw error
+                throw TransportFault.normalize(error) ?? error
             }
             let retryHeaders = Traceparent.stripForbidden(headers)
-            response = try await execute(headers: retryHeaders, bodyFile: gzipURL)
+            do {
+                response = try await execute(headers: retryHeaders, bodyFile: gzipURL)
+            } catch {
+                throw TransportFault.normalize(error) ?? error
+            }
             traceparent?.noteAutoDisabled()
             autoDisabled = true
         }
