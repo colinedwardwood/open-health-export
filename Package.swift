@@ -55,6 +55,7 @@ let linuxCore: [Target] = [
         dependencies: [
             "CoreDomain",
             "CoreTemporal",
+            "CSQLite",
             "EnginePorts",
             "MetricCatalog",
             "WireFormat",

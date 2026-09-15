@@ -5,10 +5,13 @@ import CoreDomain
 import CSQLite
 import EnginePorts
 import Foundation
+import StorageSQLite
 
 private let sqliteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
-/// The on-disk shape before `ALTER TABLE` expansions (`PRAGMA user_version = 1`).
+/// QA-31's pre-release on-disk shape, before the current store's `ALTER TABLE`
+/// expansions (`PRAGMA user_version = 1`). It lives in TestSupport rather than
+/// StorageSQLite so a fixture generator is not shipped in the production graph.
 public enum SQLiteV1Fixture {
     public static func write(
         path: String,

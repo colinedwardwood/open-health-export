@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import importlib.util
+import json
+import re
 import unittest
 from pathlib import Path
 
@@ -79,6 +81,26 @@ class FlakeTests(unittest.TestCase):
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_first_release_migration_evidence_matches_the_current_store(self):
+        manifest = json.loads((ROOT / "qa/migrations/v1.json").read_text())
+        self.assertEqual(manifest["schemaVersion"], 1)
+        self.assertTrue(manifest["firstRelease"])
+        fixture = manifest["fixture"].removeprefix("programmatic:")
+        self.assertTrue((ROOT / fixture).is_file())
+        self.assertEqual(manifest["ciCheck"], "export-core")
+
+        store_source = (ROOT / "Sources/StorageSQLite/SQLiteStateStore.swift").read_text()
+        expected = re.search(r"expectedSchemaVersion\s*=\s*(\d+)", store_source)
+        self.assertIsNotNone(expected)
+        self.assertEqual(manifest["targetSchemaVersion"], int(expected.group(1)))
+
+        tests = "\n".join(
+            path.read_text()
+            for path in (ROOT / "Tests").rglob("*.swift")
+        )
+        for test in manifest["automatedTests"]:
+            self.assertIn(f"func {test}(", tests)
+
     def test_repository_requires_machine_readable_status_and_matrix(self):
         policy = {
             "maintenanceStatuses": ["maintained"],

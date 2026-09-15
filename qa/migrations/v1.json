@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "priorSchemaVersion": 1,
+  "targetSchemaVersion": 18,
+  "firstRelease": true,
+  "fixture": "programmatic:Sources/TestSupport/SQLiteV1Fixture.swift",
+  "ciCheck": "export-core",
+  "automatedTests": [
+    "p13PriorSQLiteSchemaMigratesWithoutResettingTheCursor",
+    "aBackgroundWakeRefusesToMigrateAndLeavesTheSchemaAlone",
+    "aForegroundLaunchStillMigrates",
+    "sec16PriorSQLiteSchemaGainsScopeStorageWithoutLosingTheCursor",
+    "p14ProcessExitDuringAnchorPersistLeavesThePriorCheckpointComplete",
+    "backfillUpgradesV1CheckpointThenResumes",
+    "r86Format1CheckpointMatchesCommittedGoldenBytes"
+  ],
+  "postFirstReleaseRequirement": "Replace the programmatic stand-in with a committed store captured from the previous released tag and exercise install N-1 to N on a device."
+}
