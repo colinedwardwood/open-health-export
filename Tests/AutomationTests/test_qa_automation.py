@@ -160,6 +160,25 @@ class ReleaseTests(unittest.TestCase):
         }
         self.assertEqual(release.check_runs(all_green, required), [])
 
+    def test_both_accessibility_device_matrices_must_succeed(self):
+        required = [
+            "full-state-matrix (iPhone)",
+            "full-state-matrix (iPad)",
+        ]
+        iphone_only = {
+            "check_runs": [
+                {
+                    "name": required[0],
+                    "status": "completed",
+                    "conclusion": "success",
+                }
+            ]
+        }
+        self.assertEqual(
+            release.check_runs(iphone_only, required),
+            [f"required check is not successful: {required[1]}"],
+        )
+
 
 class UpstreamPublishableTests(unittest.TestCase):
     def test_mosquitto_ignores_alpine_and_moving_tags(self):

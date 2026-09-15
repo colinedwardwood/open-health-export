@@ -51,7 +51,9 @@
     "signed-off-by",
     "utc-fixed-offset (ubuntu-latest, true)",
     "utc-fixed-offset (ubuntu-24.04-arm, true)",
-    "utc-fixed-offset (macos-26, false)"
+    "utc-fixed-offset (macos-26, false)",
+    "full-state-matrix (iPhone)",
+    "full-state-matrix (iPad)"
   ],
   "requiredMatrix": {
     "iOS": "18.0",
