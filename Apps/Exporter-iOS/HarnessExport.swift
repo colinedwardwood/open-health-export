@@ -3923,12 +3923,17 @@ enum HarnessExport {
         guard !changes.isEmpty else { return false }
 
         let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+        // A revoked type drops what every enabled destination was owed, so the
+        // ledger entry names them all rather than the archive folder alone.
+        let owed = healthDestinationIDs.filter { isDestinationEnabled($0) }
         for change in changes {
             for metric in change.grant.metrics {
                 try await store.purgeType(
                     metric: metric,
                     reason: "authorization_revoked:\(change.grant.id)",
-                    destination: "local-file",
+                    destination: owed.isEmpty
+                        ? "no enabled destination"
+                        : owed.joined(separator: ","),
                     atEpoch: change.observedAtEpoch
                 )
             }
