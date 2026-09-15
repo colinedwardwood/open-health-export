@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "priorSchemaVersion": 1,
-  "targetSchemaVersion": 19,
+  "targetSchemaVersion": 20,
   "firstRelease": true,
   "fixture": "programmatic:Sources/TestSupport/SQLiteV1Fixture.swift",
   "ciCheck": "export-core",
@@ -10,6 +10,7 @@
     "aBackgroundWakeRefusesToMigrateAndLeavesTheSchemaAlone",
     "aForegroundLaunchStillMigrates",
     "sec16PriorSQLiteSchemaGainsScopeStorageWithoutLosingTheCursor",
+    "deliveryAuditKeepsOneRowPerDestinationAcrossTheV20Migration",
     "p14ProcessExitDuringAnchorPersistLeavesThePriorCheckpointComplete",
     "backfillUpgradesV1CheckpointThenResumes",
     "r86Format1CheckpointMatchesCommittedGoldenBytes"

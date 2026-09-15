@@ -2835,10 +2835,13 @@ enum HarnessExport {
     static func stopExportingHeartRate() async throws {
         let root = try applicationSupportRoot()
         let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+        // A stop drops the queued payload for every sink that was owed it, so the
+        // ledger entry names them all rather than whichever one came first.
+        let owed = healthDestinationIDs.filter { isDestinationEnabled($0) }
         try await store.purgeType(
             metric: MetricCatalog.heartRate.id,
             reason: "explicit_stop",
-            destination: "local-file",
+            destination: owed.isEmpty ? "no enabled destination" : owed.joined(separator: ","),
             atEpoch: Date().timeIntervalSince1970
         )
     }

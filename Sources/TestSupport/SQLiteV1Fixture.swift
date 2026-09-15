@@ -17,7 +17,8 @@ public enum SQLiteV1Fixture {
         path: String,
         metric: MetricID,
         checkpoint: CheckpointEnvelope,
-        runID: String
+        runID: String,
+        deliveries: [(batchID: String, accepted: Int)] = []
     ) throws {
         var handle: OpaquePointer?
         let status = sqlite3_open_v2(
@@ -68,6 +69,26 @@ public enum SQLiteV1Fixture {
         }
         guard sqlite3_step(stmt) == SQLITE_DONE else {
             throw StorageError.execFailed("legacy cursor insert")
+        }
+        guard !deliveries.isEmpty else { return }
+        // Every schema through 19 keyed the audit by batch alone.
+        try exec(
+            db,
+            """
+            CREATE TABLE deliveries (
+                batch_id TEXT PRIMARY KEY,
+                accepted INTEGER NOT NULL
+            );
+            """
+        )
+        for delivery in deliveries {
+            try exec(
+                db,
+                """
+                INSERT INTO deliveries (batch_id, accepted)
+                    VALUES ('\(delivery.batchID)', \(delivery.accepted));
+                """
+            )
         }
     }
 

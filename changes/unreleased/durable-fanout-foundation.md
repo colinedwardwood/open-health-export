@@ -9,3 +9,6 @@ when destination grants differ. Automatic wakes now plan every enabled designate
 HealthKit read: local-file, HTTPS, Home Assistant, and MQTT are attempted;
 a Mac companion is queued on background wakes and Shortcuts, then delivered
 when the app is in the foreground or Export now runs from Control Centre.
+The delivery audit is now keyed by batch and destination (schema 20), so a
+second sink's acknowledgement no longer overwrites the first's, and evicting a
+batch clears the obligations that were owed on its payload.

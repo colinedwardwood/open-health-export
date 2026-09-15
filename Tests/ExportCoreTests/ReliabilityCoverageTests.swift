@@ -132,7 +132,8 @@ private func coverageISODay(_ offset: Int) -> String {
                             batchID: batch.id,
                             accepted: batch.expectedRecords,
                             statusOnly: false
-                        )
+                        ),
+                        destinationID: DestinationID(rawValue: "coverage")
                     )
                 }
             case 3:

@@ -388,6 +388,19 @@ public struct GapRecord: Sendable {
     }
 }
 
+/// One stored audit row: what a single destination acknowledged for a single batch.
+public struct DeliveryAuditRow: Hashable, Sendable {
+    public var deliveryID: DeliveryID
+    public var accepted: Int
+    public var unconfirmed: Int
+
+    public init(deliveryID: DeliveryID, accepted: Int, unconfirmed: Int = 0) {
+        self.deliveryID = deliveryID
+        self.accepted = accepted
+        self.unconfirmed = unconfirmed
+    }
+}
+
 public struct DeliveryReceipt: Sendable {
     public var batchID: BatchID
     public var accepted: Int
@@ -712,10 +725,12 @@ public protocol StateTransaction: AnyObject {
     func queuedBytes() throws -> Int
     func loadGaps() throws -> [GapRecord]
     func evict(_ batchID: BatchID, recording: GapRecord) throws
-    func recordDelivery(_ receipt: DeliveryReceipt) throws
+    func recordDelivery(_ receipt: DeliveryReceipt, destinationID: DestinationID) throws
     /// Sum of `accepted` on stored receipts. Used with gaps and pending for
     /// `delivered ∪ gap ⊇ read`.
     func deliveredAccepted() throws -> Int
+    /// Audit rows for one batch, one per destination that has acknowledged it.
+    func deliveryAudit(batchID: BatchID) throws -> [DeliveryAuditRow]
     func appendJournal(_ event: RunEvent) throws
     func upsertOpenRun(_ run: OpenRun) throws
     func loadOpenRuns() throws -> [OpenRun]

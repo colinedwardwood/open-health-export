@@ -100,7 +100,35 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
         ] {
             do { try exec(sql) } catch { _ = error }
         }
+        try migrateDeliveryAudit()
         try migrateLedgerChain()
+    }
+
+    /// v20: one audit row per destination. A single-column primary key meant the
+    /// second sink to acknowledge a fan-out batch overwrote the first one's count.
+    private func migrateDeliveryAudit() throws {
+        let columns = try prepare("PRAGMA table_info(deliveries);")
+        defer { sqlite3_finalize(columns) }
+        var hasDestination = false
+        while sqlite3_step(columns) == SQLITE_ROW {
+            guard let name = sqlite3_column_text(columns, 1) else { continue }
+            if String(cString: name) == "destination_id" { hasDestination = true }
+        }
+        guard !hasDestination else { return }
+        try exec("""
+            ALTER TABLE deliveries RENAME TO deliveries_pre_v20;
+            CREATE TABLE deliveries (
+                batch_id TEXT NOT NULL,
+                destination_id TEXT NOT NULL DEFAULT '',
+                accepted INTEGER NOT NULL,
+                unconfirmed INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (batch_id, destination_id)
+            );
+            INSERT INTO deliveries (batch_id, destination_id, accepted)
+                SELECT batch_id, '', accepted FROM deliveries_pre_v20;
+            DROP TABLE deliveries_pre_v20;
+            PRAGMA user_version = \(Self.expectedSchemaVersion);
+            """)
     }
 
     deinit {
@@ -167,8 +195,11 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
             );
             CREATE INDEX IF NOT EXISTS idx_pending_metric ON pending_batches (metric);
             CREATE TABLE IF NOT EXISTS deliveries (
-                batch_id TEXT PRIMARY KEY,
-                accepted INTEGER NOT NULL
+                batch_id TEXT NOT NULL,
+                destination_id TEXT NOT NULL DEFAULT '',
+                accepted INTEGER NOT NULL,
+                unconfirmed INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (batch_id, destination_id)
             );
             CREATE TABLE IF NOT EXISTS delivery_obligations (
                 batch_id TEXT NOT NULL,
@@ -260,7 +291,7 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
 
     /// The version this build's `migrate()` leaves behind. Interpolated into the migration
     /// itself so the constant and the stamp cannot drift apart.
-    public static let expectedSchemaVersion = 19
+    public static let expectedSchemaVersion = 20
 
     /// Reads the stamp without opening the store proper, so a caller (or a test) can ask
     /// what is on disk without triggering the migration it is asking about.
@@ -728,6 +759,19 @@ private final class SQLiteTransaction: StateTransaction {
     }
 
     func evict(_ batchID: BatchID, recording: GapRecord) throws {
+        // The payload is going away, so nothing is owed for it any more. Leaving the
+        // obligations behind would strand rows no destination can ever settle.
+        let obligations = try store.prepare(
+            "DELETE FROM delivery_obligations WHERE batch_id = ?;"
+        )
+        bindText(obligations, 1, batchID.rawValue)
+        do {
+            try stepDone(obligations)
+            sqlite3_finalize(obligations)
+        } catch {
+            sqlite3_finalize(obligations)
+            throw error
+        }
         let delete = try store.prepare("DELETE FROM pending_batches WHERE batch_id = ?;")
         bindText(delete, 1, batchID.rawValue)
         do {
@@ -750,13 +794,21 @@ private final class SQLiteTransaction: StateTransaction {
         try stepDone(stmt)
     }
 
-    func recordDelivery(_ receipt: DeliveryReceipt) throws {
+    func recordDelivery(_ receipt: DeliveryReceipt, destinationID: DestinationID) throws {
         let stmt = try store.prepare(
-            "INSERT INTO deliveries (batch_id, accepted) VALUES (?, ?) ON CONFLICT(batch_id) DO UPDATE SET accepted = excluded.accepted;"
+            """
+            INSERT INTO deliveries (batch_id, destination_id, accepted, unconfirmed)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(batch_id, destination_id) DO UPDATE SET
+                accepted = excluded.accepted,
+                unconfirmed = excluded.unconfirmed;
+            """
         )
         defer { sqlite3_finalize(stmt) }
         bindText(stmt, 1, receipt.batchID.rawValue)
-        sqlite3_bind_int64(stmt, 2, sqlite3_int64(receipt.accepted))
+        bindText(stmt, 2, destinationID.rawValue)
+        sqlite3_bind_int64(stmt, 3, sqlite3_int64(receipt.accepted))
+        sqlite3_bind_int64(stmt, 4, sqlite3_int64(receipt.unconfirmed))
         try stepDone(stmt)
         guard receipt.unconfirmed == 0 else { return }
         let owed = try store.prepare(
@@ -777,10 +829,43 @@ private final class SQLiteTransaction: StateTransaction {
     }
 
     func deliveredAccepted() throws -> Int {
-        let stmt = try store.prepare("SELECT COALESCE(SUM(accepted), 0) FROM deliveries;")
+        // One read that fans out to N sinks is still one read. Coverage counts a
+        // batch's best single destination, not the sum across destinations.
+        let stmt = try store.prepare(
+            """
+            SELECT COALESCE(SUM(best), 0) FROM (
+                SELECT MAX(accepted) AS best FROM deliveries GROUP BY batch_id
+            );
+            """
+        )
         defer { sqlite3_finalize(stmt) }
         guard sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
         return Int(sqlite3_column_int64(stmt, 0))
+    }
+
+    func deliveryAudit(batchID: BatchID) throws -> [DeliveryAuditRow] {
+        let stmt = try store.prepare(
+            """
+            SELECT destination_id, accepted, unconfirmed FROM deliveries
+            WHERE batch_id = ? ORDER BY destination_id;
+            """
+        )
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, batchID.rawValue)
+        var rows: [DeliveryAuditRow] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            rows.append(
+                DeliveryAuditRow(
+                    deliveryID: DeliveryID(
+                        batchID: batchID,
+                        destinationID: DestinationID(rawValue: text(stmt, 0))
+                    ),
+                    accepted: Int(sqlite3_column_int64(stmt, 1)),
+                    unconfirmed: Int(sqlite3_column_int64(stmt, 2))
+                )
+            )
+        }
+        return rows
     }
 
     func appendJournal(_ event: RunEvent) throws {

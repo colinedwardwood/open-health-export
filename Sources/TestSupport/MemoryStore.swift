@@ -14,7 +14,7 @@ public final class MemoryTransaction: StateTransaction {
     public var gaps: [GapRecord] = []
     public var census: [String: CensusRow] = [:]
     public var dirty: [MetricID: Set<String>] = [:]
-    public var deliveries: [BatchID: DeliveryReceipt] = [:]
+    public var deliveries: [DeliveryID: DeliveryReceipt] = [:]
     public var pending: [BatchID: PendingBatch] = [:]
     public var fanoutDeliveries: [DeliveryID: PendingDelivery] = [:]
     public var emittedIndex: [String: EmittedIndexRow] = [:]
@@ -199,11 +199,14 @@ public final class MemoryTransaction: StateTransaction {
     public func evict(_ batchID: BatchID, recording: GapRecord) throws {
         pending.removeValue(forKey: batchID)
         pendingOrder.removeAll { $0 == batchID }
+        for id in fanoutDeliveries.keys where id.batchID == batchID {
+            fanoutDeliveries.removeValue(forKey: id)
+        }
         gaps.append(recording)
     }
 
-    public func recordDelivery(_ receipt: DeliveryReceipt) throws {
-        deliveries[receipt.batchID] = receipt
+    public func recordDelivery(_ receipt: DeliveryReceipt, destinationID: DestinationID) throws {
+        deliveries[DeliveryID(batchID: receipt.batchID, destinationID: destinationID)] = receipt
         let hasFanout = fanoutDeliveries.keys.contains {
             $0.batchID == receipt.batchID
         }
@@ -217,7 +220,24 @@ public final class MemoryTransaction: StateTransaction {
     }
 
     public func deliveredAccepted() throws -> Int {
-        deliveries.values.reduce(0) { $0 + $1.accepted }
+        var best: [BatchID: Int] = [:]
+        for (id, receipt) in deliveries {
+            best[id.batchID] = max(best[id.batchID] ?? 0, receipt.accepted)
+        }
+        return best.values.reduce(0, +)
+    }
+
+    public func deliveryAudit(batchID: BatchID) throws -> [DeliveryAuditRow] {
+        deliveries
+            .filter { $0.key.batchID == batchID }
+            .map {
+                DeliveryAuditRow(
+                    deliveryID: $0.key,
+                    accepted: $0.value.accepted,
+                    unconfirmed: $0.value.unconfirmed
+                )
+            }
+            .sorted { $0.deliveryID.destinationID.rawValue < $1.deliveryID.destinationID.rawValue }
     }
 
     private func openRunKey(destinationID: String, metric: MetricID) -> String {

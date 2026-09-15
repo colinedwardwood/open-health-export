@@ -31,7 +31,7 @@ enum FanoutObligation {
         destinationID: String,
         on tx: any StateTransaction
     ) throws -> DeliverySettlement {
-        try tx.recordDelivery(receipt)
+        try tx.recordDelivery(receipt, destinationID: DestinationID(rawValue: destinationID))
         return try tx.settleDelivery(
             DestinationDeliveryReceipt(
                 deliveryID: DeliveryID(

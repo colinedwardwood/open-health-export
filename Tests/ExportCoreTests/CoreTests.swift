@@ -198,6 +198,57 @@ private struct DeviceLockedSource: SampleSource {
     #expect(try await store.transact { try $0.pendingBatches() }.isEmpty)
 }
 
+/// A purge or queue eviction destroys the payload, so no destination can ever settle
+/// what was owed on it. The obligations have to go with the batch.
+@Test func evictingABatchClearsEveryDestinationObligation() async throws {
+    let path = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-evict-fanout-\(UUID().uuidString).sqlite").path
+    defer { try? FileManager.default.removeItem(atPath: path) }
+    let store = try SQLiteStateStore(path: path)
+    let batch = PendingBatch(
+        id: BatchID(rawValue: "0192f3c1-0000-7000-8000-00000000003b"),
+        payloadURL: "/tmp/evict-fanout",
+        expectedRecords: 2,
+        metric: MetricCatalog.heartRate.id
+    )
+    let destinationIDs = ["local-file", "companion"]
+    let destinations = try destinationIDs.map { id in
+        BatchDestination(
+            destinationID: DestinationID(rawValue: id),
+            expectedRecords: 2,
+            scopeSnapshot: try DestinationExportScope(
+                destinationID: id,
+                metrics: [MetricCatalog.heartRate.id],
+                startInclusive: Date(timeIntervalSince1970: 1)
+            ),
+            scopeDigest: "scope-\(id)"
+        )
+    }
+    try await store.transact { try $0.enqueueFanout(batch, destinations: destinations) }
+    #expect(try await store.transact { try $0.hasDeliveryObligations(batchID: batch.id) })
+
+    _ = try await store.transact { tx in
+        try TypePurge.apply(
+            metric: MetricCatalog.heartRate.id,
+            reason: "explicit_stop",
+            destination: destinationIDs.joined(separator: ","),
+            atEpoch: 10,
+            on: tx
+        )
+    }
+
+    #expect(try await store.transact { try $0.pendingBatches() }.isEmpty)
+    #expect(try await store.transact { try !$0.hasDeliveryObligations(batchID: batch.id) })
+    for id in destinationIDs {
+        let due = try await store.transact {
+            try $0.pendingDeliveries(destinationID: DestinationID(rawValue: id), limit: 10)
+        }
+        #expect(due.isEmpty)
+    }
+    // The read is still accounted for, as a gap rather than a silent loss.
+    #expect(try await store.transact { try $0.loadGaps() }.count == 1)
+}
+
 @Test func fanoutObligationsSurviveSQLiteReopen() async throws {
     let path = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-fanout-\(UUID().uuidString).sqlite").path
@@ -3097,6 +3148,56 @@ private func runUntilProcessExitSeam() async throws {
     #expect(journal.contains { $0.runID.rawValue == "adr-r8-wake" })
 }
 
+/// Before v20 the audit was keyed by batch alone, so the second sink to acknowledge a
+/// fan-out batch erased the first sink's row. The migration has to widen the key without
+/// discarding what an upgrading install already recorded.
+@Test func deliveryAuditKeepsOneRowPerDestinationAcrossTheV20Migration() async throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-v20-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let path = root.appendingPathComponent("state.sqlite").path
+    try SQLiteV1Fixture.write(
+        path: path,
+        metric: MetricCatalog.heartRate.id,
+        checkpoint: CheckpointEnvelope(tzDatabaseVersion: "2024a", epoch: 1, adapterAnchor: Data([0x01])),
+        runID: "v20-prior",
+        deliveries: [(batchID: "carried", accepted: 7)]
+    )
+
+    let store = try SQLiteStateStore(path: path)
+    #expect(try SQLiteStateStore.onDiskSchemaVersion(path: path) == 20)
+
+    // The pre-v20 row survives, attributed to no destination because the old schema
+    // never knew which one it was.
+    let carried = try await store.transact {
+        try $0.deliveryAudit(batchID: BatchID(rawValue: "carried"))
+    }
+    #expect(carried.count == 1)
+    #expect(carried.first?.accepted == 7)
+    #expect(carried.first?.deliveryID.destinationID == DestinationID(rawValue: ""))
+
+    let batchID = BatchID(rawValue: "0192f3c1-0000-7000-8000-00000000002a")
+    try await store.transact {
+        try $0.recordDelivery(
+            DeliveryReceipt(batchID: batchID, accepted: 4, statusOnly: false),
+            destinationID: DestinationID(rawValue: "local-file")
+        )
+        try $0.recordDelivery(
+            DeliveryReceipt(batchID: batchID, accepted: 3, statusOnly: false, unconfirmed: 1),
+            destinationID: DestinationID(rawValue: "companion")
+        )
+    }
+    let rows = try await store.transact { try $0.deliveryAudit(batchID: batchID) }
+    #expect(rows.map(\.deliveryID.destinationID.rawValue) == ["companion", "local-file"])
+    #expect(rows.map(\.accepted) == [3, 4])
+    #expect(rows.map(\.unconfirmed) == [1, 0])
+
+    // Fan-out does not inflate coverage: one read delivered twice is still one read,
+    // so the batch contributes its best destination rather than the sum.
+    #expect(try await store.transact { try $0.deliveredAccepted() } == 11)
+}
+
 /// A foreground launch has always been allowed to migrate, and must stay that way.
 @Test func aForegroundLaunchStillMigrates() throws {
     let root = FileManager.default.temporaryDirectory
@@ -3528,13 +3629,15 @@ private func runUntilProcessExitSeam() async throws {
     ])
     try await store.transact {
         try $0.recordDelivery(
-            DeliveryReceipt(batchID: BatchID(rawValue: "b"), accepted: 1, statusOnly: false)
+            DeliveryReceipt(batchID: BatchID(rawValue: "b"), accepted: 1, statusOnly: false),
+            destinationID: DestinationID(rawValue: "local-file")
         )
     }
     #expect(try await store.transact { try $0.pendingBatches() }.count == 1)
     try await store.transact {
         try $0.recordDelivery(
-            DeliveryReceipt(batchID: BatchID(rawValue: "b"), accepted: 2, statusOnly: false)
+            DeliveryReceipt(batchID: BatchID(rawValue: "b"), accepted: 2, statusOnly: false),
+            destinationID: DestinationID(rawValue: "local-file")
         )
     }
     #expect(try await store.transact { try $0.pendingBatches() }.isEmpty)
