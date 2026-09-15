@@ -360,6 +360,96 @@ private struct DeviceLockedSource: SampleSource {
     #expect(secondFiles.count == 1)
 }
 
+@Test func fanoutExpectedRecordCountRespectsDestinationStart() throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let page = SamplePage(
+        samples: [
+            heartSample("11111111-1111-4111-8111-111111111111", start: "2024-01-01T00:00:00Z"),
+            heartSample("22222222-2222-4222-8222-222222222222", start: "2024-06-01T00:00:00Z"),
+        ],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0x01]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let wide = try DestinationExportScope(
+        destinationID: "wide",
+        metrics: [metric],
+        startInclusive: ExportScopeGate.dayStartUTC("2024-01-01")
+    )
+    let narrow = try DestinationExportScope(
+        destinationID: "narrow",
+        metrics: [metric],
+        startInclusive: ExportScopeGate.dayStartUTC("2024-06-01")
+    )
+    #expect(FanoutPayload.expectedRecordCount(page: page, metric: metric, scope: wide) == 2)
+    #expect(FanoutPayload.expectedRecordCount(page: page, metric: metric, scope: narrow) == 1)
+}
+
+@Test func fanoutProjectsANarrowerDestinationFromOneCanonicalBatch() async throws {
+    let metric = MetricID(rawValue: "heartRate")
+    let early = heartSample("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", start: "2024-01-01T00:00:00Z")
+    let late = heartSample("ffffffff-ffff-4fff-8fff-ffffffffffff", start: "2024-06-01T00:00:00Z")
+    let page = SamplePage(
+        samples: [early, late],
+        tombstones: [],
+        metric: metric,
+        anchorBlob: Data([0xE1]),
+        observedThrough: Date(timeIntervalSince1970: 0)
+    )
+    let source = ReadCountingSource(page: page)
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-fanout-project-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let wideDir = root.appendingPathComponent("wide")
+    let narrowDir = root.appendingPathComponent("narrow")
+    try FileManager.default.createDirectory(at: wideDir, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: narrowDir, withIntermediateDirectories: true)
+    let wideScope = try DestinationExportScope(
+        destinationID: "wide",
+        metrics: [metric],
+        startInclusive: ExportScopeGate.dayStartUTC("2024-01-01")
+    )
+    let narrowScope = try DestinationExportScope(
+        destinationID: "narrow",
+        metrics: [metric],
+        startInclusive: ExportScopeGate.dayStartUTC("2024-06-01")
+    )
+    let store = MemoryStateStore()
+    let outcome = try await ExportRun(
+        source: source,
+        destination: .testing(LocalFileSink(directory: wideDir)),
+        store: store,
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch"),
+        envelope: testEnvelope(),
+        destinations: [
+            RunDestination(
+                id: "wide",
+                destination: .testing(LocalFileSink(directory: wideDir)),
+                scope: wideScope
+            ),
+            RunDestination(
+                id: "narrow",
+                destination: .testing(LocalFileSink(directory: narrowDir)),
+                scope: narrowScope
+            ),
+        ]
+    ).run()
+    #expect(outcome.kind == .success)
+    #expect(source.reads == 1)
+    let wideNames = try FileManager.default.contentsOfDirectory(atPath: wideDir.path)
+    let narrowNames = try FileManager.default.contentsOfDirectory(atPath: narrowDir.path)
+    #expect(wideNames.contains { $0.hasSuffix(".ndjson") }, "wide: \(wideNames)")
+    #expect(narrowNames.contains { $0.hasSuffix(".ndjson") }, "narrow: \(narrowNames)")
+    let wideFile = wideDir.appendingPathComponent(try #require(wideNames.first { $0.hasSuffix(".ndjson") }))
+    let narrowFile = narrowDir.appendingPathComponent(try #require(narrowNames.first { $0.hasSuffix(".ndjson") }))
+    let wideCount = try NativeWire.countRecords(at: wideFile)
+    let narrowCount = try NativeWire.countRecords(at: narrowFile)
+    #expect(wideCount == 4)
+    #expect(narrowCount == 2)
+}
+
 @Test func automaticFanoutSkipsManualOnlyDestinationsWithoutASecondRead() async throws {
     let metric = MetricID(rawValue: "heartRate")
     let page = SamplePage(

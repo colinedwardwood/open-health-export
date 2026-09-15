@@ -377,6 +377,20 @@ public struct ExportRun: Sendable {
             rangeStartDay: rangeDays.min() ?? fallbackDay,
             rangeEndDay: rangeDays.max() ?? fallbackDay
         )
+        let extraStarts = aggregates.map(\.record.bucketStart)
+        let expectedByDestination = Dictionary(
+            uniqueKeysWithValues: owed.map {
+                (
+                    $0.id,
+                    FanoutPayload.expectedRecordCount(
+                        page: page,
+                        extraStarts: extraStarts,
+                        metric: metric,
+                        scope: $0.scope
+                    )
+                )
+            }
+        )
         let enqueue = try await store.transact { tx -> (victims: [PendingBatch], undatable: [String]) in
             let evicted = try QueueAdmission.makeRoom(for: pending.byteCount, on: tx)
             try tx.commitFanout(
@@ -385,7 +399,7 @@ public struct ExportRun: Sendable {
                     try FanoutObligation.destination(
                         id: $0.id,
                         metric: metric,
-                        expectedRecords: pending.expectedRecords,
+                        expectedRecords: expectedByDestination[$0.id] ?? pending.expectedRecords,
                         scope: $0.scope
                     )
                 },
@@ -441,7 +455,16 @@ public struct ExportRun: Sendable {
         var receipts: [(RunDestination, DeliveryReceipt)] = []
         for dest in owed where dest.attemptNow {
             do {
-                receipts.append((dest, try await deliver(pending: pending, dest: dest)))
+                receipts.append(
+                    (
+                        dest,
+                        try await deliver(
+                            pending: pending,
+                            dest: dest,
+                            expectedRecords: expectedByDestination[dest.id] ?? pending.expectedRecords
+                        )
+                    )
+                )
             } catch let error as DestinationSendError {
                 failed += 1
                 terminalError = error.errorClass
@@ -468,9 +491,11 @@ public struct ExportRun: Sendable {
             }
         }
         let attemptedCount = owed.filter(\.attemptNow).count
-        let deriveCount = attemptedCount == 0 ? 1 : attemptedCount
+        let owedExpected = owed.filter(\.attemptNow).reduce(0) {
+            $0 + (expectedByDestination[$1.id] ?? recordCount)
+        }
         var tally = RunTally(
-            read: recordCount * deriveCount,
+            read: attemptedCount == 0 ? recordCount : owedExpected,
             committed: recordCount,
             acked: attemptedCount == 0 ? recordCount : accepted,
             unconfirmed: unconfirmed,
@@ -997,26 +1022,51 @@ public struct ExportRun: Sendable {
 
     private func deliver(
         pending: PendingBatch,
-        dest: RunDestination
+        dest: RunDestination,
+        expectedRecords: Int
     ) async throws -> DeliveryReceipt {
+        if expectedRecords == 0 {
+            return DeliveryReceipt(
+                batchID: pending.id,
+                accepted: 0,
+                statusOnly: false
+            )
+        }
+        var attempt = pending
+        let url = try FanoutPayload.attemptURL(
+            canonical: pending,
+            destinationID: dest.id,
+            expectedRecords: expectedRecords,
+            scope: dest.scope,
+            scratchDirectory: scratchDirectory
+        )
+        attempt.payloadURL = url.path
+        attempt.expectedRecords = expectedRecords
+        defer {
+            if url.path != pending.payloadURL {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
         #if DEBUG
         return try await DeliveryExecutor.send(
-            batch: pending,
+            batch: attempt,
             destination: dest.destination,
             destinationName: dest.id,
             store: store,
             faults: faults,
             clock: clock,
-            scope: dest.scope
+            scope: dest.scope,
+            skipRangeGate: url.path != pending.payloadURL
         )
         #else
         return try await DeliveryExecutor.send(
-            batch: pending,
+            batch: attempt,
             destination: dest.destination,
             destinationName: dest.id,
             store: store,
             clock: clock,
-            scope: dest.scope
+            scope: dest.scope,
+            skipRangeGate: url.path != pending.payloadURL
         )
         #endif
     }

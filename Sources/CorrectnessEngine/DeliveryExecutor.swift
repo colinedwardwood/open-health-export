@@ -16,7 +16,8 @@ enum DeliveryExecutor {
         destinationName: String,
         store: any StateStore,
         clock: any Clock = SystemClock(),
-        scope: DestinationExportScope? = nil
+        scope: DestinationExportScope? = nil,
+        skipRangeGate: Bool = false
     ) async throws -> DeliveryReceipt {
         try await sendImpl(
             batch: batch,
@@ -25,6 +26,7 @@ enum DeliveryExecutor {
             store: store,
             clock: clock,
             scope: scope,
+            skipRangeGate: skipRangeGate,
             beforeAckObservation: {}
         )
     }
@@ -37,7 +39,8 @@ enum DeliveryExecutor {
         store: any StateStore,
         faults: any ExportFaultInjector,
         clock: any Clock = SystemClock(),
-        scope: DestinationExportScope? = nil
+        scope: DestinationExportScope? = nil,
+        skipRangeGate: Bool = false
     ) async throws -> DeliveryReceipt {
         try await sendImpl(
             batch: batch,
@@ -46,6 +49,7 @@ enum DeliveryExecutor {
             store: store,
             clock: clock,
             scope: scope,
+            skipRangeGate: skipRangeGate,
             beforeAckObservation: { try faults.hit(.afterDestinationWriteBeforeAck) }
         )
     }
@@ -58,15 +62,19 @@ enum DeliveryExecutor {
         store: any StateStore,
         clock: any Clock,
         scope: DestinationExportScope?,
+        skipRangeGate: Bool,
         beforeAckObservation: () throws -> Void
     ) async throws -> DeliveryReceipt {
-        if let scope {
-            try ExportScopeGate.require(
-                metric: batch.metric,
-                rangeStartDay: batch.rangeStartDay,
-                rangeEndDay: batch.rangeEndDay,
-                scope: scope
-            )
+        if let scope, !batch.metric.rawValue.isEmpty {
+            try ExportScopeGate.require(metric: batch.metric, scope: scope)
+            if !skipRangeGate {
+                try ExportScopeGate.require(
+                    metric: batch.metric,
+                    rangeStartDay: batch.rangeStartDay,
+                    rangeEndDay: batch.rangeEndDay,
+                    scope: scope
+                )
+            }
         }
         let attemptID = UUID().uuidString.lowercased()
         try await append(

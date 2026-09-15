@@ -5,6 +5,7 @@ import CoreDomain
 import CoreTemporal
 import DestinationTrust
 import EnginePorts
+import Foundation
 
 /// Replays committed batches after a crash. Each call performs at most one transport attempt for
 /// this sink, using the oldest owed delivery for this destination when fan-out rows exist,
@@ -43,7 +44,7 @@ public struct PendingDeliveryRunner: Sendable {
         }
         if let delivery = owed.first {
             return try await HTTPTransferSchedule.$current.withValue(.discretionaryRetry) {
-                try await sendOnce(batch: delivery.batch)
+                try await sendOnce(delivery: delivery)
             }
         }
         let batches = try await store.transact { tx in
@@ -53,29 +54,85 @@ public struct PendingDeliveryRunner: Sendable {
         }
         guard let batch = batches.first else { return [] }
         return try await HTTPTransferSchedule.$current.withValue(.discretionaryRetry) {
-            try await sendOnce(batch: batch)
+            try await sendAttempt(
+                batch: batch,
+                expectedRecords: batch.expectedRecords,
+                grant: scope,
+                project: false
+            )
         }
     }
 
-    private func sendOnce(batch: PendingBatch) async throws -> [DeliveryReceipt] {
+    private func sendOnce(delivery: PendingDelivery) async throws -> [DeliveryReceipt] {
+        try await sendAttempt(
+            batch: delivery.batch,
+            expectedRecords: delivery.expectedRecords,
+            grant: scope ?? delivery.scopeSnapshot,
+            project: true
+        )
+    }
+
+    private func sendAttempt(
+        batch: PendingBatch,
+        expectedRecords: Int,
+        grant: DestinationExportScope?,
+        project: Bool
+    ) async throws -> [DeliveryReceipt] {
+        if expectedRecords == 0 {
+            let receipt = DeliveryReceipt(
+                batchID: batch.id,
+                accepted: 0,
+                statusOnly: false
+            )
+            try await store.transact { tx in
+                _ = try FanoutObligation.settle(
+                    receipt: receipt,
+                    destinationID: destinationName,
+                    on: tx
+                )
+            }
+            return [receipt]
+        }
+        var attempt = batch
+        var skipRangeGate = false
+        if project {
+            let scratch = URL(fileURLWithPath: batch.payloadURL).deletingLastPathComponent()
+            let url = try FanoutPayload.attemptURL(
+                canonical: batch,
+                destinationID: destinationName,
+                expectedRecords: expectedRecords,
+                scope: grant,
+                scratchDirectory: scratch
+            )
+            attempt.payloadURL = url.path
+            skipRangeGate = url.path != batch.payloadURL
+        }
+        attempt.expectedRecords = expectedRecords
+        defer {
+            if attempt.payloadURL != batch.payloadURL {
+                try? FileManager.default.removeItem(atPath: attempt.payloadURL)
+            }
+        }
         #if DEBUG
         let receipt = try await DeliveryExecutor.send(
-            batch: batch,
+            batch: attempt,
             destination: destination,
             destinationName: destinationName,
             store: store,
             faults: faults,
             clock: clock,
-            scope: scope
+            scope: grant,
+            skipRangeGate: skipRangeGate
         )
         #else
         let receipt = try await DeliveryExecutor.send(
-            batch: batch,
+            batch: attempt,
             destination: destination,
             destinationName: destinationName,
             store: store,
             clock: clock,
-            scope: scope
+            scope: grant,
+            skipRangeGate: skipRangeGate
         )
         #endif
         #if DEBUG

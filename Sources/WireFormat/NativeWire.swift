@@ -573,6 +573,97 @@ public enum NativeWire {
         out.append(0x0A)
         return out
     }
+
+    /// Rebuilds header, kept record lines, and footer digest from one canonical
+    /// batch so a destination with a narrower grant receives only its records.
+    public static func project(
+        from source: URL,
+        to dest: URL,
+        keepingRecord: (Data) throws -> Bool
+    ) throws -> Int {
+        let handle = try FileHandle(forReadingFrom: source)
+        defer { try? handle.close() }
+        var reader = NDJSONLineReader(handle: handle)
+        var headerLine: Data?
+        var footerLine: Data?
+        var kept: [Data] = []
+        var kinds: [String: Int] = [:]
+        while let line = try reader.next() {
+            guard !line.isEmpty else { continue }
+            if line.range(of: headerKind) != nil {
+                headerLine = line
+                continue
+            }
+            if line.range(of: footerKind) != nil {
+                footerLine = line
+                continue
+            }
+            guard try keepingRecord(line) else { continue }
+            kept.append(line)
+            if let kind = jsonString(line, "kind") {
+                kinds[kind, default: 0] += 1
+            }
+        }
+        guard let headerLine, let footerLine else {
+            throw WireError.malformedBatch
+        }
+        var hasher = SHA256.Hasher()
+        var body = Data()
+        body.reserveCapacity(kept.reduce(0) { $0 + $1.count + 1 })
+        for line in kept {
+            var record = line
+            record.append(0x0A)
+            hasher.update(record)
+            body.append(record)
+        }
+        let digest = "sha256:" + hasher.finalize().map { String(format: "%02x", $0) }.joined()
+        let header = try rewriteHeader(headerLine, recordCount: kept.count)
+        let footer = try rewriteFooter(footerLine, counts: kinds, digest: digest)
+        var out = Data()
+        out.append(contentsOf: header.utf8)
+        out.append(0x0A)
+        out.append(body)
+        out.append(contentsOf: footer.utf8)
+        out.append(0x0A)
+        try out.write(to: dest, options: .atomic)
+        return kept.count
+    }
+
+    private static func jsonString(_ line: Data, _ key: String) -> String? {
+        guard
+            let object = try? JSONSerialization.jsonObject(with: line) as? [String: Any]
+        else {
+            return nil
+        }
+        return object[key] as? String
+    }
+
+    private static func rewriteHeader(_ line: Data, recordCount: Int) throws -> String {
+        let object = try JSONSerialization.jsonObject(with: line)
+        guard case .object(var fields) = try CanonicalJSON.parse(object) else {
+            throw WireError.malformedBatch
+        }
+        fields["recordCount"] = .integer(recordCount)
+        return try CanonicalJSON.object(fields).serialized()
+    }
+
+    private static func rewriteFooter(
+        _ line: Data,
+        counts: [String: Int],
+        digest: String
+    ) throws -> String {
+        let object = try JSONSerialization.jsonObject(with: line)
+        guard case .object(var fields) = try CanonicalJSON.parse(object) else {
+            throw WireError.malformedBatch
+        }
+        fields["contentDigest"] = .string(digest)
+        var encoded: [String: CanonicalJSON] = [:]
+        for (kind, count) in counts.sorted(by: { $0.key < $1.key }) where count > 0 {
+            encoded[kind] = .integer(count)
+        }
+        fields["counts"] = .object(encoded)
+        return try CanonicalJSON.object(fields).serialized()
+    }
 }
 
 public enum WireError: Error, Equatable {
@@ -580,6 +671,7 @@ public enum WireError: Error, Equatable {
     case nonFiniteNumber
     case invertedInterval
     case documentExceedsByteLimit
+    case malformedBatch
 }
 
 private extension NativeWire {
