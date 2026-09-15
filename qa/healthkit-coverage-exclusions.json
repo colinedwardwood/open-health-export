@@ -1,7 +1,15 @@
 {
   "exclusions": [
     {
+      "identifier": "HKCategoryTypeIdentifierBleedingAfterMenopause",
+      "reason": "Pinned in HKTypeIdentifiers.h, but HKCategoryType.categoryType(forIdentifier:) returns nil on this SDK, so export stays off."
+    },
+    {
       "identifier": "HKCategoryTypeIdentifierEnvironmentalAudioExposureEvent",
+      "reason": "Pinned in HKTypeIdentifiers.h, but HKCategoryType.categoryType(forIdentifier:) returns nil on this SDK, so export stays off."
+    },
+    {
+      "identifier": "HKCategoryTypeIdentifierMenopausalState",
       "reason": "Pinned in HKTypeIdentifiers.h, but HKCategoryType.categoryType(forIdentifier:) returns nil on this SDK, so export stays off."
     },
     {
@@ -27,6 +35,10 @@
     {
       "identifier": "HKMedicationDoseEventTypeIdentifierMedicationDoseEvent",
       "reason": "Not in the v1 selectable catalogue. Export stays off until HealthKit exposes a stable medication concept string for medicationName."
+    },
+    {
+      "identifier": "HKQuantityTypeIdentifierHeartRateVariabilityRMSSD",
+      "reason": "Pinned in HKTypeIdentifiers.h, but HKQuantityType.quantityType(forIdentifier:) returns nil on this SDK, so export stays off."
     },
     {
       "identifier": "HKScoredAssessmentTypeIdentifierGAD7",
