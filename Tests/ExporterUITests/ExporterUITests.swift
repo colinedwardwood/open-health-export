@@ -1821,7 +1821,7 @@ final class ExporterUITests: XCTestCase {
     /// Swiping the *app* scrolls content and leaves the keyboard; swiping the keyboard
     /// itself, or tapping its return corner, is what actually puts it away.
     private func dismissKeyboard() {
-        guard app.keyboards.element.exists else { return }
+        guard keyboardIsShowing() else { return }
         // iPad keyboards carry their own hide key and do not dismiss on return, so
         // the iPhone-shaped attempts below are not enough on their own.
         let names = ["return", "done", "hide keyboard", "dismiss"]
@@ -1850,12 +1850,32 @@ final class ExporterUITests: XCTestCase {
         )
     }
 
+    /// On iPad the keyboard element stays in the hierarchy with an empty frame,
+    /// parked below the screen, when the simulator is using the hardware keyboard.
+    /// Nothing is drawn over the app and there is no candidate bar for an audit to
+    /// find, but asking to dismiss it fails outright: a swipe on an element with an
+    /// empty visible frame is an error, not a no-op.
+    private func keyboardIsShowing() -> Bool {
+        let keyboard = app.keyboards.element
+        guard keyboard.exists else { return false }
+        let frame = keyboard.frame
+        return frame.height > 0 && frame.minY < app.windows.firstMatch.frame.maxY
+    }
+
     private func keyboardIsGone() -> Bool {
-        let gone = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "exists == false"),
-            object: app.keyboards.element
-        )
-        return XCTWaiter().wait(for: [gone], timeout: 2) == .completed
+        for _ in 0 ..< 4 {
+            if !keyboardIsShowing() { return true }
+            _ = XCTWaiter().wait(
+                for: [
+                    XCTNSPredicateExpectation(
+                        predicate: NSPredicate(format: "exists == false"),
+                        object: app.keyboards.element
+                    ),
+                ],
+                timeout: 0.5
+            )
+        }
+        return !keyboardIsShowing()
     }
 
     private func visibleIdentifiers() -> [String] {
@@ -1869,18 +1889,19 @@ final class ExporterUITests: XCTestCase {
         let identifiers = ["tab-status", "tab-data", "tab-destinations", "tab-history"]
         guard identifiers.indices.contains(index) else { return }
         let identifier = identifiers[index]
+        if rootTabIsShowing(index) { return }
 
         let bar = app.tabBars.firstMatch
         if bar.waitForExistence(timeout: 1) {
             let identified = bar.buttons[identifier].firstMatch
             if identified.exists {
-                identified.tap()
-                return
+                tapWithinScreen(identified)
+                if rootTabIsShowing(index) { return }
             }
             let positional = bar.buttons.element(boundBy: index)
             if positional.exists {
-                positional.tap()
-                return
+                tapWithinScreen(positional)
+                if rootTabIsShowing(index) { return }
             }
         }
 
@@ -1895,10 +1916,51 @@ final class ExporterUITests: XCTestCase {
             guard candidate.exists else { continue }
             let height = candidate.frame.height
             if candidate.elementType == .button || (height > 0 && height < 120) {
-                candidate.tap()
-                return
+                tapWithinScreen(candidate)
+                if rootTabIsShowing(index) { return }
             }
         }
+
+        // Last resort for Destinations, which the app itself offers a way into from
+        // Status. Reaching it this way still audits the same page.
+        if index == 2 {
+            let opener = app.descendants(matching: .any)["status-open-destinations"]
+            if opener.exists {
+                tapWithinScreen(opener)
+            }
+        }
+    }
+
+    /// Doubled pseudo-locale labels can make a tab control wider than the screen, so
+    /// its centre — where a plain `tap()` lands — is outside the window and the tap
+    /// does nothing. Tapping the part that is actually on screen does.
+    private func tapWithinScreen(_ element: XCUIElement) {
+        let window = app.windows.firstMatch.frame
+        let frame = element.frame
+        let visible = frame.intersection(window)
+        guard !visible.isNull, visible.width > 1, visible.height > 1,
+              !window.contains(CGPoint(x: frame.midX, y: frame.midY)),
+              frame.width > 1, frame.height > 1
+        else {
+            element.tap()
+            return
+        }
+        element.coordinate(
+            withNormalizedOffset: CGVector(
+                dx: (visible.midX - frame.minX) / frame.width,
+                dy: (visible.midY - frame.minY) / frame.height
+            )
+        ).tap()
+    }
+
+    /// A tab is selected when its page is on screen. Tapping a tab control is not
+    /// proof of that: an off-screen hit point, a sidebar row that is only a label,
+    /// or an overflow menu all leave the previous page in place.
+    private func rootTabIsShowing(_ index: Int) -> Bool {
+        let names = ["status", "data", "destinations", "history"]
+        guard names.indices.contains(index) else { return false }
+        return app.descendants(matching: .any)["root-scroll-\(names[index])"]
+            .waitForExistence(timeout: 2)
     }
 
     private func settingsCloseControl() -> XCUIElement {
