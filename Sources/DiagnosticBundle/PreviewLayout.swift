@@ -50,8 +50,14 @@ public enum DiagnosticPreviewLayout {
         }
     }
 
-    /// What the view renders: wrappable text, in bounded pieces.
-    public static func displayChunks(_ text: String) -> [String] {
-        chunks(wrappable(text))
+    /// What the view renders: wrappable text, one line per view.
+    ///
+    /// A blank line is rendered as a space so it still occupies a view and the
+    /// preview keeps the shape of the JSON it is showing.
+    public static func displayLines(_ text: String) -> [String] {
+        text.split(separator: "\n", omittingEmptySubsequences: false).map {
+            let line = wrappable(String($0))
+            return line.isEmpty ? " " : line
+        }
     }
 }

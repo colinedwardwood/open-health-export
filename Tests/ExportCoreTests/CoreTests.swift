@@ -830,15 +830,15 @@ private struct HealthDataRestrictedSource: SampleSource {
     #expect(laid.contains("\"short\" : 1"))
 }
 
-@Test func diagnosticPreviewArrivesInBoundedPieces() {
-    let json = (1 ... 95).map { "  \"run\($0)\" : \($0)," }.joined(separator: "\n")
-    let chunks = DiagnosticPreviewLayout.chunks(json, linesPerChunk: 20)
-    #expect(chunks.count == 5)
-    #expect(chunks.allSatisfy { $0.split(separator: "\n", omittingEmptySubsequences: false).count <= 20 })
-    // Every line survives, in order, with nothing inserted between the pieces.
-    #expect(chunks.joined(separator: "\n") == json)
-    #expect(DiagnosticPreviewLayout.chunks("").isEmpty == false)
-    #expect(DiagnosticPreviewLayout.displayChunks(json).count == 5)
+@Test func diagnosticPreviewArrivesOneLinePerView() {
+    let json = "{\n\n  \"run\" : 1\n}"
+    let lines = DiagnosticPreviewLayout.displayLines(json)
+    // Every line of the bundle is its own view, including the blank one, so the
+    // preview keeps the shape of the JSON it is showing.
+    #expect(lines == ["{", " ", "  \"run\" : 1", "}"])
+    let long = (1 ... 95).map { "  \"run\($0)\" : \($0)," }.joined(separator: "\n")
+    #expect(DiagnosticPreviewLayout.displayLines(long).count == 95)
+    #expect(DiagnosticPreviewLayout.displayLines(long).allSatisfy { !$0.contains("\n") })
 }
 
 @Test func diagnosticBundleRejectsContentAboveHardCap() {

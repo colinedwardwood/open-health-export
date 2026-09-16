@@ -1679,11 +1679,19 @@ final class ExporterUITests: XCTestCase {
             }
             guard let cause else {
                 if let element = issue.element {
+                    // Shape before content: a clipped-text finding is about how much
+                    // text is in what frame, and a label of a hundred JSON lines
+                    // buries that under itself.
+                    let label = element.label
+                    let longest = label.split(separator: "\n").map(\.count).max() ?? label.count
                     print(
                         "UNSUPPRESSED AX \(state): type=\(issue.auditType) "
-                            + "id=\(element.identifier) label=\(element.label) "
+                            + "id=\(element.identifier) "
+                            + "labelChars=\(label.count) labelLines=\(label.split(separator: "\n").count) "
+                            + "longestLine=\(longest) "
                             + "enabled=\(element.isEnabled) hittable=\(element.isHittable) "
-                            + "frame=\(element.frame)"
+                            + "frame=\(element.frame) window=\(self.app.windows.firstMatch.frame) "
+                            + "label=\(label)"
                     )
                 } else {
                     print(
@@ -1965,8 +1973,15 @@ final class ExporterUITests: XCTestCase {
     private func rootTabIsShowing(_ index: Int) -> Bool {
         let names = ["status", "data", "destinations", "history"]
         guard names.indices.contains(index) else { return false }
-        return app.descendants(matching: .any)["root-scroll-\(names[index])"]
-            .waitForExistence(timeout: 2)
+        let scroll = app.descendants(matching: .any)["root-scroll-\(names[index])"]
+        guard scroll.waitForExistence(timeout: 2) else { return false }
+        // A page still reports `exists` when it is off-screen or has a detail
+        // pushed over it, and tapping the tab again is how that detail is popped.
+        // So "showing" has to mean on screen, not merely present: otherwise a test
+        // standing on a destination's detail page believes it is already at the
+        // root, skips the tap, and then hunts the root's controls where they
+        // cannot be.
+        return scroll.isHittable
     }
 
     private func settingsCloseControl() -> XCUIElement {
@@ -2104,12 +2119,59 @@ final class ExporterUITests: XCTestCase {
            !elementBelongsToPreferredScroll(element, preferredScroll) {
             return false
         }
+        // A keyboard covers the bottom of the page and takes the swipes meant for
+        // it, so the hunt scrolls nothing and spends its whole budget finding out.
+        dismissKeyboard()
+        // A page is not a queue. Tests fill a form in the order that reads best,
+        // which is not the order the fields are laid out in, so a control can sit
+        // above where the last one left the page. Hunting one way only found it by
+        // luck: whether the field happened to still be on screen.
+        if hunt(element, scrolls: scrolls, preferredScroll: preferredScroll, huntIfMissing: huntIfMissing, towardContentBottom: true) {
+            return true
+        }
+        return hunt(element, scrolls: scrolls, preferredScroll: preferredScroll, huntIfMissing: huntIfMissing, towardContentBottom: false)
+    }
+
+    private func hunt(
+        _ element: XCUIElement,
+        scrolls: Int,
+        preferredScroll: String?,
+        huntIfMissing: Bool,
+        towardContentBottom: Bool
+    ) -> Bool {
+        var stalled = 0
+        var lastProbe = scrollProgressProbe(preferredScroll)
         for _ in 0 ..< scrolls {
-            swipeTowardContentBottom(preferredScroll: preferredScroll)
+            swipe(preferredScroll: preferredScroll, towardContentBottom: towardContentBottom)
             if elementIsCurrentlyReachable(element) { return true }
-            if !huntIfMissing, !element.exists { return false }
+            let probe = scrollProgressProbe(preferredScroll)
+            // Swiping something that does not move will not start moving. Giving up
+            // early leaves the failure legible and the rest of the shard its time.
+            if probe == lastProbe {
+                stalled += 1
+                if stalled >= 5 { return false }
+            } else {
+                stalled = 0
+                lastProbe = probe
+            }
         }
         return false
+    }
+
+    /// Cheap evidence that a swipe moved the content: what is at the far end of
+    /// the scrolling region, and how much of the page has been built.
+    ///
+    /// Not the near end. A page can hold a title that stays where it is while the
+    /// content scrolls under it, and sampling that reports a moving page as stuck.
+    private func scrollProgressProbe(_ preferredScroll: String?) -> String {
+        let scroll = preferredScroll.map { app.scrollViews[$0] } ?? app.scrollViews.firstMatch
+        guard scroll.exists else { return "no-scroll" }
+        let texts = scroll.descendants(matching: .staticText)
+        let count = texts.count
+        guard count > 0 else { return "empty" }
+        let last = texts.element(boundBy: count - 1)
+        guard last.exists else { return "count-\(count)" }
+        return "count-\(count)|\(last.identifier)|\(last.label.prefix(24))|\(Int(last.frame.minY))"
     }
 
     private func elementIsCurrentlyReachable(_ element: XCUIElement) -> Bool {
@@ -2139,23 +2201,39 @@ final class ExporterUITests: XCTestCase {
         guard elementFrame.width > 0, elementFrame.height > 0, scrollFrame.width > 0 else {
             return true
         }
-        let overlapsHorizontally =
-            elementFrame.maxX > scrollFrame.minX && elementFrame.minX < scrollFrame.maxX
-        let notEntirelyAbove = elementFrame.maxY > scrollFrame.minY - 8
-        return overlapsHorizontally && notEntirelyAbove
+        // Horizontal overlap alone. A TabView lays its pages out side by side, so a
+        // control on another tab is off to one side, which is what this check is
+        // for. Being above the viewport means the opposite: it is this page, just
+        // scrolled past, and the hunt can go back up for it.
+        return elementFrame.maxX > scrollFrame.minX && elementFrame.minX < scrollFrame.maxX
     }
 
     private func swipeTowardContentBottom(preferredScroll: String? = nil) {
+        swipe(preferredScroll: preferredScroll, towardContentBottom: true)
+    }
+
+    private func swipeTowardContentTop(preferredScroll: String? = nil) {
+        swipe(preferredScroll: preferredScroll, towardContentBottom: false)
+    }
+
+    private func swipe(preferredScroll: String?, towardContentBottom: Bool) {
+        func scroll(_ element: XCUIElement) {
+            if towardContentBottom {
+                element.swipeUp()
+            } else {
+                element.swipeDown()
+            }
+        }
         if let preferredScroll {
             let preferred = app.scrollViews[preferredScroll]
             if preferred.exists {
-                preferred.swipeUp()
+                scroll(preferred)
                 return
             }
         }
         let settingsScroll = app.scrollViews["settings-scroll"]
         if settingsScroll.exists {
-            settingsScroll.swipeUp()
+            scroll(settingsScroll)
             return
         }
         var hittableRoots: [XCUIElement] = []
@@ -2166,9 +2244,13 @@ final class ExporterUITests: XCTestCase {
             }
         }
         if let tallest = hittableRoots.max(by: { $0.frame.height < $1.frame.height }) {
-            tallest.swipeUp()
+            scroll(tallest)
             return
         }
-        app.swipeUp()
+        if towardContentBottom {
+            app.swipeUp()
+        } else {
+            app.swipeDown()
+        }
     }
 }

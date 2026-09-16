@@ -1822,15 +1822,16 @@ struct HarnessView: View {
                         )
                     }
                     if !json.isEmpty {
-                        // JSON has no spaces inside a token, so a long path or value
-                        // had nowhere to wrap and its tail was clipped instead. The
-                        // preview now carries break opportunities and arrives in
-                        // bounded pieces rather than as one view holding the bundle.
+                        // One line per view, like the summary lines above, which have
+                        // never been reported as clipped. A single view holding the
+                        // whole bundle was: hundreds of lines of JSON is not text a
+                        // layout can be trusted to fit, and long tokens carry no
+                        // spaces to wrap at, so break opportunities are added too.
                         ForEach(
-                            Array(DiagnosticPreviewLayout.displayChunks(json).enumerated()),
+                            Array(DiagnosticPreviewLayout.displayLines(json).enumerated()),
                             id: \.offset
-                        ) { index, chunk in
-                            Text(chunk)
+                        ) { index, line in
+                            Text(line)
                                 .font(.system(.body, design: .monospaced))
                                 .foregroundStyle(.primary)
                                 .lineLimit(nil)
