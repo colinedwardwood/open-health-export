@@ -718,52 +718,21 @@ public struct ReconcileSweep: Sendable {
             FanoutObligation.unlink(settlement)
         }
         let queued = try await store.transact { try $0.queuedBytes() }
-        try writeSnapshot(
+        try FanoutSnapshotWriter.write(
+            destinations: destinations,
+            destinationName: destinationName,
+            fallbackURL: snapshotURL,
+            children: rows,
             outcome: outcome,
-            tally: tally,
+            combinedErrorClass: tally.terminalError.rawValue,
+            now: nowEpoch,
+            trigger: trigger,
+            freshnessCadenceSeconds: freshnessCadenceSeconds,
+            freshnessEstimates: [:],
             queueOccupancy: QueueRed.occupancy(queuedBytes: queued).snapshotToken
         )
         try writeExternalStatus(outcome: outcome, tally: tally)
         try await writeLedgerHeadSeal()
-    }
-
-    private func writeSnapshot(
-        outcome: RunOutcome,
-        tally: RunTally,
-        queueOccupancy: String
-    ) throws {
-        guard let snapshotURL else { return }
-        let now = clock.now().timeIntervalSince1970
-        let prior = try? DestinationSnapshotFile.read(from: snapshotURL)
-        let succeeded = outcome.kind == .success || outcome.kind == .successNothingDue
-        let thresholds = FreshnessTarget.snapshotThresholds(
-            estimates: prior?.freshnessEstimates ?? [:],
-            cadenceSeconds: freshnessCadenceSeconds
-        )
-        try DestinationSnapshotFile.write(
-            DestinationStatusSnapshot(
-                destinationID: destinationName,
-                destinationLabel: prior?.destinationLabel ?? destinationName,
-                enabled: true,
-                lastOutcome: outcome.kind.rawValue,
-                lastSuccessEpoch: succeeded ? now : prior?.lastSuccessEpoch,
-                lastConfirmedAckEpoch:
-                    outcome.ackEvidence == .receiptFull ? now : prior?.lastConfirmedAckEpoch,
-                attribution: ExternalStatusRecord.attribution(for: trigger),
-                attributionConfidence: "evidenced",
-                errorClass: tally.terminalError.rawValue,
-                staleThresholdSeconds: thresholds.stale,
-                overdueThresholdSeconds: thresholds.overdue,
-                nextAttemptEarliestEpoch: prior?.nextAttemptEarliestEpoch,
-                nextAttemptLatestEpoch: prior?.nextAttemptLatestEpoch,
-                freshnessEstimates: prior?.freshnessEstimates ?? [:],
-                queueOccupancy: queueOccupancy,
-                unacknowledgedSecurityEventCount:
-                    prior?.unacknowledgedSecurityEventCount ?? 0,
-                writtenAtEpoch: now
-            ),
-            to: snapshotURL
-        )
     }
 
     private func writeLedgerHeadSeal() async throws {

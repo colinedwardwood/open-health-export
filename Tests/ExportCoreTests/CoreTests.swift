@@ -5109,6 +5109,18 @@ private func anchorHoldFixture(
         metrics: [metric],
         startInclusive: ExportScopeGate.dayStartUTC("2024-01-01")
     )
+    let wideSnap = root.appendingPathComponent("wide-status.json")
+    let narrowSnap = root.appendingPathComponent("narrow-status.json")
+    for (id, url) in [("wide", wideSnap), ("narrow", narrowSnap)] {
+        try DestinationSnapshotFile.write(
+            DestinationStatusSnapshot(
+                destinationID: id,
+                enabled: true,
+                writtenAtEpoch: 1
+            ),
+            to: url
+        )
+    }
     let store = MemoryStateStore()
     let outcome = try await ReconcileSweep(
         observations: observations,
@@ -5116,17 +5128,21 @@ private func anchorHoldFixture(
         store: store,
         metric: metric,
         scratchDirectory: root.appendingPathComponent("scratch"),
+        destinationName: "wide",
         envelope: testEnvelope(),
+        snapshotURL: wideSnap,
         destinations: [
             RunDestination(
                 id: "wide",
                 destination: .testing(LocalFileSink(directory: wideDir)),
-                scope: wideScope
+                scope: wideScope,
+                snapshotURL: wideSnap
             ),
             RunDestination(
                 id: "narrow",
                 destination: .testing(LocalFileSink(directory: narrowDir)),
-                scope: narrowScope
+                scope: narrowScope,
+                snapshotURL: narrowSnap
             ),
         ]
     ).runFullHistory(throughDay: "2024-01-01")
@@ -5155,6 +5171,8 @@ private func anchorHoldFixture(
     #expect(parents.count == 1)
     #expect(Set(children.compactMap(\.facts.destinationID)) == ["wide", "narrow"])
     #expect(children.allSatisfy { $0.facts.parentRunID == parents[0].runID.rawValue })
+    #expect(try DestinationSnapshotFile.read(from: wideSnap).lastOutcome == "success")
+    #expect(try DestinationSnapshotFile.read(from: narrowSnap).lastOutcome == "success")
     // Both obligations settled, so nothing is still owed for that batch.
     #expect(try store.transaction.pendingBatches().isEmpty)
 }
