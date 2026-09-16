@@ -5177,6 +5177,65 @@ private func anchorHoldFixture(
     #expect(try store.transaction.pendingBatches().isEmpty)
 }
 
+@Test func aTrailingReconcileRepairsEveryDestinationFromOneWindowRead() async throws {
+    let metric = MetricCatalog.heartRate.id
+    var older = heartSample("dddddddd-dddd-dddd-dddd-dddddddddddd")
+    older.start = "2023-12-20T10:00:00Z"
+    older.end = older.start
+    var recent = heartSample("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")
+    recent.start = "2024-01-01T10:00:00Z"
+    recent.end = recent.start
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-trailing-fanout-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let firstDir = root.appendingPathComponent("first")
+    let secondDir = root.appendingPathComponent("second")
+    for dir in [firstDir, secondDir] {
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    }
+    let observations = CountingFixtureDays(
+        byDay: [
+            "2023-12-20": [older],
+            "2024-01-01": [recent],
+        ]
+    )
+    let outcome = try await ReconcileSweep(
+        observations: observations,
+        destination: .testing(LocalFileSink(directory: firstDir)),
+        store: MemoryStateStore(),
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch"),
+        envelope: testEnvelope(),
+        destinations: [
+            RunDestination(
+                id: "first",
+                destination: .testing(LocalFileSink(directory: firstDir))
+            ),
+            RunDestination(
+                id: "second",
+                destination: .testing(LocalFileSink(directory: secondDir))
+            ),
+        ]
+    ).run(throughDay: "2024-01-01")
+    #expect(outcome.kind == .success)
+    // Seven trailing days, each observed once for both sinks. A sweep per sink
+    // would double that.
+    let dayReads = await observations.dayReads
+    #expect(dayReads == 7, "day reads: \(dayReads)")
+    func delivered(_ directory: URL) throws -> String {
+        try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "ndjson" }
+            .map { try String(contentsOf: $0, encoding: .utf8) }
+            .joined()
+    }
+    let first = try delivered(firstDir)
+    let second = try delivered(secondDir)
+    #expect(!first.contains(older.key.uuid))
+    #expect(first.contains(recent.key.uuid))
+    #expect(!second.contains(older.key.uuid))
+    #expect(second.contains(recent.key.uuid))
+}
+
 @Test func catchUpAdmissionStopsAtSixtyPercentOfCap() {
     let policy = QueuePolicy.production
     #expect(policy.catchUpLimit == policy.cap * 3 / 5)
