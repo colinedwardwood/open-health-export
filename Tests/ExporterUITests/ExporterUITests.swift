@@ -335,13 +335,15 @@ final class ExporterUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment["OHE_SEED_ANCHOR_HOLD"] = "heartRate"
         app.launch()
+        // The banner is on Status, under the first-run cover. Looking for it
+        // before Continue only sees disclosure identifiers.
+        enterControls()
 
         let banner = app.descendants(matching: .any)["anchor-hold-banner"]
         XCTAssertTrue(
             banner.waitForExistence(timeout: uiWait),
             "available identifiers: \(visibleIdentifiers())"
         )
-        enterControls()
         let explanation = scrollStatus(app.staticTexts["anchor-hold-explanation-0"])
         XCTAssertTrue(explanation.exists)
         XCTAssertTrue(explanation.label.contains("2026-09-08"), explanation.label)
@@ -1527,13 +1529,13 @@ final class ExporterUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment["OHE_SEED_ANCHOR_HOLD"] = "heartRate"
         app.launch()
+        enterControls()
         XCTAssertTrue(
             app.descendants(matching: .any)["anchor-hold-banner"]
                 .waitForExistence(timeout: uiWait),
             "available identifiers: \(visibleIdentifiers())"
         )
         try performAccessibilityAudit("anchor-hold-banner")
-        enterControls()
         _ = scrollStatus(app.staticTexts["anchor-hold-explanation-0"])
         try performAccessibilityAudit("anchor-hold-explanation")
     }
@@ -1895,15 +1897,18 @@ final class ExporterUITests: XCTestCase {
     /// On iPad the keyboard element stays in the hierarchy with an empty frame,
     /// parked below the screen, when the simulator is using the hardware keyboard.
     /// Nothing is drawn over the app and there is no candidate bar for an audit to
-    /// find, but asking XCTest for `keyboards.firstMatch` when the query is empty
-    /// fails the test instead of reporting that nothing is showing.
+    /// find. Resolving `keyboards.firstMatch` or `allElementsBoundByIndex` when the
+    /// query is empty fails the test (`No matches found for Descendants matching
+    /// type Keyboard`) instead of reporting that nothing is showing.
+    /// `waitForExistence` is the query that returns false on an empty match.
     private func visibleKeyboard() -> XCUIElement? {
+        let keyboard = app.keyboards.element(boundBy: 0)
+        guard keyboard.waitForExistence(timeout: 0) else { return nil }
         let window = app.windows.firstMatch.frame
-        return app.keyboards.allElementsBoundByIndex.first { keyboard in
-            keyboard.exists
-                && keyboard.frame.height > 1
-                && keyboard.frame.minY < window.maxY
+        guard keyboard.frame.height > 1, keyboard.frame.minY < window.maxY else {
+            return nil
         }
+        return keyboard
     }
 
     private func keyboardIsShowing() -> Bool {
