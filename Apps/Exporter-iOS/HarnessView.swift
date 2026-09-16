@@ -2115,7 +2115,7 @@ struct HarnessView: View {
         }
         #endif
         let unlocked = await LocalAuthenticationAdapter().authenticate(
-            reason: "Reveal the exact export payload stored on this iPhone."
+            reason: "Reveal the exact export payload stored on \(DeviceNoun.thisDevice)."
         )
         if unlocked {
             revealedHistoryIDs.insert(rowID)
@@ -2435,7 +2435,7 @@ struct HarnessView: View {
             Text(
                 browserDemoMode
                     ? "Demo values. This is what App Review sees without HealthKit history."
-                    : "Health values read on this iPhone."
+                    : "Health values read on \(DeviceNoun.thisDevice)."
             )
                 .font(.footnote)
                 .foregroundStyle(.primary)
@@ -2984,7 +2984,7 @@ struct HarnessView: View {
                 return "Ready. Backfill is paused while Low Power Mode is on."
             }
             if results.contains(CatchUpAdmission.thermalParkedJournalDetail) {
-                return "Ready. Backfill is paused while your iPhone cools down."
+                return "Ready. Backfill is paused while your \(DeviceNoun.current) cools down."
             }
             if results.contains(CatchUpAdmission.parkedJournalDetail) {
                 return "Ready. Backfill is paused until queued work drains."

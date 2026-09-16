@@ -3730,7 +3730,7 @@ enum HarnessExport {
             try DestinationSnapshotFile.recordSecurityEvents(
                 completed.events.count,
                 destinationID: "local-file",
-                destinationLabel: "This iPhone → Archive folder",
+                destinationLabel: "This \(DeviceNoun.current) → Archive folder",
                 writtenAtEpoch: Date().timeIntervalSince1970,
                 at: snapshotURL
             )

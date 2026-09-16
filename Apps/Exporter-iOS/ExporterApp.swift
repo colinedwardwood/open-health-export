@@ -1,12 +1,22 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import CoreDomain
 import SwiftUI
+import UIKit
 
 @main
 struct ExporterApp: App {
     @UIApplicationDelegateAdaptor(ExporterAppDelegate.self)
     private var appDelegate
+
+    init() {
+        // The same binary runs on both, and every piece of copy that names the
+        // device asks here rather than assuming a phone.
+        DeviceNoun.configure(
+            idiomIsPad: UIDevice.current.userInterfaceIdiom == .pad
+        )
+    }
 
     var body: some Scene {
         WindowGroup {

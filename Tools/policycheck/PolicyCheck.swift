@@ -2232,6 +2232,61 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck R-83 seams stay inside DEBUG: ok")
+        try checkDeviceNounInCopy(root: root)
+    }
+
+    /// The same binary runs on iPhone and iPad, so copy that names the device must
+    /// ask which one it is on. A hardcoded "iPhone" is wrong on an iPad about both
+    /// the device and whose Health data it is describing, and it is the kind of
+    /// wrong that reads as the app not knowing where it is running.
+    ///
+    /// Wire values and fixtures are exempt by path: a Home Assistant device model
+    /// and a synthetic corpus are contract data, not copy, and changing them with
+    /// the running device would break the receiver and the goldens.
+    static func checkDeviceNounInCopy(root: URL) throws {
+        let exempt = [
+            "Sources/WireFormat/",
+            "Sources/CompanionReceive/",
+            "Sources/CoreDomain/DeviceNoun.swift",
+            "Sources/MetricCatalog/HealthAvailability.swift",
+        ]
+        var hits: [String] = []
+        for directory in ["Sources", "Apps"] {
+            let base = root.appendingPathComponent(directory)
+            guard let files = FileManager.default.enumerator(
+                at: base,
+                includingPropertiesForKeys: nil
+            ) else { continue }
+            for case let file as URL in files where file.pathExtension == "swift" {
+                let relative = file.path.replacingOccurrences(of: root.path + "/", with: "")
+                if exempt.contains(where: { relative.hasPrefix($0) }) { continue }
+                let text = try String(contentsOf: file, encoding: .utf8)
+                for (number, line) in text.split(
+                    omittingEmptySubsequences: false,
+                    whereSeparator: \.isNewline
+                ).enumerated() {
+                    let trimmed = line.trimmingCharacters(in: .whitespaces)
+                    if trimmed.hasPrefix("//") || trimmed.hasPrefix("///") { continue }
+                    guard line.contains("\"") else { continue }
+                    if line.contains("iPhone") || line.contains("iPad") {
+                        hits.append("\(relative):\(number + 1): \(trimmed)")
+                    }
+                }
+            }
+        }
+        if !hits.isEmpty {
+            FileHandle.standardError.write(
+                Data(
+                    (
+                        "copy names a device instead of asking DeviceNoun:\n"
+                            + hits.joined(separator: "\n")
+                            + "\n"
+                    ).utf8
+                )
+            )
+            exit(1)
+        }
+        print("policycheck copy asks which device it is running on: ok")
     }
 
     static func withoutDebugCompilationBlocks(_ text: String) -> String {

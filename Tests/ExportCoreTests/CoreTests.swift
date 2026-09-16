@@ -4920,6 +4920,32 @@ private func anchorHoldFixture(
     #expect(payload.contains(recent.key.uuid))
 }
 
+/// Copy that names the device has to name the device the person is holding. The
+/// same binary runs on both, and an iPad reads its own Health store, so "this
+/// iPhone" on an iPad was wrong about the device and about whose data it meant.
+@Test func copyNamesTheDeviceItIsRunningOn() {
+    DeviceNoun.configure(idiomIsPad: false)
+    #expect(DeviceNoun.current == "iPhone")
+    #expect(DataFlowExplainer.title == "Where this iPhone sends health data")
+    #expect(DataBrowser.noDataCopy == "No data on this iPhone")
+    #expect(HealthAuthorizationPriming.title == "Next, iPhone will ask for permission")
+    #expect(CredentialDisclosure.copy.contains("only on this iPhone"))
+    DeviceNoun.configure(idiomIsPad: true)
+    #expect(DeviceNoun.current == "iPad")
+    #expect(DataFlowExplainer.title == "Where this iPad sends health data")
+    #expect(DataBrowser.noDataCopy == "No data on this iPad")
+    #expect(HealthAuthorizationPriming.title == "Next, iPad will ask for permission")
+    #expect(CredentialDisclosure.copy.contains("only on this iPad"))
+    #expect(
+        UserFacingErrorObject
+            .make(archetype: .healthLocked, destinationLabel: "Archive folder")
+            .cause
+            .hasPrefix("The iPad")
+    )
+    // Back to the default so this test cannot change what any other one reads.
+    DeviceNoun.configure(idiomIsPad: false)
+}
+
 /// A repair sweep is the same fan-out as an export, and its per-sink rows are
 /// what the harness writes each destination's status from. A sweep that reported
 /// only the destination it was constructed around left the others showing a

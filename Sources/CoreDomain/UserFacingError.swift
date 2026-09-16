@@ -179,14 +179,14 @@ public struct UserFacingErrorObject: Sendable, Equatable {
         case .tlsTrustFailure:
             return (
                 "Couldn't verify \(label)'s certificate",
-                "The server presented a certificate this iPhone does not trust. Self-signed and private-CA certificates are not trusted by default.",
+                "The server presented a certificate \(DeviceNoun.thisDevice) does not trust. Self-signed and private-CA certificates are not trusted by default.",
                 "Import the server's certificate and pin it here, or install a publicly trusted certificate on the server.",
                 [.editDestination, .testAgain]
             )
         case .certificateExpired:
             return (
                 "\(label)'s certificate has expired",
-                "The TLS certificate on the server is past its not-after date, so this iPhone refused the connection.",
+                "The TLS certificate on the server is past its not-after date, so \(DeviceNoun.thisDevice) refused the connection.",
                 "Renew the certificate on the server. If you use Caddy or Traefik, check that automatic renewal is still running.",
                 [.testAgain]
             )
@@ -259,7 +259,7 @@ public struct UserFacingErrorObject: Sendable, Equatable {
         case .healthLocked:
             return (
                 "Health data was locked",
-                "The iPhone must be unlocked for any app to read Health data. Access ends shortly after you lock it. This is an Apple restriction.",
+                "\(DeviceNoun.theDevice) must be unlocked for any app to read Health data. Access ends shortly after you lock it. This is an Apple restriction.",
                 "Nothing to change here. Export will continue after you unlock.",
                 [.testAgain]
             )

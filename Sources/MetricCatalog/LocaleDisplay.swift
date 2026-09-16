@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import CoreDomain
 import Foundation
 
 /// R-65: display units follow the region, per measurement family rather than per
@@ -96,7 +97,7 @@ public enum ClockDisplay: String, Sendable, Codable, CaseIterable {
 
     public var label: String {
         switch self {
-        case .system: "Follow this iPhone"
+        case .system: "Follow \(DeviceNoun.thisDevice)"
         case .twelveHour: "12-hour"
         case .twentyFourHour: "24-hour"
         }

@@ -240,7 +240,7 @@ extension DataSelectionReview {
 
 /// R-69 type list: catalogue rows with values when present, never a denial claim.
 public enum DataBrowser {
-    public static let noDataCopy = "No data on this iPhone"
+    public static var noDataCopy: String { "No data on \(DeviceNoun.thisDevice)" }
     /// HK-30: characteristics are identity-adjacent and off until the user enables them.
     public static let characteristicCopy =
         "Health characteristic. Off by default because it is re-identifying."
@@ -249,9 +249,10 @@ public enum DataBrowser {
     /// both causes and hand over the route to check, rather than claiming either one.
     public static let healthPathCopy =
         "Check in Health, under Sharing, then Apps."
-    public static let emptyDetailCopy =
-        "No samples for this type on this iPhone. Either there aren't any, or access is off in Health. "
+    public static var emptyDetailCopy: String {
+        "No samples for this type on \(DeviceNoun.thisDevice). Either there aren't any, or access is off in Health. "
             + healthPathCopy
+    }
     /// UX-05 third state: zero samples and no limited-window date. Neutral, not a warning.
     public static let nothingReturnedCopy =
         "Nothing returned. Either Health has no data for this type, or access is off. "

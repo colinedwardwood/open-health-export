@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import CoreDomain
 /// UX-45: the data-flow explainer is rendered from the person's actual
 /// destinations. Hosts, protocols, and credential *kinds* appear; secrets do not.
 public struct DataFlowHop: Sendable, Equatable, Identifiable {
@@ -26,14 +27,15 @@ public struct DataFlowHop: Sendable, Equatable, Identifiable {
 }
 
 public enum DataFlowExplainer {
-    public static let title = "Where this iPhone sends health data"
-    public static let source = "Apple Health on this iPhone"
+    public static var title: String { "Where \(DeviceNoun.thisDevice) sends health data" }
+    public static var source: String { "Apple Health on \(DeviceNoun.thisDevice)" }
     public static let transform =
         "This app transforms to JSON. Nothing stays after a successful send."
     public static let nowhereElse =
         "Nowhere else. No account. No analytics. No crash reporting."
-    public static let empty =
-        "No destinations yet. Health stays on this iPhone until you add one."
+    public static var empty: String {
+        "No destinations yet. Health stays on \(DeviceNoun.thisDevice) until you add one."
+    }
 
     public static func typeCountCopy(_ count: Int) -> String {
         if count <= 0 {
