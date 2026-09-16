@@ -825,6 +825,7 @@ enum HarnessExport {
 
         var lines: [String] = []
         var kinds: [RunOutcome.Kind] = []
+        var kindsByDestination: [String: [RunOutcome.Kind]] = [:]
         for (index, metric) in metrics.enumerated() {
             await onProgress?(index + 1, metrics.count)
             let primary = destinations[0]
@@ -855,15 +856,21 @@ enum HarnessExport {
                 deferForLowPower: isLowPowerDeferred(),
                 destinations: destinations
             )
-            let outcome = try await run.run()
+            let result = try await run.runFanout()
+            let outcome = result.outcome
             kinds.append(outcome.kind)
             for destination in destinations {
+                // A destination answers for itself. Reporting the combined outcome
+                // against every sink told people a working archive folder had
+                // failed because an unrelated server was unreachable.
+                let own = result.kind(for: destination.id) ?? outcome.kind
+                kindsByDestination[destination.id, default: []].append(own)
                 await notifyIfFailed(
-                    outcome,
+                    own,
                     destinationID: destination.id,
                     destinationLabel: destinationLabel(destination.id)
                 )
-                if (outcome.kind == .success || outcome.kind == .successNothingDue),
+                if own == .success || own == .successNothingDue,
                    let snapshotURL = destination.snapshotURL {
                     await rescheduleOverdueNotification(snapshotURL: snapshotURL)
                 }
@@ -936,7 +943,12 @@ enum HarnessExport {
             if let snapshotURL = StatusSnapshotLocation.url(destinationID: destinationID),
                var snapshot = try? DestinationSnapshotFile.read(from: snapshotURL)
             {
-                snapshot.applyLastOutcome(combined.rawValue)
+                // This destination's own results across the types it was owed. A
+                // sink with no results of its own — one this trigger could only
+                // queue for — keeps the run's combined outcome, because nothing
+                // was attempted against it to say otherwise.
+                let own = kindsByDestination[destinationID].map(CombinedExportSummary.kind)
+                snapshot.applyLastOutcome((own ?? combined).rawValue)
                 snapshot.writtenAtEpoch = Date().timeIntervalSince1970
                 try DestinationSnapshotFile.write(snapshot, to: snapshotURL)
             }
@@ -1041,7 +1053,7 @@ enum HarnessExport {
             deferForLowPower: isLowPowerDeferred()
         ).run(throughDay: String(envelope.emittedAt.prefix(10)))
         await notifyIfFailed(
-            reconciled,
+            reconciled.kind,
             destinationID: destinationID,
             destinationLabel: destinationLabel
         )
@@ -1060,11 +1072,11 @@ enum HarnessExport {
     }
 
     private static func notifyIfFailed(
-        _ outcome: RunOutcome,
+        _ kind: RunOutcome.Kind,
         destinationID: String,
         destinationLabel: String
     ) async {
-        guard outcome.kind == .failed else { return }
+        guard kind == .failed else { return }
         await notifyDestinationFailure(
             destinationID: destinationID,
             destinationLabel: destinationLabel
@@ -1199,7 +1211,8 @@ enum HarnessExport {
             }
             guard !covering.isEmpty else { continue }
             await onProgress?(index + 1, owed.count)
-            let outcome = try await ReconcileSweep(
+            let rows = DestinationRowCollector()
+            var sweep = ReconcileSweep(
                 observations: observations,
                 destination: covering[0].destination,
                 store: store,
@@ -1224,10 +1237,14 @@ enum HarnessExport {
                 freshnessCadenceSeconds: freshnessCadenceSeconds(),
                 deferForLowPower: isLowPowerDeferred(),
                 destinations: covering
-            ).runFullHistory(throughDay: String(now.prefix(10)))
+            )
+            sweep.rowCollector = rows
+            let outcome = try await sweep.runFullHistory(throughDay: String(now.prefix(10)))
+            let reported = await rows.rows()
             for destination in covering {
+                // A repair that failed for one sink is not news about the others.
                 await notifyIfFailed(
-                    outcome,
+                    DestinationRunRow.kind(for: destination.id, in: reported) ?? outcome.kind,
                     destinationID: destination.id,
                     destinationLabel: destinationLabel(destination.id)
                 )
@@ -1495,7 +1512,8 @@ enum HarnessExport {
         guard !owed.isEmpty else { return .successNothingDue }
         // The gap is a range of days, not a destination's problem: read it once and
         // re-export it to everyone who was owed it.
-        let outcome = try await ReconcileSweep(
+        let rows = DestinationRowCollector()
+        var sweep = ReconcileSweep(
             observations: HealthKitDayObservationSource(
                 context: context,
                 limit: samplePageLimit()
@@ -1523,10 +1541,13 @@ enum HarnessExport {
             freshnessCadenceSeconds: freshnessCadenceSeconds(),
             deferForLowPower: isLowPowerDeferred(),
             destinations: owed
-        ).run(gap: gap)
+        )
+        sweep.rowCollector = rows
+        let outcome = try await sweep.run(gap: gap)
+        let reported = await rows.rows()
         for destination in owed {
             await notifyIfFailed(
-                outcome,
+                DestinationRunRow.kind(for: destination.id, in: reported) ?? outcome.kind,
                 destinationID: destination.id,
                 destinationLabel: destinationLabel(destination.id)
             )
@@ -1647,7 +1668,7 @@ enum HarnessExport {
             )
             let outcome = try await run.run()
             await notifyIfFailed(
-                outcome,
+                outcome.kind,
                 destinationID: "companion",
                 destinationLabel: "Mac companion"
             )
@@ -2795,7 +2816,7 @@ enum HarnessExport {
             deferForLowPower: isLowPowerDeferred()
             ).run()
             await notifyIfFailed(
-                outcome,
+                outcome.kind,
                 destinationID: "mqtt",
                 destinationLabel: "MQTT destination"
             )
@@ -2984,7 +3005,7 @@ enum HarnessExport {
             deferForLowPower: isLowPowerDeferred()
             ).run()
             await notifyIfFailed(
-                outcome,
+                outcome.kind,
                 destinationID: destinationID,
                 destinationLabel: destinationLabel
             )

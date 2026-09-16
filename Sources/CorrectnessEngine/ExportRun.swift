@@ -40,13 +40,58 @@ public struct RunDestination: Sendable {
 }
 
 /// What one destination did with a read, for the history row that hangs under it.
-struct DestinationRunRow: Sendable {
-    var destinationID: String
-    var outcomeKind: String
-    var detail: String
-    var expectedRecords: Int
-    var acceptedRecords: Int
-    var errorClass: String?
+public struct DestinationRunRow: Sendable {
+    public var destinationID: String
+    public var outcomeKind: String
+    public var detail: String
+    public var expectedRecords: Int
+    public var acceptedRecords: Int
+    public var errorClass: String?
+
+    /// What one sink did, if this run has anything to say about it. A sink this
+    /// trigger could only queue for is absent: nothing was attempted, so its last
+    /// result still stands.
+    public static func kind(
+        for destinationID: String,
+        in rows: [DestinationRunRow]
+    ) -> RunOutcome.Kind? {
+        guard let row = rows.first(where: { $0.destinationID == destinationID })
+        else { return nil }
+        return RunOutcome.Kind(rawValue: row.outcomeKind)
+    }
+}
+
+/// One read's result: what the run as a whole did, and what each sink did with it.
+///
+/// The run's own outcome is the combination across sinks, which is what a caller
+/// reports to the person who asked for the export. A destination's *status* is its
+/// own row: attributing the combined outcome to every sink told someone their
+/// working archive folder had failed because an unrelated server was unreachable.
+/// Sinks this trigger could only queue for have no row, because nothing was
+/// attempted for them and their last result still stands.
+public struct FanoutRunResult: Sendable {
+    public let outcome: RunOutcome
+    public let destinations: [DestinationRunRow]
+
+    public func kind(for destinationID: String) -> RunOutcome.Kind? {
+        DestinationRunRow.kind(for: destinationID, in: destinations)
+    }
+}
+
+/// Carries the per-destination rows out of a run without changing what the run
+/// returns, so every existing caller and every early return stays as it was.
+public actor DestinationRowCollector {
+    private var stored: [DestinationRunRow] = []
+
+    public init() {}
+
+    func record(_ rows: [DestinationRunRow]) {
+        stored = rows
+    }
+
+    public func rows() -> [DestinationRunRow] {
+        stored
+    }
 }
 
 public struct ExportRun: Sendable {
@@ -141,6 +186,17 @@ public struct ExportRun: Sendable {
         self.freshnessCadenceSeconds = freshnessCadenceSeconds
         self.deferForLowPower = deferForLowPower
         self.persistHistoryPayload = persistHistoryPayload
+    }
+
+    var rowCollector: DestinationRowCollector?
+
+    /// The same run, with each sink's own result alongside the combined outcome.
+    public func runFanout() async throws -> FanoutRunResult {
+        let collector = DestinationRowCollector()
+        var run = self
+        run.rowCollector = collector
+        let outcome = try await run.run()
+        return FanoutRunResult(outcome: outcome, destinations: await collector.rows())
     }
 
     public func run() async throws -> RunOutcome {
@@ -534,6 +590,16 @@ public struct ExportRun: Sendable {
             ackEvidenceStatusOnly: statusOnly,
             partialCause: tally.partialCause
         )
+        let children = destinationRows(
+            owed: owed,
+            expectedByDestination: expectedByDestination,
+            receipts: receipts,
+            failures: failures,
+            fallbackExpected: recordCount
+        )
+        // Each sink's own result, so a caller can report a destination's status as
+        // its own rather than as the combination of every sink's.
+        await rowCollector?.record(children)
         try await record(
             outcome: outcome,
             tally: journalTally,
@@ -542,13 +608,7 @@ public struct ExportRun: Sendable {
             startedAt: startedAt,
             timings: timings,
             pending: pending,
-            children: destinationRows(
-                owed: owed,
-                expectedByDestination: expectedByDestination,
-                receipts: receipts,
-                failures: failures,
-                fallbackExpected: recordCount
-            )
+            children: children
         )
         for settlement in releasedPayloads {
             FanoutObligation.unlink(settlement)

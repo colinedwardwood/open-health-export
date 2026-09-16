@@ -4920,6 +4920,72 @@ private func anchorHoldFixture(
     #expect(payload.contains(recent.key.uuid))
 }
 
+/// One sink's transport failure must not be reported against a sink that
+/// succeeded. Attributing the run's combined outcome to every destination told
+/// people a working archive folder had failed because a server was unreachable.
+@Test func aFailingDestinationDoesNotMakeAHealthyOneLookFailed() async throws {
+    let metric = MetricCatalog.heartRate.id
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-attribution-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let goodDir = root.appendingPathComponent("good")
+    try FileManager.default.createDirectory(at: goodDir, withIntermediateDirectories: true)
+    let store = MemoryStateStore()
+    let run = ExportRun(
+        source: FixtureSource(
+            pages: [
+                SamplePage(
+                    samples: [heartSample("cccccccc-cccc-cccc-cccc-cccccccccccc")],
+                    tombstones: [],
+                    metric: metric,
+                    anchorBlob: Data([0xC1]),
+                    observedThrough: Date(timeIntervalSince1970: 0)
+                ),
+            ]
+        ),
+        destination: .testing(LocalFileSink(directory: goodDir)),
+        store: store,
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch"),
+        destinationName: "good",
+        envelope: testEnvelope(),
+        destinations: [
+            RunDestination(
+                id: "good",
+                destination: .testing(LocalFileSink(directory: goodDir))
+            ),
+            RunDestination(
+                id: "unreachable",
+                destination: .testing(ThrowingSink(error: .destinationUnreachable))
+            ),
+        ]
+    )
+    let result = try await run.runFanout()
+    // The run as a whole is not clean, and says so to whoever asked for it.
+    #expect(
+        result.outcome.kind == RunOutcome.Kind.partial
+            || result.outcome.kind == RunOutcome.Kind.failed
+    )
+    // Each sink answers for itself.
+    #expect(result.kind(for: "good") == .success)
+    #expect(result.kind(for: "unreachable") == .failed)
+    let rows = result.destinations
+    #expect(rows.first { $0.destinationID == "unreachable" }?.errorClass != nil)
+    #expect(rows.first { $0.destinationID == "good" }?.errorClass == nil)
+    // The failed sink keeps its obligation, so the batch is still owed to it.
+    let owed = try store.transaction.pendingDeliveries(
+        destinationID: DestinationID(rawValue: "unreachable"),
+        limit: 10
+    )
+    #expect(owed.count == 1)
+    #expect(
+        try store.transaction.pendingDeliveries(
+            destinationID: DestinationID(rawValue: "good"),
+            limit: 10
+        ).isEmpty
+    )
+}
+
 @Test func aFullReconcileRepairsEveryDestinationFromOneHistoryRead() async throws {
     let metric = MetricCatalog.heartRate.id
     var old = heartSample("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")

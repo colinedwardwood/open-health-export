@@ -43,6 +43,9 @@ public struct ReconcileSweep: Sendable {
     /// it; sweeping per sink would read the same history N times and let the sinks
     /// disagree about which observation they were repaired from.
     public var destinations: [RunDestination]
+    /// Set to read what each sink did with the repair, so a caller can report a
+    /// destination's status as its own rather than as the combined result.
+    public var rowCollector: DestinationRowCollector?
 
     public init(
         observations: any DayObservationSource,
@@ -402,6 +405,7 @@ public struct ReconcileSweep: Sendable {
         var receipts: [(RunDestination, DeliveryReceipt)] = []
         var expectedOfAttempts = 0
         var firstError: DestinationSendError?
+        var failures: [String: DestinationSendError] = [:]
         for dest in attempting {
             let expected = expectedByDestination[dest.id] ?? recordCount
             expectedOfAttempts += expected
@@ -420,6 +424,7 @@ public struct ReconcileSweep: Sendable {
                 terminalError = error.errorClass
                 partialCause = error.errorClass.rawValue
                 firstError = firstError ?? error
+                failures[dest.id] = error
             }
         }
         // A repair nobody could attempt in this context is not a repair that
@@ -439,7 +444,14 @@ public struct ReconcileSweep: Sendable {
             tally.partialCause = "receipt_short"
         }
         let outcome = RunOutcome.derive(from: tally)
-        try await record(outcome: outcome, tally: tally, receipts: receipts)
+        try await record(
+            outcome: outcome,
+            tally: tally,
+            receipts: receipts,
+            owed: owed,
+            failures: failures,
+            expectedByDestination: expectedByDestination
+        )
         if let firstError, receipts.isEmpty, attempting.count == 1 {
             // A single-sink sweep still surfaces its transport failure to the caller
             // exactly as it always has.
@@ -471,6 +483,62 @@ public struct ReconcileSweep: Sendable {
             throw error
         }
         return matching
+    }
+
+    /// What each sink did with this repair. A sink that was attempted and failed is
+    /// reported as failed against itself; only a sink this context could not attempt
+    /// is still owed the repair.
+    private func destinationRows(
+        owed: [RunDestination],
+        receipts: [(RunDestination, DeliveryReceipt)],
+        failures: [String: DestinationSendError],
+        expectedByDestination: [String: Int],
+        fallbackExpected: Int
+    ) -> [DestinationRunRow] {
+        let accepted = Dictionary(
+            receipts.map { ($0.0.id, $0.1) },
+            uniquingKeysWith: { _, latest in latest }
+        )
+        return owed.map { dest in
+            let expected = expectedByDestination[dest.id] ?? fallbackExpected
+            if let error = failures[dest.id] {
+                return DestinationRunRow(
+                    destinationID: dest.id,
+                    outcomeKind: RunOutcome.Kind.failed.rawValue,
+                    detail: error.errorClass.rawValue,
+                    expectedRecords: expected,
+                    acceptedRecords: 0,
+                    errorClass: error.errorClass.rawValue
+                )
+            }
+            guard let receipt = accepted[dest.id] else {
+                return DestinationRunRow(
+                    destinationID: dest.id,
+                    outcomeKind: RunEvent.queuedOutcomeKind,
+                    detail: "",
+                    expectedRecords: expected,
+                    acceptedRecords: 0,
+                    errorClass: nil
+                )
+            }
+            let own = RunOutcome.derive(
+                from: RunTally(
+                    read: expected,
+                    committed: expected,
+                    acked: receipt.accepted,
+                    unconfirmed: receipt.unconfirmed,
+                    ackEvidenceStatusOnly: receipt.statusOnly
+                )
+            )
+            return DestinationRunRow(
+                destinationID: dest.id,
+                outcomeKind: own.kind.rawValue,
+                detail: own.partialCause ?? "",
+                expectedRecords: expected,
+                acceptedRecords: receipt.accepted,
+                errorClass: nil
+            )
+        }
     }
 
     private func permits(day: String, scope: DestinationExportScope?) -> Bool {
@@ -570,10 +638,21 @@ public struct ReconcileSweep: Sendable {
     private func record(
         outcome: RunOutcome,
         tally: RunTally,
-        receipts: [(RunDestination, DeliveryReceipt)]
+        receipts: [(RunDestination, DeliveryReceipt)],
+        owed: [RunDestination] = [],
+        failures: [String: DestinationSendError] = [:],
+        expectedByDestination: [String: Int] = [:]
     ) async throws {
         let nowEpoch = clock.now().timeIntervalSince1970
         let parentRunID = RunID(rawValue: "reconcile-\(metric.rawValue)")
+        let rows = destinationRows(
+            owed: owed.isEmpty ? destinations : owed,
+            receipts: receipts,
+            failures: failures,
+            expectedByDestination: expectedByDestination,
+            fallbackExpected: tally.committed
+        )
+        await rowCollector?.record(rows)
         var settlements: [DeliverySettlement] = []
         try await store.transact { tx in
             for (dest, receipt) in receipts {
@@ -602,30 +681,21 @@ public struct ReconcileSweep: Sendable {
             )
             // A repair that fanned out says what each sink did with it, under one
             // parent row. A lone sink keeps the flat single row it always had.
-            if destinations.count > 1 {
-                let accepted = Dictionary(
-                    receipts.map { ($0.0.id, $0.1) },
-                    uniquingKeysWith: { _, latest in latest }
-                )
-                for dest in destinations {
-                    let receipt = accepted[dest.id]
+            if rows.count > 1 {
+                for row in rows {
                     try tx.appendJournal(
                         RunEvent(
-                            runID: RunID(rawValue: "\(parentRunID.rawValue)-\(dest.id)"),
-                            outcomeKind: receipt == nil
-                                ? RunEvent.queuedOutcomeKind
-                                : outcome.kind.rawValue,
-                            detail: receipt == nil ? "" : (outcome.partialCause ?? ""),
+                            runID: RunID(rawValue: "\(parentRunID.rawValue)-\(row.destinationID)"),
+                            outcomeKind: row.outcomeKind,
+                            detail: row.detail,
                             trigger: trigger,
-                            samplesRead: tally.read,
-                            samplesCommitted: tally.committed,
-                            samplesAcked: receipt?.accepted ?? 0,
+                            samplesRead: row.expectedRecords,
+                            samplesCommitted: row.expectedRecords,
+                            samplesAcked: row.acceptedRecords,
                             wallTimeEpoch: nowEpoch,
-                            errorClass: receipt == nil
-                                ? nil
-                                : (tally.terminalError == .none ? nil : tally.terminalError.rawValue),
+                            errorClass: row.errorClass,
                             facts: RunHistoryFacts(
-                                destinationID: dest.id,
+                                destinationID: row.destinationID,
                                 metric: metric.rawValue,
                                 parentRunID: parentRunID.rawValue
                             )
