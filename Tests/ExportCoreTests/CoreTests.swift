@@ -5001,6 +5001,18 @@ private func anchorHoldFixture(
     defer { try? FileManager.default.removeItem(at: root) }
     let goodDir = root.appendingPathComponent("good")
     try FileManager.default.createDirectory(at: goodDir, withIntermediateDirectories: true)
+    let goodSnap = root.appendingPathComponent("good-status.json")
+    let badSnap = root.appendingPathComponent("bad-status.json")
+    for (id, url) in [("good", goodSnap), ("unreachable", badSnap)] {
+        try DestinationSnapshotFile.write(
+            DestinationStatusSnapshot(
+                destinationID: id,
+                enabled: true,
+                writtenAtEpoch: 1
+            ),
+            to: url
+        )
+    }
     let store = MemoryStateStore()
     let run = ExportRun(
         source: FixtureSource(
@@ -5020,14 +5032,17 @@ private func anchorHoldFixture(
         scratchDirectory: root.appendingPathComponent("scratch"),
         destinationName: "good",
         envelope: testEnvelope(),
+        snapshotURL: goodSnap,
         destinations: [
             RunDestination(
                 id: "good",
-                destination: .testing(LocalFileSink(directory: goodDir))
+                destination: .testing(LocalFileSink(directory: goodDir)),
+                snapshotURL: goodSnap
             ),
             RunDestination(
                 id: "unreachable",
-                destination: .testing(ThrowingSink(error: .destinationUnreachable))
+                destination: .testing(ThrowingSink(error: .destinationUnreachable)),
+                snapshotURL: badSnap
             ),
         ]
     )
@@ -5043,6 +5058,11 @@ private func anchorHoldFixture(
     let rows = result.destinations
     #expect(rows.first { $0.destinationID == "unreachable" }?.errorClass != nil)
     #expect(rows.first { $0.destinationID == "good" }?.errorClass == nil)
+    // Status files answer for each sink, not the combined run. Writing the
+    // combined outcome onto the primary snapshot made a working archive folder
+    // look failed for the rest of a long export.
+    #expect(try DestinationSnapshotFile.read(from: goodSnap).lastOutcome == "success")
+    #expect(try DestinationSnapshotFile.read(from: badSnap).lastOutcome == "failed")
     // The failed sink keeps its obligation, so the batch is still owed to it.
     let owed = try store.transaction.pendingDeliveries(
         destinationID: DestinationID(rawValue: "unreachable"),
