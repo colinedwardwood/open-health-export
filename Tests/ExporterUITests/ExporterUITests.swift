@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import UIKit
 import XCTest
 
 @MainActor
@@ -52,7 +53,7 @@ final class ExporterUITests: XCTestCase {
         )
         XCTAssertEqual(
             emptyFlow.label,
-            "No destinations yet. Health stays on this iPhone until you add one."
+            "No destinations yet. Health stays on \(thisDeviceNoun) until you add one."
         )
         XCTAssertEqual(
             app.staticTexts["data-flow-nowhere-else"].label,
@@ -1671,7 +1672,7 @@ final class ExporterUITests: XCTestCase {
             } else if issue.element == nil,
                       self.app.windows.firstMatch.frame.width >= 700,
                       Self.iPadUnhostedTextStates.contains(state),
-                      String(describing: issue).contains("Potentially inaccessible text")
+                      self.iPadUnhostedIssueMatches(issue)
             {
                 cause = "iPadUnhostedPotentiallyInaccessibleText"
             } else {
@@ -1783,14 +1784,27 @@ final class ExporterUITests: XCTestCase {
         "iPadUnhostedPotentiallyInaccessibleText": trackingIssue,
     ]
 
-    /// iPadOS 26.5 sometimes returns a text-detection audit finding with no
-    /// `XCUIElement`, despite the queried SwiftUI controls being present in the
-    /// accessibility tree. Keep this exception restricted to the two reproduced
+    /// iPadOS 26.5 sometimes returns a text-detection or clipped-text audit finding
+    /// with no `XCUIElement`, despite the queried SwiftUI controls being present in
+    /// the accessibility tree. Keep this exception restricted to the reproduced
     /// states instead of suppressing unattributed text findings globally.
     private static let iPadUnhostedTextStates: Set<String> = [
         "public-destination-confirmation",
         "diagnostic-preview-share-warning",
+        "pseudo-destinations",
+        "pseudo-history",
     ]
+
+    private func iPadUnhostedIssueMatches(_ issue: XCUIAccessibilityAuditIssue) -> Bool {
+        let description = String(describing: issue)
+        return description.contains("Potentially inaccessible text")
+            || description.contains("Text clipped")
+    }
+
+    /// The noun the running simulator actually is. Copy uses DeviceNoun the same way.
+    private var thisDeviceNoun: String {
+        UIDevice.current.userInterfaceIdiom == .pad ? "this iPad" : "this iPhone"
+    }
 
     /// The floating tab bar fades content above its own frame, and the navigation
     /// bar (including large-title / scroll-edge material) fades a taller band below
@@ -1816,9 +1830,12 @@ final class ExporterUITests: XCTestCase {
         // tapping again, not by waiting longer for a keyboard that is not coming.
         for _ in 0 ..< 3 {
             field.tap()
-            if app.keyboards.element.waitForExistence(timeout: min(10, uiWait)) { break }
+            if app.keyboards.firstMatch.waitForExistence(timeout: min(10, uiWait)) { break }
         }
-        XCTAssertTrue(app.keyboards.element.exists, "keyboard never appeared for \(field.identifier)")
+        XCTAssertTrue(
+            app.keyboards.firstMatch.exists,
+            "keyboard never appeared for \(field.identifier)"
+        )
         field.typeText(text)
     }
 
@@ -1848,7 +1865,7 @@ final class ExporterUITests: XCTestCase {
         }
         // The keyboard can go away on its own between any two of these attempts, and
         // acting on one that has already gone is a hard failure rather than a no-op.
-        let keyboard = app.keyboards.element
+        let keyboard = app.keyboards.firstMatch
         if keyboardIsShowing() {
             keyboard.swipeDown()
         }
@@ -1870,7 +1887,7 @@ final class ExporterUITests: XCTestCase {
     /// find, but asking to dismiss it fails outright: a swipe on an element with an
     /// empty visible frame is an error, not a no-op.
     private func keyboardIsShowing() -> Bool {
-        let keyboard = app.keyboards.element
+        let keyboard = app.keyboards.firstMatch
         guard keyboard.exists else { return false }
         let frame = keyboard.frame
         return frame.height > 0 && frame.minY < app.windows.firstMatch.frame.maxY
@@ -1883,7 +1900,7 @@ final class ExporterUITests: XCTestCase {
                 for: [
                     XCTNSPredicateExpectation(
                         predicate: NSPredicate(format: "exists == false"),
-                        object: app.keyboards.element
+                        object: app.keyboards.firstMatch
                     ),
                 ],
                 timeout: 0.5

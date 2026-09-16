@@ -710,10 +710,10 @@ struct HarnessView: View {
                         .font(.headline)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(IPadExporterNotice.body)
-                        .font(.footnote)
+                        .font(.body)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .accessibilityElement(children: .combine)
+                .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("ipad-only-exporter")
             }
 
@@ -1074,6 +1074,8 @@ struct HarnessView: View {
             Button("Refresh destination status") {
                 refreshDestinationSurfaces()
             }
+            .font(.body)
+            .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("destination-refresh")
             if destinationSnapshots.isEmpty {
                 Text(destinationStatusLines.first ?? DestinationStatusLine.emptyCopy)
@@ -1634,10 +1636,12 @@ struct HarnessView: View {
             .accessibilityIdentifier("history-load")
             if historyEvents.isEmpty {
                 ForEach(Array(historyLines.enumerated()), id: \.offset) { index, line in
-                    selectableMonospaceLine(
-                        line,
-                        identifier: "history-row-\(index)"
-                    )
+                    Text(line)
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityIdentifier("history-row-\(index)")
                 }
             } else {
                 Text(RunHistoryDetail.retentionCopy)
@@ -1822,27 +1826,20 @@ struct HarnessView: View {
                         )
                     }
                     if !json.isEmpty {
-                        // One line per view, like the summary lines above, which have
-                        // never been reported as clipped. A single view holding the
-                        // whole bundle was: hundreds of lines of JSON is not text a
-                        // layout can be trusted to fit, and long tokens carry no
-                        // spaces to wrap at, so break opportunities are added too.
-                        ForEach(
-                            Array(DiagnosticPreviewLayout.displayLines(json).enumerated()),
-                            id: \.offset
-                        ) { index, line in
-                            Text(line)
-                                .font(.system(.body, design: .monospaced))
-                                .foregroundStyle(.primary)
-                                .lineLimit(nil)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .accessibilityIdentifier(
-                                    index == 0
-                                        ? "diagnostic-preview-json"
-                                        : "diagnostic-preview-json-\(index)"
-                                )
-                        }
+                        // One wrapping view, not one view per brace: a padded row whose
+                        // only glyphs are spaces and `}` failed the contrast audit, and
+                        // one viewport-tall unwrapped token failed the clip audit. Break
+                        // opportunities live in the string; the view is ordinary body
+                        // text on a light field so Dynamic Type and contrast both apply.
+                        Text(DiagnosticPreviewLayout.wrappable(json))
+                            .font(.body)
+                            .foregroundStyle(.black)
+                            .lineLimit(nil)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(8)
+                            .background(Color.white)
+                            .accessibilityIdentifier("diagnostic-preview-json")
                     }
                 }
                 // S9: the share affordance exists only past the last line of content, so
