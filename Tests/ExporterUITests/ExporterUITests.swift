@@ -1833,15 +1833,21 @@ final class ExporterUITests: XCTestCase {
                     name
                 )
             ).firstMatch
-            if key.waitForExistence(timeout: 1), key.isHittable {
+            if key.waitForExistence(timeout: 1), key.isHittable, keyboardIsShowing() {
                 key.tap()
                 if keyboardIsGone() { return }
             }
         }
+        // The keyboard can go away on its own between any two of these attempts, and
+        // acting on one that has already gone is a hard failure rather than a no-op.
         let keyboard = app.keyboards.element
-        keyboard.swipeDown()
+        if keyboardIsShowing() {
+            keyboard.swipeDown()
+        }
         if keyboardIsGone() { return }
-        keyboard.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.88)).tap()
+        if keyboardIsShowing() {
+            keyboard.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.88)).tap()
+        }
         if keyboardIsGone() { return }
         app.navigationBars.firstMatch.tap()
         XCTAssertTrue(

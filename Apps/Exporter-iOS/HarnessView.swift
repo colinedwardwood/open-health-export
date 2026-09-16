@@ -1822,13 +1822,26 @@ struct HarnessView: View {
                         )
                     }
                     if !json.isEmpty {
-                        Text(json)
-                            .font(.system(.body, design: .monospaced))
-                            .foregroundStyle(.primary)
-                            .lineLimit(nil)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .accessibilityIdentifier("diagnostic-preview-json")
+                        // JSON has no spaces inside a token, so a long path or value
+                        // had nowhere to wrap and its tail was clipped instead. The
+                        // preview now carries break opportunities and arrives in
+                        // bounded pieces rather than as one view holding the bundle.
+                        ForEach(
+                            Array(DiagnosticPreviewLayout.displayChunks(json).enumerated()),
+                            id: \.offset
+                        ) { index, chunk in
+                            Text(chunk)
+                                .font(.system(.body, design: .monospaced))
+                                .foregroundStyle(.primary)
+                                .lineLimit(nil)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .accessibilityIdentifier(
+                                    index == 0
+                                        ? "diagnostic-preview-json"
+                                        : "diagnostic-preview-json-\(index)"
+                                )
+                        }
                     }
                 }
                 // S9: the share affordance exists only past the last line of content, so

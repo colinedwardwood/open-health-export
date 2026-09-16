@@ -804,6 +804,43 @@ private struct HealthDataRestrictedSource: SampleSource {
     #expect(gate.sharePayload == payload)
 }
 
+@Test func diagnosticPreviewGivesLongJSONTokensSomewhereToWrap() {
+    // A path this long has no space in it, so a text view had nowhere legal to break
+    // and clipped the rest. Hosted CI saw that and this machine did not, because it
+    // depends on what the bundle happened to contain.
+    let json = """
+    {
+      "schema" : "ohe.diagnostic\\/1",
+      "path" : "\(String(repeating: "abcdefghij", count: 12))",
+      "short" : 1
+    }
+    """
+    let laid = DiagnosticPreviewLayout.wrappable(json)
+    let zeroWidth = DiagnosticPreviewLayout.breakOpportunity
+    #expect(laid.contains(zeroWidth))
+    // Nothing but break opportunities is added, so the text still says the same thing.
+    #expect(laid.replacingOccurrences(of: zeroWidth, with: "") == json)
+    for line in laid.split(separator: "\n") {
+        for run in line.components(separatedBy: zeroWidth) {
+            let unbroken = run.split(whereSeparator: \.isWhitespace).map(\.count).max() ?? 0
+            #expect(unbroken <= 24, "unbroken run of \(unbroken)")
+        }
+    }
+    // Short lines are left exactly as they were.
+    #expect(laid.contains("\"short\" : 1"))
+}
+
+@Test func diagnosticPreviewArrivesInBoundedPieces() {
+    let json = (1 ... 95).map { "  \"run\($0)\" : \($0)," }.joined(separator: "\n")
+    let chunks = DiagnosticPreviewLayout.chunks(json, linesPerChunk: 20)
+    #expect(chunks.count == 5)
+    #expect(chunks.allSatisfy { $0.split(separator: "\n", omittingEmptySubsequences: false).count <= 20 })
+    // Every line survives, in order, with nothing inserted between the pieces.
+    #expect(chunks.joined(separator: "\n") == json)
+    #expect(DiagnosticPreviewLayout.chunks("").isEmpty == false)
+    #expect(DiagnosticPreviewLayout.displayChunks(json).count == 5)
+}
+
 @Test func diagnosticBundleRejectsContentAboveHardCap() {
     let event = RunEvent(
         runID: RunID(rawValue: "r"),
