@@ -741,18 +741,33 @@ enum HarnessExport {
 
         var destinations: [RunDestination] = []
         var traceparentEmissions: [(String, TraceparentEmission)] = []
+        var unreconstructed: [String: ErrorClass] = [:]
         for destinationID in plannedIDs {
-            if let (destination, emission) = try? await makeAutomaticRunDestination(
-                destinationID,
-                trigger: trigger,
-                root: root,
-                folderAccess: folderAccess
-            ) {
+            do {
+                let (destination, emission) = try await makeAutomaticRunDestination(
+                    destinationID,
+                    trigger: trigger,
+                    root: root,
+                    folderAccess: folderAccess
+                )
                 destinations.append(destination)
                 if let emission {
                     traceparentEmissions.append((destinationID, emission))
                 }
+            } catch {
+                // An enabled destination whose configuration or credential can no
+                // longer be rebuilt is not exporting, and saying nothing would let
+                // the other destinations' success stand in for it.
+                unreconstructed[destinationID] =
+                    (error as? DestinationSendError)?.errorClass ?? .internalFault
             }
+        }
+        for (destinationID, errorClass) in unreconstructed.sorted(by: { $0.key < $1.key }) {
+            recordDestinationFailureSnapshot(destinationID, errorClass: errorClass)
+            await notifyDestinationFailure(
+                destinationID: destinationID,
+                destinationLabel: destinationLabel(destinationID)
+            )
         }
         guard !destinations.isEmpty else {
             return ["blocked: No destination could be reconstructed for this export."]
@@ -917,7 +932,7 @@ enum HarnessExport {
             destinationLabel: destinationLabel(destinations[0].id)
         )
         let combined = CombinedExportSummary.kind(kinds)
-        for destinationID in plannedIDs {
+        for destinationID in plannedIDs where unreconstructed[destinationID] == nil {
             if let snapshotURL = StatusSnapshotLocation.url(destinationID: destinationID),
                var snapshot = try? DestinationSnapshotFile.read(from: snapshotURL)
             {
@@ -925,6 +940,9 @@ enum HarnessExport {
                 snapshot.writtenAtEpoch = Date().timeIntervalSince1970
                 try DestinationSnapshotFile.write(snapshot, to: snapshotURL)
             }
+        }
+        for destinationID in unreconstructed.keys.sorted() {
+            lines.append("\(destinationID): configuration could not be rebuilt for this export")
         }
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
         lines.insert(CombinedExportSummary.copy(kinds), at: 0)
@@ -1051,6 +1069,22 @@ enum HarnessExport {
             destinationID: destinationID,
             destinationLabel: destinationLabel
         )
+    }
+
+    /// Marks one destination's own status as failed, for the case where the run
+    /// never reached it: its last outcome must not inherit the combined result of
+    /// the destinations that did run.
+    private static func recordDestinationFailureSnapshot(
+        _ destinationID: String,
+        errorClass: ErrorClass
+    ) {
+        guard let snapshotURL = StatusSnapshotLocation.url(destinationID: destinationID),
+              var snapshot = try? DestinationSnapshotFile.read(from: snapshotURL)
+        else { return }
+        snapshot.applyLastOutcome(RunOutcome.Kind.failed.rawValue)
+        snapshot.errorClass = errorClass.rawValue
+        snapshot.writtenAtEpoch = Date().timeIntervalSince1970
+        try? DestinationSnapshotFile.write(snapshot, to: snapshotURL)
     }
 
     /// A run that threw before any destination could report for itself. Naming the
