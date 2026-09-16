@@ -1829,33 +1829,27 @@ struct HarnessView: View {
                         )
                     }
                     if !json.isEmpty {
-                        // A single UILabel holding the whole bundle is reported as
-                        // clipped at larger type sizes even when it wraps today: the
-                        // audit sees a 600-point view. VoiceOver also should not walk
-                        // every brace. Sighted layout stays line-by-line on a white
-                        // field so contrast and wrapping both hold; the identifier
-                        // lives on a one-line caption the audit can measure.
+                        // One line per view so the clip audit does not see a 600-point
+                        // UILabel. The lines stay in the accessibility tree: hiding them
+                        // left visible text the audit then reported as inaccessible.
                         Text("Redacted diagnostic JSON")
                             .font(.body)
                             .lineLimit(nil)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("diagnostic-preview-json")
-                        VStack(alignment: .leading, spacing: 0) {
-                            ForEach(
-                                Array(DiagnosticPreviewLayout.displayLines(json).enumerated()),
-                                id: \.offset
-                            ) { _, line in
-                                Text(line)
-                                    .font(.body)
-                                    .foregroundStyle(.black)
-                                    .lineLimit(nil)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 8)
-                                    .background(Color.white)
-                            }
+                        ForEach(
+                            Array(DiagnosticPreviewLayout.displayLines(json).enumerated()),
+                            id: \.offset
+                        ) { _, line in
+                            Text(line)
+                                .font(.body)
+                                .foregroundStyle(.black)
+                                .lineLimit(nil)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 8)
+                                .background(Color.white)
                         }
-                        .accessibilityHidden(true)
                     }
                 }
                 // S9: the share affordance exists only past the last line of content, so

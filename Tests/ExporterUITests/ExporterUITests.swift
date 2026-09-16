@@ -1663,52 +1663,62 @@ final class ExporterUITests: XCTestCase {
     }
 
     private func performAccessibilityAudit(_ state: String = #function) throws {
-        try app.performAccessibilityAudit { issue in
-            let cause: String?
-            if issue.auditType == .contrast, let element = issue.element {
-                cause = self.suppressionCause(for: element)
-            } else if issue.auditType == .dynamicType {
-                cause = self.dynamicTypeSuppressionCause(for: issue.element)
-            } else if issue.element == nil,
-                      self.app.windows.firstMatch.frame.width >= 700,
-                      Self.iPadUnhostedTextStates.contains(state),
-                      self.iPadUnhostedIssueMatches(issue)
-            {
-                cause = "iPadUnhostedPotentiallyInaccessibleText"
-            } else {
-                cause = nil
-            }
-            guard let cause else {
-                if let element = issue.element {
-                    // Shape before content: a clipped-text finding is about how much
-                    // text is in what frame, and a label of a hundred JSON lines
-                    // buries that under itself.
-                    let label = element.label
-                    let longest = label.split(separator: "\n").map(\.count).max() ?? label.count
-                    print(
-                        "UNSUPPRESSED AX \(state): type=\(issue.auditType) "
-                            + "id=\(element.identifier) "
-                            + "labelChars=\(label.count) labelLines=\(label.split(separator: "\n").count) "
-                            + "longestLine=\(longest) "
-                            + "enabled=\(element.isEnabled) hittable=\(element.isHittable) "
-                            + "frame=\(element.frame) window=\(self.app.windows.firstMatch.frame) "
-                            + "label=\(label)"
-                    )
-                } else {
-                    print(
-                        "UNSUPPRESSED AX \(state): type=\(issue.auditType) "
-                            + "element=nil issue=\(String(describing: issue))"
-                    )
+        var attempt = 0
+        while true {
+            do {
+                try app.performAccessibilityAudit { issue in
+                    let cause: String?
+                    if issue.auditType == .contrast, let element = issue.element {
+                        cause = self.suppressionCause(for: element)
+                    } else if issue.auditType == .dynamicType {
+                        cause = self.dynamicTypeSuppressionCause(for: issue.element)
+                    } else if issue.element == nil,
+                              Self.iPadUnhostedTextStates.contains(state),
+                              self.iPadUnhostedIssueMatches(issue)
+                    {
+                        cause = "iPadUnhostedPotentiallyInaccessibleText"
+                    } else {
+                        cause = nil
+                    }
+                    guard let cause else {
+                        if let element = issue.element {
+                            let label = element.label
+                            let longest = label.split(separator: "\n").map(\.count).max() ?? label.count
+                            print(
+                                "UNSUPPRESSED AX \(state): type=\(issue.auditType) "
+                                    + "id=\(element.identifier) "
+                                    + "labelChars=\(label.count) labelLines=\(label.split(separator: "\n").count) "
+                                    + "longestLine=\(longest) "
+                                    + "enabled=\(element.isEnabled) hittable=\(element.isHittable) "
+                                    + "frame=\(element.frame) window=\(self.app.windows.firstMatch.frame) "
+                                    + "label=\(label)"
+                            )
+                        } else {
+                            print(
+                                "UNSUPPRESSED AX \(state): type=\(issue.auditType) "
+                                    + "element=nil issue=\(String(describing: issue))"
+                            )
+                        }
+                        return false
+                    }
+                    guard let link = Self.accessibilitySuppressionIssues[cause],
+                          link.hasPrefix("https://")
+                    else {
+                        XCTFail("suppressed \(cause) in \(state) with no linked issue")
+                        return false
+                    }
+                    return true
                 }
-                return false
+                return
+            } catch {
+                attempt += 1
+                let timedOut = (error as NSError).code == -56
+                    || String(describing: error).contains("Audit failed to complete in time")
+                if timedOut, attempt < 2 {
+                    continue
+                }
+                throw error
             }
-            guard let link = Self.accessibilitySuppressionIssues[cause],
-                  link.hasPrefix("https://")
-            else {
-                XCTFail("suppressed \(cause) in \(state) with no linked issue")
-                return false
-            }
-            return true
         }
     }
 
@@ -1830,12 +1840,14 @@ final class ExporterUITests: XCTestCase {
         // tapping again, not by waiting longer for a keyboard that is not coming.
         for _ in 0 ..< 3 {
             field.tap()
-            if app.keyboards.firstMatch.waitForExistence(timeout: min(10, uiWait)) { break }
+            let deadline = Date().addingTimeInterval(min(10, uiWait))
+            while Date() < deadline {
+                if visibleKeyboard() != nil { break }
+                _ = XCTWaiter().wait(for: [XCTestExpectation(description: "keyboard")], timeout: 0.25)
+            }
+            if visibleKeyboard() != nil { break }
         }
-        XCTAssertTrue(
-            app.keyboards.firstMatch.exists,
-            "keyboard never appeared for \(field.identifier)"
-        )
+        XCTAssertNotNil(visibleKeyboard(), "keyboard never appeared for \(field.identifier)")
         field.typeText(text)
     }
 
@@ -1865,12 +1877,11 @@ final class ExporterUITests: XCTestCase {
         }
         // The keyboard can go away on its own between any two of these attempts, and
         // acting on one that has already gone is a hard failure rather than a no-op.
-        let keyboard = app.keyboards.firstMatch
-        if keyboardIsShowing() {
+        if let keyboard = visibleKeyboard() {
             keyboard.swipeDown()
         }
         if keyboardIsGone() { return }
-        if keyboardIsShowing() {
+        if let keyboard = visibleKeyboard() {
             keyboard.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.88)).tap()
         }
         if keyboardIsGone() { return }
@@ -1884,26 +1895,27 @@ final class ExporterUITests: XCTestCase {
     /// On iPad the keyboard element stays in the hierarchy with an empty frame,
     /// parked below the screen, when the simulator is using the hardware keyboard.
     /// Nothing is drawn over the app and there is no candidate bar for an audit to
-    /// find, but asking to dismiss it fails outright: a swipe on an element with an
-    /// empty visible frame is an error, not a no-op.
+    /// find, but asking XCTest for `keyboards.firstMatch` when the query is empty
+    /// fails the test instead of reporting that nothing is showing.
+    private func visibleKeyboard() -> XCUIElement? {
+        let window = app.windows.firstMatch.frame
+        return app.keyboards.allElementsBoundByIndex.first { keyboard in
+            keyboard.exists
+                && keyboard.frame.height > 1
+                && keyboard.frame.minY < window.maxY
+        }
+    }
+
     private func keyboardIsShowing() -> Bool {
-        let keyboard = app.keyboards.firstMatch
-        guard keyboard.exists else { return false }
-        let frame = keyboard.frame
-        return frame.height > 0 && frame.minY < app.windows.firstMatch.frame.maxY
+        visibleKeyboard() != nil
     }
 
     private func keyboardIsGone() -> Bool {
-        for _ in 0 ..< 4 {
+        for _ in 0 ..< 8 {
             if !keyboardIsShowing() { return true }
             _ = XCTWaiter().wait(
-                for: [
-                    XCTNSPredicateExpectation(
-                        predicate: NSPredicate(format: "exists == false"),
-                        object: app.keyboards.firstMatch
-                    ),
-                ],
-                timeout: 0.5
+                for: [XCTestExpectation(description: "keyboard-gone")],
+                timeout: 0.25
             )
         }
         return !keyboardIsShowing()
