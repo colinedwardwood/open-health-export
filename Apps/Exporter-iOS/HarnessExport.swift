@@ -882,16 +882,15 @@ enum HarnessExport {
             WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
             lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
 
-            for destination in destinations where destination.attemptNow {
+            let trailing = destinations.filter(\.attemptNow)
+            if !trailing.isEmpty {
                 lines.append(
                     try await trailingReconcileAfterDelta(
                         observations: observations,
-                        destination: destination.destination,
+                        destinations: trailing,
                         store: store,
                         metric: metric,
                         scratchDirectory: scratch,
-                        destinationID: destination.id,
-                        destinationLabel: destinationLabel(destination.id),
                         envelope: WireEnvelope(
                             exporterId: exporterId,
                             seq: 1,
@@ -901,11 +900,9 @@ enum HarnessExport {
                         temporal: context,
                         statistics: statistics,
                         trigger: trigger,
-                        snapshotURL: destination.snapshotURL,
                         externalStatusURL: dest?.appendingPathComponent("status.json"),
                         ledgerHeadSeal: ledgerSeal,
-                        ledgerSealURL: ledgerSealURL,
-                        scope: destination.scope
+                        ledgerSealURL: ledgerSealURL
                     )
                 )
             }
@@ -1017,53 +1014,69 @@ enum HarnessExport {
     }
 
     /// R-08: every live destination run also applies the trailing seven-day sweep.
-    /// Delta ExportRun does not itself reconcile; leaving this only on the archive
-    /// folder would skip repair for HTTPS, MQTT, and the Mac companion.
+    /// Delta ExportRun does not itself reconcile. One trailing window is read once
+    /// and fanned out; a sweep per sink would re-observe the same days and let the
+    /// sinks be repaired from different observations of them.
     private static func trailingReconcileAfterDelta(
         observations: any DayObservationSource,
-        destination: VerifiedDestination,
+        destinations: [RunDestination],
         store: any StateStore,
         metric: MetricID,
         scratchDirectory: URL,
-        destinationID: String,
-        destinationLabel: String,
         envelope: WireEnvelope,
         temporal: TemporalContext,
         statistics: (any StatisticsSource)?,
         trigger: RunTrigger,
-        snapshotURL: URL?,
         externalStatusURL: URL? = nil,
         ledgerHeadSeal: (any LedgerHeadSeal)?,
-        ledgerSealURL: URL?,
-        scope: DestinationExportScope?
+        ledgerSealURL: URL?
     ) async throws -> String {
-        let reconciled = try await ReconcileSweep(
+        let covering = destinations.filter {
+            $0.scope.map { $0.metrics.contains(metric) } ?? true
+        }
+        guard !covering.isEmpty else {
+            return "\(metric.rawValue) reconcile: \(RunOutcome.Kind.successNothingDue.rawValue)"
+        }
+        let rows = DestinationRowCollector()
+        var sweep = ReconcileSweep(
             observations: observations,
-            destination: destination,
+            destination: covering[0].destination,
             store: store,
             metric: metric,
             scratchDirectory: scratchDirectory,
-            destinationName: destinationID,
+            destinationName: covering[0].id,
             envelope: envelope,
             temporal: temporal,
             statistics: statistics,
             trigger: trigger,
-            snapshotURL: snapshotURL,
+            snapshotURL: covering[0].snapshotURL,
             externalStatusURL: externalStatusURL,
             ledgerHeadSeal: ledgerHeadSeal,
             ledgerSealURL: ledgerSealURL,
-            scope: scope,
+            scope: covering[0].scope,
             freshnessCadenceSeconds: freshnessCadenceSeconds(),
-            deferForLowPower: isLowPowerDeferred()
-        ).run(throughDay: String(envelope.emittedAt.prefix(10)))
-        await notifyIfFailed(
-            reconciled.kind,
-            destinationID: destinationID,
-            destinationLabel: destinationLabel
+            deferForLowPower: isLowPowerDeferred(),
+            destinations: covering
         )
-        if (reconciled.kind == .success || reconciled.kind == .successNothingDue),
-           let snapshotURL {
-            await rescheduleOverdueNotification(snapshotURL: snapshotURL)
+        sweep.rowCollector = rows
+        let reconciled = try await sweep.run(
+            throughDay: String(envelope.emittedAt.prefix(10))
+        )
+        let reported = await rows.rows()
+        applyDestinationOutcomes(reported, to: covering.map(\.id))
+        for destination in covering {
+            let kind = DestinationRunRow.kind(for: destination.id, in: reported)
+                ?? reconciled.kind
+            await notifyIfFailed(
+                kind,
+                destinationID: destination.id,
+                destinationLabel: destinationLabel(destination.id)
+            )
+            if kind == .success || kind == .successNothingDue,
+               let snapshotURL = destination.snapshotURL
+            {
+                await rescheduleOverdueNotification(snapshotURL: snapshotURL)
+            }
         }
         return "\(metric.rawValue) reconcile: \(reconciled.kind.rawValue)"
     }
@@ -1721,12 +1734,17 @@ enum HarnessExport {
             lines.append(
                 try await trailingReconcileAfterDelta(
                     observations: observations,
-                    destination: verified,
+                    destinations: [
+                        RunDestination(
+                            id: "companion",
+                            destination: verified,
+                            scope: scope,
+                            snapshotURL: StatusSnapshotLocation.url(destinationID: "companion")
+                        ),
+                    ],
                     store: store,
                     metric: metric,
                     scratchDirectory: scratch,
-                    destinationID: "companion",
-                    destinationLabel: "Mac companion",
                     envelope: WireEnvelope(
                         exporterId: session.localInstallationID,
                         seq: 1,
@@ -1736,10 +1754,8 @@ enum HarnessExport {
                     temporal: context,
                     statistics: statistics,
                     trigger: .manual,
-                    snapshotURL: StatusSnapshotLocation.url(destinationID: "companion"),
                     ledgerHeadSeal: ledgerSeal,
-                    ledgerSealURL: ledgerSealURL,
-                    scope: scope
+                    ledgerSealURL: ledgerSealURL
                 )
             )
         }
@@ -2868,20 +2884,23 @@ enum HarnessExport {
             lines.append(
                 try await trailingReconcileAfterDelta(
                     observations: observations,
-                    destination: verified,
+                    destinations: [
+                        RunDestination(
+                            id: "mqtt",
+                            destination: verified,
+                            scope: scope,
+                            snapshotURL: snapshotURL
+                        ),
+                    ],
                     store: store,
                     metric: metric,
                     scratchDirectory: scratch,
-                    destinationID: "mqtt",
-                    destinationLabel: "MQTT destination",
                     envelope: envelope,
                     temporal: context,
                     statistics: statistics,
                     trigger: .manual,
-                    snapshotURL: snapshotURL,
                     ledgerHeadSeal: ledgerSeal,
-                    ledgerSealURL: ledgerSealURL,
-                    scope: scope
+                    ledgerSealURL: ledgerSealURL
                 )
             )
         }
@@ -3057,20 +3076,23 @@ enum HarnessExport {
             lines.append(
                 try await trailingReconcileAfterDelta(
                     observations: observations,
-                    destination: verified,
+                    destinations: [
+                        RunDestination(
+                            id: destinationID,
+                            destination: verified,
+                            scope: scope,
+                            snapshotURL: snapshotURL
+                        ),
+                    ],
                     store: store,
                     metric: metric,
                     scratchDirectory: scratch,
-                    destinationID: destinationID,
-                    destinationLabel: destinationLabel,
                     envelope: envelope,
                     temporal: context,
                     statistics: statistics,
                     trigger: .manual,
-                    snapshotURL: snapshotURL,
                     ledgerHeadSeal: ledgerSeal,
-                    ledgerSealURL: ledgerSealURL,
-                    scope: scope
+                    ledgerSealURL: ledgerSealURL
                 )
             )
         }

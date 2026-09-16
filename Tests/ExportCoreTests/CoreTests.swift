@@ -6227,7 +6227,7 @@ private func anchorHoldFixture(
     #expect(harness.contains("try removeIfPresent(directory)"))
 }
 
-@Test func r08TrailingReconcileRunsOnEveryHealthDestination() throws {
+@Test func r08TrailingReconcileFansOutFromOneRead() throws {
     let root = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
         .deletingLastPathComponent()
@@ -6237,14 +6237,14 @@ private func anchorHoldFixture(
         encoding: .utf8
     )
     let calls = harness.components(separatedBy: "try await trailingReconcileAfterDelta(").count - 1
-    let destinationIDs = ["local-file", "https", "mqtt", "companion"]
-    #expect(calls == destinationIDs.count)
-    for destinationID in destinationIDs {
-        #expect(
-            harness.contains("destinationID: \"\(destinationID)\""),
-            "missing trailing reconcile destination \(destinationID)"
-        )
-    }
+    #expect(calls == 4)
+    // The automatic path fans one trailing window to every sink that can take it
+    // now. Dedicated MQTT, HTTPS, and companion runners still call the same helper.
+    #expect(harness.contains("destinations: trailing"))
+    #expect(harness.contains("destinations: covering"))
+    #expect(harness.contains("id: \"companion\""))
+    #expect(harness.contains("id: \"mqtt\""))
+    #expect(harness.contains("id: destinationID"))
 }
 
 @Test func o9ScheduledFullReconcileIsGatedByCatchUpAdmission() throws {
