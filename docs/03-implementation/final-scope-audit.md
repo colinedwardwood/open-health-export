@@ -86,6 +86,24 @@ asserts that across the concentrated-heart boundary and that the five slices
 cover the corpus with no gap or overlap. The local container run remains the
 whole-corpus, single-process measurement behind the sharded gate.
 
+The sharded leg has now concluded success on GitHub-hosted Linux in
+[`nightly-volume` run 35044169117](https://github.com/colinedwardwood/open-health-export/actions/runs/35044169117),
+alongside green `tier-one-corpus` and `tier-two-pathologies`. All fifty million
+records passed through `ExportRun` under the ceiling, worst shard 79.5 MiB:
+
+| Shard | Records | Pages | Metrics | Peak RSS |
+| --- | --- | --- | --- | --- |
+| 0 | 10,000,000 | 1,000 | 1 | 56.8 MiB |
+| 1 | 10,000,000 | 1,000 | 1 | 56.9 MiB |
+| 2 | 10,000,000 | 960 | 120 | 65.6 MiB |
+| 3 | 10,000,000 | 960 | 120 | 79.5 MiB |
+| 4 | 10,000,000 | 960 | 120 | 74.0 MiB |
+
+Shards 0 and 1 are the concentrated single-type prefix; the rest span all 120
+metrics with structural records, which is where the peak sits. Every shard
+reported `outcome=success`, `declared_records=10000000`, `samples_read` equal to
+`samples_acked`, and all five formats.
+
 The two earlier remote dispatches of `tier-one-corpus` predate the streaming
 fix and recorded the old failure (`peak resident memory 145044 KiB exceeded
 102400 KiB`). They are superseded by the 66.3 MiB green run above.
