@@ -205,7 +205,8 @@ private struct HealthBackfillProcessor: BackfillChunkProcessor {
         }
         let counted = CountingBackfillObservations(base: observations)
         let now = Date().ISO8601Format()
-        let outcome = try await ReconcileSweep(
+        let rows = DestinationRowCollector()
+        var sweep = ReconcileSweep(
             observations: counted,
             destination: owed[0].destination,
             store: store,
@@ -231,7 +232,10 @@ private struct HealthBackfillProcessor: BackfillChunkProcessor {
             freshnessCadenceSeconds: HarnessExport.freshnessCadenceSeconds(),
             deferForLowPower: HarnessExport.isLowPowerDeferred(),
             destinations: owed
-        ).runBackfill(days: days, mode: mode)
+        )
+        sweep.rowCollector = rows
+        let outcome = try await sweep.runBackfill(days: days, mode: mode)
+        HarnessExport.applyBackfillOutcomes(await rows.rows(), to: owed.map(\.id))
         return BackfillChunkResult(
             samplesRead: await counted.count(),
             batchesEnqueued: outcome.kind == RunOutcome.Kind.successNothingDue ? 0 : 1
@@ -1083,6 +1087,44 @@ enum HarnessExport {
         )
     }
 
+    /// Applies each sink's own result to its own status, for a run that fanned one
+    /// read out to several of them.
+    ///
+    /// A repair sweep writes the status of the destination it was constructed
+    /// around, which is one of N. The others were delivered to in the same sweep,
+    /// so leaving their status untouched left the widget and the destinations list
+    /// showing a result from an earlier run, and a sink that was just repaired
+    /// could still read as overdue. A sink with no row of its own keeps what it
+    /// had, because nothing was attempted against it.
+    /// Reachable from the backfill runner, which lives outside this type.
+    static func applyBackfillOutcomes(
+        _ rows: [DestinationRunRow],
+        to destinationIDs: [String]
+    ) {
+        applyDestinationOutcomes(rows, to: destinationIDs)
+    }
+
+    private static func applyDestinationOutcomes(
+        _ rows: [DestinationRunRow],
+        to destinationIDs: [String]
+    ) {
+        let now = Date().timeIntervalSince1970
+        for destinationID in destinationIDs {
+            guard let row = rows.first(where: { $0.destinationID == destinationID }),
+                  let kind = RunOutcome.Kind(rawValue: row.outcomeKind),
+                  let snapshotURL = StatusSnapshotLocation.url(destinationID: destinationID),
+                  var snapshot = try? DestinationSnapshotFile.read(from: snapshotURL)
+            else { continue }
+            snapshot.applyLastOutcome(kind.rawValue)
+            snapshot.errorClass = row.errorClass
+            if kind == .success || kind == .successNothingDue {
+                snapshot.lastSuccessEpoch = now
+            }
+            snapshot.writtenAtEpoch = now
+            try? DestinationSnapshotFile.write(snapshot, to: snapshotURL)
+        }
+    }
+
     /// Marks one destination's own status as failed, for the case where the run
     /// never reached it: its last outcome must not inherit the combined result of
     /// the destinations that did run.
@@ -1241,6 +1283,7 @@ enum HarnessExport {
             sweep.rowCollector = rows
             let outcome = try await sweep.runFullHistory(throughDay: String(now.prefix(10)))
             let reported = await rows.rows()
+            applyDestinationOutcomes(reported, to: covering.map(\.id))
             for destination in covering {
                 // A repair that failed for one sink is not news about the others.
                 await notifyIfFailed(
@@ -1545,6 +1588,7 @@ enum HarnessExport {
         sweep.rowCollector = rows
         let outcome = try await sweep.run(gap: gap)
         let reported = await rows.rows()
+        applyDestinationOutcomes(reported, to: owed.map(\.id))
         for destination in owed {
             await notifyIfFailed(
                 DestinationRunRow.kind(for: destination.id, in: reported) ?? outcome.kind,

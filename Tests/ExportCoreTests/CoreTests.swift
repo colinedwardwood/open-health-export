@@ -4920,6 +4920,51 @@ private func anchorHoldFixture(
     #expect(payload.contains(recent.key.uuid))
 }
 
+/// A repair sweep is the same fan-out as an export, and its per-sink rows are
+/// what the harness writes each destination's status from. A sweep that reported
+/// only the destination it was constructed around left the others showing a
+/// result from an earlier run, so a sink it had just repaired could still read as
+/// overdue.
+@Test func aRepairSweepReportsARowForEveryDestinationItWasOwedTo() async throws {
+    let metric = MetricCatalog.heartRate.id
+    var sample = heartSample("dddddddd-dddd-dddd-dddd-dddddddddddd")
+    sample.start = "2024-01-01T10:00:00Z"
+    sample.end = sample.start
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-sweep-rows-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let goodDir = root.appendingPathComponent("good")
+    try FileManager.default.createDirectory(at: goodDir, withIntermediateDirectories: true)
+    let store = MemoryStateStore()
+    let rows = DestinationRowCollector()
+    var sweep = ReconcileSweep(
+        observations: FixtureDays(byDay: ["2024-01-01": [sample]]),
+        destination: .testing(LocalFileSink(directory: goodDir)),
+        store: store,
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch"),
+        destinationName: "good",
+        envelope: testEnvelope(),
+        destinations: [
+            RunDestination(
+                id: "good",
+                destination: .testing(LocalFileSink(directory: goodDir))
+            ),
+            RunDestination(
+                id: "unreachable",
+                destination: .testing(ThrowingSink(error: .destinationUnreachable))
+            ),
+        ]
+    )
+    sweep.rowCollector = rows
+    _ = try await sweep.runFullHistory(throughDay: "2024-01-02")
+    let reported = await rows.rows()
+    #expect(reported.count == 2)
+    #expect(DestinationRunRow.kind(for: "good", in: reported) == RunOutcome.Kind.success)
+    #expect(DestinationRunRow.kind(for: "unreachable", in: reported) == RunOutcome.Kind.failed)
+    #expect(reported.first { $0.destinationID == "unreachable" }?.errorClass != nil)
+}
+
 /// One sink's transport failure must not be reported against a sink that
 /// succeeded. Attributing the run's combined outcome to every destination told
 /// people a working archive folder had failed because a server was unreachable.
