@@ -1639,6 +1639,9 @@ struct HarnessView: View {
                     Text(line)
                         .font(.body)
                         .foregroundStyle(.primary)
+                        .lineLimit(nil)
+                        .multilineTextAlignment(.leading)
+                        .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .accessibilityIdentifier("history-row-\(index)")
@@ -1826,20 +1829,33 @@ struct HarnessView: View {
                         )
                     }
                     if !json.isEmpty {
-                        // One wrapping view, not one view per brace: a padded row whose
-                        // only glyphs are spaces and `}` failed the contrast audit, and
-                        // one viewport-tall unwrapped token failed the clip audit. Break
-                        // opportunities live in the string; the view is ordinary body
-                        // text on a light field so Dynamic Type and contrast both apply.
-                        Text(DiagnosticPreviewLayout.wrappable(json))
+                        // A single UILabel holding the whole bundle is reported as
+                        // clipped at larger type sizes even when it wraps today: the
+                        // audit sees a 600-point view. VoiceOver also should not walk
+                        // every brace. Sighted layout stays line-by-line on a white
+                        // field so contrast and wrapping both hold; the identifier
+                        // lives on a one-line caption the audit can measure.
+                        Text("Redacted diagnostic JSON")
                             .font(.body)
-                            .foregroundStyle(.black)
                             .lineLimit(nil)
                             .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(8)
-                            .background(Color.white)
                             .accessibilityIdentifier("diagnostic-preview-json")
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(
+                                Array(DiagnosticPreviewLayout.displayLines(json).enumerated()),
+                                id: \.offset
+                            ) { _, line in
+                                Text(line)
+                                    .font(.body)
+                                    .foregroundStyle(.black)
+                                    .lineLimit(nil)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 8)
+                                    .background(Color.white)
+                            }
+                        }
+                        .accessibilityHidden(true)
                     }
                 }
                 // S9: the share affordance exists only past the last line of content, so
@@ -2258,7 +2274,7 @@ struct HarnessView: View {
     @ViewBuilder
     private func selectableMonospaceLine(_ line: String, identifier: String) -> some View {
         Text(line)
-            .font(.system(.footnote, design: .monospaced))
+            .font(.body)
             .foregroundStyle(.primary)
             .textSelection(.enabled)
             .lineLimit(nil)
