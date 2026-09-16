@@ -13,7 +13,7 @@ struct CorpusGen {
         var buffer = Data()
         buffer.append(try provenanceHeader(options: options))
         buffer.append(0x0A)
-        for index in 0..<options.resolvedCount {
+        for index in options.start..<(options.start + options.resolvedCount) {
             let declaration = DemoCorpus.declaration(at: index, tier: options.tier)
             let sample = DemoCorpus.sample(
                 at: index,
@@ -86,6 +86,11 @@ private struct Options {
     var seed: UInt64 = 1
     var tier: SyntheticCorpusTier = .t0
     var count: Int?
+    /// First record index. Each record is a pure function of its index, so a slice
+    /// starting here is byte-identical to the same span of the whole corpus. One
+    /// GitHub-hosted job is six hours, which fifty million records through
+    /// `exportruncheck` exceeds; contiguous slices cover the corpus in jobs that fit.
+    var start = 0
     var resolvedCount: Int { count ?? tier.defaultCount }
 
     init(arguments: [String]) throws {
@@ -101,6 +106,11 @@ private struct Options {
                     throw OptionError.invalidValue
                 }
                 count = parsed
+            case "--start":
+                guard let parsed = Int(arguments[index + 1]), parsed >= 0 else {
+                    throw OptionError.invalidValue
+                }
+                start = parsed
             case "--tier":
                 guard let parsed = SyntheticCorpusTier(
                     rawValue: arguments[index + 1].uppercased()

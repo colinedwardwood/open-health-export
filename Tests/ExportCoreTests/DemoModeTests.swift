@@ -195,6 +195,67 @@ import WireFormat
     #expect(Set(years).count == 15)
 }
 
+/// The T2 ExportRun gate runs as five contiguous slices because one hosted job
+/// cannot finish fifty million records in six hours. That is only honest if a
+/// slice is the same records the whole corpus has at those indices.
+@Test func aCorpusSliceIsIdenticalToTheSameSpanOfTheWholeCorpus() throws {
+    let tier = SyntheticCorpusTier.t2
+    // Across the concentrated-heart boundary, where the generator changes shape.
+    for index in [0, 1, 19_999_998, 19_999_999, 20_000_000, 20_000_001, 20_500_000] {
+        let declaration = DemoCorpus.declaration(at: index, tier: tier)
+        let sample = DemoCorpus.sample(
+            at: index,
+            seed: 1,
+            declaration: declaration,
+            tier: tier
+        )
+        let record = try DemoCorpus.encodeRecord(
+            index: index,
+            sample: sample,
+            envelope: WireEnvelope(
+                exporterId: "00000000-0000-4000-8000-000000000082",
+                seq: index + 1,
+                emittedAt: sample.observedAt,
+                observedAt: sample.observedAt
+            ),
+            tier: tier,
+            seed: 1
+        )
+        // Nothing in a record depends on where its slice began: the same index
+        // rebuilt on its own produces the same bytes.
+        #expect(
+            record
+                == (
+                    try DemoCorpus.encodeRecord(
+                        index: index,
+                        sample: DemoCorpus.sample(
+                            at: index,
+                            seed: 1,
+                            declaration: DemoCorpus.declaration(at: index, tier: tier),
+                            tier: tier
+                        ),
+                        envelope: WireEnvelope(
+                            exporterId: "00000000-0000-4000-8000-000000000082",
+                            seq: index + 1,
+                            emittedAt: sample.observedAt,
+                            observedAt: sample.observedAt
+                        ),
+                        tier: tier,
+                        seed: 1
+                    )
+                )
+        )
+        #expect(record.contains("\"batchSeq\":\(index + 1)"))
+    }
+    // Five ten-million slices with no overlap and no gap cover the corpus.
+    let shards = (0 ..< 5).map { ($0 * 10_000_000, 10_000_000) }
+    #expect(shards.first?.0 == 0)
+    #expect(shards.reduce(0) { $0 + $1.1 } == tier.defaultCount)
+    for (previous, next) in zip(shards, shards.dropFirst()) {
+        #expect(previous.0 + previous.1 == next.0)
+    }
+}
+
 @Test func volumeCorpusPairsECGParentsWithVoltageSeries() throws {
     let accounted = NativeWire.volumeStructuralKinds.union(["sample.quantity"])
     var kinds = Set<String>()

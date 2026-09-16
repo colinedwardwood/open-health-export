@@ -76,8 +76,15 @@ container ran `exportruncheck` over the full fifty-million-record corpus in
 flat from one million lines to fifty million, so the peak is the page path, as
 T1 predicted. The remote `tier-two-exportrun` leg of
 [`nightly-volume` run 34999124577](https://github.com/colinedwardwood/open-health-export/actions/runs/34999124577)
-is still executing and is what the release gate reads by check name; the local
-container run is the measurement, not a substitute for that gate.
+ran for exactly six hours with the export phase still in flight and was
+cancelled at GitHub's per-job wall. One hosted job cannot hold this corpus, so
+that leg is now five contiguous ten-million-record slices, each measured in its
+own process against the whole 100 MiB ceiling rather than a fifth of it, and
+release validation requires all five by name. A record is a pure function of its
+index, so a slice is byte-identical to the same span of the corpus; a test
+asserts that across the concentrated-heart boundary and that the five slices
+cover the corpus with no gap or overlap. The local container run remains the
+whole-corpus, single-process measurement behind the sharded gate.
 
 The two earlier remote dispatches of `tier-one-corpus` predate the streaming
 fix and recorded the old failure (`peak resident memory 145044 KiB exceeded

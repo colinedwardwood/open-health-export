@@ -1822,17 +1822,21 @@ final class ExporterUITests: XCTestCase {
     /// itself, or tapping its return corner, is what actually puts it away.
     private func dismissKeyboard() {
         guard app.keyboards.element.exists else { return }
-        let predicate = NSPredicate(
-            format: "identifier CONTAINS[cd] %@ OR label CONTAINS[cd] %@ OR identifier CONTAINS[cd] %@ OR label CONTAINS[cd] %@",
-            "return",
-            "return",
-            "done",
-            "done"
-        )
-        let key = app.keyboards.buttons.matching(predicate).firstMatch
-        if key.waitForExistence(timeout: 1), key.isHittable {
-            key.tap()
-            if keyboardIsGone() { return }
+        // iPad keyboards carry their own hide key and do not dismiss on return, so
+        // the iPhone-shaped attempts below are not enough on their own.
+        let names = ["return", "done", "hide keyboard", "dismiss"]
+        for name in names {
+            let key = app.keyboards.buttons.matching(
+                NSPredicate(
+                    format: "identifier CONTAINS[cd] %@ OR label CONTAINS[cd] %@",
+                    name,
+                    name
+                )
+            ).firstMatch
+            if key.waitForExistence(timeout: 1), key.isHittable {
+                key.tap()
+                if keyboardIsGone() { return }
+            }
         }
         let keyboard = app.keyboards.element
         keyboard.swipeDown()

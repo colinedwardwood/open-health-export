@@ -108,10 +108,21 @@ jobs:
             'pipelinecheck concentrated_heart_prefix=20000000 year_range=2010-2024 distinct_years=15' \
             /tmp/t2-pipeline.out
           printf 'tier=T2 records=50000000 sha256=%s\n' "$digest"
+  # Fifty million records through ExportRun in one process needs longer than the
+  # six hours one hosted job gets: the whole-corpus attempt was cancelled at the
+  # wall with the export phase still running. Each record is a pure function of
+  # its index, so five contiguous ten-million-record slices are byte-identical to
+  # the corpus and each slice measures the same page path in its own process. The
+  # ceiling is per run, so every shard is held to the full 100 MiB, not a fifth
+  # of it, and release validation requires all five.
   tier-two-exportrun:
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 4 * * 0'
     runs-on: ubuntu-latest
     timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4]
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc
@@ -123,12 +134,17 @@ jobs:
           swift build -c release --product exportruncheck
       - name: Exercise ExportRun within its memory ceiling
         shell: bash
+        env:
+          SHARD: ${{ matrix.shard }}
         run: |
           set -euo pipefail
-          .build/release/corpusgen --tier T2 --seed 1 |
+          shard_records=10000000
+          start=$((SHARD * shard_records))
+          .build/release/corpusgen --tier T2 --seed 1 \
+            --start "$start" --count "$shard_records" |
             .build/release/exportruncheck --page-size 10000 2>&1 |
             tee /tmp/t2-exportrun.out
           grep -F 'exportruncheck outcome=success' /tmp/t2-exportrun.out
-          grep -F 'declared_records=50000000' /tmp/t2-exportrun.out
+          grep -F "declared_records=$shard_records" /tmp/t2-exportrun.out
           grep -F 'limit_mib=100' /tmp/t2-exportrun.out
           grep -F 'formats=native-ndjson,native-json,native-json-pretty,csv,hae' /tmp/t2-exportrun.out
