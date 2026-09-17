@@ -1844,16 +1844,21 @@ final class ExporterUITests: XCTestCase {
     private func type(_ text: String, into field: XCUIElement) {
         // Shorter than uiWait on purpose: a tap that did not take focus is fixed by
         // tapping again, not by waiting longer for a keyboard that is not coming.
+        // Hosted simulators often connect the hardware keyboard, so no software
+        // Keyboard row appears; `hasKeyboardFocus` is the signal in that mode.
         for _ in 0 ..< 3 {
             field.tap()
             let deadline = Date().addingTimeInterval(min(10, uiWait))
             while Date() < deadline {
-                if visibleKeyboard() != nil { break }
+                if field.hasKeyboardFocus || visibleKeyboard() != nil { break }
                 _ = XCTWaiter().wait(for: [XCTestExpectation(description: "keyboard")], timeout: 0.25)
             }
-            if visibleKeyboard() != nil { break }
+            if field.hasKeyboardFocus || visibleKeyboard() != nil { break }
         }
-        XCTAssertNotNil(visibleKeyboard(), "keyboard never appeared for \(field.identifier)")
+        XCTAssertTrue(
+            field.hasKeyboardFocus || visibleKeyboard() != nil,
+            "keyboard never appeared for \(field.identifier)"
+        )
         field.typeText(text)
     }
 

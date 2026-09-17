@@ -1444,7 +1444,9 @@ struct HarnessView: View {
                 .font(.body)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(minHeight: 44)
-                .accessibilityLabel("MQTT QoS")
+                .accessibilityLabel(
+                    mqttQoS == 0 ? "MQTT QoS, At most once (0)" : "MQTT QoS, At least once (1)"
+                )
                 .accessibilityIdentifier("mqtt-qos")
             Button("At most once (0)") { mqttQoS = 0 }
                 .disabled(mqttQoS == 0)
