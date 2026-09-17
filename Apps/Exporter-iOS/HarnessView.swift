@@ -1108,35 +1108,42 @@ struct HarnessView: View {
 
                         if snapshot.enabled,
                            HarnessExport.healthDestinationIDs.contains(snapshot.destinationID) {
-                            Picker(
-                                "Exports from this device",
-                                selection: Binding(
-                                    get: {
-                                        HarnessExport.destinationExportRole(
-                                            snapshot.destinationID
-                                        )
-                                    },
-                                    set: { role in
-                                        try? HarnessExport.setDestinationExportRole(
-                                            role,
-                                            destinationID: snapshot.destinationID
-                                        )
-                                        refreshDestinationSurfaces()
-                                        Task { await reevaluateAutomaticExport() }
-                                    }
+                            // A menu picker is a UIKit control that does not take the
+                            // accessibility content-size category, so the hosted audit
+                            // reports Dynamic Type as partially unsupported. Two wrapping
+                            // buttons keep the same choice without that chrome.
+                            let role = HarnessExport.destinationExportRole(
+                                snapshot.destinationID
+                            )
+                            Text("Exports from this device")
+                                .font(.body)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier(
+                                    "destination-export-role-\(snapshot.destinationID)"
                                 )
-                            ) {
-                                Text("Automatic and manual").tag(
-                                    DestinationExportRole.designated
+                            Button("Automatic and manual") {
+                                try? HarnessExport.setDestinationExportRole(
+                                    .designated,
+                                    destinationID: snapshot.destinationID
                                 )
-                                Text("Manual only").tag(
-                                    DestinationExportRole.manualOnly
-                                )
+                                refreshDestinationSurfaces()
+                                Task { await reevaluateAutomaticExport() }
                             }
-                            .pickerStyle(.menu)
-                            .frame(minHeight: 44)
+                            .disabled(role == .designated)
                             .accessibilityIdentifier(
-                                "destination-export-role-\(snapshot.destinationID)"
+                                "destination-export-role-designated-\(snapshot.destinationID)"
+                            )
+                            Button("Manual only") {
+                                try? HarnessExport.setDestinationExportRole(
+                                    .manualOnly,
+                                    destinationID: snapshot.destinationID
+                                )
+                                refreshDestinationSurfaces()
+                                Task { await reevaluateAutomaticExport() }
+                            }
+                            .disabled(role == .manualOnly)
+                            .accessibilityIdentifier(
+                                "destination-export-role-manual-\(snapshot.destinationID)"
                             )
                             Text(
                                 HarnessExport.destinationExportRole(snapshot.destinationID)
@@ -1162,25 +1169,31 @@ struct HarnessView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Where your data goes")
                 .font(.headline)
+                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("destination-title")
             dataFlowExplainer
             Text("Export window: \(exportWindowHours) hours")
                 .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("export-window-hours")
             Text("Freshness interval: \(freshnessIntervalMinutes) minutes")
                 .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("freshness-interval-minutes")
             Text(FreshnessTarget.provisionalDisclosure)
                 .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("freshness-target")
             ForEach(HarnessExport.freshnessDisclosureLines(), id: \.id) { disclosure in
                 Text(disclosure.text)
                     .font(.footnote)
+                    .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier(disclosure.id)
             }
             if !wakeAttribution.isEmpty {
                 Text(wakeAttribution)
                     .font(.footnote)
+                    .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("wake-attribution")
             }
             if !ledgerWarning.isEmpty {
@@ -1633,6 +1646,7 @@ struct HarnessView: View {
                 Task { await loadHistory() }
             }
             .disabled(phase == .working)
+            .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("history-load")
             if historyEvents.isEmpty {
                 ForEach(Array(historyLines.enumerated()), id: \.offset) { index, line in
@@ -1879,6 +1893,7 @@ struct HarnessView: View {
                     } else {
                         Text(ShareDisclosure.copy)
                             .font(.footnote)
+                            .foregroundStyle(.primary)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("share-protection-warning")
                         Button("I understand — show sharing") {

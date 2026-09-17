@@ -463,8 +463,9 @@ final class ExporterUITests: XCTestCase {
             identified("destination-export-role-copy-home-assistant").label
                 .contains("designated automatic exporter")
         )
-        role.tap()
-        app.buttons["Manual only"].tap()
+        scrollStatus(
+            identified("destination-export-role-manual-home-assistant")
+        ).tap()
 
         let copy = identified("destination-export-role-copy-home-assistant")
         XCTAssertTrue(copy.waitForExistence(timeout: uiWait))
@@ -1714,8 +1715,11 @@ final class ExporterUITests: XCTestCase {
                 return
             } catch {
                 attempt += 1
-                let timedOut = (error as NSError).code == -56
+                let ns = error as NSError
+                let timedOut = ns.code == -56
+                    || ns.code == 1000
                     || String(describing: error).contains("Audit failed to complete in time")
+                    || String(describing: error).contains("Timed out while running accessibility audit")
                 if timedOut, attempt < 2 {
                     continue
                 }

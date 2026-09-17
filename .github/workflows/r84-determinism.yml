@@ -42,7 +42,8 @@ jobs:
           sudo rm -f /etc/apt/sources.list.d/google-chrome*.list \
             /etc/apt/sources.list.d/google-chrome*.sources
           sudo apt-get update
-          sudo apt-get install -y zlib1g-dev libsqlite3-dev
+          sudo apt-get install -y zlib1g-dev libsqlite3-dev \
+            || { sleep 20; sudo apt-get update; sudo apt-get install -y zlib1g-dev libsqlite3-dev; }
       - name: Record hosted architecture honestly
         run: |
           printf 'runner=%s os=%s arch=%s\n' \

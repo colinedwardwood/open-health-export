@@ -3,9 +3,9 @@
 Living checklist for code-completable Stage 3 implementation and Stage 4 automated QA.
 Updated as items finish. Times are wall-clock, including hosted CI waits.
 
-Last updated: 2026-09-16 15:15 ET (America/New_York)
+Last updated: 2026-09-17 07:26 ET (America/New_York)
 
-**Current HEAD:** local UI-test slice on top of `fdadc78`. Previous macos-build `35129159849` **failed** (3 of 6 UI shards). Hosted UI is not done until the next six shards are green.
+**Current HEAD:** local slice on top of `7cd0d01`. macos-build `35139143228` **completed**: five `ios-ui` shards green (all three iPhone, iPad 1/2). **iPad 0 failed** (`testDestinationsAndHistoryInRTL` accessibility audit XCTFuture 1000). Keyboard shard (iPad 1) and paused-anchor (iPhone 0 / iPad 0 XXXL+paused-anchor) are proven on this SHA except the RTL audit timeout.
 
 **Estimate if the next macos-build is green:** about **6–10 hours** remaining.
 **Estimate if another hosted UI cycle is needed:** add **2–4 hours** per cycle.
@@ -16,18 +16,21 @@ Out of scope (not on this list as work to do): physical-device / R-71 soak, back
 
 ## Now (blocking hosted UI)
 
-- [x] **Fix empty-keyboard XCTest queries** (code done; waiting on hosted CI)
-  - `visibleKeyboard()` now uses `waitForExistence` so an empty Keyboard query does not fail the case.
-- [x] **Assert paused-anchor banner after disclosure** (code done; waiting on hosted CI)
-  - Paused-anchor cases tap Continue first; the banner lives under the first-run cover.
+- [x] **Fix empty-keyboard XCTest queries**
+  - Proven on `35139143228` iPad 1. `visibleKeyboard()` uses `waitForExistence`.
+- [x] **Assert paused-anchor banner after disclosure**
+  - Proven on `35139143228` iPhone 0 (and iPad 0 ran past paused-anchor).
 - [ ] **Watch XXXL launch flake** (no extra code unless it repeats)
-  - Evidence: `ios-ui (0, iPad)` — `testAccessibilityExtraExtraExtraLargeContentSize` timed out launching, then failed acquiring a background assertion. Already has `-retry-tests-on-failure`. Revisit only if it fails again after the two fixes above.
-- [ ] **Push the UI-test slice and wait for macos-build** (~50–90 min)
-  - Gate: all six `ios-ui` shards green on the new SHA. Do not push again while those shards are in flight.
+  - Prior evidence: iPad 0 XXXL launch timeout. On `35139143228` iPad 0 XXXL passed; keep watching.
+- [ ] **Wait for macos-build after this push** (~50–90 min)
+  - Local slice retries AX audits on XCTFuture 1000 as well as Xcode -56, replaces the AR-15 menu Picker with wrapping Automatic/Manual buttons, wraps Destinations/History titles, and retries r84 apt. Do not push again while those shards are in flight.
+- [x] **r84-determinism arm apt 404** (infra; rerun succeeded)
+  - Apt retry is in this commit.
 
 ## After hosted UI is green
 
 - [ ] **Dispatch `accessibility-matrix.yml`** (~60–90 min, 12 jobs)
+  - Last dispatch (`35106994795` on `e8cc1ba`) failed iPhone 1 / iPad 2, 4, 5. Keyboard empty-query and iPad DeviceNoun copy should already be fixed on `7cd0d01`. iPad Dynamic Type, share-warning contrast, and pseudo-locale clip may still be real; do not suppress them without a product fix.
 - [ ] **Fix any matrix findings** (0 if green; 2–4 hours if red, plus another matrix)
 - [ ] **Local iPhone UI suite on an idle machine** (~20–40 min)
 - [ ] **Local iPad UI suite on an idle machine** (~30–90 min)
@@ -37,9 +40,9 @@ Out of scope (not on this list as work to do): physical-device / R-71 soak, back
 ## Completion audit (do not skip)
 
 - [ ] **Prove Stage 3 one-read / N-sink fan-out and automatic orchestration from current `main`** (~20 min)
-  - Engine, harness drain, observers, trailing reconcile, per-destination snapshots — already implemented; audit against current tree, not memory.
+  - Tree check on `7cd0d01` (not a substitute for hosted UI): `ExportRun.run()` loads once then delivers per `owed` dest; `trailingReconcileAfterDelta` takes covering destinations into one `ReconcileSweep`; `FanoutSnapshotWriter` writes per-sink snapshots; `drainPendingDeliveries` walks owed transports; `reevaluateAutomaticExport` restarts observers on destination change. Still need requirement-by-requirement confirmation after hosted UI is green.
 - [ ] **Prove Stage 4 automated QA wedges from current CI** (~20 min)
-  - Hosted six UI shards, accessibility matrix, T1/T2 volume checks, release-gate names. Physical soak / backup / store listing stay out of scope.
+  - Release gate already names all six `ios-ui` shards, T1/T2 volume jobs, and twelve `full-state-matrix` jobs (`qa/release-gate.json`). Those checks are not proven until macos-build and a dispatched matrix succeed.
 
 ## Done (do not re-open)
 
