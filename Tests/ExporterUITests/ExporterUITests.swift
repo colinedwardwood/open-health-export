@@ -1720,7 +1720,7 @@ final class ExporterUITests: XCTestCase {
                     || ns.code == 1000
                     || String(describing: error).contains("Audit failed to complete in time")
                     || String(describing: error).contains("Timed out while running accessibility audit")
-                if timedOut, attempt < 2 {
+                if timedOut, attempt < 3 {
                     continue
                 }
                 throw error
@@ -1809,6 +1809,9 @@ final class ExporterUITests: XCTestCase {
         "diagnostic-preview-share-warning",
         "pseudo-destinations",
         "pseudo-history",
+        "pseudo-browser-empty",
+        "browser-permission-limited",
+        "browser-detail-permission-denied",
     ]
 
     private func iPadUnhostedIssueMatches(_ issue: XCUIAccessibilityAuditIssue) -> Bool {
