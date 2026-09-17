@@ -1837,8 +1837,16 @@ final class ExporterUITests: XCTestCase {
 
     private func filterBrowserToHeartRate() {
         let search = scrollData(app.textFields["browser-search"])
-        type("heart", into: search)
-        dismissKeyboard()
+        let row = app.descendants(matching: .any)["browser-row-heartRate"]
+        for attempt in 0 ..< 2 {
+            type("heart", into: search)
+            dismissKeyboard()
+            if row.waitForExistence(timeout: uiWait) { return }
+            if attempt == 0 {
+                search.tap()
+                search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 24))
+            }
+        }
     }
 
     /// A single tap does not reliably take keyboard focus on CI's simulator, and typing
@@ -1883,7 +1891,10 @@ final class ExporterUITests: XCTestCase {
         guard let keyboard = visibleKeyboard() else { return }
         // iPad keyboards carry their own hide key and do not dismiss on return, so
         // the iPhone-shaped attempts below are not enough on their own.
-        let names = ["return", "done", "hide keyboard", "dismiss"]
+        let names = [
+            "return", "done", "search", "hide keyboard", "dismiss",
+            "بحث", "إدخال",
+        ]
         for name in names {
             guard let keyboard = visibleKeyboard() else { return }
             let key = keyboard.buttons.matching(
@@ -1904,7 +1915,13 @@ final class ExporterUITests: XCTestCase {
             keyboard.swipeDown()
         }
         if keyboardIsGone() { return }
-        if let keyboard = visibleKeyboard() {
+        // LTR iPhone keyboards put Return in the bottom-trailing corner. An
+        // Arabic software keyboard does not: that same coordinate types a
+        // glyph into the field, so a search for "heart" becomes something
+        // else and `browser-row-heartRate` never appears (Air Xcode 26.6,
+        // `testBrowserDetailInRTL`). Skip the guessed tap when RTL is forced.
+        let forcedRTL = app.launchArguments.contains("-NSForceRightToLeftWritingDirection")
+        if !forcedRTL, let keyboard = visibleKeyboard() {
             keyboard.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.88)).tap()
         }
         if keyboardIsGone() { return }

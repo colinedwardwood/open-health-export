@@ -3,13 +3,13 @@
 Living checklist for code-completable Stage 3 implementation and Stage 4 automated QA.
 Updated as items finish. Times are wall-clock, including hosted CI waits.
 
-Last updated: 2026-09-17 11:55 ET (America/New_York)
+Last updated: 2026-09-17 14:56 ET (America/New_York)
 
-**Current HEAD:** `1ff6ca5` on origin; this slice names iPad-only unhosted text states and retries AX timeouts once more.
+**Current HEAD:** `17f6584` on origin (named iPad unhosted text states + third AX-timeout retry).
 
-**Last macos-build:** [`35254591575`](https://github.com/colinedwardwood/open-health-export/actions/runs/35254591575) on `1ff6ca5` — iPhone 1/2 and iPad 0/2 green; **iPad 1** inaccessible text on permission-limited + pseudo-browser-empty (nil `XCUIElement`, after Data-tab `.combine`); **iPhone 0** imported-HTTPS audit timeout (`-56` / XCTFuture 1000) then background-assertion cascade, not the earlier HTTPS contrast failure.
+**Last macos-build:** [`35261508549`](https://github.com/colinedwardwood/open-health-export/actions/runs/35261508549) on `17f6584` — in progress (darwin-package / from-source / ios-build / release-artifact-scan; mac-companion already green). Previous run [`35254591575`](https://github.com/colinedwardwood/open-health-export/actions/runs/35254591575) on `1ff6ca5` failed iPad 1 (nil-element inaccessible text) and iPhone 0 (audit timeout cascade).
 
-**Do not push again** until the replacement macos-build UI shards finish.
+**Do not push again** until those UI shards finish.
 
 **Estimate if the next macos-build is green:** about **5–9 hours** remaining.
 **Estimate if another hosted UI cycle is needed:** add **2–4 hours** per cycle.
@@ -46,15 +46,27 @@ Out of scope (not on this list as work to do): physical-device / R-71 soak, back
   - Last dispatch (`35106994795` on `e8cc1ba`) failed iPhone 1 / iPad 2, 4, 5. Keyboard empty-query and iPad DeviceNoun copy should already be fixed on `7cd0d01`.
 - [ ] **Fix any matrix findings** (0 if green; 2–4 hours if red, plus another matrix)
 - [ ] **Local iPhone UI suite** (~20–40 min) — Air, in parallel with hosted matrix / macos-build
-- [ ] **Local iPad UI suite** (~30–90 min) — this Mac or Air, in parallel with the iPhone suite
+  - In progress on Xcode 26.6 `iPhone 17 Pro`. `testBrowserDetailInRTL` failed: after the keyboard corner-tap fallback, `browser-row-heartRate` never appeared (likely an Arabic glyph typed into search). Uncommitted test fix waits until hosted shards finish: skip the 0.92/0.88 tap under forced RTL, retry the filter once.
+  - That case is **ios-ui shard 2** (`scripts/ui-test-shard.sh 2 3`). Hosted `ios-ui (2, iPhone)` is in flight on `17f6584` with `-retry-tests-on-failure`; do not push over it.
+- [ ] **Local iPad UI suite** (~30–90 min) — this Mac Xcode 27, in progress; `testBrowserDetailInRTL` passed here.
 - [ ] **Configure `main` branch protection** (~15 min)
   - Only after the last direct-push implementation slice. Not before.
 
 ## Completion audit (do not skip)
 
-- [ ] **Prove Stage 3 one-read / N-sink fan-out and automatic orchestration from current `main`** (~20 min)
-  - Tree check on `0a40fbb` (not a substitute for hosted UI): `ExportRun.run()` loads `source.page` once, `commitFanout` for every owed dest, then `deliver` per `attemptNow`. `trailingReconcileAfterDelta` takes covering destinations into one `ReconcileSweep`. `FanoutSnapshotWriter` writes per-sink snapshots. Multi-dest export drains each `attemptNow` destination before the new read. `reevaluateAutomaticExport` restarts observers on destination change.
-  - Local `swift test` on `0a40fbb` passed: `automaticFanoutSkipsManualOnlyDestinationsWithoutASecondRead`, `backgroundFanoutQueuesADestinationWithoutAttemptingIt`, `fanoutRetainsPayloadUntilEveryDestinationSettles`, `r08TrailingReconcileFansOutFromOneRead`. Still need requirement-by-requirement confirmation after hosted UI is green.
+- [x] **Prove Stage 3 one-read / N-sink fan-out and automatic orchestration from current `main`** (engine + unit tests on `17f6584`; hosted UI is Stage 4)
+  - Tree on `17f6584`: `ExportRun.run()` loads `source.page` once, `commitFanout` for every owed dest, then `deliver` per `attemptNow`. `runFanout()` adds per-sink rows. `owedDestinations()` applies AR-15. `trailingReconcileAfterDelta` uses one `ReconcileSweep`. `FanoutSnapshotWriter` writes per-sink snapshots. `drainPendingDeliveries` runs before a new read. `reevaluateAutomaticExport` restarts observers. Unreconstructed destinations get their own failure in `HarnessExport`. Schema v20 `deliveries` is `(batch_id, destination_id)`.
+  - Local `swift test` on `17f6584` (this Mac, 2026-09-17 14:58 ET), 23/23:
+    AR-02 `oneReadFansOutToTwoDestinations`, `fanoutProjectsANarrowerDestinationFromOneCanonicalBatch`, `fanoutExpectedRecordCountRespectsDestinationStart`;
+    R-03 `r03BatchIdentityIsUUIDv7AndTimeOrdered`, `r03PendingBatchIdentityCannotBeReused`;
+    AR-14 `ar14BatchSequenceIsMonotonicAndScopedToTheExporter`;
+    AR-15 `ar15ManualOnlyRoleRejectsEveryAutomaticTrigger`, `ar15ManualOnlySnapshotSurvivesOutcomesAndRoundTrips`, `automaticFanoutSkipsManualOnlyDestinationsWithoutASecondRead`;
+    retain/unlink `fanoutRetainsPayloadUntilEveryDestinationSettles`, `aSettledBatchLeavesNoQueuedPayloadBehind`, `evictingABatchClearsEveryDestinationObligation`, `fanoutObligationsSurviveSQLiteReopen`;
+    companion `backgroundFanoutQueuesADestinationWithoutAttemptingIt`, `companionTransportIsAttemptedOnlyFromForegroundOrExplicitUI`;
+    v20 `deliveryAuditKeepsOneRowPerDestinationAcrossTheV20Migration`, `pendingDeliveryRunnerDoesNotSendAnotherDestinationObligation`;
+    R-08 `r08TrailingReconcileFansOutFromOneRead`, `aFullReconcileRepairsEveryDestinationFromOneHistoryRead`, `aTrailingReconcileRepairsEveryDestinationFromOneWindowRead`, `aRepairSweepReportsARowForEveryDestinationItWasOwedTo`;
+    R-11 park `backfillParksWhenDestinationBreakerIsOpen`;
+    history/OTLP `otlpBacklogKeepsPerDestinationChildRowsOnDevice`.
 - [ ] **Prove Stage 4 automated QA wedges from current CI** (~20 min)
   - Release gate already names all six `ios-ui` shards, T1/T2 volume jobs, and twelve `full-state-matrix` jobs (`qa/release-gate.json`). Those checks are not proven until macos-build and a dispatched matrix succeed.
 
