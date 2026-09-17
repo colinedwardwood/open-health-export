@@ -1450,13 +1450,15 @@ struct HarnessView: View {
                 .accessibilityIdentifier("mqtt-qos")
             Button("At most once (0)") { mqttQoS = 0 }
                 .font(.body)
+                .foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
-                .disabled(mqttQoS == 0)
+                .fontWeight(mqttQoS == 0 ? .semibold : .regular)
                 .accessibilityIdentifier("mqtt-qos-0")
             Button("At least once (1)") { mqttQoS = 1 }
                 .font(.body)
+                .foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
-                .disabled(mqttQoS == 1)
+                .fontWeight(mqttQoS == 1 ? .semibold : .regular)
                 .accessibilityIdentifier("mqtt-qos-1")
             Button("Choose MQTT client PKCS#12") {
                 pickingMQTTPKCS12 = true
@@ -1669,7 +1671,7 @@ struct HarnessView: View {
                         .multilineTextAlignment(.leading)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         .accessibilityIdentifier("history-row-\(index)")
                 }
             } else {
@@ -2495,12 +2497,14 @@ struct HarnessView: View {
                         Task { await loadDestinationScope(id) }
                     }
                     .font(.body)
+                    .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
-                    .disabled(scopeDestinationID == id)
+                    .fontWeight(scopeDestinationID == id ? .semibold : .regular)
                     .accessibilityIdentifier("scope-destination-\(id)")
                 }
                 Text("Each destination starts with zero types. Choose a destination, types, and the earliest date it may receive.")
                     .font(.footnote)
+                    .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("scope-zero-default")
                 if browserSelection.isEmpty {
@@ -2653,8 +2657,9 @@ struct HarnessView: View {
                         displayUnitPreference = preference
                     }
                     .font(.body)
+                    .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
-                    .disabled(displayUnitPreference == preference)
+                    .fontWeight(displayUnitPreference == preference ? .semibold : .regular)
                     .accessibilityIdentifier("browser-display-units-\(preference.rawValue)")
                 }
                 Text("Time format")
@@ -2667,8 +2672,9 @@ struct HarnessView: View {
                         clockDisplay = choice
                     }
                     .font(.body)
+                    .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
-                    .disabled(clockDisplay == choice)
+                    .fontWeight(clockDisplay == choice ? .semibold : .regular)
                     .accessibilityIdentifier("browser-time-format-\(choice.rawValue)")
                 }
                 Text("Sample times read as \(clockDisplay.timeString(Date(), locale: Locale.current, timeZone: .current)).")
@@ -4053,6 +4059,9 @@ struct HarnessView: View {
 private struct HarnessButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .font(.body)
+            .foregroundStyle(.primary)
+            .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .contentShape(Rectangle())
             .opacity(configuration.isPressed ? 0.7 : 1)
