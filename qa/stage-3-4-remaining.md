@@ -3,11 +3,11 @@
 Living checklist for code-completable Stage 3 implementation and Stage 4 automated QA.
 Updated as items finish. Times are wall-clock, including hosted CI waits.
 
-Last updated: 2026-09-17 12:45 ET (America/New_York)
+Last updated: 2026-09-17 13:44 ET (America/New_York)
 
-**Current HEAD:** pushing iPad 1 contrast fix after `2541039`.
+**Current HEAD:** pushing Data-tab AX combine + empty/search/share contrast after `e0ff3ff`.
 
-**Last macos-build:** [`35242881667`](https://github.com/colinedwardwood/open-health-export/actions/runs/35242881667) — linux-core green; **iPhone 0 green** (HTTPS contrast); **iPad 1 failed** permission-limited + share-warning contrast. Other UI shards green.
+**Last macos-build:** [`35248617231`](https://github.com/colinedwardwood/open-health-export/actions/runs/35248617231) — iPhone 0/2 and iPad 0/2 green; **iPad 1** permission-limited inaccessible text; **iPhone 1** pseudo-locale empty inaccessible text + share-warning contrast.
 
 **Do not push again** until the replacement macos-build UI shards finish.
 

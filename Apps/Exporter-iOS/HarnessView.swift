@@ -1884,7 +1884,8 @@ struct HarnessView: View {
                 // or Full Keyboard Access. Visibility, not an onAppear, is the evidence:
                 // a ScrollView builds every child eagerly whether it is on screen or not.
                 Text("End of diagnostic bundle")
-                    .font(.footnote)
+                    .font(.body)
+                    .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("diagnostic-end")
                     // A low threshold is the honest one: the marker sits below every line
@@ -1912,6 +1913,8 @@ struct HarnessView: View {
                         Button("I understand — show sharing") {
                             shareProtectionAcknowledged = true
                         }
+                        .font(.body)
+                        .foregroundStyle(.primary)
                         .frame(minHeight: 44)
                         .accessibilityIdentifier("share-protection-continue")
                     }
@@ -2689,8 +2692,10 @@ struct HarnessView: View {
                     .accessibilityIdentifier("browser-search")
                 if rows.isEmpty {
                     Text("No data types match your search.")
-                        .font(.footnote)
+                        .font(.body)
+                        .foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         .accessibilityLabel("No data types match your search.")
                         .accessibilityIdentifier("browser-empty")
                 }
@@ -2740,7 +2745,7 @@ struct HarnessView: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .accessibilityElement(children: .ignore)
+                    .accessibilityElement(children: .combine)
                     .accessibilityLabel("\(row.title), \(row.subtitle)")
                     .accessibilityIdentifier("browser-row-\(row.metric.rawValue)")
                 }
@@ -2765,7 +2770,9 @@ struct HarnessView: View {
             Text("Source: \(latest.source?.name ?? "Unknown")").font(.footnote)
         } else {
             Text(DataBrowser.emptyDetailCopy)
-                .font(.footnote)
+                .font(.body)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("browser-detail-empty")
         }
         Text("Exported to").font(.caption)
