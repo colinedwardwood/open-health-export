@@ -2669,30 +2669,43 @@ struct HarnessView: View {
                     .accessibilityLabel("Display units")
                     .accessibilityIdentifier("browser-display-units")
                 ForEach(DisplayUnitPreference.allCases, id: \.self) { preference in
-                    Button(preference.label) {
+                    Button {
                         displayUnitPreference = preference
+                    } label: {
+                        Text(preference.label)
+                            .font(.body)
+                            .foregroundStyle(.primary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .fontWeight(displayUnitPreference == preference ? .semibold : .regular)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
                     }
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .fontWeight(displayUnitPreference == preference ? .semibold : .regular)
-                    .buttonStyle(HarnessButtonStyle())
+                    .buttonStyle(.plain)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(preference.label)
                     .accessibilityIdentifier("browser-display-units-\(preference.rawValue)")
                 }
                 Text("Time format")
                     .font(.body)
+                    .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityLabel("Time format")
                     .accessibilityIdentifier("browser-time-format")
                 ForEach(ClockDisplay.allCases, id: \.self) { choice in
-                    Button(choice.label) {
+                    Button {
                         clockDisplay = choice
+                    } label: {
+                        Text(choice.label)
+                            .font(.body)
+                            .foregroundStyle(.primary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .fontWeight(clockDisplay == choice ? .semibold : .regular)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
                     }
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .fontWeight(clockDisplay == choice ? .semibold : .regular)
-                    .buttonStyle(HarnessButtonStyle())
+                    .buttonStyle(.plain)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(choice.label)
                     .accessibilityIdentifier("browser-time-format-\(choice.rawValue)")
                 }
                 Text("Sample times read as \(clockDisplay.timeString(Date(), locale: Locale.current, timeZone: .current)).")
