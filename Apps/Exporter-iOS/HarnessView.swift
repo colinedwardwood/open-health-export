@@ -1905,10 +1905,10 @@ struct HarnessView: View {
                         .accessibilityIdentifier("diagnostic-share")
                     } else {
                         Text(ShareDisclosure.copy)
-                            .font(.footnote)
-                            .foregroundStyle(.primary)
+                            .font(.body)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("share-protection-warning")
+                            .attentionBanner()
                         Button("I understand — show sharing") {
                             shareProtectionAcknowledged = true
                         }
@@ -2499,6 +2499,7 @@ struct HarnessView: View {
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
                     .fontWeight(scopeDestinationID == id ? .semibold : .regular)
+                    .buttonStyle(HarnessButtonStyle())
                     .accessibilityIdentifier("scope-destination-\(id)")
                 }
                 Text("Each destination starts with zero types. Choose a destination, types, and the earliest date it may receive.")
@@ -2659,6 +2660,7 @@ struct HarnessView: View {
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
                     .fontWeight(displayUnitPreference == preference ? .semibold : .regular)
+                    .buttonStyle(HarnessButtonStyle())
                     .accessibilityIdentifier("browser-display-units-\(preference.rawValue)")
                 }
                 Text("Time format")
@@ -2674,6 +2676,7 @@ struct HarnessView: View {
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
                     .fontWeight(clockDisplay == choice ? .semibold : .regular)
+                    .buttonStyle(HarnessButtonStyle())
                     .accessibilityIdentifier("browser-time-format-\(choice.rawValue)")
                 }
                 Text("Sample times read as \(clockDisplay.timeString(Date(), locale: Locale.current, timeZone: .current)).")
@@ -2743,8 +2746,6 @@ struct HarnessView: View {
                 }
             }
         }
-        .buttonStyle(HarnessButtonStyle())
-        .controlSize(.large)
     }
 
     @ViewBuilder

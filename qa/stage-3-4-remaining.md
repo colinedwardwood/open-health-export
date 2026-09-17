@@ -3,11 +3,11 @@
 Living checklist for code-completable Stage 3 implementation and Stage 4 automated QA.
 Updated as items finish. Times are wall-clock, including hosted CI waits.
 
-Last updated: 2026-09-17 11:47 ET (America/New_York)
+Last updated: 2026-09-17 12:45 ET (America/New_York)
 
-**Current HEAD:** pushing Data-tab `HarnessButtonStyle`, MQTT QoS catalog strings, and history/export-role contrast after `0a40fbb`.
+**Current HEAD:** pushing iPad 1 contrast fix after `2541039`.
 
-**Last macos-build:** [`35235939172`](https://github.com/colinedwardwood/open-health-export/actions/runs/35235939172) — 5/6 UI shards green; **ios-ui (0, iPhone) failed** twice on contrast `scope-destination-https` (20pt, enabled). Linux was already red on QA-27 MQTT labels.
+**Last macos-build:** [`35242881667`](https://github.com/colinedwardwood/open-health-export/actions/runs/35242881667) — linux-core green; **iPhone 0 green** (HTTPS contrast); **iPad 1 failed** permission-limited + share-warning contrast. Other UI shards green.
 
 **Do not push again** until the replacement macos-build UI shards finish.
 
@@ -27,9 +27,9 @@ Out of scope (not on this list as work to do): physical-device / R-71 soak, back
 - [ ] **Wait for macos-build after this push** (~50–90 min)
   - Do not push again while those shards are in flight.
 - [x] **r84-determinism arm apt 404**
-  - Green on `2e0182f`. QA-27 MQTT labels still need the catalog on this push.
+  - Green on `2e0182f`. QA-27 MQTT labels green on `2541039`.
 - [x] **Selected destination / unit / time / QoS choices stay enabled at primary contrast**
-  - `0a40fbb` was not enough for Data-tab HTTPS (20pt default chrome). This push applies `HarnessButtonStyle` to the Data tab.
+  - `2541039` fixed iPhone 0 HTTPS. This push keeps that chrome on choice buttons only so catalogue rows are not restyled.
 
 ## After hosted UI is green
 
