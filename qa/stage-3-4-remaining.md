@@ -3,9 +3,13 @@
 Living checklist for code-completable Stage 3 implementation and Stage 4 automated QA.
 Updated as items finish. Times are wall-clock, including hosted CI waits.
 
-Last updated: 2026-09-17 09:44 ET (America/New_York)
+Last updated: 2026-09-17 11:47 ET (America/New_York)
 
-**Current HEAD:** pushing contrast, dismiss-after-type, and body-sized choice buttons after `10c1a41` UI failures (iPhone 1/2, iPad 0). Remaining shards cancelled by this push.
+**Current HEAD:** pushing Data-tab `HarnessButtonStyle`, MQTT QoS catalog strings, and history/export-role contrast after `0a40fbb`.
+
+**Last macos-build:** [`35235939172`](https://github.com/colinedwardwood/open-health-export/actions/runs/35235939172) — 5/6 UI shards green; **ios-ui (0, iPhone) failed** twice on contrast `scope-destination-https` (20pt, enabled). Linux was already red on QA-27 MQTT labels.
+
+**Do not push again** until the replacement macos-build UI shards finish.
 
 **Estimate if the next macos-build is green:** about **6–10 hours** remaining.
 **Estimate if another hosted UI cycle is needed:** add **2–4 hours** per cycle.
@@ -16,14 +20,16 @@ Out of scope (not on this list as work to do): physical-device / R-71 soak, back
 
 ## Now (blocking hosted UI)
 
-- [ ] **Type into fields when the hardware keyboard has focus**
-  - Property access failed hosted compile; KVC `hasKeyboardFocus` is the replacement.
+- [x] **Type into fields when the hardware keyboard has focus**
+  - Hosted Xcode 26 overlay has no `XCUIElement.hasKeyboardFocus`; tests use KVC `value(forKey: "hasKeyboardFocus")`. Empty typed Keyboard queries stay forbidden.
 - [x] **Assert paused-anchor banner after disclosure**
 - [ ] **Watch XXXL launch flake** (no extra code unless it repeats)
 - [ ] **Wait for macos-build after this push** (~50–90 min)
   - Do not push again while those shards are in flight.
 - [x] **r84-determinism arm apt 404**
-  - Green on `2e0182f`.
+  - Green on `2e0182f`. QA-27 MQTT labels still need the catalog on this push.
+- [x] **Selected destination / unit / time / QoS choices stay enabled at primary contrast**
+  - `0a40fbb` was not enough for Data-tab HTTPS (20pt default chrome). This push applies `HarnessButtonStyle` to the Data tab.
 
 ## After hosted UI is green
 
@@ -38,7 +44,8 @@ Out of scope (not on this list as work to do): physical-device / R-71 soak, back
 ## Completion audit (do not skip)
 
 - [ ] **Prove Stage 3 one-read / N-sink fan-out and automatic orchestration from current `main`** (~20 min)
-  - Tree check on `7cd0d01` (not a substitute for hosted UI): `ExportRun.run()` loads once then delivers per `owed` dest; `trailingReconcileAfterDelta` takes covering destinations into one `ReconcileSweep`; `FanoutSnapshotWriter` writes per-sink snapshots; `drainPendingDeliveries` walks owed transports; `reevaluateAutomaticExport` restarts observers on destination change. Still need requirement-by-requirement confirmation after hosted UI is green.
+  - Tree check on `0a40fbb` (not a substitute for hosted UI): `ExportRun.run()` loads `source.page` once, `commitFanout` for every owed dest, then `deliver` per `attemptNow`. `trailingReconcileAfterDelta` takes covering destinations into one `ReconcileSweep`. `FanoutSnapshotWriter` writes per-sink snapshots. Multi-dest export drains each `attemptNow` destination before the new read. `reevaluateAutomaticExport` restarts observers on destination change.
+  - Local `swift test` on `0a40fbb` passed: `automaticFanoutSkipsManualOnlyDestinationsWithoutASecondRead`, `backgroundFanoutQueuesADestinationWithoutAttemptingIt`, `fanoutRetainsPayloadUntilEveryDestinationSettles`, `r08TrailingReconcileFansOutFromOneRead`. Still need requirement-by-requirement confirmation after hosted UI is green.
 - [ ] **Prove Stage 4 automated QA wedges from current CI** (~20 min)
   - Release gate already names all six `ios-ui` shards, T1/T2 volume jobs, and twelve `full-state-matrix` jobs (`qa/release-gate.json`). Those checks are not proven until macos-build and a dispatched matrix succeed.
 

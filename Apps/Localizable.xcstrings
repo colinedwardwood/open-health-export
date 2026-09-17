@@ -1399,6 +1399,28 @@
         }
       }
     },
+    "MQTT QoS, At least once (1)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MQTT QoS, At least once (1)"
+          }
+        }
+      }
+    },
+    "MQTT QoS, At most once (0)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MQTT QoS, At most once (0)"
+          }
+        }
+      }
+    },
     "MQTT broker URL": {
       "extractionState": "manual",
       "localizations": {

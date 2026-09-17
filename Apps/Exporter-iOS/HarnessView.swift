@@ -1129,7 +1129,7 @@ struct HarnessView: View {
                                 refreshDestinationSurfaces()
                                 Task { await reevaluateAutomaticExport() }
                             }
-                            .disabled(role == .designated)
+                            .fontWeight(role == .designated ? .semibold : .regular)
                             .accessibilityIdentifier(
                                 "destination-export-role-designated-\(snapshot.destinationID)"
                             )
@@ -1141,7 +1141,7 @@ struct HarnessView: View {
                                 refreshDestinationSurfaces()
                                 Task { await reevaluateAutomaticExport() }
                             }
-                            .disabled(role == .manualOnly)
+                            .fontWeight(role == .manualOnly ? .semibold : .regular)
                             .accessibilityIdentifier(
                                 "destination-export-role-manual-\(snapshot.destinationID)"
                             )
@@ -1669,7 +1669,6 @@ struct HarnessView: View {
                         .foregroundStyle(.primary)
                         .lineLimit(nil)
                         .multilineTextAlignment(.leading)
-                        .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         .accessibilityIdentifier("history-row-\(index)")
@@ -2503,7 +2502,7 @@ struct HarnessView: View {
                     .accessibilityIdentifier("scope-destination-\(id)")
                 }
                 Text("Each destination starts with zero types. Choose a destination, types, and the earliest date it may receive.")
-                    .font(.footnote)
+                    .font(.body)
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("scope-zero-default")
@@ -2744,6 +2743,8 @@ struct HarnessView: View {
                 }
             }
         }
+        .buttonStyle(HarnessButtonStyle())
+        .controlSize(.large)
     }
 
     @ViewBuilder
