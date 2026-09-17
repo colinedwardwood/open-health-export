@@ -2683,7 +2683,9 @@ struct HarnessView: View {
                     .accessibilityIdentifier("browser-time-format-\(choice.rawValue)")
                 }
                 Text("Sample times read as \(clockDisplay.timeString(Date(), locale: Locale.current, timeZone: .current)).")
-                    .font(.footnote)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("browser-time-example")
                 TextField("Search types", text: $browserSearch)
                     .textInputAutocapitalization(.never)

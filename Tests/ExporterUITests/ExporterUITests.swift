@@ -282,7 +282,7 @@ final class ExporterUITests: XCTestCase {
         type("no-such-health-type", into: search)
         XCTAssertTrue(app.staticTexts["browser-empty"].waitForExistence(timeout: uiWait))
         dismissKeyboard()
-        try performAccessibilityAudit()
+        try performAccessibilityAudit("browser-empty")
         app.terminate()
         app.launch()
         enterData()
@@ -294,7 +294,7 @@ final class ExporterUITests: XCTestCase {
         )
         row.tap()
         XCTAssertTrue(app.buttons["browser-back"].waitForExistence(timeout: uiWait))
-        try performAccessibilityAudit()
+        try performAccessibilityAudit("browser-detail")
     }
 
     func testAccessibilityExtraExtraExtraLargeContentSize() throws {
