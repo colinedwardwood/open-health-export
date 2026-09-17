@@ -1449,9 +1449,13 @@ struct HarnessView: View {
                 )
                 .accessibilityIdentifier("mqtt-qos")
             Button("At most once (0)") { mqttQoS = 0 }
+                .font(.body)
+                .fixedSize(horizontal: false, vertical: true)
                 .disabled(mqttQoS == 0)
                 .accessibilityIdentifier("mqtt-qos-0")
             Button("At least once (1)") { mqttQoS = 1 }
+                .font(.body)
+                .fixedSize(horizontal: false, vertical: true)
                 .disabled(mqttQoS == 1)
                 .accessibilityIdentifier("mqtt-qos-1")
             Button("Choose MQTT client PKCS#12") {
@@ -2490,6 +2494,8 @@ struct HarnessView: View {
                         scopeDestinationID = id
                         Task { await loadDestinationScope(id) }
                     }
+                    .font(.body)
+                    .fixedSize(horizontal: false, vertical: true)
                     .disabled(scopeDestinationID == id)
                     .accessibilityIdentifier("scope-destination-\(id)")
                 }
@@ -2632,8 +2638,10 @@ struct HarnessView: View {
                     .accessibilityIdentifier("sensitive-destination-confirm")
                 }
                 Toggle("Only types with data", isOn: $browserOnlyWithData)
+                    .foregroundStyle(.primary)
                     .accessibilityIdentifier("browser-only-with-data")
                 Toggle("Show demo values", isOn: $browserDemoMode)
+                    .foregroundStyle(.primary)
                     .accessibilityIdentifier("browser-demo-mode")
                 Text("Display units")
                     .font(.body)
@@ -2644,6 +2652,8 @@ struct HarnessView: View {
                     Button(preference.label) {
                         displayUnitPreference = preference
                     }
+                    .font(.body)
+                    .fixedSize(horizontal: false, vertical: true)
                     .disabled(displayUnitPreference == preference)
                     .accessibilityIdentifier("browser-display-units-\(preference.rawValue)")
                 }
@@ -2656,6 +2666,8 @@ struct HarnessView: View {
                     Button(choice.label) {
                         clockDisplay = choice
                     }
+                    .font(.body)
+                    .fixedSize(horizontal: false, vertical: true)
                     .disabled(clockDisplay == choice)
                     .accessibilityIdentifier("browser-time-format-\(choice.rawValue)")
                 }

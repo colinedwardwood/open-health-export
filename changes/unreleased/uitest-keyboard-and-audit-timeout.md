@@ -11,4 +11,5 @@ paused-anchor banner is asserted after first-run Continue rather than under the
 cover. An accessibility audit that times out (Xcode -56 or XCTFuture 1000) is
 tried once more before the case fails. Typing into a field accepts hardware
 keyboard focus (via KVC `hasKeyboardFocus`) when no software Keyboard row is
-in the dump.
+in the dump. Browser empty-state toggles use primary contrast. Typing dismisses
+the keyboard so later destination fields stay reachable.

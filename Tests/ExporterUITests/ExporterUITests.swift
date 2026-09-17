@@ -1860,6 +1860,7 @@ final class ExporterUITests: XCTestCase {
             "keyboard never appeared for \(field.identifier)"
         )
         field.typeText(text)
+        dismissKeyboard()
     }
 
     /// Hosted Xcode 26's XCUIElement overlay does not expose `hasKeyboardFocus`.
@@ -1921,7 +1922,7 @@ final class ExporterUITests: XCTestCase {
     /// `firstMatch`, `element(boundBy:)`, and `waitForExistence`. Walk the dumped
     /// tree first; only resolve the typed query after a Keyboard row is present.
     private func visibleKeyboard() -> XCUIElement? {
-        guard app.debugDescription.contains("Keyboard, {") else { return nil }
+        guard app.debugDescription.contains("Keyboard") else { return nil }
         let keyboard = app.keyboards.firstMatch
         guard keyboard.exists else { return nil }
         let window = app.windows.firstMatch.frame

@@ -3,9 +3,9 @@
 Living checklist for code-completable Stage 3 implementation and Stage 4 automated QA.
 Updated as items finish. Times are wall-clock, including hosted CI waits.
 
-Last updated: 2026-09-17 09:00 ET (America/New_York)
+Last updated: 2026-09-17 09:44 ET (America/New_York)
 
-**Current HEAD:** `ios-build` on `214cd91` failed: XCUIElement has no `hasKeyboardFocus` member. Pushing KVC focus check.
+**Current HEAD:** pushing contrast, dismiss-after-type, and body-sized choice buttons after `10c1a41` UI failures (iPhone 1/2, iPad 0). Remaining shards cancelled by this push.
 
 **Estimate if the next macos-build is green:** about **6–10 hours** remaining.
 **Estimate if another hosted UI cycle is needed:** add **2–4 hours** per cycle.
@@ -20,8 +20,8 @@ Out of scope (not on this list as work to do): physical-device / R-71 soak, back
   - Property access failed hosted compile; KVC `hasKeyboardFocus` is the replacement.
 - [x] **Assert paused-anchor banner after disclosure**
 - [ ] **Watch XXXL launch flake** (no extra code unless it repeats)
-- [ ] **Wait for macos-build after this push** (~50–90 min)
-  - Do not push again while those shards are in flight.
+- [ ] **Wait for remaining shards on `35224505632`, then push contrast + dismiss-after-type**
+  - Do not push while iPhone 0 / iPad shards are in flight.
 - [x] **r84-determinism arm apt 404**
   - Green on `2e0182f`.
 
