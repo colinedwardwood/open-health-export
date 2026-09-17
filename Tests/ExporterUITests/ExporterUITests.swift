@@ -1838,13 +1838,14 @@ final class ExporterUITests: XCTestCase {
     private func filterBrowserToHeartRate() {
         let search = scrollData(app.textFields["browser-search"])
         let row = app.descendants(matching: .any)["browser-row-heartRate"]
-        for attempt in 0 ..< 2 {
+        for attempt in 0 ..< 3 {
             type("heart", into: search)
-            dismissKeyboard()
             if row.waitForExistence(timeout: uiWait) { return }
-            if attempt == 0 {
+            if attempt < 2 {
                 search.tap()
-                search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 24))
+                let extra = (search.value as? String)?.count ?? 24
+                search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: max(extra, 24)))
+                dismissKeyboard()
             }
         }
     }
@@ -1915,12 +1916,11 @@ final class ExporterUITests: XCTestCase {
             keyboard.swipeDown()
         }
         if keyboardIsGone() { return }
-        // LTR Return is bottom-trailing (0.92). RTL Return is bottom-leading;
-        // tapping the trailing corner types a glyph into search (Air 26.6).
-        let forcedRTL = app.launchArguments.contains("-NSForceRightToLeftWritingDirection")
-        let cornerX: CGFloat = forcedRTL ? 0.08 : 0.92
+        // Bottom-trailing Return dismisses the software keyboard. Under RTL that
+        // same coordinate can also type a glyph; `filterBrowserToHeartRate`
+        // retries the query after clearing the field.
         if let keyboard = visibleKeyboard() {
-            keyboard.coordinate(withNormalizedOffset: CGVector(dx: cornerX, dy: 0.88)).tap()
+            keyboard.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.88)).tap()
         }
         if keyboardIsGone() { return }
         app.navigationBars.firstMatch.tap()
