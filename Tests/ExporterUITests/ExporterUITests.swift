@@ -1864,12 +1864,13 @@ final class ExporterUITests: XCTestCase {
     /// Swiping the *app* scrolls content and leaves the keyboard; swiping the keyboard
     /// itself, or tapping its return corner, is what actually puts it away.
     private func dismissKeyboard() {
-        guard keyboardIsShowing() else { return }
+        guard let keyboard = visibleKeyboard() else { return }
         // iPad keyboards carry their own hide key and do not dismiss on return, so
         // the iPhone-shaped attempts below are not enough on their own.
         let names = ["return", "done", "hide keyboard", "dismiss"]
         for name in names {
-            let key = app.keyboards.buttons.matching(
+            guard let keyboard = visibleKeyboard() else { return }
+            let key = keyboard.buttons.matching(
                 NSPredicate(
                     format: "identifier CONTAINS[cd] %@ OR label CONTAINS[cd] %@",
                     name,
@@ -1901,13 +1902,16 @@ final class ExporterUITests: XCTestCase {
     /// On iPad the keyboard element stays in the hierarchy with an empty frame,
     /// parked below the screen, when the simulator is using the hardware keyboard.
     /// Nothing is drawn over the app and there is no candidate bar for an audit to
-    /// find. Resolving `keyboards.firstMatch` or `allElementsBoundByIndex` when the
-    /// query is empty fails the test (`No matches found for Descendants matching
-    /// type Keyboard`) instead of reporting that nothing is showing.
-    /// `waitForExistence` is the query that returns false on an empty match.
+    /// find.
+    ///
+    /// Typed `app.keyboards` queries fail the hosted case when the query is empty
+    /// (`No matches found for Descendants matching type Keyboard`), including
+    /// `firstMatch`, `element(boundBy:)`, and `waitForExistence`. Walk the dumped
+    /// tree first; only resolve the typed query after a Keyboard row is present.
     private func visibleKeyboard() -> XCUIElement? {
-        let keyboard = app.keyboards.element(boundBy: 0)
-        guard keyboard.waitForExistence(timeout: 0) else { return nil }
+        guard app.debugDescription.contains("Keyboard, {") else { return nil }
+        let keyboard = app.keyboards.firstMatch
+        guard keyboard.exists else { return nil }
         let window = app.windows.firstMatch.frame
         guard keyboard.frame.height > 1, keyboard.frame.minY < window.maxY else {
             return nil

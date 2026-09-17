@@ -3,9 +3,9 @@
 Living checklist for code-completable Stage 3 implementation and Stage 4 automated QA.
 Updated as items finish. Times are wall-clock, including hosted CI waits.
 
-Last updated: 2026-09-17 07:26 ET (America/New_York)
+Last updated: 2026-09-17 08:10 ET (America/New_York)
 
-**Current HEAD:** local slice on top of `7cd0d01`. macos-build `35139143228` **completed**: five `ios-ui` shards green (all three iPhone, iPad 1/2). **iPad 0 failed** (`testDestinationsAndHistoryInRTL` accessibility audit XCTFuture 1000). Keyboard shard (iPad 1) and paused-anchor (iPhone 0 / iPad 0 XXXL+paused-anchor) are proven on this SHA except the RTL audit timeout.
+**Current HEAD:** pushing local slice after macos-build `35215696713` **failure**. iPhone 0/2 and **iPad 2 green**. iPhone 1, iPad 0, iPad 1 failed (empty Keyboard query, Dynamic Type, AX 1000).
 
 **Estimate if the next macos-build is green:** about **6–10 hours** remaining.
 **Estimate if another hosted UI cycle is needed:** add **2–4 hours** per cycle.
@@ -16,16 +16,15 @@ Out of scope (not on this list as work to do): physical-device / R-71 soak, back
 
 ## Now (blocking hosted UI)
 
-- [x] **Fix empty-keyboard XCTest queries**
-  - Proven on `35139143228` iPad 1. `visibleKeyboard()` uses `waitForExistence`.
+- [ ] **Stop empty Keyboard queries from failing XCTest** (local, unpushed)
+  - `waitForExistence` on `app.keyboards` still fails hosted Xcode 26 when the query is empty (`testMQTTSecretFieldsFlagLeadingWhitespace` twice on iPhone 1; browser empty/detail on iPad 0). Local helper now inspects `debugDescription` before any typed Keyboard query.
 - [x] **Assert paused-anchor banner after disclosure**
-  - Proven on `35139143228` iPhone 0 (and iPad 0 ran past paused-anchor).
+  - Proven on iPhone 0 of this run.
 - [ ] **Watch XXXL launch flake** (no extra code unless it repeats)
-  - Prior evidence: iPad 0 XXXL launch timeout. On `35139143228` iPad 0 XXXL passed; keep watching.
 - [ ] **Wait for macos-build after this push** (~50–90 min)
-  - Local slice retries AX audits on XCTFuture 1000 as well as Xcode -56, replaces the AR-15 menu Picker with wrapping Automatic/Manual buttons, wraps Destinations/History titles, and retries r84 apt. Do not push again while those shards are in flight.
-- [x] **r84-determinism arm apt 404** (infra; rerun succeeded)
-  - Apt retry is in this commit.
+  - Do not push again while those shards are in flight.
+- [x] **r84-determinism arm apt 404**
+  - Green on `2e0182f`.
 
 ## After hosted UI is green
 

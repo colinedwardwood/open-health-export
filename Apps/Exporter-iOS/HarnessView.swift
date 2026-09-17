@@ -1440,12 +1440,18 @@ struct HarnessView: View {
             Text("Use {{exporterId|raw}} and {{batchId|raw}} if the broker needs a templated topic.")
                 .font(.footnote)
                 .foregroundStyle(.primary)
-            Picker("MQTT QoS", selection: $mqttQoS) {
-                Text("At most once (0)").tag(UInt8(0))
-                Text("At least once (1)").tag(UInt8(1))
-            }
-            .frame(minHeight: 44)
-            .accessibilityIdentifier("mqtt-qos")
+            Text(mqttQoS == 0 ? "At most once (0)" : "At least once (1)")
+                .font(.body)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(minHeight: 44)
+                .accessibilityLabel("MQTT QoS")
+                .accessibilityIdentifier("mqtt-qos")
+            Button("At most once (0)") { mqttQoS = 0 }
+                .disabled(mqttQoS == 0)
+                .accessibilityIdentifier("mqtt-qos-0")
+            Button("At least once (1)") { mqttQoS = 1 }
+                .disabled(mqttQoS == 1)
+                .accessibilityIdentifier("mqtt-qos-1")
             Button("Choose MQTT client PKCS#12") {
                 pickingMQTTPKCS12 = true
             }
@@ -2464,16 +2470,26 @@ struct HarnessView: View {
                 .fontWeight(browserDemoMode ? .semibold : .regular)
 
             if selectedDetail == nil {
-                Picker("Export destination", selection: $scopeDestinationID) {
-                    Text("Archive folder").tag("local-file")
-                    Text("HTTPS").tag("https")
-                    Text("Home Assistant").tag("home-assistant")
-                    Text("MQTT").tag("mqtt")
-                    Text("Mac companion").tag("companion")
-                }
-                .accessibilityIdentifier("scope-destination")
-                .onChange(of: scopeDestinationID) { _, destinationID in
-                    Task { await loadDestinationScope(destinationID) }
+                Text("Export destination")
+                    .font(.body)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("scope-destination")
+                ForEach(
+                    [
+                        ("local-file", "Archive folder"),
+                        ("https", "HTTPS"),
+                        ("home-assistant", "Home Assistant"),
+                        ("mqtt", "MQTT"),
+                        ("companion", "Mac companion"),
+                    ],
+                    id: \.0
+                ) { id, title in
+                    Button(title) {
+                        scopeDestinationID = id
+                        Task { await loadDestinationScope(id) }
+                    }
+                    .disabled(scopeDestinationID == id)
+                    .accessibilityIdentifier("scope-destination-\(id)")
                 }
                 Text("Each destination starts with zero types. Choose a destination, types, and the earliest date it may receive.")
                     .font(.footnote)
@@ -2617,20 +2633,30 @@ struct HarnessView: View {
                     .accessibilityIdentifier("browser-only-with-data")
                 Toggle("Show demo values", isOn: $browserDemoMode)
                     .accessibilityIdentifier("browser-demo-mode")
-                Picker("Display units", selection: $displayUnitPreference) {
-                    ForEach(DisplayUnitPreference.allCases, id: \.self) { preference in
-                        Text(preference.label).tag(preference)
+                Text("Display units")
+                    .font(.body)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityLabel("Display units")
+                    .accessibilityIdentifier("browser-display-units")
+                ForEach(DisplayUnitPreference.allCases, id: \.self) { preference in
+                    Button(preference.label) {
+                        displayUnitPreference = preference
                     }
+                    .disabled(displayUnitPreference == preference)
+                    .accessibilityIdentifier("browser-display-units-\(preference.rawValue)")
                 }
-                .accessibilityLabel("Display units")
-                .accessibilityIdentifier("browser-display-units")
-                Picker("Time format", selection: $clockDisplay) {
-                    ForEach(ClockDisplay.allCases, id: \.self) { choice in
-                        Text(choice.label).tag(choice)
+                Text("Time format")
+                    .font(.body)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityLabel("Time format")
+                    .accessibilityIdentifier("browser-time-format")
+                ForEach(ClockDisplay.allCases, id: \.self) { choice in
+                    Button(choice.label) {
+                        clockDisplay = choice
                     }
+                    .disabled(clockDisplay == choice)
+                    .accessibilityIdentifier("browser-time-format-\(choice.rawValue)")
                 }
-                .accessibilityLabel("Time format")
-                .accessibilityIdentifier("browser-time-format")
                 Text("Sample times read as \(clockDisplay.timeString(Date(), locale: Locale.current, timeZone: .current)).")
                     .font(.footnote)
                     .accessibilityIdentifier("browser-time-example")
@@ -2667,16 +2693,21 @@ struct HarnessView: View {
                                     Image(systemName: browserSelection.contains(row.metric)
                                         ? "checkmark.circle.fill"
                                         : "circle")
+                                        .font(.body)
                                         .accessibilityHidden(true)
                                 }
                                 Text(row.title)
+                                    .font(.body)
+                                    .fixedSize(horizontal: false, vertical: true)
                                 if row.reidentifying {
                                     Text(DataBrowser.reidentifyingBadge)
                                         .font(.body)
+                                        .fixedSize(horizontal: false, vertical: true)
                                         .foregroundStyle(.primary)
                                 } else if row.sensitive {
                                     Text("sensitive")
                                         .font(.body)
+                                        .fixedSize(horizontal: false, vertical: true)
                                         .foregroundStyle(.primary)
                                 }
                             }
