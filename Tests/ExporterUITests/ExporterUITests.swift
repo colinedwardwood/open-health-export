@@ -1915,14 +1915,12 @@ final class ExporterUITests: XCTestCase {
             keyboard.swipeDown()
         }
         if keyboardIsGone() { return }
-        // LTR iPhone keyboards put Return in the bottom-trailing corner. An
-        // Arabic software keyboard does not: that same coordinate types a
-        // glyph into the field, so a search for "heart" becomes something
-        // else and `browser-row-heartRate` never appears (Air Xcode 26.6,
-        // `testBrowserDetailInRTL`). Skip the guessed tap when RTL is forced.
+        // LTR Return is bottom-trailing (0.92). RTL Return is bottom-leading;
+        // tapping the trailing corner types a glyph into search (Air 26.6).
         let forcedRTL = app.launchArguments.contains("-NSForceRightToLeftWritingDirection")
-        if !forcedRTL, let keyboard = visibleKeyboard() {
-            keyboard.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.88)).tap()
+        let cornerX: CGFloat = forcedRTL ? 0.08 : 0.92
+        if let keyboard = visibleKeyboard() {
+            keyboard.coordinate(withNormalizedOffset: CGVector(dx: cornerX, dy: 0.88)).tap()
         }
         if keyboardIsGone() { return }
         app.navigationBars.firstMatch.tap()
