@@ -1913,6 +1913,7 @@ struct HarnessView: View {
                         Button("I understand — show sharing") {
                             shareProtectionAcknowledged = true
                         }
+                        .buttonStyle(HarnessButtonStyle())
                         .font(.body)
                         .foregroundStyle(.primary)
                         .frame(minHeight: 44)
@@ -1921,7 +1922,6 @@ struct HarnessView: View {
                 }
             }
         }
-        .buttonStyle(HarnessButtonStyle())
         .controlSize(.large)
     }
 
