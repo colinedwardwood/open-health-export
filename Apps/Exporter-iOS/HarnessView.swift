@@ -2523,8 +2523,14 @@ struct HarnessView: View {
                     selection: $scopeStartDate,
                     displayedComponents: .date
                 )
+                .font(.body)
+                .foregroundStyle(.primary)
                 .accessibilityIdentifier("scope-start-date")
                 Toggle("Stop sending after a date", isOn: $scopeEndEnabled)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Stop sending after a date")
                     .accessibilityIdentifier("scope-end-enabled")
                 if scopeEndEnabled {
                     DatePicker(
@@ -2646,10 +2652,16 @@ struct HarnessView: View {
                     .accessibilityIdentifier("sensitive-destination-confirm")
                 }
                 Toggle("Only types with data", isOn: $browserOnlyWithData)
+                    .font(.body)
                     .foregroundStyle(.primary)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Only types with data")
                     .accessibilityIdentifier("browser-only-with-data")
                 Toggle("Show demo values", isOn: $browserDemoMode)
+                    .font(.body)
                     .foregroundStyle(.primary)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Show demo values")
                     .accessibilityIdentifier("browser-demo-mode")
                 Text("Display units")
                     .font(.body)
@@ -2759,7 +2771,9 @@ struct HarnessView: View {
     @ViewBuilder
     private func dataBrowserDetail(_ detail: DataBrowserDetail) -> some View {
         if let latest = detail.latest {
-            Text("Latest").font(.caption)
+            Text("Latest")
+                .font(.body)
+                .foregroundStyle(.primary)
             Text(
                 "\(DataBrowser.formatValue(detail.displayValue ?? latest.value)) "
                     + detail.displayUnit
@@ -2778,7 +2792,9 @@ struct HarnessView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("browser-detail-empty")
         }
-        Text("Exported to").font(.caption)
+        Text("Exported to")
+            .font(.body)
+            .foregroundStyle(.primary)
         if detail.destinations.isEmpty {
             Text("Not included in any export.")
         } else {
@@ -2793,10 +2809,15 @@ struct HarnessView: View {
                 .accessibilityIdentifier("browser-index-horizon")
         }
         if let explanation = detail.aggregationExplanation {
-            Text("Daily buckets (this is what we export)").font(.caption)
+            Text("Daily buckets (this is what we export)")
+                .font(.body)
+                .foregroundStyle(.primary)
             Text("Computed as: \(explanation)").font(.footnote)
         }
-        Text("Samples").font(.caption)
+        Text("Samples")
+            .font(.body)
+            .foregroundStyle(.primary)
+            .accessibilityIdentifier("browser-detail-samples")
         ForEach(detail.samples, id: \.key.uuid) { sample in
             Text("\(DataBrowser.formatValue(sample.value)) \(detail.exportUnit) · \(sample.start)")
                 .font(.footnote)

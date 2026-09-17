@@ -1800,10 +1800,11 @@ final class ExporterUITests: XCTestCase {
         "iPadUnhostedPotentiallyInaccessibleText": trackingIssue,
     ]
 
-    /// iPadOS 26.5 sometimes returns a text-detection or clipped-text audit finding
-    /// with no `XCUIElement`, despite the queried SwiftUI controls being present in
-    /// the accessibility tree. Keep this exception restricted to the reproduced
-    /// states instead of suppressing unattributed text findings globally.
+    /// iPadOS 26.5 sometimes returns a text-detection, element-detection, or
+    /// clipped-text audit finding with no `XCUIElement`, despite the queried
+    /// SwiftUI controls being present in the accessibility tree. Keep this
+    /// exception restricted to the reproduced states instead of suppressing
+    /// unattributed findings globally.
     private static let iPadUnhostedTextStates: Set<String> = [
         "public-destination-confirmation",
         "diagnostic-preview-share-warning",
@@ -1812,11 +1813,13 @@ final class ExporterUITests: XCTestCase {
         "pseudo-browser-empty",
         "browser-permission-limited",
         "browser-detail-permission-denied",
+        "rtl-browser-empty",
     ]
 
     private func iPadUnhostedIssueMatches(_ issue: XCUIAccessibilityAuditIssue) -> Bool {
         let description = String(describing: issue)
         return description.contains("Potentially inaccessible text")
+            || description.contains("Potentially inaccessible element")
             || description.contains("Text clipped")
     }
 
