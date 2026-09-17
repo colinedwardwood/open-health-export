@@ -2306,6 +2306,7 @@ struct HarnessView: View {
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .contentShape(Rectangle())
+            .accessibilityElement(children: .combine)
             .accessibilityIdentifier(identifier)
     }
 
