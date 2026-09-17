@@ -3,9 +3,9 @@
 Living checklist for code-completable Stage 3 implementation and Stage 4 automated QA.
 Updated as items finish. Times are wall-clock, including hosted CI waits.
 
-Last updated: 2026-09-17 08:56 ET (America/New_York)
+Last updated: 2026-09-17 09:00 ET (America/New_York)
 
-**Current HEAD:** pushing `hasKeyboardFocus` typing fix after `6901fc9` macos-build `35219669900` failed 5/6 UI shards (iPhone 1 still in flight; same type() defect).
+**Current HEAD:** `ios-build` on `214cd91` failed: XCUIElement has no `hasKeyboardFocus` member. Pushing KVC focus check.
 
 **Estimate if the next macos-build is green:** about **6–10 hours** remaining.
 **Estimate if another hosted UI cycle is needed:** add **2–4 hours** per cycle.
@@ -16,8 +16,8 @@ Out of scope (not on this list as work to do): physical-device / R-71 soak, back
 
 ## Now (blocking hosted UI)
 
-- [ ] **Type into fields when the hardware keyboard has focus** (local, unpushed)
-  - `6901fc9` refused to type unless a software Keyboard row was in the dump. Hosted simulators often have no such row. Local `type()` now accepts `hasKeyboardFocus`.
+- [ ] **Type into fields when the hardware keyboard has focus**
+  - Property access failed hosted compile; KVC `hasKeyboardFocus` is the replacement.
 - [x] **Assert paused-anchor banner after disclosure**
 - [ ] **Watch XXXL launch flake** (no extra code unless it repeats)
 - [ ] **Wait for macos-build after this push** (~50–90 min)

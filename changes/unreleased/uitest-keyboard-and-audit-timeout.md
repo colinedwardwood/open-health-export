@@ -10,4 +10,5 @@ the resolved keyboard element rather than `app.keyboards.buttons`. The
 paused-anchor banner is asserted after first-run Continue rather than under the
 cover. An accessibility audit that times out (Xcode -56 or XCTFuture 1000) is
 tried once more before the case fails. Typing into a field accepts hardware
-keyboard focus when no software Keyboard row is in the dump.
+keyboard focus (via KVC `hasKeyboardFocus`) when no software Keyboard row is
+in the dump.

@@ -1850,16 +1850,23 @@ final class ExporterUITests: XCTestCase {
             field.tap()
             let deadline = Date().addingTimeInterval(min(10, uiWait))
             while Date() < deadline {
-                if field.hasKeyboardFocus || visibleKeyboard() != nil { break }
+                if fieldAcceptsTyping(field) { break }
                 _ = XCTWaiter().wait(for: [XCTestExpectation(description: "keyboard")], timeout: 0.25)
             }
-            if field.hasKeyboardFocus || visibleKeyboard() != nil { break }
+            if fieldAcceptsTyping(field) { break }
         }
         XCTAssertTrue(
-            field.hasKeyboardFocus || visibleKeyboard() != nil,
+            fieldAcceptsTyping(field),
             "keyboard never appeared for \(field.identifier)"
         )
         field.typeText(text)
+    }
+
+    /// Hosted Xcode 26's XCUIElement overlay does not expose `hasKeyboardFocus`.
+    /// KVC still reports focus when the simulator hardware keyboard is connected.
+    private func fieldAcceptsTyping(_ field: XCUIElement) -> Bool {
+        if visibleKeyboard() != nil { return true }
+        return (field.value(forKey: "hasKeyboardFocus") as? NSNumber)?.boolValue == true
     }
 
     /// Arabic and other software keyboards do not expose identifier `return`. A
