@@ -1667,14 +1667,13 @@ final class ExporterUITests: XCTestCase {
     }
 
     private func performAccessibilityAudit(_ state: String = #function) throws {
-        var attempt = 0
-        while true {
-            do {
-                // Resolve chrome once. Asking XCTest for bars and the settings
-                // scroll on every contrast finding is what pushed RTL empty
-                // audits past the XCTFuture deadline (-56).
-                let chrome = AccessibilityChromeSnapshot(app: app)
-                try app.performAccessibilityAudit { issue in
+        // Do not retry a timed-out audit in-process. Hosted iPhone 2 on
+        // `69cf566` spent 186s in `testBrowserEmptyStateInRTL` (-56) and
+        // then poisoned the rest of the shard with background-assertion
+        // timeouts. `-retry-tests-on-failure` relaunches cleanly; stacking
+        // inner retries does not.
+        let chrome = AccessibilityChromeSnapshot(app: app)
+        try app.performAccessibilityAudit { issue in
                     let cause: String?
                     if issue.auditType == .contrast, let element = issue.element {
                         cause = self.suppressionCause(for: element, chrome: chrome)
@@ -1720,20 +1719,6 @@ final class ExporterUITests: XCTestCase {
                     }
                     return true
                 }
-                return
-            } catch {
-                attempt += 1
-                let ns = error as NSError
-                let timedOut = ns.code == -56
-                    || ns.code == 1000
-                    || String(describing: error).contains("Audit failed to complete in time")
-                    || String(describing: error).contains("Timed out while running accessibility audit")
-                if timedOut, attempt < 3 {
-                    continue
-                }
-                throw error
-            }
-        }
     }
 
     /// Xcode 26 audits system-rendered empty SwiftUI text-field placeholders and
