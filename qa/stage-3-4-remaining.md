@@ -3,13 +3,11 @@
 Living checklist for code-completable Stage 3 implementation and Stage 4 automated QA.
 Updated as items finish. Times are wall-clock, including hosted CI waits.
 
-Last updated: 2026-09-17 21:55 ET (America/New_York)
+Last updated: 2026-09-18 10:05 ET (America/New_York)
 
-**Origin HEAD:** `8f4068f` (toggle AX, paused seed, detail caption wrap). Hosted [`35297071470`](https://github.com/colinedwardwood/open-health-export/actions/runs/35297071470) compile jobs in progress; UI shards not started.
+**Origin HEAD:** `61b8ec9`. **macos-build [`35297295677`](https://github.com/colinedwardwood/open-health-export/actions/runs/35297295677):** all three **iPhone** shards green (toggle contrast fixed); all three **iPad** shards red (Dynamic Type on 16pt captions, `browser-back` duplicate, paused-banner miss, share-warning DT, nil empty-browser text).
 
-**Prior macos-build [`35287922062`](https://github.com/colinedwardwood/open-health-export/actions/runs/35287922062) on `591279e`:** iPhone 0/2 and iPad 0 green; iPhone 1 contrast duplicate “Stop sending after a date”; iPad 2 Dynamic Type on `browser-load-health` (22.5pt) plus paused-anchor banner; iPad 1 cancelled.
-
-**Local follow-up (do not push if ios-ui has started):** 44pt wrapping Load-30-days button.
+**Local in progress:** wrapping 44pt captions + named schedule promise + iPad `browser-empty` nil-element exception.
 
 Out of scope: physical-device / R-71 soak, backup and network-capture evidence, App Store, branding, HACS.
 
@@ -28,7 +26,8 @@ Out of scope: physical-device / R-71 soak, backup and network-capture evidence, 
 - [x] **Assert paused-anchor banner after disclosure**
 - [ ] **Watch XXXL launch flake** (no extra code unless it repeats)
 - [x] **Wait for macos-build `35287922062`** — finished red; stack pushed as `8f4068f`
-- [ ] **Wait for macos-build `35297071470`** — do not push after `ios-ui` starts
+- [x] **Wait for macos-build `35297071470`** — cancelled by `61b8ec9`
+- [x] **Wait for macos-build `35297295677` on `61b8ec9`** — iPhone green; iPad red
 - [x] **r84-determinism arm apt 404**
 - [x] **Selected destination / unit / time / QoS choices stay enabled at primary contrast**
 - [x] **Data-tab catalogue rows stay VoiceOver-visible** (`children: .combine`)

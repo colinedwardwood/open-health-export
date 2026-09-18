@@ -10,3 +10,5 @@ The data browser appears before advanced controls, uses Dynamic Type for
 sensitivity labels, and keeps enabled text at system-primary contrast. UI
 audits suppress only Xcode 26's known disabled-control contrast false positive,
 tracked in issue #4; enabled contrast findings still fail.
+Status, history, diagnostic, and Data-tab back controls use wrapping 44-point
+Dynamic Type captions so iPad AX5 and RTL audits do not report 16-point copy.

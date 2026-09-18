@@ -61,7 +61,8 @@ final class ExporterUITests: XCTestCase {
         )
         XCTAssertTrue(app.otherElements["scheduling-honesty"].waitForExistence(timeout: uiWait))
         XCTAssertTrue(
-            app.staticTexts["Nothing here promises a send at 3 a.m."].exists
+            app.staticTexts["scheduling-honesty-promise"].exists
+                || app.staticTexts["Nothing here promises a send at 3 a.m."].exists
         )
 
         disclosure.tap()
@@ -1814,6 +1815,7 @@ final class ExporterUITests: XCTestCase {
         "browser-permission-limited",
         "browser-detail-permission-denied",
         "rtl-browser-empty",
+        "browser-empty",
     ]
 
     private func iPadUnhostedIssueMatches(_ issue: XCUIAccessibilityAuditIssue) -> Bool {

@@ -510,6 +510,9 @@ struct HarnessView: View {
                 }
                 #endif
                 await refreshQueueGaps()
+                #if DEBUG
+                reapplySeededAnchorHoldIfNeeded()
+                #endif
                 await refreshCoverageWindows()
                 if disclosureAcknowledged,
                    !foregroundCatchUpStarted,
@@ -696,14 +699,16 @@ struct HarnessView: View {
     private var schedulingHonesty: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(SchedulingHonesty.title)
-                .font(.subheadline)
+                .font(.body)
                 .fontWeight(.semibold)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             Text(SchedulingHonesty.body)
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingPrimaryCaption()
             Text(SchedulingHonesty.noSchedulePromise)
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingPrimaryCaption()
+                .accessibilityIdentifier("scheduling-honesty-promise")
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("scheduling-honesty")
@@ -942,13 +947,11 @@ struct HarnessView: View {
             .disabled(phase == .working)
 
             Text("This is not a medical device. It does not diagnose or treat anything.")
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingPrimaryCaption()
                 .accessibilityIdentifier("about-disclaimer")
 
             Text("HealthKit provides no deletion callback. Tombstones are best-effort when iOS next reports a deletion; a full reconcile repairs deletions that were not reported.")
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingPrimaryCaption()
                 .accessibilityIdentifier("deletion-behaviour")
 
             Button("Run R-70 (one anchored page per type)") {
@@ -963,8 +966,7 @@ struct HarnessView: View {
             .accessibilityIdentifier("local-file-export")
             .accessibilityHint("Writes NDJSON to the archive folder you chose in Files.")
             Text(SchedulingHonesty.shortcutsLine)
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingPrimaryCaption()
                 .accessibilityIdentifier("shortcut-export")
             schedulingHonesty
             Text("Backfill runs newest-first and resumes from an inspectable checkpoint. On iOS 26 or later it continues unattended after you leave the app. On iOS 18 through 25, keep this screen open; the app prevents idle sleep while it works.")
@@ -1675,11 +1677,18 @@ struct HarnessView: View {
 
     private var historyPane: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Button("Show export history (problems first)") {
+            Button {
                 Task { await loadHistory() }
+            } label: {
+                Text("Show export history (problems first)")
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             .disabled(phase == .working)
-            .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("history-load")
             if historyEvents.isEmpty {
                 ForEach(Array(historyLines.enumerated()), id: \.offset) { index, line in
@@ -1907,9 +1916,7 @@ struct HarnessView: View {
                 // or Full Keyboard Access. Visibility, not an onAppear, is the evidence:
                 // a ScrollView builds every child eagerly whether it is on screen or not.
                 Text("End of diagnostic bundle")
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .wrappingPrimaryCaption()
                     .accessibilityIdentifier("diagnostic-end")
                     // A low threshold is the honest one: the marker sits below every line
                     // of the bundle, so any part of it entering the viewport already
@@ -1930,7 +1937,10 @@ struct HarnessView: View {
                     } else {
                         Text(ShareDisclosure.copy)
                             .font(.body)
+                            .foregroundStyle(.primary)
+                            .lineLimit(nil)
                             .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                             .accessibilityIdentifier("share-protection-warning")
                             .attentionBanner()
                         Button("I understand — show sharing") {
@@ -2476,8 +2486,18 @@ struct HarnessView: View {
                     .accessibilityIdentifier("browser-title")
                 Spacer()
                 if selectedDetail != nil {
-                    Button("Back") { selectedBrowserMetric = nil }
-                        .accessibilityIdentifier("browser-back")
+                    Button {
+                        selectedBrowserMetric = nil
+                    } label: {
+                        Text("Back")
+                            .font(.body)
+                            .foregroundStyle(.primary)
+                            .frame(minWidth: 44, minHeight: 44, alignment: .center)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Back")
+                    .accessibilityIdentifier("browser-back")
                 } else if browserSelecting {
                     Button("Review changes") {
                         browserSelecting = false
@@ -3203,8 +3223,34 @@ struct HarnessView: View {
     @MainActor
     private func refreshQueueGaps() async {
         queueEvictionGaps = (try? await HarnessExport.queueEvictionGaps()) ?? []
-        anchorHolds = (try? await HarnessExport.anchorHolds()) ?? []
+        let loaded = (try? await HarnessExport.anchorHolds()) ?? []
+        #if DEBUG
+        if loaded.isEmpty, ProcessInfo.processInfo.environment["OHE_SEED_ANCHOR_HOLD"] != nil {
+            reapplySeededAnchorHoldIfNeeded()
+            return
+        }
+        #endif
+        anchorHolds = loaded
     }
+
+    #if DEBUG
+    /// `refreshQueueGaps` reads SQLite. A UI-test seed can still be in memory
+    /// when that read returns empty. Do not blank the banner the test asserts.
+    @MainActor
+    private func reapplySeededAnchorHoldIfNeeded() {
+        guard let held = ProcessInfo.processInfo.environment["OHE_SEED_ANCHOR_HOLD"],
+              anchorHolds.isEmpty
+        else { return }
+        anchorHolds = [
+            AnchorHold(
+                metric: MetricID(rawValue: held),
+                reason: .cursorLost,
+                detectedAtEpoch: 0,
+                lastEmittedDay: "2026-09-08"
+            )
+        ]
+    }
+    #endif
 
     /// QA-17: both answers are explicit and both are recorded. Neither is a retry.
     @MainActor
@@ -4199,6 +4245,16 @@ private struct HarnessButtonStyle: ButtonStyle {
 }
 
 private extension View {
+    /// Body type, primary contrast, wrap, and a 44-point minimum so hosted
+    /// Dynamic Type audits do not fail 16-point footnote captions.
+    func wrappingPrimaryCaption() -> some View {
+        self
+            .font(.body)
+            .foregroundStyle(.primary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+    }
+
     /// Black on a deliberately light yellow. The banner has to clear the contrast
     /// audit while still reading as a warning, and `.yellow` with default label
     /// colour does not. Children stay individually addressable: the banners are
