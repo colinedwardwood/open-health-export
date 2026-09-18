@@ -356,11 +356,21 @@ struct HarnessView: View {
                 phase = .ready
                 status = "Ready."
             }
+            #if DEBUG
+            let seedHold = ProcessInfo.processInfo.environment["OHE_SEED_ANCHOR_HOLD"]
+            if let held = seedHold {
+                anchorHolds = [
+                    AnchorHold(
+                        metric: MetricID(rawValue: held),
+                        reason: .cursorLost,
+                        detectedAtEpoch: 0,
+                        lastEmittedDay: "2026-09-08"
+                    )
+                ]
+            }
+            #endif
             Task {
                 #if DEBUG
-                let seedHold = ProcessInfo.processInfo.environment["OHE_SEED_ANCHOR_HOLD"]
-                // Clearing and seeding in the same launch used to race: a later
-                // onAppear reset wiped the hold before the banner appeared.
                 if ProcessInfo.processInfo.environment["OHE_RESET_SEEDED_SURFACES"] == "1",
                    seedHold == nil
                 {
@@ -370,7 +380,11 @@ struct HarnessView: View {
                     try? await HarnessExport.seedAnchorHoldForUITests(
                         metric: MetricID(rawValue: held)
                     )
-                    anchorHolds = (try? await HarnessExport.anchorHolds()) ?? []
+                    if let loaded = try? await HarnessExport.anchorHolds(),
+                       !loaded.isEmpty
+                    {
+                        anchorHolds = loaded
+                    }
                 }
                 #endif
                 await appPrivacyGate.authenticateIfNeeded(enabled: appPrivacyGateEnabled)
