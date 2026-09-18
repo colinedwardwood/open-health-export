@@ -605,7 +605,7 @@ final class ExporterUITests: XCTestCase {
         let end = app.staticTexts["diagnostic-end"]
         XCTAssertTrue(end.waitForExistence(timeout: uiWait))
         scrollSettings(end)
-        let warning = app.staticTexts["share-protection-warning"]
+        let warning = identified("share-protection-warning")
         for _ in 0 ..< 10 where !warning.exists {
             app.swipeUp()
             _ = warning.waitForExistence(timeout: 2)
@@ -624,7 +624,7 @@ final class ExporterUITests: XCTestCase {
             _ = revealed.waitForExistence(timeout: 2)
         }
         XCTAssertTrue(revealed.waitForExistence(timeout: uiWait), "share never appeared after acknowledgement")
-        XCTAssertFalse(app.staticTexts["share-protection-warning"].exists)
+        XCTAssertFalse(identified("share-protection-warning").exists)
 
         // One-time: acknowledging survives a relaunch, or it is not a warning, it is a
         // nag, and people learn to tap through it.
@@ -641,7 +641,7 @@ final class ExporterUITests: XCTestCase {
             _ = share.waitForExistence(timeout: 2)
         }
         XCTAssertTrue(share.waitForExistence(timeout: uiWait), "warning came back after acknowledgement")
-        XCTAssertFalse(app.staticTexts["share-protection-warning"].exists)
+        XCTAssertFalse(identified("share-protection-warning").exists)
     }
 
     func testExplicitTypeStopRequiresTwoTaps() {
@@ -1771,6 +1771,12 @@ final class ExporterUITests: XCTestCase {
         // iPadOS `sidebarAdaptable` often has no XCUITest tab bar, but still
         // fades the bottom of the window the same way.
         let window = chrome.window
+        if chrome.settingsScrollExists,
+           window.height > 0,
+           frame.maxY > window.maxY - Self.settingsBottomScrollEdgeEffectHeight
+        {
+            return "behindTabBar"
+        }
         if window.height > 0, frame.maxY > window.maxY - Self.scrollEdgeEffectHeight {
             return "behindTabBar"
         }
@@ -1853,6 +1859,10 @@ final class ExporterUITests: XCTestCase {
     /// bar (including large-title / scroll-edge material) fades a taller band below
     /// its bar frame. Intersection against the bar frames alone leaves those faded
     /// bands reported as app contrast defects.
+    /// Presented Settings fades a taller band above the window bottom than the
+    /// root tab bar. Share-warning and diagnostic-end sat in that band around
+    /// y≈840–970 on the 11-inch iPad Pro (window height 1210).
+    private static let settingsBottomScrollEdgeEffectHeight: CGFloat = 400
     private static let scrollEdgeEffectHeight: CGFloat = 32
     private static let navigationScrollEdgeEffectHeight: CGFloat = 56
     /// Presented Settings uses a taller scroll-edge material than the root Status

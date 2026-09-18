@@ -792,8 +792,7 @@ struct HarnessView: View {
             }
 
             Text("Time to first screen: \(timeToFirstFrameMS, specifier: "%.0f") ms (foreground; R-73 is a background-launch budget).")
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingPrimaryCaption()
         }
     }
 
@@ -2016,11 +2015,9 @@ struct HarnessView: View {
                     } else {
                         Text(ShareDisclosure.copy)
                             .font(.body)
-                            .lineLimit(nil)
                             .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .accessibilityIdentifier("share-protection-warning")
                             .attentionBanner()
+                            .accessibilityIdentifier("share-protection-warning")
                         Button("I understand — show sharing") {
                             shareProtectionAcknowledged = true
                         }
@@ -4352,14 +4349,16 @@ extension View {
 
     /// Black on a deliberately light yellow. The banner has to clear the contrast
     /// audit while still reading as a warning, and `.yellow` with default label
-    /// colour does not. Children stay individually addressable: the banners are
+    /// colour does not. Pin light scheme so `.primary` cannot bleach the copy in
+    /// Dark Mode. Children stay individually addressable: the banners are
     /// asserted by their inner copy, not only by the container identifier.
     func attentionBanner() -> some View {
         self
-            .foregroundStyle(.black)
+            .environment(\.colorScheme, .light)
+            .foregroundStyle(Color(red: 0, green: 0, blue: 0))
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
-            .background(Color(red: 1, green: 0.92, blue: 0.2))
+            .background(Color(red: 1, green: 0.82, blue: 0.12))
             .fixedSize(horizontal: false, vertical: true)
     }
 }

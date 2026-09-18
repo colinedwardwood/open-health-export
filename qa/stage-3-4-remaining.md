@@ -3,11 +3,28 @@
 Living checklist for code-completable Stage 3 implementation and Stage 4 automated QA.
 Updated as items finish. Times are wall-clock, including hosted CI waits.
 
-Last updated: 2026-09-18 10:05 ET (America/New_York)
+Last updated: 2026-09-18 18:14 ET (America/New_York)
 
-**Origin HEAD:** `61b8ec9`. **macos-build [`35297295677`](https://github.com/colinedwardwood/open-health-export/actions/runs/35297295677):** all three **iPhone** shards green (toggle contrast fixed); all three **iPad** shards red (Dynamic Type on 16pt captions, `browser-back` duplicate, paused-banner miss, share-warning DT, nil empty-browser text).
+**Origin `1010d4e` macos-build [`35387460964`](https://github.com/colinedwardwood/open-health-export/actions/runs/35387460964): all six `ios-ui` shards green.** Accessibility matrix [`35392384276`](https://github.com/colinedwardwood/open-health-export/actions/runs/35392384276): **11/12 green**, `iPad 4` failed; `iPhone 2` still running. Do not push until that job finishes (`cancel-in-progress` on the matrix group).
 
-**Local in progress:** wrapping 44pt captions + named schedule promise + iPad `browser-empty` nil-element exception.
+Local iPad suite on `1010d4e` finished **74/3** (Xcode 27): pseudo-locale empty `-56`, pseudo disclosure/controls XCTFuture 1000, share-warning Contrast. Air iPhone suite **76/1**: R-114 623s timeout (same as this Mac; hosted iPhone 2 on `1010d4e` already green).
+
+`iPad 4` hosted failures: `testEveryDestinationDisplayStatePassesAccessibilityAudit` Dynamic Type on Status “time to first screen” (retry passed; both iterations required), and `testShareWarningIsShownOnceAndGatesTheShareControl` Contrast on Settings-sheet bottom fade (failed twice). Local iPad retest after wrapping the Status caption and classifying Settings bottom fade: both tests **passed** (56s and 192s).
+
+Proven locally, not on GitHub:
+
+- iPad `testDarkBoldAX5` 39.6s, then 40.2s with chrome snapshot
+- iPhone `testDarkBoldAX5` 22.5s
+- iPhone `testBrowserEmptyStateInRTL` 50.9s
+- iPad Destinations empty-state 37.6s
+- iPad RTL empty 53.8s
+- iPhone RTL Destinations+History 27.5s
+- iPhone RTL disclosure 22s and browser-detail 54s (suite 76s)
+- Air (Xcode 27, iOS 26.5 iPhone 17 Pro): AX5 25s green; RTL empty was audit **-56** at 107s, then **63s green** after caching chrome queries once per audit
+
+Local iPad suite on `1010d4e` finished **74/3** (see header). Chrome snapshot plus matrix iPad 4 fixes are local commits, unpushed until `iPhone 2` completes.
+
+**Prior [`35372523862`](https://github.com/colinedwardwood/open-health-export/actions/runs/35372523862) on `b1de381`:** compile green; iPhone 0/1 and iPad 0 green; iPad 2 `testDarkBoldAX5` failed on unscaled `configuration-import`; iPhone 2 cascade after accessibility-audit timeout `-56`.
 
 Out of scope: physical-device / R-71 soak, backup and network-capture evidence, App Store, branding, HACS.
 
@@ -39,14 +56,18 @@ Out of scope: physical-device / R-71 soak, backup and network-capture evidence, 
 - [x] **Clock-format 12-hour Contrast nearly passed** — fixed locally on `d1efd55`; push after `35287922062`
 - [x] **Paused-type banner seeds in-memory on appear** (`de52667`; iPad test 12.5s)
 - [x] **Data-tab detail Latest/Samples reflow at AX Dynamic Type** (`8f4068f`; local iPad RTL detail 51s)
-- [ ] **Load-30-days button 44pt Dynamic Type** — hosted iPad 2 failed `browser-load-health` height 22.5; local fix in progress
+- [x] **Wait for macos-build `35355589530` on `39b5c45`** — all six `ios-ui` failed
+- [x] **Wait for macos-build `35372523862` on `b1de381`** — iPad 2 AX5 `configuration-import`; iPhone 2 audit-timeout cascade
+- [x] **Load-30-days button 44pt Dynamic Type** (`61b8ec9`)
+- [x] **Destinations `.tributary` import wrapping Dynamic Type** (`fdd4966`; local iPad empty Destinations 39s)
+- [x] **Wait for macos-build `35387460964` on `1010d4e`** — all six `ios-ui` shards green
 
 ## After hosted UI is green
 
-- [ ] **Dispatch `accessibility-matrix.yml` immediately** (~60–90 min, 12 hosted jobs)
-- [ ] **Fix any matrix findings** (0 if green; 2–4 hours if red, plus another matrix)
-- [ ] **Local iPhone UI suite** (~20–40 min) — Air
-- [ ] **Local iPad UI suite** (~30–90 min) — this Mac, in flight
+- [x] **Dispatch `accessibility-matrix.yml` immediately** — [`35392384276`](https://github.com/colinedwardwood/open-health-export/actions/runs/35392384276) on `1010d4e`
+- [ ] **Fix any matrix findings** — `iPad 4` **failure** on `1010d4e` (Status Dynamic Type + Settings-bottom Contrast); other 10 completed jobs green; `iPhone 2` in progress. Fixes verified locally; push after `iPhone 2`.
+- [ ] **Local iPhone UI suite** — Air **76/1**, suite finished; only R-114 623s timeout
+- [ ] **Local iPad UI suite** — this Mac **74/3** on `1010d4e` (Xcode 27); hosted iPad 4 names the two product/audit gaps now fixed locally
 - [ ] **Configure `main` branch protection** (~15 min)
   - Only after the last direct-push implementation slice. Not before.
 
