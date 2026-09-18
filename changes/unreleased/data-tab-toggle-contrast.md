@@ -1,4 +1,3 @@
-Data-tab date-limit and filter toggles are one VoiceOver element at body-size
-primary, so the hosted contrast audit no longer scores the duplicated
-"Stop sending after a date" title. Browser-detail section headings use the
-same body-size primary contrast.
+Data-tab date-limit and filter switches hide the system Toggle title and
+expose one VoiceOver element. Hosted Xcode 26.6 still scored the duplicated
+"Stop sending after a date" string after `.combine` alone.

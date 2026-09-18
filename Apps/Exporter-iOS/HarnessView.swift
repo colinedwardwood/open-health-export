@@ -2526,12 +2526,11 @@ struct HarnessView: View {
                 .font(.body)
                 .foregroundStyle(.primary)
                 .accessibilityIdentifier("scope-start-date")
-                Toggle("Stop sending after a date", isOn: $scopeEndEnabled)
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Stop sending after a date")
-                    .accessibilityIdentifier("scope-end-enabled")
+                dataTabToggle(
+                    "Stop sending after a date",
+                    isOn: $scopeEndEnabled,
+                    identifier: "scope-end-enabled"
+                )
                 if scopeEndEnabled {
                     DatePicker(
                         "Stop before",
@@ -2651,18 +2650,16 @@ struct HarnessView: View {
                     )
                     .accessibilityIdentifier("sensitive-destination-confirm")
                 }
-                Toggle("Only types with data", isOn: $browserOnlyWithData)
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Only types with data")
-                    .accessibilityIdentifier("browser-only-with-data")
-                Toggle("Show demo values", isOn: $browserDemoMode)
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Show demo values")
-                    .accessibilityIdentifier("browser-demo-mode")
+                dataTabToggle(
+                    "Only types with data",
+                    isOn: $browserOnlyWithData,
+                    identifier: "browser-only-with-data"
+                )
+                dataTabToggle(
+                    "Show demo values",
+                    isOn: $browserDemoMode,
+                    identifier: "browser-demo-mode"
+                )
                 Text("Display units")
                     .font(.body)
                     .fixedSize(horizontal: false, vertical: true)
@@ -2779,6 +2776,32 @@ struct HarnessView: View {
                 }
             }
         }
+    }
+
+    /// SwiftUI `Toggle("title")` exposes the title twice to the hosted contrast
+    /// audit (empty identifier, duplicated label). Hide the switch's own title
+    /// and combine the visible copy with the control.
+    @ViewBuilder
+    private func dataTabToggle(
+        _ title: String,
+        isOn: Binding<Bool>,
+        identifier: String
+    ) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            Text(title)
+                .font(.body)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+            Toggle(title, isOn: isOn)
+                .labelsHidden()
+                .tint(.primary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(title)
+        .accessibilityValue(isOn.wrappedValue ? "On" : "Off")
+        .accessibilityIdentifier(identifier)
     }
 
     @ViewBuilder
