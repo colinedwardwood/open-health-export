@@ -2792,16 +2792,15 @@ struct HarnessView: View {
                 .font(.body)
                 .foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityHidden(true)
             Spacer(minLength: 8)
-            Toggle(title, isOn: isOn)
+            Toggle("", isOn: isOn)
                 .labelsHidden()
                 .tint(.primary)
+                .accessibilityLabel(title)
+                .accessibilityIdentifier(identifier)
         }
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(title)
-        .accessibilityValue(isOn.wrappedValue ? "On" : "Off")
-        .accessibilityIdentifier(identifier)
     }
 
     @ViewBuilder
