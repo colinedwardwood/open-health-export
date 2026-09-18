@@ -3,17 +3,13 @@
 Living checklist for code-completable Stage 3 implementation and Stage 4 automated QA.
 Updated as items finish. Times are wall-clock, including hosted CI waits.
 
-Last updated: 2026-09-17 20:54 ET (America/New_York)
+Last updated: 2026-09-17 21:55 ET (America/New_York)
 
-**Origin HEAD:** `591279e`. **Local, unpushed:** through in-memory paused-type seed (`de52667`) plus uncommitted Data-tab detail wrapping.
+**Origin HEAD:** `8f4068f` (toggle AX, paused seed, detail caption wrap). Hosted [`35297071470`](https://github.com/colinedwardwood/open-health-export/actions/runs/35297071470) compile jobs in progress; UI shards not started.
 
-**Last macos-build:** [`35287922062`](https://github.com/colinedwardwood/open-health-export/actions/runs/35287922062) on `591279e` — iPhone 0/2 and iPad 0 green; iPhone 1 and iPad 2 failed; **iPad 1 still in progress**. Do not push until that job completes.
+**Prior macos-build [`35287922062`](https://github.com/colinedwardwood/open-health-export/actions/runs/35287922062) on `591279e`:** iPhone 0/2 and iPad 0 green; iPhone 1 contrast duplicate “Stop sending after a date”; iPad 2 Dynamic Type on `browser-load-health` (22.5pt) plus paused-anchor banner; iPad 1 cancelled.
 
-**Local evidence on the unpushed tree:**
-- iPad `testPausedAnchorIsVisibleAndOffersBothChoices` passed in 12.5s after in-memory seed (`de52667`).
-- iPad share-warning passed after diagnostic JSON 44pt labels.
-- Clock/unit contrast and Data-tab Toggle AX fixes are local; not on origin.
-- Data-tab detail Latest/Samples wrap at AX sizes: uncommitted, pending iPad RTL detail audit.
+**Local follow-up (do not push if ios-ui has started):** 44pt wrapping Load-30-days button.
 
 Out of scope: physical-device / R-71 soak, backup and network-capture evidence, App Store, branding, HACS.
 
@@ -31,8 +27,8 @@ Out of scope: physical-device / R-71 soak, backup and network-capture evidence, 
 - [x] **Type into fields when the hardware keyboard has focus**
 - [x] **Assert paused-anchor banner after disclosure**
 - [ ] **Watch XXXL launch flake** (no extra code unless it repeats)
-- [ ] **Wait for macos-build `35287922062`** (~50–90 min from 19:41 ET)
-  - iPad 1 still in progress. Do not push while it is running.
+- [x] **Wait for macos-build `35287922062`** — finished red; stack pushed as `8f4068f`
+- [ ] **Wait for macos-build `35297071470`** — do not push after `ios-ui` starts
 - [x] **r84-determinism arm apt 404**
 - [x] **Selected destination / unit / time / QoS choices stay enabled at primary contrast**
 - [x] **Data-tab catalogue rows stay VoiceOver-visible** (`children: .combine`)
@@ -43,7 +39,8 @@ Out of scope: physical-device / R-71 soak, backup and network-capture evidence, 
 - [x] **Name iPad RTL empty-state nil-element** (on origin `591279e`; local iPad empty-RTL green)
 - [x] **Clock-format 12-hour Contrast nearly passed** — fixed locally on `d1efd55`; push after `35287922062`
 - [x] **Paused-type banner seeds in-memory on appear** (`de52667`; iPad test 12.5s)
-- [ ] **Data-tab detail Latest/Samples reflow at AX Dynamic Type** — uncommitted; hosted iPad 2 failed this on `591279e`
+- [x] **Data-tab detail Latest/Samples reflow at AX Dynamic Type** (`8f4068f`; local iPad RTL detail 51s)
+- [ ] **Load-30-days button 44pt Dynamic Type** — hosted iPad 2 failed `browser-load-health` height 22.5; local fix in progress
 
 ## After hosted UI is green
 

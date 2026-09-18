@@ -2566,9 +2566,17 @@ struct HarnessView: View {
             }
 
             if let detail = selectedDetail {
-                Button(browserLoadingHealth ? "Loading Health data…" : "Load 30 days from Health") {
+                Button {
                     Task { await loadBrowserSamples(metric: detail.metric) }
+                } label: {
+                    Text(browserLoadingHealth ? "Loading Health data…" : "Load 30 days from Health")
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 .disabled(browserLoadingHealth)
                 .accessibilityIdentifier("browser-load-health")
                 dataBrowserDetail(detail)

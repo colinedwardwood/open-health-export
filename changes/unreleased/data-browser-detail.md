@@ -11,4 +11,6 @@ Users can independently choose canonical export, metric display, or US customary
 units for weight, distance, temperature, height, water, glucose, and pressure. The detail
 screen names the unchanged canonical export unit whenever display conversion is active.
 Detail captions (Latest, Samples, destinations, footnotes) use Dynamic Type with
-primary contrast and wrap instead of clipping at accessibility sizes.
+primary contrast and wrap instead of clipping at accessibility sizes. The
+Load-30-days control is a 44-point wrapping primary button so hosted Dynamic
+Type audits do not report a 22-point title.
