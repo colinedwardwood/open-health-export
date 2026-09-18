@@ -31,11 +31,7 @@ struct ConfigurationImportView: View {
                 showingImporter = true
             } label: {
                 Text("Review a .tributary configuration")
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .contentShape(Rectangle())
+                    .wrappingActionLabel()
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("configuration-import")
@@ -65,14 +61,17 @@ struct ConfigurationImportView: View {
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("configuration-import-confirmation")
                 confirmationHygiene
-                Button("Create disabled destination drafts") {
+                Button {
                     confirm(review)
+                } label: {
+                    Text("Create disabled destination drafts")
+                        .wrappingActionLabel()
                 }
+                .buttonStyle(.plain)
                 .disabled(
                     CredentialFieldHygiene.secret(confirmation).normalized
                         != DestinationConfigurationImportReview.confirmationPhrase
                 )
-                .frame(minHeight: 44)
                 .accessibilityIdentifier("configuration-import-create-drafts")
             }
             if !drafts.isEmpty {
@@ -92,16 +91,24 @@ struct ConfigurationImportView: View {
                         if draft.configuration.kind == .https
                             || draft.configuration.kind == .homeAssistant
                             || draft.configuration.kind == .mqtt {
-                            Button("Add credentials and test") {
+                            Button {
                                 onConfigure(draft)
+                            } label: {
+                                Text("Add credentials and test")
+                                    .wrappingActionLabel()
                             }
+                            .buttonStyle(.plain)
                             .accessibilityIdentifier(
                                 "configuration-import-configure-\(draft.configuration.kind.rawValue)"
                             )
                         } else if draft.configuration.kind == .companion {
-                            Button("Add pairing and test") {
+                            Button {
                                 onConfigure(draft)
+                            } label: {
+                                Text("Add pairing and test")
+                                    .wrappingActionLabel()
                             }
+                            .buttonStyle(.plain)
                             .accessibilityIdentifier(
                                 "configuration-import-configure-\(draft.configuration.kind.rawValue)"
                             )
@@ -113,9 +120,13 @@ struct ConfigurationImportView: View {
                                     "configuration-import-unsupported-\(draft.configuration.kind.rawValue)"
                                 )
                         }
-                        Button("Discard draft") {
+                        Button {
                             discard(draft.localIdentifier)
+                        } label: {
+                            Text("Discard draft")
+                                .wrappingActionLabel()
                         }
+                        .buttonStyle(.plain)
                         .accessibilityIdentifier(
                             "configuration-import-discard-\(draft.localIdentifier)"
                         )

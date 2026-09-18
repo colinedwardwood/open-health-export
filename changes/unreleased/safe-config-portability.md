@@ -10,6 +10,9 @@ fresh local identifiers.
 The Destinations import and export-prepare controls use wrapping body type
 so Dynamic Type audits at accessibility sizes do not report unscaled titles.
 
+Remaining Destinations action titles (archive, pairing, HTTPS, Home Assistant,
+MQTT, OTLP, ledger) now use the same wrapping 44-point Text labels.
+
 Persisted drafts remain visible after relaunch, can be explicitly discarded,
 and are included in destructive wipe coverage.
 

@@ -1248,11 +1248,7 @@ struct HarnessView: View {
                 Task { await prepareConfigurationExport() }
             } label: {
                 Text("Prepare credential-free configuration export")
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .contentShape(Rectangle())
+                    .wrappingActionLabel()
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("configuration-export-prepare")
@@ -1262,13 +1258,17 @@ struct HarnessView: View {
                 }
                 .accessibilityIdentifier("configuration-export-share")
             }
-            Button(
-                localExportFolderName == nil
-                    ? "Choose archive folder"
-                    : "Choose archive folder again"
-            ) {
+            Button {
                 pickingLocalExportFolder = true
+            } label: {
+                Text(
+                    localExportFolderName == nil
+                        ? "Choose archive folder"
+                        : "Choose archive folder again"
+                )
+                .wrappingActionLabel()
             }
+            .buttonStyle(.plain)
             .disabled(phase == .working)
             .accessibilityIdentifier("local-file-choose-folder")
             .accessibilityHint("Opens the system folder picker. The app remembers access to that folder.")
@@ -1279,9 +1279,13 @@ struct HarnessView: View {
             .font(.footnote)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("local-file-folder")
-            Button("Test and enable archive folder") {
+            Button {
                 Task { await enableLocalFile() }
+            } label: {
+                Text("Test and enable archive folder")
+                    .wrappingActionLabel()
             }
+            .buttonStyle(.plain)
             .disabled(phase == .working || localExportFolderName == nil)
             .accessibilityIdentifier("local-file-enable")
             .accessibilityHint("Writes a canary file, reads it back, then enables the local-file destination.")
@@ -1346,14 +1350,22 @@ struct HarnessView: View {
                 }
             Text("Off by default. Never sends tracestate or baggage.")
                 .font(.footnote)
-            Button("Test HTTPS destination") {
+            Button {
                 Task { await testHTTPS() }
+            } label: {
+                Text("Test HTTPS destination")
+                    .wrappingActionLabel()
             }
+            .buttonStyle(.plain)
             .disabled(phase == .working || httpsURL.isEmpty)
             .accessibilityIdentifier("https-enable")
-            Button("Export one page (HTTPS destination)") {
+            Button {
                 Task { await runHTTPSExport() }
+            } label: {
+                Text("Export one page (HTTPS destination)")
+                    .wrappingActionLabel()
             }
+            .buttonStyle(.plain)
             .disabled(phase == .working)
             .accessibilityIdentifier("https-export")
             ForEach(Array(httpsTestLines.enumerated()), id: \.offset) { index, line in
@@ -1416,18 +1428,26 @@ struct HarnessView: View {
             Text("Off by default. Exports wait for Wi-Fi unless you turn this on.")
                 .font(.footnote)
                 .fixedSize(horizontal: false, vertical: true)
-            Button("Test Home Assistant webhook") {
+            Button {
                 Task { await testHomeAssistantWebhook() }
+            } label: {
+                Text("Test Home Assistant webhook")
+                    .wrappingActionLabel()
             }
+            .buttonStyle(.plain)
             .disabled(
                 phase == .working
                     || homeAssistantBaseURL.isEmpty
                     || homeAssistantWebhookID.isEmpty
             )
             .accessibilityIdentifier("home-assistant-enable")
-            Button("Export one page (Home Assistant webhook)") {
+            Button {
                 Task { await runHomeAssistantExport() }
+            } label: {
+                Text("Export one page (Home Assistant webhook)")
+                    .wrappingActionLabel()
             }
+            .buttonStyle(.plain)
             .disabled(
                 phase == .working
                     || !HarnessExport.isDestinationEnabled("home-assistant")
@@ -1478,21 +1498,35 @@ struct HarnessView: View {
                     mqttQoS == 0 ? "MQTT QoS, At most once (0)" : "MQTT QoS, At least once (1)"
                 )
                 .accessibilityIdentifier("mqtt-qos")
-            Button("At most once (0)") { mqttQoS = 0 }
-                .font(.body)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
-                .fontWeight(mqttQoS == 0 ? .semibold : .regular)
-                .accessibilityIdentifier("mqtt-qos-0")
-            Button("At least once (1)") { mqttQoS = 1 }
-                .font(.body)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
-                .fontWeight(mqttQoS == 1 ? .semibold : .regular)
-                .accessibilityIdentifier("mqtt-qos-1")
-            Button("Choose MQTT client PKCS#12") {
-                pickingMQTTPKCS12 = true
+            Button { mqttQoS = 0 } label: {
+                Text("At most once (0)")
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .fontWeight(mqttQoS == 0 ? .semibold : .regular)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("mqtt-qos-0")
+            Button { mqttQoS = 1 } label: {
+                Text("At least once (1)")
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .fontWeight(mqttQoS == 1 ? .semibold : .regular)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("mqtt-qos-1")
+            Button {
+                pickingMQTTPKCS12 = true
+            } label: {
+                Text("Choose MQTT client PKCS#12")
+                    .wrappingActionLabel()
+            }
+            .buttonStyle(.plain)
             .accessibilityIdentifier("mqtt-pkcs12")
             Text(mqttPKCS12Name)
                 .font(.footnote)
@@ -1503,11 +1537,15 @@ struct HarnessView: View {
                 .accessibilityIdentifier("mqtt-pkcs12-password")
             secretFieldHygiene(mqttPKCS12Password, identifierPrefix: "mqtt-pkcs12-password")
             if mqttPKCS12Data != nil {
-                Button("Clear client certificate") {
+                Button {
                     mqttPKCS12Data = nil
                     mqttPKCS12Name = "No client certificate"
                     mqttPKCS12Password = ""
+                } label: {
+                    Text("Clear client certificate")
+                        .wrappingActionLabel()
                 }
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("mqtt-pkcs12-clear")
             }
             TextField("MQTT username", text: $mqttUsername)
@@ -1550,14 +1588,22 @@ struct HarnessView: View {
                     .foregroundStyle(.primary)
                     .fontWeight(.semibold)
             }
-            Button("Test MQTT destination") {
+            Button {
                 Task { await testMQTT() }
+            } label: {
+                Text("Test MQTT destination")
+                    .wrappingActionLabel()
             }
+            .buttonStyle(.plain)
             .disabled(phase == .working || mqttURL.isEmpty || mqttClientID.isEmpty || mqttTopic.isEmpty)
             .accessibilityIdentifier("mqtt-enable")
-            Button("Export one page (MQTT destination)") {
+            Button {
                 Task { await runMQTTExport() }
+            } label: {
+                Text("Export one page (MQTT destination)")
+                    .wrappingActionLabel()
             }
+            .buttonStyle(.plain)
             .disabled(phase == .working)
             .accessibilityIdentifier("mqtt-export")
             ForEach(Array(mqttTestLines.enumerated()), id: \.offset) { index, line in
@@ -1591,9 +1637,13 @@ struct HarnessView: View {
             }
             Text("This preview is traces only. It does not include health values.")
                 .font(.footnote)
-            Button("Preview OTLP payload") {
+            Button {
                 Task { await previewOTLP() }
+            } label: {
+                Text("Preview OTLP payload")
+                    .wrappingActionLabel()
             }
+            .buttonStyle(.plain)
             .disabled(phase == .working)
             .accessibilityIdentifier("otlp-preview")
             if !otlpPreview.isEmpty {
@@ -1608,19 +1658,31 @@ struct HarnessView: View {
                         if visible { revealOTLPEnable() }
                     }
             }
-            Button("Enable OTLP collector") {
+            Button {
                 Task { await enableOTLP() }
+            } label: {
+                Text("Enable OTLP collector")
+                    .wrappingActionLabel()
             }
+            .buttonStyle(.plain)
             .disabled(phase == .working || otlpURL.isEmpty || otlpGate.sharePayload == nil)
             .accessibilityIdentifier("otlp-enable")
-            Button("Project unprojected runs") {
+            Button {
                 Task { await projectOTLP() }
+            } label: {
+                Text("Project unprojected runs")
+                    .wrappingActionLabel()
             }
+            .buttonStyle(.plain)
             .disabled(phase == .working)
             .accessibilityIdentifier("otlp-project")
-            Button("Disable OTLP collector") {
+            Button {
                 disableOTLP()
+            } label: {
+                Text("Disable OTLP collector")
+                    .wrappingActionLabel()
             }
+            .buttonStyle(.plain)
             .disabled(phase == .working)
             .accessibilityIdentifier("otlp-disable")
             ForEach(Array(otlpLines.enumerated()), id: \.offset) { index, line in
@@ -1630,7 +1692,7 @@ struct HarnessView: View {
                     .accessibilityIdentifier("otlp-line-\(index)")
             }
             #endif
-            Button("Acknowledge destination changes") {
+            Button {
                 do {
                     try HarnessExport.acknowledgeDestinationChanges()
                     refreshDestinationSurfaces()
@@ -1638,12 +1700,20 @@ struct HarnessView: View {
                 } catch {
                     status = "Failed: \(error.localizedDescription)"
                 }
+            } label: {
+                Text("Acknowledge destination changes")
+                    .wrappingActionLabel()
             }
+            .buttonStyle(.plain)
             .disabled(phase == .working)
             .accessibilityIdentifier("destination-acknowledge-changes")
-            Button("Verify and show egress ledger") {
+            Button {
                 Task { await loadLedger() }
+            } label: {
+                Text("Verify and show egress ledger")
+                    .wrappingActionLabel()
             }
+            .buttonStyle(.plain)
             .disabled(phase == .working)
             .accessibilityIdentifier("destination-ledger-verify")
             .accessibilityHint("Verifies the append-only hash chain and shows up to 50 recent transmission records.")
@@ -1978,9 +2048,13 @@ struct HarnessView: View {
                     .accessibilityIdentifier("pairing-import-name-mismatch")
             }
             if PairingCamera.canPresentScanner {
-                Button("Scan pairing QR") {
+                Button {
                     Task { await openScanner() }
+                } label: {
+                    Text("Scan pairing QR")
+                        .wrappingActionLabel()
                 }
+                .buttonStyle(.plain)
                 .disabled(phase == .working)
                 .accessibilityIdentifier("pairing-scan")
             } else {
@@ -1994,9 +2068,13 @@ struct HarnessView: View {
                 .accessibilityLabel("Pairing payload from the Mac")
                 .accessibilityIdentifier("pairing-paste")
             secretFieldHygiene(pairingPaste, identifierPrefix: "pairing-paste")
-            Button("Parse pairing payload") {
+            Button {
                 parsePairing()
+            } label: {
+                Text("Parse pairing payload")
+                    .wrappingActionLabel()
             }
+            .buttonStyle(.plain)
             .disabled(phase == .working)
             .accessibilityIdentifier("pairing-parse")
             if !sas.isEmpty {
@@ -2007,15 +2085,23 @@ struct HarnessView: View {
                 Text("This must match the Mac after the phone connects.")
                     .font(.footnote)
             }
-            Button("Export one page to companion") {
+            Button {
                 Task { await runCompanionExport() }
+            } label: {
+                Text("Export one page to companion")
+                    .wrappingActionLabel()
             }
+            .buttonStyle(.plain)
             .disabled(phase == .working || pairing == nil)
             .accessibilityIdentifier("pairing-export")
             .accessibilityHint("Browses for the paired Mac name and pushes one page over TLS-PSK.")
-            Button("Forget companion pairing") {
+            Button {
                 Task { await forgetPairing() }
+            } label: {
+                Text("Forget companion pairing")
+                    .wrappingActionLabel()
             }
+            .buttonStyle(.plain)
             .disabled(phase == .working)
             .accessibilityIdentifier("pairing-forget")
             Toggle("Send traceparent to Mac companion (opt-in)", isOn: $companionTraceparent)
@@ -4247,7 +4333,7 @@ private struct HarnessButtonStyle: ButtonStyle {
     }
 }
 
-private extension View {
+extension View {
     /// Body type, primary contrast, and wrap. Do not force a 44-point minimum at
     /// the default size: that pushed Status copy into the iPad tab fade.
     func wrappingPrimaryCaption() -> some View {
@@ -4255,6 +4341,13 @@ private extension View {
             .font(.body)
             .foregroundStyle(.primary)
             .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// Control titles that must reflow at accessibility Dynamic Type sizes.
+    func wrappingActionLabel() -> some View {
+        wrappingPrimaryCaption()
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
     }
 
     /// Black on a deliberately light yellow. The banner has to clear the contrast

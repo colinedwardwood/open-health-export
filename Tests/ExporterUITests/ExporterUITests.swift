@@ -1670,12 +1670,19 @@ final class ExporterUITests: XCTestCase {
         var attempt = 0
         while true {
             do {
+                // Resolve chrome once. Asking XCTest for bars and the settings
+                // scroll on every contrast finding is what pushed RTL empty
+                // audits past the XCTFuture deadline (-56).
+                let chrome = AccessibilityChromeSnapshot(app: app)
                 try app.performAccessibilityAudit { issue in
                     let cause: String?
                     if issue.auditType == .contrast, let element = issue.element {
-                        cause = self.suppressionCause(for: element)
+                        cause = self.suppressionCause(for: element, chrome: chrome)
                     } else if issue.auditType == .dynamicType {
-                        cause = self.dynamicTypeSuppressionCause(for: issue.element)
+                        cause = self.dynamicTypeSuppressionCause(
+                            for: issue.element,
+                            chrome: chrome
+                        )
                     } else if issue.element == nil,
                               Self.iPadUnhostedTextStates.contains(state),
                               self.iPadUnhostedIssueMatches(issue)
@@ -1694,7 +1701,7 @@ final class ExporterUITests: XCTestCase {
                                     + "labelChars=\(label.count) labelLines=\(label.split(separator: "\n").count) "
                                     + "longestLine=\(longest) "
                                     + "enabled=\(element.isEnabled) hittable=\(element.isHittable) "
-                                    + "frame=\(element.frame) window=\(self.app.windows.firstMatch.frame) "
+                                    + "frame=\(element.frame) window=\(chrome.window) "
                                     + "label=\(label)"
                             )
                         } else {
@@ -1738,28 +1745,32 @@ final class ExporterUITests: XCTestCase {
     /// Both bars are measured at audit time. A hardcoded cutoff stops describing the
     /// chrome as soon as a device or SDK changes its bar heights, which turns an
     /// SDK-owned finding into an unexplained contrast failure on one simulator only.
-    private func suppressionCause(for element: XCUIElement) -> String? {
+    private func suppressionCause(
+        for element: XCUIElement,
+        chrome: AccessibilityChromeSnapshot
+    ) -> String? {
         let frame = element.frame
-        let navigationFade = app.scrollViews["settings-scroll"].exists
+        let navigationFade = chrome.settingsScrollExists
             ? Self.settingsNavigationScrollEdgeEffectHeight
             : Self.navigationScrollEdgeEffectHeight
-        for bar in app.navigationBars.allElementsBoundByIndex where bar.exists {
-            if frame.minY < bar.frame.maxY + navigationFade {
+        for bar in chrome.navigationBarFrames {
+            if frame.minY < bar.maxY + navigationFade {
                 return "behindNavigationBar"
             }
         }
-        if app.scrollViews["settings-scroll"].exists,
+        if chrome.settingsScrollExists,
            frame.minY < Self.settingsNavigationScrollEdgeEffectHeight
         {
             return "behindNavigationBar"
         }
-        let tabBar = app.tabBars.firstMatch
-        if tabBar.exists, frame.maxY > tabBar.frame.minY - Self.scrollEdgeEffectHeight {
+        if let tabBar = chrome.tabBarFrame,
+           frame.maxY > tabBar.minY - Self.scrollEdgeEffectHeight
+        {
             return "behindTabBar"
         }
         // iPadOS `sidebarAdaptable` often has no XCUITest tab bar, but still
         // fades the bottom of the window the same way.
-        let window = app.windows.firstMatch.frame
+        let window = chrome.window
         if window.height > 0, frame.maxY > window.maxY - Self.scrollEdgeEffectHeight {
             return "behindTabBar"
         }
@@ -1774,14 +1785,16 @@ final class ExporterUITests: XCTestCase {
     /// iPadOS `sidebarAdaptable` tab labels are UIKit UILabels that do not take the
     /// accessibility content-size category. Xcode 26 reports that as a Dynamic Type
     /// failure with no `XCUIElement`, so the finding cannot be attributed to app copy.
-    private func dynamicTypeSuppressionCause(for element: XCUIElement?) -> String? {
+    private func dynamicTypeSuppressionCause(
+        for element: XCUIElement?,
+        chrome: AccessibilityChromeSnapshot
+    ) -> String? {
         guard let element else { return "unhostedDynamicTypeLabel" }
-        if app.tabBars.firstMatch.exists, element.frame.intersects(app.tabBars.firstMatch.frame) {
+        let frame = element.frame
+        if let tabBar = chrome.tabBarFrame, frame.intersects(tabBar) {
             return "unhostedDynamicTypeLabel"
         }
-        if app.navigationBars.firstMatch.exists,
-           element.frame.intersects(app.navigationBars.firstMatch.frame)
-        {
+        if chrome.navigationBarFrames.contains(where: { frame.intersects($0) }) {
             return "unhostedDynamicTypeLabel"
         }
         return nil
@@ -2336,5 +2349,27 @@ final class ExporterUITests: XCTestCase {
         } else {
             app.swipeDown()
         }
+    }
+}
+
+/// Bar and window frames used while classifying accessibility-audit findings.
+/// Captured once per audit so each contrast/Dynamic Type issue does not
+/// re-query XCTest chrome.
+private struct AccessibilityChromeSnapshot {
+    let settingsScrollExists: Bool
+    let navigationBarFrames: [CGRect]
+    let tabBarFrame: CGRect?
+    let window: CGRect
+
+    init(app: XCUIApplication) {
+        settingsScrollExists = app.scrollViews["settings-scroll"].exists
+        var bars: [CGRect] = []
+        for bar in app.navigationBars.allElementsBoundByIndex where bar.exists {
+            bars.append(bar.frame)
+        }
+        navigationBarFrames = bars
+        let tabBar = app.tabBars.firstMatch
+        tabBarFrame = tabBar.exists ? tabBar.frame : nil
+        window = app.windows.firstMatch.frame
     }
 }
