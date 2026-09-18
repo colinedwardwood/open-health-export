@@ -358,10 +358,15 @@ struct HarnessView: View {
             }
             Task {
                 #if DEBUG
-                if ProcessInfo.processInfo.environment["OHE_RESET_SEEDED_SURFACES"] == "1" {
+                let seedHold = ProcessInfo.processInfo.environment["OHE_SEED_ANCHOR_HOLD"]
+                // Clearing and seeding in the same launch used to race: a later
+                // onAppear reset wiped the hold before the banner appeared.
+                if ProcessInfo.processInfo.environment["OHE_RESET_SEEDED_SURFACES"] == "1",
+                   seedHold == nil
+                {
                     try? await HarnessExport.clearAnchorHoldsForUITests()
                 }
-                if let held = ProcessInfo.processInfo.environment["OHE_SEED_ANCHOR_HOLD"] {
+                if let held = seedHold {
                     try? await HarnessExport.seedAnchorHoldForUITests(
                         metric: MetricID(rawValue: held)
                     )
