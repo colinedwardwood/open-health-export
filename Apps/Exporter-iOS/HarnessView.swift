@@ -2944,86 +2944,56 @@ struct HarnessView: View {
     private func dataBrowserDetail(_ detail: DataBrowserDetail) -> some View {
         if let latest = detail.latest {
             Text("Latest")
-                .font(.body)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
             Text(
                 "\(DataBrowser.formatValue(detail.displayValue ?? latest.value)) "
                     + detail.displayUnit
             )
-                .font(.body)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("browser-detail-latest")
             if detail.displayUnit != detail.exportUnit {
                 Text("Export remains \(detail.exportUnit).")
-                    .font(.footnote)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .wrappingFillCaption()
             }
             Text(latest.start)
-                .font(.footnote)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
             Text("Source: \(latest.source?.name ?? "Unknown")")
-                .font(.footnote)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
         } else {
             Text(DataBrowser.emptyDetailCopy)
-                .font(.body)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("browser-detail-empty")
         }
         Text("Exported to")
-            .font(.body)
-            .foregroundStyle(.primary)
-            .fixedSize(horizontal: false, vertical: true)
+            .wrappingFillCaption()
         if detail.destinations.isEmpty {
             Text("Not included in any export.")
-                .font(.body)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
         } else {
             ForEach(detail.destinations, id: \.name) { destination in
                 Text("\(destination.name) · data through \(destination.sentThroughDay ?? "no day yet") has been sent")
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .wrappingFillCaption()
             }
         }
         Text("Export unit: \(detail.exportUnit)")
-            .font(.footnote)
-            .foregroundStyle(.primary)
-            .fixedSize(horizontal: false, vertical: true)
+            .wrappingFillCaption()
         if let horizon = detail.indexHorizonDay {
             Text(DataBrowser.horizonCopy(day: horizon))
-                .font(.footnote)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("browser-index-horizon")
         }
         if let explanation = detail.aggregationExplanation {
             Text("Daily buckets (this is what we export)")
-                .font(.body)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
             Text("Computed as: \(explanation)")
-                .font(.footnote)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
         }
         Text("Samples")
-            .font(.body)
-            .foregroundStyle(.primary)
-            .fixedSize(horizontal: false, vertical: true)
+            .wrappingFillCaption()
             .accessibilityIdentifier("browser-detail-samples")
         ForEach(detail.samples, id: \.key.uuid) { sample in
             Text("\(DataBrowser.formatValue(sample.value)) \(detail.exportUnit) · \(sample.start)")
-                .font(.footnote)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
         }
     }
 
@@ -4338,6 +4308,14 @@ extension View {
             .font(.body)
             .foregroundStyle(.primary)
             .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// Same as wrappingPrimaryCaption, but occupies the proposed width so RTL
+    /// Data-tab detail copy wraps instead of compressing to one unreadably
+    /// narrow line (hosted iPad `testBrowserDetailInRTL`).
+    func wrappingFillCaption() -> some View {
+        wrappingPrimaryCaption()
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// Control titles that must reflow at accessibility Dynamic Type sizes.
