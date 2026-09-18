@@ -20,15 +20,24 @@ struct ConfigurationImportView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Configuration portability")
                 .font(.headline)
+                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("configuration-import-heading")
             Text("Imports never contain credentials and cannot replace or enable an existing destination.")
-                .font(.footnote)
+                .font(.body)
+                .foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("configuration-import-limits")
-            Button("Review a .tributary configuration") {
+            Button {
                 showingImporter = true
+            } label: {
+                Text("Review a .tributary configuration")
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
             }
-            .frame(minHeight: 44)
+            .buttonStyle(.plain)
             .accessibilityIdentifier("configuration-import")
 
             if let review {
