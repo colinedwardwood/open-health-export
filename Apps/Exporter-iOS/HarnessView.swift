@@ -1244,9 +1244,17 @@ struct HarnessView: View {
                     .accessibilityIdentifier("pairing-imported-service-name")
             }
             companionPairingSection
-            Button("Prepare credential-free configuration export") {
+            Button {
                 Task { await prepareConfigurationExport() }
+            } label: {
+                Text("Prepare credential-free configuration export")
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             .accessibilityIdentifier("configuration-export-prepare")
             if let configurationExportURL {
                 ShareLink(item: configurationExportURL) {
