@@ -2787,9 +2787,9 @@ struct HarnessView: View {
         }
     }
 
-    /// SwiftUI `Toggle("title")` exposes the title twice to the hosted contrast
+    /// A titled SwiftUI Toggle exposes that title twice to the hosted contrast
     /// audit (empty identifier, duplicated label). Hide the switch's own title
-    /// and combine the visible copy with the control.
+    /// and keep the visible copy out of the accessibility tree.
     @ViewBuilder
     private func dataTabToggle(
         _ title: String,
