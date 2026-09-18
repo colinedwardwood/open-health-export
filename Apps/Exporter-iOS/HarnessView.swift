@@ -840,6 +840,7 @@ struct HarnessView: View {
                         }
                     }
                     .padding()
+                    .padding(.bottom, 56)
                 }
                 .accessibilityIdentifier("root-scroll-\(tab.rawValue)")
                 .navigationTitle(rootTabTitle(tab))
@@ -1026,8 +1027,8 @@ struct HarnessView: View {
                 }
             }
             Text("DEMO MODE — synthetic data")
-                .font(.headline)
-                .foregroundStyle(.primary)
+                .wrappingPrimaryCaption()
+                .accessibilityIdentifier("demo-mode-label")
             Text("Demo export never reads HealthKit. Type the destination name local-file to confirm you are not sending this into a live archive.")
                 .font(.footnote)
                 .foregroundStyle(.primary)
@@ -1115,7 +1116,7 @@ struct HarnessView: View {
                             presentErrorFromStatus(snapshot)
                         } label: {
                             Text(line)
-                                .font(.footnote)
+                                .font(.body)
                                 .foregroundStyle(.primary)
                                 .multilineTextAlignment(.leading)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -1937,10 +1938,9 @@ struct HarnessView: View {
                     } else {
                         Text(ShareDisclosure.copy)
                             .font(.body)
-                            .foregroundStyle(.primary)
                             .lineLimit(nil)
                             .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .accessibilityIdentifier("share-protection-warning")
                             .attentionBanner()
                         Button("I understand — show sharing") {
@@ -2486,18 +2486,13 @@ struct HarnessView: View {
                     .accessibilityIdentifier("browser-title")
                 Spacer()
                 if selectedDetail != nil {
-                    Button {
-                        selectedBrowserMetric = nil
-                    } label: {
-                        Text("Back")
-                            .font(.body)
-                            .foregroundStyle(.primary)
-                            .frame(minWidth: 44, minHeight: 44, alignment: .center)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("Back")
-                    .accessibilityIdentifier("browser-back")
+                    Button("Back") { selectedBrowserMetric = nil }
+                        .buttonStyle(.plain)
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .accessibilityLabel("Back")
+                        .accessibilityIdentifier("browser-back")
                 } else if browserSelecting {
                     Button("Review changes") {
                         browserSelecting = false
@@ -4245,14 +4240,13 @@ private struct HarnessButtonStyle: ButtonStyle {
 }
 
 private extension View {
-    /// Body type, primary contrast, wrap, and a 44-point minimum so hosted
-    /// Dynamic Type audits do not fail 16-point footnote captions.
+    /// Body type, primary contrast, and wrap. Do not force a 44-point minimum at
+    /// the default size: that pushed Status copy into the iPad tab fade.
     func wrappingPrimaryCaption() -> some View {
         self
             .font(.body)
             .foregroundStyle(.primary)
             .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
     }
 
     /// Black on a deliberately light yellow. The banner has to clear the contrast

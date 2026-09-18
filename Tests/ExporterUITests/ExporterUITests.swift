@@ -1757,6 +1757,12 @@ final class ExporterUITests: XCTestCase {
         if tabBar.exists, frame.maxY > tabBar.frame.minY - Self.scrollEdgeEffectHeight {
             return "behindTabBar"
         }
+        // iPadOS `sidebarAdaptable` often has no XCUITest tab bar, but still
+        // fades the bottom of the window the same way.
+        let window = app.windows.firstMatch.frame
+        if window.height > 0, frame.maxY > window.maxY - Self.scrollEdgeEffectHeight {
+            return "behindTabBar"
+        }
         if !element.isHittable { return "offscreenElement" }
         if element.isEnabled == false { return "disabledControl" }
         if element.elementType == .textField || element.elementType == .secureTextField {
