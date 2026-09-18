@@ -1872,15 +1872,19 @@ struct HarnessView: View {
                         ForEach(
                             Array(DiagnosticPreviewLayout.displayLines(json).enumerated()),
                             id: \.offset
-                        ) { _, line in
+                        ) { index, line in
                             Text(line)
                                 .font(.body)
                                 .foregroundStyle(.black)
                                 .lineLimit(nil)
                                 .fixedSize(horizontal: false, vertical: true)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                                 .padding(.horizontal, 8)
                                 .background(Color.white)
+                                .contentShape(Rectangle())
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel(line)
+                                .accessibilityIdentifier("diagnostic-json-\(index)")
                         }
                     }
                 }
