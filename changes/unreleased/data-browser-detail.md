@@ -10,3 +10,5 @@ require an explicit demo toggle, while Select mode still exposes every configura
 Users can independently choose canonical export, metric display, or US customary display
 units for weight, distance, temperature, height, water, glucose, and pressure. The detail
 screen names the unchanged canonical export unit whenever display conversion is active.
+Detail captions (Latest, Samples, destinations, footnotes) use Dynamic Type with
+primary contrast and wrap instead of clipping at accessibility sizes.

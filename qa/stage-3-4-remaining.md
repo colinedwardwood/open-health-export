@@ -3,19 +3,17 @@
 Living checklist for code-completable Stage 3 implementation and Stage 4 automated QA.
 Updated as items finish. Times are wall-clock, including hosted CI waits.
 
-Last updated: 2026-09-17 19:56 ET (America/New_York)
+Last updated: 2026-09-17 20:54 ET (America/New_York)
 
-**Origin HEAD:** `591279e` (toggle combine + iPad `rtl-browser-empty` naming). **Local, unpushed:** `d1efd55` (plain primary unit/clock choices) then `8c0411a` (R-113 changelog wording).
+**Origin HEAD:** `591279e`. **Local, unpushed:** through in-memory paused-type seed (`de52667`) plus uncommitted Data-tab detail wrapping.
 
-**Last macos-build:** [`35287922062`](https://github.com/colinedwardwood/open-health-export/actions/runs/35287922062) on `591279e` — compile jobs green; five `ios-ui` shards in progress; iPhone 1 still queued. Do not push until all six finish.
+**Last macos-build:** [`35287922062`](https://github.com/colinedwardwood/open-health-export/actions/runs/35287922062) on `591279e` — iPhone 0/2 and iPad 0 green; iPhone 1 and iPad 2 failed; **iPad 1 still in progress**. Do not push until that job completes.
 
 **Local evidence on the unpushed tree:**
-- This Mac iPad: three hosted-red cases green; full iPad suite in flight.
-- This Mac iPhone: RTL empty failed Contrast nearly passed on `browser-time-format-twelveHour` before `d1efd55`; passed after (~53s).
-- Air (Xcode 26.6): those three iPhone cases in flight.
-
-**Estimate if `591279e` UI is green:** still need to land `d1efd55` (another 50–90 min cycle) plus matrix + local suites + protection, about **5–9 hours**.
-**Estimate if `591279e` UI is red:** diagnose, then push the local commits, add **2–4 hours**.
+- iPad `testPausedAnchorIsVisibleAndOffersBothChoices` passed in 12.5s after in-memory seed (`de52667`).
+- iPad share-warning passed after diagnostic JSON 44pt labels.
+- Clock/unit contrast and Data-tab Toggle AX fixes are local; not on origin.
+- Data-tab detail Latest/Samples wrap at AX sizes: uncommitted, pending iPad RTL detail audit.
 
 Out of scope: physical-device / R-71 soak, backup and network-capture evidence, App Store, branding, HACS.
 
@@ -34,7 +32,7 @@ Out of scope: physical-device / R-71 soak, backup and network-capture evidence, 
 - [x] **Assert paused-anchor banner after disclosure**
 - [ ] **Watch XXXL launch flake** (no extra code unless it repeats)
 - [ ] **Wait for macos-build `35287922062`** (~50–90 min from 19:41 ET)
-  - Do not push `d1efd55` / `8c0411a` while those shards are in flight.
+  - iPad 1 still in progress. Do not push while it is running.
 - [x] **r84-determinism arm apt 404**
 - [x] **Selected destination / unit / time / QoS choices stay enabled at primary contrast**
 - [x] **Data-tab catalogue rows stay VoiceOver-visible** (`children: .combine`)
@@ -43,7 +41,9 @@ Out of scope: physical-device / R-71 soak, backup and network-capture evidence, 
 - [x] **Restore trailing RTL keyboard dismiss** (`d4a91a5`, Air 94s; on origin in `591279e`)
 - [x] **Combine Data-tab end-date toggle** (on origin `591279e`; local iPhone/iPad empty-pseudo green)
 - [x] **Name iPad RTL empty-state nil-element** (on origin `591279e`; local iPad empty-RTL green)
-- [ ] **Clock-format 12-hour Contrast nearly passed** — fixed locally on `d1efd55`; push after `35287922062`
+- [x] **Clock-format 12-hour Contrast nearly passed** — fixed locally on `d1efd55`; push after `35287922062`
+- [x] **Paused-type banner seeds in-memory on appear** (`de52667`; iPad test 12.5s)
+- [ ] **Data-tab detail Latest/Samples reflow at AX Dynamic Type** — uncommitted; hosted iPad 2 failed this on `591279e`
 
 ## After hosted UI is green
 

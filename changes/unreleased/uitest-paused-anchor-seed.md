@@ -1,3 +1,3 @@
-UI tests that seed a paused-type banner no longer clear holds on the same
-launch. Reset plus seed in one onAppear could leave Status with no
-anchor-hold banner on iPad.
+UI tests that seed a paused-type banner apply the hold in memory on appear
+so Status shows it before SQLite seeding finishes. Reset still clears holds
+on launches that are not seeding one.
