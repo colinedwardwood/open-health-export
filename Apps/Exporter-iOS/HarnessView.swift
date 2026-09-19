@@ -1820,6 +1820,7 @@ struct HarnessView: View {
                 showSettings = false
                 rootTab = .destinations
             }
+            .buttonStyle(HarnessButtonStyle())
             .accessibilityIdentifier("settings-open-destinations")
             dataFlowExplainer
             ForEach(Array(provenanceLines.enumerated()), id: \.offset) { index, line in
@@ -2598,6 +2599,9 @@ struct HarnessView: View {
                         browserReviewVisible = true
                         Task { await refreshAuthorizedMetricsForReview() }
                     }
+                    .buttonStyle(.plain)
+                    .wrappingPrimaryCaption()
+                    .frame(minHeight: 44)
                     .accessibilityIdentifier("browser-review")
                 } else {
                     Button("Select") {
@@ -2605,6 +2609,9 @@ struct HarnessView: View {
                         browserSelecting = true
                         browserReviewVisible = false
                     }
+                    .buttonStyle(.plain)
+                    .wrappingPrimaryCaption()
+                    .frame(minHeight: 44)
                     .accessibilityIdentifier("browser-select")
                 }
             }
