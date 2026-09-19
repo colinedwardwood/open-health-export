@@ -1696,12 +1696,11 @@ final class ExporterUITests: XCTestCase {
                             let longest = label.split(separator: "\n").map(\.count).max() ?? label.count
                             print(
                                 "UNSUPPRESSED AX \(state): type=\(issue.auditType) "
-                                    + "id=\(element.identifier) "
-                                    + "labelChars=\(label.count) labelLines=\(label.split(separator: "\n").count) "
-                                    + "longestLine=\(longest) "
-                                    + "enabled=\(element.isEnabled) hittable=\(element.isHittable) "
-                                    + "frame=\(element.frame) window=\(chrome.window) "
-                                    + "label=\(label)"
+                            + "id=\(element.identifier) "
+                            + "labelChars=\(label.count) labelLines=\(label.split(separator: "\n").count) "
+                            + "longestLine=\(longest) "
+                            + "frame=\(element.frame) window=\(chrome.window) "
+                            + "label=\(label)"
                             )
                         } else {
                             print(
@@ -1765,7 +1764,9 @@ final class ExporterUITests: XCTestCase {
         if window.height > 0, frame.maxY > window.maxY - Self.scrollEdgeEffectHeight {
             return "behindTabBar"
         }
-        if !element.isHittable { return "offscreenElement" }
+        if window.height > 0, !frame.intersects(window) {
+            return "offscreenElement"
+        }
         if element.isEnabled == false { return "disabledControl" }
         if element.elementType == .textField || element.elementType == .secureTextField {
             return "systemTextFieldPlaceholder"

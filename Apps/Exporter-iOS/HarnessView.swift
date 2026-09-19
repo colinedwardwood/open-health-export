@@ -823,10 +823,12 @@ struct HarnessView: View {
                             Button("Where your data goes") {
                                 rootTab = .destinations
                             }
+                            .buttonStyle(HarnessButtonStyle())
                             .accessibilityIdentifier("status-open-destinations")
                             Button("Settings") {
                                 showSettings = true
                             }
+                            .buttonStyle(HarnessButtonStyle())
                             .accessibilityIdentifier("status-open-settings")
                             statusOperations
                             measurements
@@ -1137,32 +1139,39 @@ struct HarnessView: View {
                                 snapshot.destinationID
                             )
                             Text("Exports from this device")
-                                .font(.body)
-                                .fixedSize(horizontal: false, vertical: true)
+                                .wrappingFillCaption()
                                 .accessibilityIdentifier(
                                     "destination-export-role-\(snapshot.destinationID)"
                                 )
-                            Button("Automatic and manual") {
+                            Button {
                                 try? HarnessExport.setDestinationExportRole(
                                     .designated,
                                     destinationID: snapshot.destinationID
                                 )
                                 refreshDestinationSurfaces()
                                 Task { await reevaluateAutomaticExport() }
+                            } label: {
+                                Text("Automatic and manual")
+                                    .fontWeight(role == .designated ? .semibold : .regular)
+                                    .wrappingActionLabel()
                             }
-                            .fontWeight(role == .designated ? .semibold : .regular)
+                            .buttonStyle(.plain)
                             .accessibilityIdentifier(
                                 "destination-export-role-designated-\(snapshot.destinationID)"
                             )
-                            Button("Manual only") {
+                            Button {
                                 try? HarnessExport.setDestinationExportRole(
                                     .manualOnly,
                                     destinationID: snapshot.destinationID
                                 )
                                 refreshDestinationSurfaces()
                                 Task { await reevaluateAutomaticExport() }
+                            } label: {
+                                Text("Manual only")
+                                    .fontWeight(role == .manualOnly ? .semibold : .regular)
+                                    .wrappingActionLabel()
                             }
-                            .fontWeight(role == .manualOnly ? .semibold : .regular)
+                            .buttonStyle(.plain)
                             .accessibilityIdentifier(
                                 "destination-export-role-manual-\(snapshot.destinationID)"
                             )
@@ -1172,11 +1181,10 @@ struct HarnessView: View {
                                     ? "This device exports here only when you ask. Keep exactly one other device automatic for this destination."
                                     : "This is the designated automatic exporter. Set every other device using this destination to Manual only."
                             )
-                            .font(.footnote)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier(
-                                "destination-export-role-copy-\(snapshot.destinationID)"
-                            )
+                                .wrappingFillCaption()
+                                .accessibilityIdentifier(
+                                    "destination-export-role-copy-\(snapshot.destinationID)"
+                                )
                         }
                     }
                 }
@@ -2605,14 +2613,12 @@ struct HarnessView: View {
                     ? "Demo values. This is what App Review sees without HealthKit history."
                     : "Health values read on \(DeviceNoun.thisDevice)."
             )
-                .font(.footnote)
-                .foregroundStyle(.primary)
+                .wrappingFillCaption()
                 .fontWeight(browserDemoMode ? .semibold : .regular)
 
             if selectedDetail == nil {
                 Text("Export destination")
-                    .font(.body)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .wrappingFillCaption()
                     .accessibilityIdentifier("scope-destination")
                 ForEach(
                     [
