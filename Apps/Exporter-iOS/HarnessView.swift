@@ -2616,7 +2616,7 @@ struct HarnessView: View {
                 .wrappingFillCaption()
                 .fontWeight(browserDemoMode ? .semibold : .regular)
 
-            if selectedDetail == nil {
+            if selectedDetail == nil, !browserSearchIsFiltering {
                 Text("Export destination")
                     .wrappingFillCaption()
                     .accessibilityIdentifier("scope-destination")
@@ -2646,8 +2646,7 @@ struct HarnessView: View {
                     .accessibilityIdentifier("scope-zero-default")
                 if browserSelection.isEmpty {
                     Text("Scope required: this destination cannot export until at least one type is selected.")
-                        .font(.footnote)
-                        .foregroundStyle(.primary)
+                        .wrappingFillCaption()
                         .fontWeight(.semibold)
                         .accessibilityIdentifier("scope-required")
                 }
@@ -2801,9 +2800,9 @@ struct HarnessView: View {
                     isOn: $browserDemoMode,
                     identifier: "browser-demo-mode"
                 )
+                if !browserSearchIsFiltering {
                 Text("Display units")
-                    .font(.body)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .wrappingFillCaption()
                     .accessibilityLabel("Display units")
                     .accessibilityIdentifier("browser-display-units")
                 ForEach(DisplayUnitPreference.allCases, id: \.self) { preference in
@@ -2811,12 +2810,8 @@ struct HarnessView: View {
                         displayUnitPreference = preference
                     } label: {
                         Text(preference.label)
-                            .font(.body)
-                            .foregroundStyle(.primary)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .wrappingActionLabel()
                             .fontWeight(displayUnitPreference == preference ? .semibold : .regular)
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityElement(children: .combine)
@@ -2824,9 +2819,7 @@ struct HarnessView: View {
                     .accessibilityIdentifier("browser-display-units-\(preference.rawValue)")
                 }
                 Text("Time format")
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .wrappingFillCaption()
                     .accessibilityLabel("Time format")
                     .accessibilityIdentifier("browser-time-format")
                 ForEach(ClockDisplay.allCases, id: \.self) { choice in
@@ -2834,12 +2827,8 @@ struct HarnessView: View {
                         clockDisplay = choice
                     } label: {
                         Text(choice.label)
-                            .font(.body)
-                            .foregroundStyle(.primary)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .wrappingActionLabel()
                             .fontWeight(clockDisplay == choice ? .semibold : .regular)
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityElement(children: .combine)
@@ -2847,10 +2836,9 @@ struct HarnessView: View {
                     .accessibilityIdentifier("browser-time-format-\(choice.rawValue)")
                 }
                 Text("Sample times read as \(clockDisplay.timeString(Date(), locale: Locale.current, timeZone: .current)).")
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .wrappingFillCaption()
                     .accessibilityIdentifier("browser-time-example")
+                }
                 TextField("Search types", text: $browserSearch)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -2858,10 +2846,7 @@ struct HarnessView: View {
                     .accessibilityIdentifier("browser-search")
                 if rows.isEmpty {
                     Text("No data types match your search.")
-                        .font(.body)
-                        .foregroundStyle(.primary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .wrappingFillCaption()
                         .accessibilityLabel("No data types match your search.")
                         .accessibilityIdentifier("browser-empty")
                 }
@@ -2919,6 +2904,10 @@ struct HarnessView: View {
         }
     }
 
+    private var browserSearchIsFiltering: Bool {
+        !browserSearch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     /// A titled SwiftUI Toggle exposes that title twice to the hosted contrast
     /// audit (empty identifier, duplicated label). Hide the switch's own title
     /// and keep the visible copy out of the accessibility tree.
@@ -2930,9 +2919,7 @@ struct HarnessView: View {
     ) -> some View {
         HStack(alignment: .center, spacing: 12) {
             Text(title)
-                .font(.body)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityHidden(true)
             Spacer(minLength: 8)
             Toggle("", isOn: isOn)
