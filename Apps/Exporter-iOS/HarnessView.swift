@@ -2642,9 +2642,7 @@ struct HarnessView: View {
                     .accessibilityIdentifier("scope-destination-\(id)")
                 }
                 Text("Each destination starts with zero types. Choose a destination, types, and the earliest date it may receive.")
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .wrappingFillCaption()
                     .accessibilityIdentifier("scope-zero-default")
                 if browserSelection.isEmpty {
                     Text("Scope required: this destination cannot export until at least one type is selected.")
