@@ -273,8 +273,7 @@ struct HarnessView: View {
                         .font(.headline)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(overdueBanner)
-                        .font(.footnote)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .wrappingFillCaption()
                 }
                 .attentionBanner()
                 .accessibilityIdentifier("export-overdue-banner")
@@ -287,8 +286,7 @@ struct HarnessView: View {
                         .font(.headline)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(destinationChangeBanner)
-                        .font(.footnote)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .wrappingFillCaption()
                 }
                 .attentionBanner()
                 .accessibilityIdentifier("destination-change-banner")
@@ -301,8 +299,7 @@ struct HarnessView: View {
                         .font(.headline)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(AnchorHoldBanner.detail(anchorHolds))
-                        .font(.footnote)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .wrappingFillCaption()
                 }
                 .attentionBanner()
                 .accessibilityIdentifier("anchor-hold-banner")
@@ -633,14 +630,12 @@ struct HarnessView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("privacy-gate-locked-title")
             Text("Unlocking protects this screen only. Background exports and destination delivery continue without a prompt.")
-                .font(.footnote)
+                .wrappingFillCaption()
                 .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("privacy-gate-background-scope")
             if appPrivacyGate.authenticationFailed {
                 Text("Authentication was not completed.")
-                    .font(.footnote)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .wrappingFillCaption()
                     .accessibilityIdentifier("privacy-gate-failure")
             }
             Button(
@@ -650,6 +645,7 @@ struct HarnessView: View {
                     await appPrivacyGate.authenticateIfNeeded(enabled: appPrivacyGateEnabled)
                 }
             }
+            .buttonStyle(HarnessButtonStyle())
             .disabled(appPrivacyGate.state == .authenticating)
             .accessibilityIdentifier("privacy-gate-unlock")
         }
@@ -666,30 +662,24 @@ struct HarnessView: View {
                 .font(.subheadline)
                 .fontWeight(.semibold)
             Text(DataFlowExplainer.source)
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
             Text(DataFlowExplainer.typeCountCopy(dataFlowTypeCount))
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
             Text(DataFlowExplainer.transform)
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
             if dataFlowHops.isEmpty {
                 Text(DataFlowExplainer.empty)
-                    .font(.footnote)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .wrappingFillCaption()
                     .accessibilityIdentifier("data-flow-empty")
             } else {
                 ForEach(Array(dataFlowHops.enumerated()), id: \.element.id) { index, hop in
                     Text(DataFlowExplainer.hopLine(hop))
-                        .font(.footnote)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .wrappingFillCaption()
                         .accessibilityIdentifier("data-flow-hop-\(index)")
                 }
             }
             Text(DataFlowExplainer.nowhereElse)
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("data-flow-nowhere-else")
         }
         .accessibilityElement(children: .contain)
@@ -734,8 +724,7 @@ struct HarnessView: View {
                         .font(.headline)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(IPadExporterNotice.body)
-                        .font(.body)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .wrappingFillCaption()
                 }
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("ipad-only-exporter")
@@ -747,11 +736,11 @@ struct HarnessView: View {
                         .font(.headline)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(CoverageDrop.attentionDetail)
-                        .font(.footnote)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .wrappingFillCaption()
                     Button(CoverageDrop.reviewAction) {
                         rootTab = .data
                     }
+                    .buttonStyle(HarnessButtonStyle())
                     .accessibilityIdentifier("coverage-drop-review")
                 }
                 .accessibilityElement(children: .contain)
@@ -783,6 +772,7 @@ struct HarnessView: View {
                         Button(action.label) {
                             applyUserFacingFix(action)
                         }
+                        .buttonStyle(HarnessButtonStyle())
                         .disabled(phase == .working)
                         .accessibilityIdentifier("error-fix-\(action.rawValue)")
                     }
@@ -907,6 +897,7 @@ struct HarnessView: View {
                 phase = .ready
                 status = "Ready. Next: request Health read access, then measure."
             }
+            .buttonStyle(HarnessButtonStyle())
             .accessibilityIdentifier("disclosure-continue")
             .accessibilityHint("Shows Health permission and measurement controls.")
         }
@@ -930,6 +921,7 @@ struct HarnessView: View {
                 showHealthPriming = false
                 Task { await requestAccess() }
             }
+            .buttonStyle(HarnessButtonStyle())
             .accessibilityIdentifier("health-priming-continue")
             .accessibilityHint("Opens Apple's Health permission sheet.")
         }
@@ -944,6 +936,7 @@ struct HarnessView: View {
             Button("Request Health read access for selected types") {
                 Task { await presentHealthPriming() }
             }
+            .buttonStyle(HarnessButtonStyle())
             .accessibilityIdentifier("health-request")
             .accessibilityHint("Asks Apple for read permission only for types currently selected in Data.")
             .disabled(phase == .working)
@@ -959,11 +952,13 @@ struct HarnessView: View {
             Button("Run R-70 (one anchored page per type)") {
                 Task { await runR70() }
             }
+            .buttonStyle(HarnessButtonStyle())
             .disabled(phase == .working)
             .accessibilityIdentifier("r70-run")
             Button("Export one page") {
                 Task { await runLocalExport() }
             }
+            .buttonStyle(HarnessButtonStyle())
             .disabled(phase == .working || !HarnessExport.hasAutomaticExport(trigger: .manual))
             .accessibilityIdentifier("local-file-export")
             .accessibilityHint("Writes NDJSON to the archive folder you chose in Files.")
@@ -972,22 +967,24 @@ struct HarnessView: View {
                 .accessibilityIdentifier("shortcut-export")
             schedulingHonesty
             Text("Backfill runs newest-first and resumes from an inspectable checkpoint. On iOS 26 or later it continues unattended after you leave the app. On iOS 18 through 25, keep this screen open; the app prevents idle sleep while it works.")
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("backfill-os-disclosure")
             Button("Backfill all history (aggregates)") {
                 Task { await runBackfill(mode: .aggregateOnly) }
             }
+            .buttonStyle(HarnessButtonStyle())
             .disabled(phase == .working || !HarnessExport.isLocalFileEnabled())
             .accessibilityIdentifier("backfill-aggregate")
             Button("Backfill raw history (explicit action)") {
                 Task { await runBackfill(mode: .raw) }
             }
+            .buttonStyle(HarnessButtonStyle())
             .disabled(phase == .working || !HarnessExport.isLocalFileEnabled())
             .accessibilityIdentifier("backfill-raw")
             Button("Reconcile all available Health history") {
                 Task { await runFullReconcile() }
             }
+            .buttonStyle(HarnessButtonStyle())
             .disabled(phase == .working || !HarnessExport.isLocalFileEnabled())
             .accessibilityIdentifier("full-reconcile")
             .accessibilityHint("Compares every available day without advancing HealthKit anchors.")
@@ -1002,11 +999,13 @@ struct HarnessView: View {
                     Button(AnchorHoldBanner.reexportChoice) {
                         Task { await decideAnchorHold(hold, reexport: true) }
                     }
+                    .buttonStyle(HarnessButtonStyle())
                     .disabled(phase == .working)
                     .accessibilityIdentifier("anchor-hold-reexport-\(index)")
                     Button(AnchorHoldBanner.stopChoice) {
                         Task { await decideAnchorHold(hold, reexport: false) }
                     }
+                    .buttonStyle(HarnessButtonStyle())
                     .disabled(phase == .working)
                     .accessibilityIdentifier("anchor-hold-stop-\(index)")
                 }
@@ -1023,6 +1022,7 @@ struct HarnessView: View {
                     ) {
                         Task { await reExportQueueGap(gap) }
                     }
+                    .buttonStyle(HarnessButtonStyle())
                     .disabled(phase == .working)
                     .accessibilityIdentifier("gap-reexport-\(index)")
                 }
@@ -1031,9 +1031,7 @@ struct HarnessView: View {
                 .wrappingPrimaryCaption()
                 .accessibilityIdentifier("demo-mode-label")
             Text("Demo export never reads HealthKit. Type the destination name local-file to confirm you are not sending this into a live archive.")
-                .font(.footnote)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
             TextField("Type local-file to confirm demo export", text: $demoConfirmName)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -1044,6 +1042,7 @@ struct HarnessView: View {
             Button("Export demo dataset (every catalogue metric)") {
                 Task { await runDemoExport() }
             }
+            .buttonStyle(HarnessButtonStyle())
             .disabled(
                 phase == .working
                     || CredentialFieldHygiene.secret(demoConfirmName).normalized != "local-file"
@@ -1053,6 +1052,7 @@ struct HarnessView: View {
             Button("Send sample destination-enabled notice") {
                 Task { await sendSampleNotice() }
             }
+            .buttonStyle(HarnessButtonStyle())
             .disabled(phase == .working)
             .accessibilityIdentifier("destination-enabled-notice")
             .accessibilityHint("Asks for notification permission and posts one R-40 notice with copy from the registry.")
@@ -1097,8 +1097,7 @@ struct HarnessView: View {
             Button("Refresh destination status") {
                 refreshDestinationSurfaces()
             }
-            .font(.body)
-            .fixedSize(horizontal: false, vertical: true)
+            .buttonStyle(HarnessButtonStyle())
             .accessibilityIdentifier("destination-refresh")
             if destinationSnapshots.isEmpty {
                 Text(destinationStatusLines.first ?? DestinationStatusLine.emptyCopy)
@@ -1202,40 +1201,32 @@ struct HarnessView: View {
                 .accessibilityIdentifier("destination-title")
             dataFlowExplainer
             Text("Export window: \(exportWindowHours) hours")
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("export-window-hours")
             Text("Freshness interval: \(freshnessIntervalMinutes) minutes")
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("freshness-interval-minutes")
             Text(FreshnessTarget.provisionalDisclosure)
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("freshness-target")
             ForEach(HarnessExport.freshnessDisclosureLines(), id: \.id) { disclosure in
                 Text(disclosure.text)
-                    .font(.footnote)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .wrappingFillCaption()
                     .accessibilityIdentifier(disclosure.id)
             }
             if !wakeAttribution.isEmpty {
                 Text(wakeAttribution)
-                    .font(.footnote)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .wrappingFillCaption()
                     .accessibilityIdentifier("wake-attribution")
             }
             if !ledgerWarning.isEmpty {
                 Text(ledgerWarning)
-                    .font(.footnote)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .foregroundStyle(.primary)
+                    .wrappingFillCaption()
                     .fontWeight(ledgerWarning.hasPrefix("WARNING") ? .semibold : .regular)
                     .accessibilityLabel("Ledger status: \(ledgerWarning)")
             }
             Text("Your health data is sent only to destinations listed here. This is what the app records about its own use, not independent proof.")
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("destination-ledger-honesty")
             ConfigurationImportView(
                 refreshToken: importedDraftRefreshToken
@@ -1245,9 +1236,9 @@ struct HarnessView: View {
             }
             if let importedName = importedCompanionServiceName {
                 Text("Imported Mac name")
-                    .font(.footnote)
+                    .wrappingFillCaption()
                 Text(importedName)
-                    .font(.footnote)
+                    .wrappingFillCaption()
                     .accessibilityIdentifier("pairing-imported-service-name")
             }
             companionPairingSection
@@ -1298,18 +1289,11 @@ struct HarnessView: View {
             .accessibilityHint("Writes a canary file, reads it back, then enables the local-file destination.")
             ForEach(Array(localFileTestLines.enumerated()), id: \.offset) { index, line in
                 Text(line)
-                    .font(.footnote)
-                    .foregroundStyle(.primary)
-                    .frame(
-                        maxWidth: .infinity,
-                        minHeight: 44,
-                        alignment: .leading
-                    )
+                    .wrappingFillCaption()
                     .accessibilityIdentifier("local-file-test-line-\(index)")
             }
             Text(ExportProfile.haeCompatibility.label)
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("hae-compatibility-label")
             TextField("HTTPS destination URL", text: $httpsURL)
                 .textInputAutocapitalization(.never)
@@ -1320,8 +1304,7 @@ struct HarnessView: View {
                 .accessibilityIdentifier("https-url")
             urlFieldHygiene(httpsURL, identifierPrefix: "https-url")
             Text(CredentialDisclosure.copy)
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("credential-disclosure-https")
             SecureField("Bearer token (optional)", text: $httpsBearer)
                 .textInputAutocapitalization(.never)
@@ -1331,7 +1314,7 @@ struct HarnessView: View {
             secretFieldHygiene(httpsBearer, identifierPrefix: "https-bearer")
             if let httpsBearerDescriptor {
                 Text(httpsBearerDescriptor)
-                    .font(.footnote)
+                    .wrappingFillCaption()
                     .accessibilityIdentifier("https-bearer-descriptor")
             }
             Toggle("Allow plain HTTP (unsafe)", isOn: $allowInsecureHTTP)
@@ -1341,12 +1324,10 @@ struct HarnessView: View {
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("https-metered")
             Text("Off by default. Exports wait for Wi-Fi unless you turn this on.")
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
             if allowInsecureHTTP {
                 Text("Plain HTTP exposes health exports to anyone able to observe this network.")
-                    .font(.footnote)
-                    .foregroundStyle(.primary)
+                    .wrappingFillCaption()
                     .fontWeight(.semibold)
             }
             Toggle("Send traceparent header (opt-in)", isOn: $propagateTraceparent)
@@ -1356,7 +1337,7 @@ struct HarnessView: View {
                     try? HarnessExport.setHTTPSTraceparent(enabled)
                 }
             Text("Off by default. Never sends tracestate or baggage.")
-                .font(.footnote)
+                .wrappingFillCaption()
             Button {
                 Task { await testHTTPS() }
             } label: {
@@ -1390,8 +1371,7 @@ struct HarnessView: View {
                 .font(.headline)
                 .accessibilityIdentifier("home-assistant-title")
             Text("Sends the complete native NDJSON feed to an automation webhook. Home Assistant does not import historical sensor states from this feed by itself.")
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("home-assistant-semantics")
             TextField("Home Assistant base URL", text: $homeAssistantBaseURL)
                 .textInputAutocapitalization(.never)
@@ -1415,7 +1395,7 @@ struct HarnessView: View {
             )
             if let homeAssistantWebhookDescriptor {
                 Text(homeAssistantWebhookDescriptor)
-                    .font(.footnote)
+                    .wrappingFillCaption()
                     .accessibilityIdentifier(
                         "home-assistant-webhook-descriptor"
                     )
@@ -1433,8 +1413,7 @@ struct HarnessView: View {
             .frame(minHeight: 44)
             .accessibilityIdentifier("home-assistant-metered")
             Text("Off by default. Exports wait for Wi-Fi unless you turn this on.")
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
             Button {
                 Task { await testHomeAssistantWebhook() }
             } label: {
@@ -1495,11 +1474,9 @@ struct HarnessView: View {
                 .accessibilityIdentifier("mqtt-topic")
             secretFieldHygiene(mqttTopic, identifierPrefix: "mqtt-topic")
             Text("Use {{exporterId|raw}} and {{batchId|raw}} if the broker needs a templated topic.")
-                .font(.footnote)
-                .foregroundStyle(.primary)
+                .wrappingFillCaption()
             Text(mqttQoS == 0 ? "At most once (0)" : "At least once (1)")
-                .font(.body)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .frame(minHeight: 44)
                 .accessibilityLabel(
                     mqttQoS == 0 ? "MQTT QoS, At most once (0)" : "MQTT QoS, At least once (1)"
@@ -1507,23 +1484,15 @@ struct HarnessView: View {
                 .accessibilityIdentifier("mqtt-qos")
             Button { mqttQoS = 0 } label: {
                 Text("At most once (0)")
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .wrappingActionLabel()
                     .fontWeight(mqttQoS == 0 ? .semibold : .regular)
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("mqtt-qos-0")
             Button { mqttQoS = 1 } label: {
                 Text("At least once (1)")
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .wrappingActionLabel()
                     .fontWeight(mqttQoS == 1 ? .semibold : .regular)
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("mqtt-qos-1")
@@ -1536,7 +1505,7 @@ struct HarnessView: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("mqtt-pkcs12")
             Text(mqttPKCS12Name)
-                .font(.footnote)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("mqtt-pkcs12-name")
             SecureField("PKCS#12 password", text: $mqttPKCS12Password)
                 .textContentType(.password)
@@ -1562,8 +1531,7 @@ struct HarnessView: View {
                 .accessibilityIdentifier("mqtt-username")
             secretFieldHygiene(mqttUsername, identifierPrefix: "mqtt-username")
             Text(CredentialDisclosure.copy)
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("credential-disclosure-mqtt")
             SecureField("MQTT password", text: $mqttPassword)
                 .textContentType(.password)
@@ -1572,12 +1540,12 @@ struct HarnessView: View {
             secretFieldHygiene(mqttPassword, identifierPrefix: "mqtt-password")
             if let mqttPasswordDescriptor {
                 Text(mqttPasswordDescriptor)
-                    .font(.footnote)
+                    .wrappingFillCaption()
                     .accessibilityIdentifier("mqtt-password-descriptor")
             }
             if let mqttPKCS12PasswordDescriptor {
                 Text(mqttPKCS12PasswordDescriptor)
-                    .font(.footnote)
+                    .wrappingFillCaption()
                     .accessibilityIdentifier("mqtt-pkcs12-password-descriptor")
             }
             Toggle("Allow plain MQTT (unsafe)", isOn: $allowInsecureMQTT)
@@ -1587,12 +1555,10 @@ struct HarnessView: View {
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("mqtt-metered")
             Text("Off by default. Exports wait for Wi-Fi unless you turn this on.")
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
             if allowInsecureMQTT {
                 Text("Plain MQTT exposes health exports to anyone able to observe this network.")
-                    .font(.footnote)
-                    .foregroundStyle(.primary)
+                    .wrappingFillCaption()
                     .fontWeight(.semibold)
             }
             Button {
@@ -1634,16 +1600,14 @@ struct HarnessView: View {
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("otlp-metered")
             Text("Off by default. Exports wait for Wi-Fi unless you turn this on.")
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
             if allowInsecureOTLP {
                 Text("Plain HTTP exposes traces to anyone able to observe this network.")
-                    .font(.footnote)
-                    .foregroundStyle(.primary)
+                    .wrappingFillCaption()
                     .fontWeight(.semibold)
             }
             Text("This preview is traces only. It does not include health values.")
-                .font(.footnote)
+                .wrappingFillCaption()
             Button {
                 Task { await previewOTLP() }
             } label: {
@@ -1659,7 +1623,7 @@ struct HarnessView: View {
                     .textSelection(.enabled)
                     .accessibilityIdentifier("otlp-preview-body")
                 Text("End of OTLP preview")
-                    .font(.footnote)
+                    .wrappingFillCaption()
                     .accessibilityIdentifier("otlp-preview-end")
                     .onScrollVisibilityChange(threshold: 0.1) { visible in
                         if visible { revealOTLPEnable() }
@@ -1916,6 +1880,7 @@ struct HarnessView: View {
                     status = "Ready. Tap again to purge queued heart-rate payloads and disable that type."
                 }
             }
+            .buttonStyle(HarnessButtonStyle())
             .accessibilityIdentifier("stop-heart-rate")
             .disabled(phase == .working)
             Button(wipeArmed ? WipeCopy.confirmTitle : WipeCopy.title) {
@@ -1926,6 +1891,7 @@ struct HarnessView: View {
                     status = "Ready. Tap again to destroy credentials, pairing, and the ledger signing identity."
                 }
             }
+            .buttonStyle(HarnessButtonStyle())
             .accessibilityIdentifier("wipe-everything")
             .disabled(phase == .working)
 
@@ -1950,8 +1916,7 @@ struct HarnessView: View {
             Button("Build diagnostic bundle") {
                 buildDiagnostic()
             }
-            .frame(minHeight: 44)
-            .foregroundStyle(.primary)
+            .buttonStyle(HarnessButtonStyle())
             .accessibilityIdentifier("diagnostic-build")
             .disabled(phase == .working)
             .accessibilityHint("Assembles a redacted ohe.diagnostic/1 JSON preview. Sharing exists only below the bundle's last line.")
@@ -2702,14 +2667,23 @@ struct HarnessView: View {
                         Button("Use Core Daily") {
                             applyCoreDailyPreset()
                         }
+                        .buttonStyle(.plain)
+                        .wrappingPrimaryCaption()
+                        .frame(minHeight: 44)
                         .accessibilityIdentifier("browser-core-daily")
                         Button("Invert routine") {
                             var draft = DataSelectionDraft(baseline: browserSelection)
                             draft.invertRoutine(MetricCatalog.selectable.map(\.id))
                             browserSelection = draft.selected
                         }
+                        .buttonStyle(.plain)
+                        .wrappingPrimaryCaption()
+                        .frame(minHeight: 44)
                         .accessibilityIdentifier("browser-invert-routine")
                         Button("Clear all") { browserSelection.removeAll() }
+                            .buttonStyle(.plain)
+                            .wrappingPrimaryCaption()
+                            .frame(minHeight: 44)
                             .accessibilityIdentifier("browser-clear-all")
                     }
                     if let upgrade = coreDailyUpgrade {
@@ -2726,10 +2700,16 @@ struct HarnessView: View {
                                     coreDailyAppliedVersion = shipped.version
                                     coreDailyUpgrade = nil
                                 }
+                                .buttonStyle(.plain)
+                                .wrappingPrimaryCaption()
+                                .frame(minHeight: 44)
                                 .accessibilityIdentifier("preset-upgrade-apply")
                                 Button("Keep current types") {
                                     coreDailyUpgrade = nil
                                 }
+                                .buttonStyle(.plain)
+                                .wrappingPrimaryCaption()
+                                .frame(minHeight: 44)
                                 .accessibilityIdentifier("preset-upgrade-keep")
                             }
                         }
@@ -2766,6 +2746,7 @@ struct HarnessView: View {
                         Button("Continue") {
                             Task { await applyBrowserSelection() }
                         }
+                        .buttonStyle(HarnessButtonStyle())
                         .accessibilityIdentifier("browser-review-continue")
                     }
                 }
@@ -2791,6 +2772,7 @@ struct HarnessView: View {
                             sensitiveDestinationConfirmation = ""
                         }
                     }
+                    .buttonStyle(HarnessButtonStyle())
                     .disabled(
                         CredentialFieldHygiene.secret(sensitiveDestinationConfirmation)
                             .normalized != scopeDestinationID
@@ -3874,22 +3856,24 @@ struct HarnessView: View {
                             identifierPrefix: "public-destination-confirmation"
                         )
                     }
-                    Button("This is my server") {
+                    Button {
                         Task { await confirmPendingDestination() }
+                    } label: {
+                        Text("This is my server")
+                            .wrappingActionLabel()
                     }
+                    .buttonStyle(.borderedProminent)
                     .disabled(
                         card.requiresPublicAddressConfirmation
                             && CredentialFieldHygiene.secret(publicAddressConfirmation)
                                 .normalized != ConfirmationCopy.publicAddressPhrase
                     )
                     .accessibilityIdentifier("destination-confirm")
-                    .buttonStyle(.borderedProminent)
                     Button("Cancel") {
                         cancelDestinationConfirmation()
                     }
+                    .buttonStyle(HarnessButtonStyle())
                     .accessibilityIdentifier("destination-confirm-cancel")
-                    .foregroundStyle(.primary)
-                    .frame(minWidth: 44, minHeight: 44)
                 }
                 .padding()
             }
