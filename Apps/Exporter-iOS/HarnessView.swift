@@ -720,8 +720,8 @@ struct HarnessView: View {
             if showsIPadOnlyExporterNotice {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(IPadExporterNotice.title)
-                        .font(.headline)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .wrappingFillCaption()
+                        .fontWeight(.semibold)
                     Text(IPadExporterNotice.body)
                         .wrappingFillCaption()
                 }
@@ -732,8 +732,8 @@ struct HarnessView: View {
             if userFacingError == nil, let drop = coverageDropEvents.first {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(CoverageDrop.attentionHeadline(for: drop))
-                        .font(.headline)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .wrappingFillCaption()
+                        .fontWeight(.semibold)
                     Text(CoverageDrop.attentionDetail)
                         .wrappingFillCaption()
                     Button(CoverageDrop.reviewAction) {
