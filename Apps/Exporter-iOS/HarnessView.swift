@@ -993,8 +993,7 @@ struct HarnessView: View {
                     .font(.headline)
                 ForEach(Array(anchorHolds.enumerated()), id: \.offset) { index, hold in
                     Text(AnchorHoldBanner.explanation(hold))
-                        .font(.footnote)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .wrappingFillCaption()
                         .accessibilityIdentifier("anchor-hold-explanation-\(index)")
                     Button(AnchorHoldBanner.reexportChoice) {
                         Task { await decideAnchorHold(hold, reexport: true) }
@@ -1014,7 +1013,7 @@ struct HarnessView: View {
                 Text("Data gaps")
                     .font(.headline)
                 Text("These queued date ranges were evicted to keep storage bounded.")
-                    .font(.footnote)
+                    .wrappingFillCaption()
                 ForEach(Array(queueEvictionGaps.enumerated()), id: \.offset) { index, gap in
                     Button(
                         "Re-export \(gap.metric.rawValue) "
@@ -1060,17 +1059,16 @@ struct HarnessView: View {
             Text("Security advisories")
                 .font(.headline)
             Text(AdvisoryPinnedKeys.urlString)
-                .font(.footnote)
+                .wrappingFillCaption()
                 .accessibilityLabel("Security advisory endpoint")
             Text("This is the sole built-in host. The app never sends Health data there. Fetch happens only on a visible foreground launch, never during export.")
-                .font(.footnote)
+                .wrappingFillCaption()
             Toggle("Fetch security advisories", isOn: $advisoryEnabled)
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("advisory-fetch")
             if let advisoryBanner {
                 Text(advisoryBanner)
-                    .font(.footnote)
-                    .foregroundStyle(.primary)
+                    .wrappingFillCaption()
                     .fontWeight(.semibold)
                     .accessibilityIdentifier("advisory-banner")
             }
@@ -1840,37 +1838,30 @@ struct HarnessView: View {
                 .font(.headline)
                 .accessibilityIdentifier("wipe-section-heading")
             Text(WipeCopy.counts(wipeInventory))
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("wipe-counts")
             Text(WipeCopy.receivedLimit)
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("wipe-received-limit")
             if wipeInventory.received.isEmpty {
                 Text(WipeCopy.noneReceived)
-                    .font(.footnote)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .wrappingFillCaption()
                     .accessibilityIdentifier("wipe-none-received")
             } else {
                 ForEach(Array(wipeInventory.received.enumerated()), id: \.offset) { index, range in
                     Text(WipeCopy.receivedLine(range))
-                        .font(.footnote)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .wrappingFillCaption()
                         .accessibilityIdentifier("wipe-received-\(index)")
                 }
             }
             Text(WipeCopy.healthLimit)
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("wipe-health-limit")
             Text(WipeCopy.healthPath)
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("wipe-health-path")
             Text(WipeCopy.macLimit)
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("wipe-mac-limit")
             Button(stopHeartRateArmed ? "Confirm: stop exporting heart rate" : "Stop exporting heart rate") {
                 if stopHeartRateArmed {
@@ -3815,33 +3806,17 @@ struct HarnessView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Confirm this server")
-                        .font(.headline)
-                        .frame(
-                            maxWidth: .infinity,
-                            minHeight: 44,
-                            alignment: .leading
-                        )
+                        .wrappingFillCaption()
+                        .fontWeight(.semibold)
                         .accessibilityIdentifier("destination-confirm-title")
-                        .accessibilityAddTraits(.isHeader)
-                        .accessibilityRespondsToUserInteraction(false)
                     ForEach(Array(card.lines.dropFirst().enumerated()), id: \.offset) { index, line in
                         Text(line)
-                            .font(.footnote)
-                            .foregroundStyle(.primary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(
-                                maxWidth: .infinity,
-                                minHeight: 44,
-                                alignment: .leading
-                            )
+                            .wrappingFillCaption()
                             .accessibilityIdentifier("destination-confirm-line-\(index)")
                     }
                     if card.requiresPublicAddressConfirmation {
                         Text(ConfirmationCopy.publicAddressWarning)
-                            .font(.footnote)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.primary)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .attentionBanner()
                             .accessibilityIdentifier("public-destination-warning")
                         TextField(
                             ConfirmationCopy.publicAddressPhrase,
@@ -3876,7 +3851,12 @@ struct HarnessView: View {
                     .accessibilityIdentifier("destination-confirm-cancel")
                 }
                 .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .environment(\.colorScheme, .light)
+                .foregroundStyle(.black)
+                .background(Color.white)
             }
+            .background(Color.white)
         }
         .interactiveDismissDisabled()
         .presentationDetents([.large])
