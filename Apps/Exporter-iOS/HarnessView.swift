@@ -1099,12 +1099,8 @@ struct HarnessView: View {
             .accessibilityIdentifier("destination-refresh")
             if destinationSnapshots.isEmpty {
                 Text(destinationStatusLines.first ?? DestinationStatusLine.emptyCopy)
-                    .font(.footnote)
-                    .foregroundStyle(.primary)
+                    .wrappingFillCaption()
                     .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .contentShape(Rectangle())
                     .accessibilityIdentifier("destination-empty")
             } else {
                 ForEach(Array(destinationSnapshots.enumerated()), id: \.element.destinationID) { index, snapshot in
@@ -1272,8 +1268,7 @@ struct HarnessView: View {
                 localExportFolderName.map { "Archive folder: \($0)" }
                     ?? "No archive folder selected."
             )
-            .font(.footnote)
-            .fixedSize(horizontal: false, vertical: true)
+            .wrappingFillCaption()
             .accessibilityIdentifier("local-file-folder")
             Button {
                 Task { await enableLocalFile() }
@@ -1356,13 +1351,7 @@ struct HarnessView: View {
             .accessibilityIdentifier("https-export")
             ForEach(Array(httpsTestLines.enumerated()), id: \.offset) { index, line in
                 Text(line)
-                    .font(.footnote)
-                    .foregroundStyle(.primary)
-                    .frame(
-                        maxWidth: .infinity,
-                        minHeight: 44,
-                        alignment: .leading
-                    )
+                    .wrappingFillCaption()
                     .accessibilityIdentifier("https-test-line-\(index)")
             }
             Text("Home Assistant webhook")
@@ -1442,13 +1431,7 @@ struct HarnessView: View {
                 id: \.offset
             ) { index, line in
                 Text(line)
-                    .font(.footnote)
-                    .foregroundStyle(.primary)
-                    .frame(
-                        maxWidth: .infinity,
-                        minHeight: 44,
-                        alignment: .leading
-                    )
+                    .wrappingFillCaption()
                     .accessibilityIdentifier("home-assistant-test-line-\(index)")
             }
             TextField("MQTT broker URL", text: $mqttURL)
@@ -1579,7 +1562,7 @@ struct HarnessView: View {
             .accessibilityIdentifier("mqtt-export")
             ForEach(Array(mqttTestLines.enumerated()), id: \.offset) { index, line in
                 Text(line)
-                    .font(.footnote)
+                    .wrappingFillCaption()
                     .textSelection(.enabled)
                     .accessibilityIdentifier("mqtt-test-line-\(index)")
             }
@@ -1656,7 +1639,7 @@ struct HarnessView: View {
             .accessibilityIdentifier("otlp-disable")
             ForEach(Array(otlpLines.enumerated()), id: \.offset) { index, line in
                 Text(line)
-                    .font(.footnote)
+                    .wrappingFillCaption()
                     .textSelection(.enabled)
                     .accessibilityIdentifier("otlp-line-\(index)")
             }
@@ -1697,14 +1680,13 @@ struct HarnessView: View {
                 .accessibilityIdentifier("network-activity-title")
             ForEach(Array(networkActivityLines.enumerated()), id: \.offset) { index, line in
                 Text(line)
-                    .font(.footnote)
+                    .wrappingFillCaption()
                     .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("network-activity-\(index)")
             }
             ForEach(Array(provenanceLines.enumerated()), id: \.offset) { index, line in
                 Text(line)
-                    .font(.footnote)
+                    .wrappingFillCaption()
                     .textSelection(.enabled)
                     .accessibilityIdentifier("build-provenance-\(index)")
             }
@@ -1715,7 +1697,7 @@ struct HarnessView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("acknowledgements-title")
             Text(acknowledgementsText)
-                .font(.footnote)
+                .wrappingFillCaption()
                 .textSelection(.enabled)
                 .accessibilityIdentifier("acknowledgements-body")
         }
@@ -1729,11 +1711,7 @@ struct HarnessView: View {
                 Task { await loadHistory() }
             } label: {
                 Text("Show export history (problems first)")
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .contentShape(Rectangle())
+                    .wrappingActionLabel()
             }
             .buttonStyle(.plain)
             .disabled(phase == .working)
@@ -1741,18 +1719,13 @@ struct HarnessView: View {
             if historyEvents.isEmpty {
                 ForEach(Array(historyLines.enumerated()), id: \.offset) { index, line in
                     Text(line)
-                        .font(.body)
-                        .foregroundStyle(.primary)
+                        .wrappingFillCaption()
                         .lineLimit(nil)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         .accessibilityIdentifier("history-row-\(index)")
                 }
             } else {
                 Text(RunHistoryDetail.retentionCopy)
-                    .font(.footnote)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .wrappingFillCaption()
                 ForEach(Array(historyEvents.enumerated()), id: \.offset) { eventIndex, event in
                     let rowID = historyRowID(event)
                     let revealed = revealedHistoryIDs.contains(rowID)
@@ -1767,6 +1740,7 @@ struct HarnessView: View {
                         Button("Reveal exact payload") {
                             Task { await revealHistoryPayload(rowID) }
                         }
+                        .buttonStyle(HarnessButtonStyle())
                         .accessibilityIdentifier("history-reveal-payload-\(eventIndex)")
                     }
                 }
@@ -1787,7 +1761,7 @@ struct HarnessView: View {
             dataFlowExplainer
             ForEach(Array(provenanceLines.enumerated()), id: \.offset) { index, line in
                 Text(line)
-                    .font(.footnote)
+                    .wrappingFillCaption()
                     .textSelection(.enabled)
                     .accessibilityIdentifier("settings-build-provenance-\(index)")
             }
@@ -1819,19 +1793,16 @@ struct HarnessView: View {
             .frame(minHeight: 44)
             .accessibilityIdentifier("privacy-gate-enabled")
             Text("This protects the foreground screen only. It never gates background tasks or destination delivery.")
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("privacy-gate-scope")
             Text(CredentialPresentationPolicy.copy)
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("credential-no-reveal-policy")
             Text("If someone else set this up")
                 .font(.headline)
                 .accessibilityIdentifier("hide-lock-heading")
             Text("iOS can hide this app. We cannot prevent that, and we do not offer stealth mode, alternate icons, or a second name. Check Settings → Apps → Hidden Apps, Screen Time, Battery, and App Store purchase history. Apple's Personal Safety guide: https://support.apple.com/guide/personal-safety/lock-or-hide-apps-on-your-iphone-ipsd0be4c185/web")
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("hide-lock-body")
 
             Text("Stop and delete")
@@ -2020,7 +1991,7 @@ struct HarnessView: View {
                 .accessibilityIdentifier("pairing-scan")
             } else {
                 Text(PairingCamera.unavailableReason)
-                    .font(.footnote)
+                    .wrappingFillCaption()
                     .accessibilityIdentifier("pairing-scan-unavailable")
             }
             TextEditor(text: $pairingPaste)
@@ -2343,18 +2314,17 @@ struct HarnessView: View {
         let hygiene = CredentialFieldHygiene.url(raw)
         if hygiene.strippedWhitespace {
             Text(CredentialFieldHygiene.whitespaceNote)
-                .font(.footnote)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("\(identifierPrefix)-whitespace")
         }
         if hygiene.replacedSmartPunctuation {
             Text(CredentialFieldHygiene.smartPunctuationNote)
-                .font(.footnote)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("\(identifierPrefix)-smartquotes")
         }
         if let parseBack = hygiene.parseBack {
             Text(parseBack)
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("\(identifierPrefix)-parseback")
         }
     }
@@ -2403,12 +2373,12 @@ struct HarnessView: View {
         let hygiene = CredentialFieldHygiene.secret(raw)
         if hygiene.strippedWhitespace {
             Text(CredentialFieldHygiene.whitespaceNote)
-                .font(.footnote)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("\(identifierPrefix)-whitespace")
         }
         if hygiene.replacedSmartPunctuation {
             Text(CredentialFieldHygiene.smartPunctuationNote)
-                .font(.footnote)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("\(identifierPrefix)-smartquotes")
         }
     }
@@ -2722,15 +2692,13 @@ struct HarnessView: View {
                             .accessibilityIdentifier("browser-review-removing")
                         if let permission = review.permissionConsequence {
                             Text(permission)
-                                .font(.footnote)
-                                .foregroundStyle(.primary)
+                                .wrappingFillCaption()
                                 .fontWeight(.semibold)
                                 .accessibilityIdentifier("browser-review-permission")
                         }
                         if let warning = review.removalWarning {
                             Text(warning)
-                                .font(.footnote)
-                                .foregroundStyle(.primary)
+                                .wrappingFillCaption()
                                 .fontWeight(.semibold)
                         }
                         Button("Continue") {
@@ -2869,9 +2837,7 @@ struct HarnessView: View {
                                 }
                             }
                             Text(row.subtitle)
-                                .font(.footnote)
-                                .foregroundStyle(.primary)
-                                .fixedSize(horizontal: false, vertical: true)
+                                .wrappingFillCaption()
                         }
                     }
                     .buttonStyle(.plain)
