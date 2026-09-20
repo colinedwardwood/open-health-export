@@ -19,13 +19,11 @@ struct ConfigurationImportView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Configuration portability")
-                .font(.headline)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
+                .fontWeight(.semibold)
                 .accessibilityIdentifier("configuration-import-heading")
             Text("Imports never contain credentials and cannot replace or enable an existing destination.")
-                .font(.body)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("configuration-import-limits")
             Button {
                 showingImporter = true
@@ -47,9 +45,9 @@ struct ConfigurationImportView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(destination.displayName)
                         Text("\(destination.kind.rawValue): \(destination.endpoint)")
-                            .font(.footnote)
+                            .wrappingFillCaption()
                         Text("\(destination.exportScope.metrics.count) metric grants; credentials omitted")
-                            .font(.footnote)
+                            .wrappingFillCaption()
                     }
                 }
                 TextField(
@@ -85,9 +83,9 @@ struct ConfigurationImportView: View {
                             "\(draft.configuration.kind.rawValue): "
                                 + draft.configuration.endpoint
                         )
-                        .font(.footnote)
+                        .wrappingFillCaption()
                         Text("Disabled — destination test required")
-                            .font(.footnote)
+                            .wrappingFillCaption()
                         if draft.configuration.kind == .https
                             || draft.configuration.kind == .homeAssistant
                             || draft.configuration.kind == .mqtt {
@@ -114,8 +112,7 @@ struct ConfigurationImportView: View {
                             )
                         } else {
                             Text("This destination kind does not yet have an import setup path.")
-                                .font(.footnote)
-                                .fixedSize(horizontal: false, vertical: true)
+                                .wrappingFillCaption()
                                 .accessibilityIdentifier(
                                     "configuration-import-unsupported-\(draft.configuration.kind.rawValue)"
                                 )
@@ -135,8 +132,7 @@ struct ConfigurationImportView: View {
             }
             if !status.isEmpty {
                 Text(status)
-                    .font(.footnote)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .wrappingFillCaption()
                     .accessibilityIdentifier("configuration-import-status")
             }
         }
@@ -234,12 +230,12 @@ struct ConfigurationImportView: View {
         let hygiene = CredentialFieldHygiene.secret(confirmation)
         if hygiene.strippedWhitespace {
             Text(CredentialFieldHygiene.whitespaceNote)
-                .font(.footnote)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("configuration-import-confirmation-whitespace")
         }
         if hygiene.replacedSmartPunctuation {
             Text(CredentialFieldHygiene.smartPunctuationNote)
-                .font(.footnote)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("configuration-import-confirmation-smartquotes")
         }
     }

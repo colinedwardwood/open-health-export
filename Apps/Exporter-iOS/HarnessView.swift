@@ -886,11 +886,11 @@ struct HarnessView: View {
             Text("Before Health access")
                 .font(.headline)
             Text("This is not a medical device. It does not diagnose or treat anything.")
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("first-run-disclaimer")
             schedulingHonesty
             Text("You choose what is read. We do not hide destinations, and we do not send telemetry to the maintainers.")
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
             dataFlowExplainer
             Button("I understand — continue") {
                 disclosureAcknowledged = true
@@ -906,16 +906,16 @@ struct HarnessView: View {
     private var healthPriming: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(HealthAuthorizationPriming.title)
-                .font(.title2)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
+                .fontWeight(.semibold)
                 .accessibilityIdentifier("health-priming-title")
             Text(HealthAuthorizationPriming.typeCountCopy(primingTypeCount))
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("health-priming-types")
             Text(HealthAuthorizationPriming.sheetFollows)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
             Text(HealthAuthorizationPriming.invisibility)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
                 .accessibilityIdentifier("health-priming-invisibility")
             Button(HealthAuthorizationPriming.continueTitle) {
                 showHealthPriming = false
