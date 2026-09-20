@@ -270,8 +270,8 @@ struct HarnessView: View {
             if !isPrivacyLocked, let overdueBanner {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Export overdue")
-                        .font(.headline)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .wrappingFillCaption()
+                        .fontWeight(.semibold)
                     Text(overdueBanner)
                         .wrappingFillCaption()
                 }
@@ -283,8 +283,8 @@ struct HarnessView: View {
             if !isPrivacyLocked, let destinationChangeBanner {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Unacknowledged destination change")
-                        .font(.headline)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .wrappingFillCaption()
+                        .fontWeight(.semibold)
                     Text(destinationChangeBanner)
                         .wrappingFillCaption()
                 }
@@ -296,8 +296,8 @@ struct HarnessView: View {
             if !isPrivacyLocked, AnchorHoldBanner.isVisible(anchorHolds) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(AnchorHoldBanner.title)
-                        .font(.headline)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .wrappingFillCaption()
+                        .fontWeight(.semibold)
                     Text(AnchorHoldBanner.detail(anchorHolds))
                         .wrappingFillCaption()
                 }
@@ -1077,9 +1077,9 @@ struct HarnessView: View {
                     Text("\(item.severity.uppercased()): \(item.id)")
                         .font(.subheadline)
                     Text(item.description)
-                        .font(.footnote)
+                        .wrappingFillCaption()
                     Text(item.url)
-                        .font(.footnote)
+                        .wrappingFillCaption()
                         .accessibilityLabel("Security advisory web link")
                 }
                 .accessibilityIdentifier("advisory-\(item.id)")
@@ -2004,8 +2004,7 @@ struct HarnessView: View {
                 .font(.headline)
             if pairingImportMismatch {
                 Text("The pairing names a different Mac than the imported configuration.")
-                    .font(.footnote)
-                    .foregroundStyle(.primary)
+                    .wrappingFillCaption()
                     .fontWeight(.semibold)
                     .accessibilityIdentifier("pairing-import-name-mismatch")
             }
