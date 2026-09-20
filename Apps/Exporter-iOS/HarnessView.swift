@@ -711,9 +711,8 @@ struct HarnessView: View {
     private var statusAttention: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(status)
-                .font(.body)
+                .wrappingFillCaption()
                 .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityLabel("Status: \(status)")
                 .accessibilityIdentifier("status-line")
                 .id("status-line")
