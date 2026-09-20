@@ -3,9 +3,11 @@
 Living checklist for code-completable Stage 3 implementation and Stage 4 automated QA.
 Updated as items finish. Times are wall-clock, including hosted CI waits.
 
-Last updated: 2026-09-20 19:30 ET (America/New_York)
+Last updated: 2026-09-20 19:52 ET (America/New_York)
 
-**Origin `a23a987` macos-build [`35463198198`](https://github.com/colinedwardwood/open-health-export/actions/runs/35463198198): failed.** iPhone 0/1/2 ios-ui green; iPad 0/1/2 red (empty+detail Dynamic Type then `-56`; Destinations+History RTL `-56`; public-destination Contrast). Local stack `f0c9c8b`… plus public-destination banner is ready to push.
+**Origin `825c06e` macos-build [`35545175003`](https://github.com/colinedwardwood/open-health-export/actions/runs/35545175003): ios-ui in flight.** Do not push local `b42b4f1`…`4707219` (6 commits: banner titles, dest/history wrap, companion/sensitive, import/disclosure, Status line, iPad-only/coverage headlines).
+
+Prior origin `a23a987` [`35463198198`](https://github.com/colinedwardwood/open-health-export/actions/runs/35463198198): iPhone 0/1/2 green; iPad 0 empty+detail DT/`-56` and dest RTL `-56`; iPad 1 public-destination Contrast; iPad 2 paused-anchor Contrast. Public-destination opaque sheet is on origin in `825c06e`.
 
 Local iPad suite on `1010d4e` finished **74/3** (Xcode 27): pseudo-locale empty `-56`, pseudo disclosure/controls XCTFuture 1000, share-warning Contrast. Air iPhone suite **76/1**: R-114 623s timeout (same as this Mac; hosted iPhone 2 on `1010d4e` already green).
 
@@ -22,7 +24,7 @@ Proven locally, not on GitHub:
 - iPhone RTL disclosure 22s and browser-detail 54s (suite 76s)
 - Air (Xcode 27, iOS 26.5 iPhone 17 Pro): AX5 25s green; RTL empty was audit **-56** at 107s, then **63s green** after caching chrome queries once per audit
 
-Local iPad suite on `1010d4e` finished **74/3** (see header). Chrome snapshot plus matrix iPad 4 fixes are local commits, unpushed until `iPhone 2` completes.
+Local iPad suite on `1010d4e` finished **74/3** (see header). Held wrapping commits wait for `35545175003`.
 
 **Prior [`35372523862`](https://github.com/colinedwardwood/open-health-export/actions/runs/35372523862) on `b1de381`:** compile green; iPhone 0/1 and iPad 0 green; iPad 2 `testDarkBoldAX5` failed on unscaled `configuration-import`; iPhone 2 cascade after accessibility-audit timeout `-56`.
 
@@ -62,12 +64,13 @@ Out of scope: physical-device / R-71 soak, backup and network-capture evidence, 
 - [x] **Destinations `.tributary` import wrapping Dynamic Type** (`fdd4966`; local iPad empty Destinations 39s)
 - [x] **Wait for macos-build `35387460964` on `1010d4e`** — all six `ios-ui` shards green
 - [x] **Wait for macos-build `35463198198` on `a23a987`** — iPhone ios-ui green; iPad 0/1/2 red
+- [ ] **Wait for macos-build `35545175003` on `825c06e`** — ios-ui in flight; then push six local wrapping commits
 
 ## After hosted UI is green
 
 - [x] **Dispatch `accessibility-matrix.yml`** — [`35392384276`](https://github.com/colinedwardwood/open-health-export/actions/runs/35392384276) on `1010d4e` (iPad 4 red)
 - [x] **Dispatch `accessibility-matrix.yml`** — [`35431247193`](https://github.com/colinedwardwood/open-health-export/actions/runs/35431247193) on `703912d`: **11/12**, only iPad 1 empty-pseudo `-56`
-- [ ] **Fix remaining matrix / hosted iPad gaps** — empty-search collapse and wrapping local; public-destination Contrast banner not yet on origin
+- [ ] **Fix remaining matrix / hosted iPad gaps** — empty-search collapse and wrapping are local (`f0c9c8b`…`4707219`); public-destination Contrast is on origin `825c06e`
 - [ ] **Local iPhone UI suite** — last full suite Air **76/1** on older HEAD; re-run on proven HEAD
 - [ ] **Local iPad UI suite** — last full suite this Mac **74/3** on `1010d4e`; re-run on proven HEAD
 - [ ] **Configure `main` branch protection** (~15 min)
