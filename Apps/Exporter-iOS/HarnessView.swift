@@ -2015,7 +2015,7 @@ struct HarnessView: View {
                     .accessibilityLabel("Confirmation code \(sas)")
                     .accessibilityIdentifier("pairing-confirmation")
                 Text("This must match the Mac after the phone connects.")
-                    .font(.footnote)
+                    .wrappingFillCaption()
             }
             Button {
                 Task { await runCompanionExport() }
@@ -2046,8 +2046,7 @@ struct HarnessView: View {
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("companion-metered")
             Text("Off by default. Exports wait for Wi-Fi unless you turn this on.")
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
         }
     }
 
@@ -2710,7 +2709,7 @@ struct HarnessView: View {
                 }
                 if let pendingSensitiveMetric {
                     Text("Sensitive type — type \(scopeDestinationID) to add it individually.")
-                        .font(.footnote)
+                        .wrappingFillCaption()
                         .accessibilityIdentifier("sensitive-type-prompt")
                     TextField(scopeDestinationID, text: $sensitiveDestinationConfirmation)
                         .textInputAutocapitalization(.never)
