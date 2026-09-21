@@ -684,7 +684,9 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(app.buttons["browser-select"].exists)
         XCTAssertFalse(app.buttons["browser-review"].exists)
         app.buttons["browser-select"].tap()
-        XCTAssertTrue(app.buttons["browser-invert-routine"].waitForExistence(timeout: uiWait))
+        XCTAssertTrue(
+            scrollData(app.buttons["browser-invert-routine"]).waitForExistence(timeout: uiWait)
+        )
         XCTAssertTrue(app.buttons["browser-clear-all"].exists)
         XCTAssertTrue(app.buttons["browser-review"].exists)
         XCTAssertTrue(app.staticTexts["Measurements"].exists == false)
@@ -698,7 +700,9 @@ final class ExporterUITests: XCTestCase {
         app.buttons["browser-review-continue"].tap()
         XCTAssertTrue(app.buttons["browser-select"].waitForExistence(timeout: uiWait))
         app.buttons["browser-select"].tap()
-        XCTAssertTrue(app.buttons["browser-invert-routine"].waitForExistence(timeout: uiWait))
+        XCTAssertTrue(
+            scrollData(app.buttons["browser-invert-routine"]).waitForExistence(timeout: uiWait)
+        )
         app.buttons["browser-invert-routine"].tap()
         app.buttons["browser-review"].tap()
         let permission = app.staticTexts["browser-review-permission"]
@@ -1757,7 +1761,7 @@ final class ExporterUITests: XCTestCase {
             return "behindNavigationBar"
         }
         if let tabBar = chrome.tabBarFrame,
-           frame.maxY > tabBar.minY - Self.scrollEdgeEffectHeight
+           frame.maxY > tabBar.minY - Self.tabBarScrollEdgeEffectHeight
         {
             return "behindTabBar"
         }
@@ -1770,7 +1774,7 @@ final class ExporterUITests: XCTestCase {
         {
             return "behindTabBar"
         }
-        if window.height > 0, frame.maxY > window.maxY - Self.scrollEdgeEffectHeight {
+        if window.height > 0, frame.maxY > window.maxY - Self.tabBarScrollEdgeEffectHeight {
             return "behindTabBar"
         }
         if window.height > 0, !frame.intersects(window) {
@@ -1859,6 +1863,15 @@ final class ExporterUITests: XCTestCase {
     /// y≈840–970 on the 11-inch iPad Pro (window height 1210).
     private static let settingsBottomScrollEdgeEffectHeight: CGFloat = 400
     private static let scrollEdgeEffectHeight: CGFloat = 32
+    /// iPad floating tabs fade a much taller band than the 32-point iPhone
+    /// cutoff. After scrolling the paused-anchor explanation into view, demo
+    /// honesty copy sat at y≈826 / window 1210 (Contrast, empty identifier).
+    private static let iPadTabBarScrollEdgeEffectHeight: CGFloat = 360
+    private static var tabBarScrollEdgeEffectHeight: CGFloat {
+        UIDevice.current.userInterfaceIdiom == .pad
+            ? iPadTabBarScrollEdgeEffectHeight
+            : scrollEdgeEffectHeight
+    }
     private static let navigationScrollEdgeEffectHeight: CGFloat = 56
     /// Presented Settings uses a taller scroll-edge material than the root Status
     /// bar. JSON under that fade was scoring Contrast nearly passed at y≈248.

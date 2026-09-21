@@ -1034,6 +1034,7 @@ struct HarnessView: View {
                 .accessibilityIdentifier("demo-mode-label")
             Text("Demo export never reads HealthKit. Type the destination name local-file to confirm you are not sending this into a live archive.")
                 .wrappingFillCaption()
+                .accessibilityIdentifier("demo-export-honesty")
             TextField("Type local-file to confirm demo export", text: $demoConfirmName)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -2520,8 +2521,7 @@ struct HarnessView: View {
                 .accessibilityIdentifier("browser-title")
             if selectedDetail != nil {
                 Button("Back") { selectedBrowserMetric = nil }
-                    .buttonStyle(.plain)
-                    .wrappingActionLabel()
+                    .buttonStyle(HarnessButtonStyle())
                     .accessibilityLabel("Back")
                     .accessibilityIdentifier("browser-back")
             } else if browserSelecting {
@@ -2530,8 +2530,7 @@ struct HarnessView: View {
                     browserReviewVisible = true
                     Task { await refreshAuthorizedMetricsForReview() }
                 }
-                .buttonStyle(.plain)
-                .wrappingActionLabel()
+                .buttonStyle(HarnessButtonStyle())
                 .accessibilityIdentifier("browser-review")
             } else {
                 Button("Select") {
@@ -2539,8 +2538,7 @@ struct HarnessView: View {
                     browserSelecting = true
                     browserReviewVisible = false
                 }
-                .buttonStyle(.plain)
-                .wrappingActionLabel()
+                .buttonStyle(HarnessButtonStyle())
                 .accessibilityIdentifier("browser-select")
             }
             Text(
@@ -2550,6 +2548,24 @@ struct HarnessView: View {
             )
                 .wrappingFillCaption()
                 .fontWeight(browserDemoMode ? .semibold : .regular)
+
+            if selectedDetail == nil, browserSelecting {
+                Button("Use Core Daily") {
+                    applyCoreDailyPreset()
+                }
+                .buttonStyle(HarnessButtonStyle())
+                .accessibilityIdentifier("browser-core-daily")
+                Button("Invert routine") {
+                    var draft = DataSelectionDraft(baseline: browserSelection)
+                    draft.invertRoutine(MetricCatalog.selectable.map(\.id))
+                    browserSelection = draft.selected
+                }
+                .buttonStyle(HarnessButtonStyle())
+                .accessibilityIdentifier("browser-invert-routine")
+                Button("Clear all") { browserSelection.removeAll() }
+                    .buttonStyle(HarnessButtonStyle())
+                    .accessibilityIdentifier("browser-clear-all")
+            }
 
             if selectedDetail == nil, !browserSearchIsFiltering {
                 Text("Export destination")
@@ -2625,31 +2641,7 @@ struct HarnessView: View {
                 .accessibilityIdentifier("browser-load-health")
                 dataBrowserDetail(detail)
             } else {
-                if browserSelecting {
-                    HStack {
-                        Button("Use Core Daily") {
-                            applyCoreDailyPreset()
-                        }
-                        .buttonStyle(.plain)
-                        .wrappingPrimaryCaption()
-                        .frame(minHeight: 44)
-                        .accessibilityIdentifier("browser-core-daily")
-                        Button("Invert routine") {
-                            var draft = DataSelectionDraft(baseline: browserSelection)
-                            draft.invertRoutine(MetricCatalog.selectable.map(\.id))
-                            browserSelection = draft.selected
-                        }
-                        .buttonStyle(.plain)
-                        .wrappingPrimaryCaption()
-                        .frame(minHeight: 44)
-                        .accessibilityIdentifier("browser-invert-routine")
-                        Button("Clear all") { browserSelection.removeAll() }
-                            .buttonStyle(.plain)
-                            .wrappingPrimaryCaption()
-                            .frame(minHeight: 44)
-                            .accessibilityIdentifier("browser-clear-all")
-                    }
-                    if let upgrade = coreDailyUpgrade {
+                if browserSelecting, let upgrade = coreDailyUpgrade {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Review Core Daily update")
                                 .wrappingFillCaption()
@@ -2658,7 +2650,7 @@ struct HarnessView: View {
                             Text(upgrade.summary)
                                 .wrappingFillCaption()
                                 .accessibilityIdentifier("preset-upgrade-summary")
-                            HStack {
+                            VStack(alignment: .leading, spacing: 8) {
                                 Button("Apply Core Daily update") {
                                     let shipped = CoreDailyPreset.current
                                     browserSelection = shipped.metricIDs
@@ -2666,19 +2658,16 @@ struct HarnessView: View {
                                     coreDailyUpgrade = nil
                                 }
                                 .buttonStyle(.plain)
-                                .wrappingPrimaryCaption()
-                                .frame(minHeight: 44)
+                                .wrappingActionLabel()
                                 .accessibilityIdentifier("preset-upgrade-apply")
                                 Button("Keep current types") {
                                     coreDailyUpgrade = nil
                                 }
                                 .buttonStyle(.plain)
-                                .wrappingPrimaryCaption()
-                                .frame(minHeight: 44)
+                                .wrappingActionLabel()
                                 .accessibilityIdentifier("preset-upgrade-keep")
                             }
                         }
-                    }
                 }
                 if browserReviewVisible {
                     let review = DataSelectionReview.comparing(
