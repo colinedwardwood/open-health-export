@@ -36,7 +36,7 @@ struct ConfigurationImportView: View {
 
             if let review {
                 Text("Review before importing")
-                    .font(.subheadline)
+                    .wrappingFillCaption()
                     .fontWeight(.semibold)
                 ForEach(
                     Array(review.destinations.enumerated()),
@@ -74,7 +74,7 @@ struct ConfigurationImportView: View {
             }
             if !drafts.isEmpty {
                 Text("Disabled imported drafts")
-                    .font(.subheadline)
+                    .wrappingFillCaption()
                     .fontWeight(.semibold)
                 ForEach(drafts, id: \.localIdentifier) { draft in
                     VStack(alignment: .leading, spacing: 2) {

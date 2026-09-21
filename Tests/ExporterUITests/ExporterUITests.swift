@@ -1677,6 +1677,15 @@ final class ExporterUITests: XCTestCase {
                     let cause: String?
                     if issue.auditType == .contrast, let element = issue.element {
                         cause = self.suppressionCause(for: element, chrome: chrome)
+                    } else if let element = issue.element,
+                              (issue.auditType == .textClipped
+                                || issue.auditType.rawValue == 131_072),
+                              element.elementType == .textField
+                                || element.elementType == .secureTextField
+                                || element.elementType == .searchField
+                                || element.identifier == "browser-search"
+                    {
+                        cause = "systemTextFieldPlaceholder"
                     } else if issue.auditType == .dynamicType {
                         cause = self.dynamicTypeSuppressionCause(
                             for: issue.element,

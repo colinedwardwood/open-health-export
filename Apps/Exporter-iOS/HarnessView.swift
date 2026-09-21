@@ -605,9 +605,9 @@ struct HarnessView: View {
     private var healthKitUnavailable: some View {
         VStack(spacing: 16) {
             Text(HealthAvailability.unavailableTitle)
-                .font(.headline)
+                .wrappingPrimaryCaption()
+                .fontWeight(.semibold)
                 .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
             Text(HealthAvailability.unavailableBody)
                 .font(.body)
                 .multilineTextAlignment(.center)
@@ -626,8 +626,8 @@ struct HarnessView: View {
                 .font(.largeTitle)
                 .accessibilityHidden(true)
             Text("Open Health Exporter is locked")
-                .font(.headline)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
+                .fontWeight(.semibold)
                 .accessibilityIdentifier("privacy-gate-locked-title")
             Text("Unlocking protects this screen only. Background exports and destination delivery continue without a prompt.")
                 .wrappingFillCaption()
@@ -659,7 +659,7 @@ struct HarnessView: View {
     private var dataFlowExplainer: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(DataFlowExplainer.title)
-                .font(.subheadline)
+                .wrappingFillCaption()
                 .fontWeight(.semibold)
             Text(DataFlowExplainer.source)
                 .wrappingFillCaption()
@@ -789,7 +789,8 @@ struct HarnessView: View {
         Group {
             if !results.isEmpty {
                 Text("Measurements")
-                    .font(.headline)
+                    .wrappingFillCaption()
+                    .fontWeight(.semibold)
                 ForEach(Array(results.enumerated()), id: \.offset) { _, line in
                     Text(line)
                         .font(.body)
@@ -883,7 +884,8 @@ struct HarnessView: View {
     private var disclosure: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Before Health access")
-                .font(.headline)
+                .wrappingFillCaption()
+                .fontWeight(.semibold)
             Text("This is not a medical device. It does not diagnose or treat anything.")
                 .wrappingFillCaption()
                 .accessibilityIdentifier("first-run-disclaimer")
@@ -989,7 +991,8 @@ struct HarnessView: View {
             .accessibilityHint("Compares every available day without advancing HealthKit anchors.")
             if !anchorHolds.isEmpty {
                 Text("Paused data")
-                    .font(.headline)
+                    .wrappingFillCaption()
+                    .fontWeight(.semibold)
                 ForEach(Array(anchorHolds.enumerated()), id: \.offset) { index, hold in
                     Text(AnchorHoldBanner.explanation(hold))
                         .wrappingFillCaption()
@@ -1010,7 +1013,8 @@ struct HarnessView: View {
             }
             if !queueEvictionGaps.isEmpty {
                 Text("Data gaps")
-                    .font(.headline)
+                    .wrappingFillCaption()
+                    .fontWeight(.semibold)
                 Text("These queued date ranges were evicted to keep storage bounded.")
                     .wrappingFillCaption()
                 ForEach(Array(queueEvictionGaps.enumerated()), id: \.offset) { index, gap in
@@ -1056,7 +1060,8 @@ struct HarnessView: View {
             .accessibilityHint("Asks for notification permission and posts one R-40 notice with copy from the registry.")
 
             Text("Security advisories")
-                .font(.headline)
+                .wrappingFillCaption()
+                .fontWeight(.semibold)
             Text(AdvisoryPinnedKeys.urlString)
                 .wrappingFillCaption()
                 .accessibilityLabel("Security advisory endpoint")
@@ -1074,7 +1079,8 @@ struct HarnessView: View {
             ForEach(advisoryItems, id: \.id) { item in
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(item.severity.uppercased()): \(item.id)")
-                        .font(.subheadline)
+                        .wrappingFillCaption()
+                        .fontWeight(.semibold)
                     Text(item.description)
                         .wrappingFillCaption()
                     Text(item.url)
@@ -1189,8 +1195,8 @@ struct HarnessView: View {
     private var destinationsPane: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Where your data goes")
-                .font(.headline)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
+                .fontWeight(.semibold)
                 .accessibilityIdentifier("destination-title")
             dataFlowExplainer
             Text("Export window: \(exportWindowHours) hours")
@@ -1354,7 +1360,8 @@ struct HarnessView: View {
                     .accessibilityIdentifier("https-test-line-\(index)")
             }
             Text("Home Assistant webhook")
-                .font(.headline)
+                .wrappingFillCaption()
+                .fontWeight(.semibold)
                 .accessibilityIdentifier("home-assistant-title")
             Text("Sends the complete native NDJSON feed to an automation webhook. Home Assistant does not import historical sensor states from this feed by itself.")
                 .wrappingFillCaption()
@@ -1675,7 +1682,8 @@ struct HarnessView: View {
                 )
             }
             Text(EgressAttemptLog.sectionTitle)
-                .font(.headline)
+                .wrappingFillCaption()
+                .fontWeight(.semibold)
                 .accessibilityIdentifier("network-activity-title")
             ForEach(Array(networkActivityLines.enumerated()), id: \.offset) { index, line in
                 Text(line)
@@ -1690,10 +1698,8 @@ struct HarnessView: View {
                     .accessibilityIdentifier("build-provenance-\(index)")
             }
             Text("Acknowledgements")
-                .font(.headline)
-                .foregroundStyle(.primary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrappingFillCaption()
+                .fontWeight(.semibold)
                 .accessibilityIdentifier("acknowledgements-title")
             Text(acknowledgementsText)
                 .wrappingFillCaption()
@@ -1765,7 +1771,8 @@ struct HarnessView: View {
                     .accessibilityIdentifier("settings-build-provenance-\(index)")
             }
             Text("App privacy")
-                .font(.headline)
+                .wrappingFillCaption()
+                .fontWeight(.semibold)
                 .accessibilityIdentifier("app-privacy-heading")
             Toggle(
                 "Require Face ID, Touch ID, or device passcode to open the app",
@@ -1798,14 +1805,16 @@ struct HarnessView: View {
                 .wrappingFillCaption()
                 .accessibilityIdentifier("credential-no-reveal-policy")
             Text("If someone else set this up")
-                .font(.headline)
+                .wrappingFillCaption()
+                .fontWeight(.semibold)
                 .accessibilityIdentifier("hide-lock-heading")
             Text("iOS can hide this app. We cannot prevent that, and we do not offer stealth mode, alternate icons, or a second name. Check Settings → Apps → Hidden Apps, Screen Time, Battery, and App Store purchase history. Apple's Personal Safety guide: https://support.apple.com/guide/personal-safety/lock-or-hide-apps-on-your-iphone-ipsd0be4c185/web")
                 .wrappingFillCaption()
                 .accessibilityIdentifier("hide-lock-body")
 
             Text("Stop and delete")
-                .font(.headline)
+                .wrappingFillCaption()
+                .fontWeight(.semibold)
                 .accessibilityIdentifier("wipe-section-heading")
             Text(WipeCopy.counts(wipeInventory))
                 .wrappingFillCaption()
@@ -1857,8 +1866,8 @@ struct HarnessView: View {
             .disabled(phase == .working)
 
             Text("Diagnostics")
-                .font(.headline)
-                .foregroundStyle(.primary)
+                .wrappingFillCaption()
+                .fontWeight(.semibold)
                 .accessibilityIdentifier("diagnostic-section-heading")
             Stepper(
                 "Include at least \(diagnosticMinimumRuns) recent runs",
@@ -1971,7 +1980,8 @@ struct HarnessView: View {
     private var companionPairingSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Companion pairing")
-                .font(.headline)
+                .wrappingFillCaption()
+                .fontWeight(.semibold)
             if pairingImportMismatch {
                 Text("The pairing names a different Mac than the imported configuration.")
                     .wrappingFillCaption()
@@ -2010,7 +2020,8 @@ struct HarnessView: View {
             .accessibilityIdentifier("pairing-parse")
             if !sas.isEmpty {
                 Text("Confirmation: \(sas)")
-                    .font(.title2)
+                    .wrappingFillCaption()
+                    .fontWeight(.semibold)
                     .accessibilityLabel("Confirmation code \(sas)")
                     .accessibilityIdentifier("pairing-confirmation")
                 Text("This must match the Mac after the phone connects.")
@@ -2503,40 +2514,34 @@ struct HarnessView: View {
             )
         }
         return VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(selectedDetail?.title ?? "Data")
-                    .font(.headline)
-                    .accessibilityIdentifier("browser-title")
-                Spacer()
-                if selectedDetail != nil {
-                    Button("Back") { selectedBrowserMetric = nil }
-                        .buttonStyle(.plain)
-                        .font(.body)
-                        .foregroundStyle(.primary)
-                        .frame(minWidth: 44, minHeight: 44)
-                        .accessibilityLabel("Back")
-                        .accessibilityIdentifier("browser-back")
-                } else if browserSelecting {
-                    Button("Review changes") {
-                        browserSelecting = false
-                        browserReviewVisible = true
-                        Task { await refreshAuthorizedMetricsForReview() }
-                    }
+            Text(selectedDetail?.title ?? "Data")
+                .wrappingFillCaption()
+                .fontWeight(.semibold)
+                .accessibilityIdentifier("browser-title")
+            if selectedDetail != nil {
+                Button("Back") { selectedBrowserMetric = nil }
                     .buttonStyle(.plain)
-                    .wrappingPrimaryCaption()
-                    .frame(minHeight: 44)
-                    .accessibilityIdentifier("browser-review")
-                } else {
-                    Button("Select") {
-                        browserBaseline = browserSelection
-                        browserSelecting = true
-                        browserReviewVisible = false
-                    }
-                    .buttonStyle(.plain)
-                    .wrappingPrimaryCaption()
-                    .frame(minHeight: 44)
-                    .accessibilityIdentifier("browser-select")
+                    .wrappingActionLabel()
+                    .accessibilityLabel("Back")
+                    .accessibilityIdentifier("browser-back")
+            } else if browserSelecting {
+                Button("Review changes") {
+                    browserSelecting = false
+                    browserReviewVisible = true
+                    Task { await refreshAuthorizedMetricsForReview() }
                 }
+                .buttonStyle(.plain)
+                .wrappingActionLabel()
+                .accessibilityIdentifier("browser-review")
+            } else {
+                Button("Select") {
+                    browserBaseline = browserSelection
+                    browserSelecting = true
+                    browserReviewVisible = false
+                }
+                .buttonStyle(.plain)
+                .wrappingActionLabel()
+                .accessibilityIdentifier("browser-select")
             }
             Text(
                 browserDemoMode
@@ -2647,9 +2652,11 @@ struct HarnessView: View {
                     if let upgrade = coreDailyUpgrade {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Review Core Daily update")
-                                .font(.headline)
+                                .wrappingFillCaption()
+                                .fontWeight(.semibold)
                                 .accessibilityIdentifier("preset-upgrade-title")
                             Text(upgrade.summary)
+                                .wrappingFillCaption()
                                 .accessibilityIdentifier("preset-upgrade-summary")
                             HStack {
                                 Button("Apply Core Daily update") {
@@ -2682,11 +2689,14 @@ struct HarnessView: View {
                     )
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Review changes")
-                            .font(.headline)
+                            .wrappingFillCaption()
+                            .fontWeight(.semibold)
                             .accessibilityIdentifier("browser-review-title")
                         Text("Adding \(review.adding.count) types")
+                            .wrappingFillCaption()
                             .accessibilityIdentifier("browser-review-adding")
                         Text("Removing \(review.removing.count) types")
+                            .wrappingFillCaption()
                             .accessibilityIdentifier("browser-review-removing")
                         if let permission = review.permissionConsequence {
                             Text(permission)
@@ -2735,6 +2745,7 @@ struct HarnessView: View {
                     )
                     .accessibilityIdentifier("sensitive-destination-confirm")
                 }
+                if !browserSearchIsFiltering {
                 dataTabToggle(
                     "Only types with data",
                     isOn: $browserOnlyWithData,
@@ -2745,7 +2756,6 @@ struct HarnessView: View {
                     isOn: $browserDemoMode,
                     identifier: "browser-demo-mode"
                 )
-                if !browserSearchIsFiltering {
                 Text("Display units")
                     .wrappingFillCaption()
                     .accessibilityLabel("Display units")
@@ -2785,8 +2795,11 @@ struct HarnessView: View {
                     .accessibilityIdentifier("browser-time-example")
                 }
                 TextField("Search types", text: $browserSearch)
+                    .font(.body)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
+                    .submitLabel(.search)
+                    .frame(minHeight: 44)
                     .accessibilityLabel("Search types")
                     .accessibilityIdentifier("browser-search")
                 if rows.isEmpty {
@@ -2811,28 +2824,21 @@ struct HarnessView: View {
                         }
                     } label: {
                         VStack(alignment: .leading, spacing: 2) {
-                            HStack {
-                                if browserSelecting {
-                                    Image(systemName: browserSelection.contains(row.metric)
-                                        ? "checkmark.circle.fill"
-                                        : "circle")
-                                        .font(.body)
-                                        .accessibilityHidden(true)
-                                }
-                                Text(row.title)
+                            if browserSelecting {
+                                Image(systemName: browserSelection.contains(row.metric)
+                                    ? "checkmark.circle.fill"
+                                    : "circle")
                                     .font(.body)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                if row.reidentifying {
-                                    Text(DataBrowser.reidentifyingBadge)
-                                        .font(.body)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                        .foregroundStyle(.primary)
-                                } else if row.sensitive {
-                                    Text("sensitive")
-                                        .font(.body)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                        .foregroundStyle(.primary)
-                                }
+                                    .accessibilityHidden(true)
+                            }
+                            Text(row.title)
+                                .wrappingFillCaption()
+                            if row.reidentifying {
+                                Text(DataBrowser.reidentifyingBadge)
+                                    .wrappingFillCaption()
+                            } else if row.sensitive {
+                                Text("sensitive")
+                                    .wrappingFillCaption()
                             }
                             Text(row.subtitle)
                                 .wrappingFillCaption()
@@ -2863,6 +2869,7 @@ struct HarnessView: View {
         HStack(alignment: .center, spacing: 12) {
             Text(title)
                 .wrappingFillCaption()
+                .layoutPriority(1)
                 .accessibilityHidden(true)
             Spacer(minLength: 8)
             Toggle("", isOn: isOn)
@@ -4232,6 +4239,7 @@ extension View {
         self
             .font(.body)
             .foregroundStyle(.primary)
+            .lineLimit(nil)
             .fixedSize(horizontal: false, vertical: true)
     }
 
