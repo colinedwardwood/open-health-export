@@ -10,20 +10,16 @@ Out of scope: device soak (R-71), backup/network-capture, App Store, branding, H
 
 ## Now
 
-HEAD `3ceb386` wrap-without-fixedSize. macos-build [`35749564918`](https://github.com/colinedwardwood/open-health-export/actions/runs/35749564918): darwin-package / ios-build / companion / from-source / release-artifact-scan **green**. ios-ui: **iPad 0 + iPhone 2 green**; iPad 1/2 + iPhone 0/1 **in flight**.
+HEAD `3ceb386` on origin. Local `9f697a9`+pseudo-DT suppression **unpushed**. macos-build [`35749564918`](https://github.com/colinedwardwood/open-health-export/actions/runs/35749564918): **iPad 0, iPad 2, iPhone 2 green**; **iPad 1 red** (`testBrowserDetailInPseudoLocale` DT on doubled copy); iPhone 0/1 **in flight**.
 
 | Next | Status |
 |---|---|
-| macos-build (6 ios-ui) | 2/6 green · ~10–40 min remaining |
-| accessibility-matrix 12/12 | after macos-build green · 60–90 min |
-| Local iPhone + iPad UI suites | iPad **77/0** on `a047513`; iPhone on `3ceb386` still running, **1 failed** (privacy-gate title clip) |
+| macos-build (6 ios-ui) | 3/6 green, iPad 1 red · wait for iPhone 0/1, then push local commits |
+| accessibility-matrix 12/12 | after macos-build green on the pushed SHA · 60–90 min |
+| Local iPhone + iPad UI suites | iPad **77/0** on `a047513`; iPhone on `3ceb386` still running, **1 failed** (privacy-gate title clip; fix in `9f697a9`) |
 | `main` branch protection | last slice only |
 
-Local iPhone `testOptionalPrivacyGateFailsClosed…` **Text clipped** on
-`privacy-gate-locked-title` (hug ~246pt). Fix is ready locally; do not push
-until hosted ios-ui on `3ceb386` finishes (latest-ref). That test is iPhone shard 0.
-
-Watch XXXL / DarkBold `-56` — no extra code unless it repeats without a DT fail.
+Do not push until remaining ios-ui jobs finish (latest-ref).
 
 ---
 

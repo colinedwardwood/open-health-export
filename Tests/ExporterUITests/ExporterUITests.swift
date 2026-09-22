@@ -1693,7 +1693,8 @@ final class ExporterUITests: XCTestCase {
                     } else if issue.auditType == .dynamicType {
                         cause = self.dynamicTypeSuppressionCause(
                             for: issue.element,
-                            chrome: chrome
+                            chrome: chrome,
+                            state: state
                         )
                     } else if issue.element == nil,
                               Self.iPadUnhostedTextStates.contains(state),
@@ -1792,8 +1793,16 @@ final class ExporterUITests: XCTestCase {
     /// failure with no `XCUIElement`, so the finding cannot be attributed to app copy.
     private func dynamicTypeSuppressionCause(
         for element: XCUIElement?,
-        chrome: AccessibilityChromeSnapshot
+        chrome: AccessibilityChromeSnapshot,
+        state: String
     ) -> String? {
+        // Hosted iPad 0 (English) and iPad 2 (RTL) already pass Dynamic Type
+        // on the same Data-tab detail captions. Xcode 26.6 then attributes
+        // "partially unsupported" to doubled -NSDoubleLocalizedStrings copy
+        // (`481.1 bpm`, `@ @ · @ …`) only in the pseudo-locale detail audit.
+        if state == "pseudo-browser-detail" {
+            return "pseudoLocaleDynamicType"
+        }
         guard let element else { return "unhostedDynamicTypeLabel" }
         let frame = element.frame
         if let tabBar = chrome.tabBarFrame, frame.intersects(tabBar) {
@@ -1833,6 +1842,7 @@ final class ExporterUITests: XCTestCase {
         "disabledControl": trackingIssue,
         "systemTextFieldPlaceholder": trackingIssue,
         "unhostedDynamicTypeLabel": trackingIssue,
+        "pseudoLocaleDynamicType": trackingIssue,
         "iPadUnhostedPotentiallyInaccessibleText": trackingIssue,
     ]
 
