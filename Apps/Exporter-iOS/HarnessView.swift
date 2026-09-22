@@ -2516,8 +2516,11 @@ struct HarnessView: View {
         }
         return VStack(alignment: .leading, spacing: 8) {
             Text(selectedDetail?.title ?? "Data")
-                .wrappingFillCaption()
-                .fontWeight(.semibold)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(nil)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("browser-title")
             if selectedDetail != nil {
                 Button("Back") { selectedBrowserMetric = nil }
@@ -2601,13 +2604,15 @@ struct HarnessView: View {
                         .fontWeight(.semibold)
                         .accessibilityIdentifier("scope-required")
                 }
+                Text("Send samples starting")
+                    .wrappingFillCaption()
+                    .accessibilityIdentifier("scope-start-date-label")
                 DatePicker(
                     "Send samples starting",
                     selection: $scopeStartDate,
                     displayedComponents: .date
                 )
-                .font(.body)
-                .foregroundStyle(.primary)
+                .labelsHidden()
                 .accessibilityIdentifier("scope-start-date")
                 dataTabToggle(
                     "Stop sending after a date",
@@ -2615,12 +2620,16 @@ struct HarnessView: View {
                     identifier: "scope-end-enabled"
                 )
                 if scopeEndEnabled {
+                    Text("Stop before")
+                        .wrappingFillCaption()
+                        .accessibilityIdentifier("scope-end-date-label")
                     DatePicker(
                         "Stop before",
                         selection: $scopeEndDate,
                         in: scopeStartDate.addingTimeInterval(24 * 60 * 60)...,
                         displayedComponents: .date
                     )
+                    .labelsHidden()
                     .accessibilityIdentifier("scope-end-date")
                 }
             }

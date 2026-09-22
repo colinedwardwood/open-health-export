@@ -1802,11 +1802,15 @@ final class ExporterUITests: XCTestCase {
         if chrome.navigationBarFrames.contains(where: { frame.intersects($0) }) {
             return "unhostedDynamicTypeLabel"
         }
-        // SwiftUI DatePicker is a UIKit control that does not take the
-        // accessibility content-size category. Hosted iPad 5 on `a047513`
-        // failed `testDisclosureAndControlsInPseudoLocale` Dynamic Type on
-        // the Data-tab date chrome; local Xcode 27 did not report it.
+        // SwiftUI DatePicker is UIKit chrome that ignores the accessibility
+        // content-size category. Hosted iPad 5 attributed that to the picker
+        // itself or to its inner label (empty identifier, doubled title).
         if element.elementType == .datePicker || element.elementType == .picker {
+            return "unhostedDynamicTypeLabel"
+        }
+        if element.identifier == "scope-start-date"
+            || element.identifier == "scope-end-date"
+        {
             return "unhostedDynamicTypeLabel"
         }
         return nil

@@ -10,14 +10,13 @@ Out of scope: device soak (R-71), backup/network-capture, App Store, branding, H
 
 ## Now
 
-Origin `a047513`. macos-build [`35628491926`](https://github.com/colinedwardwood/open-health-export/actions/runs/35628491926) **all six ios-ui green.** Matrix [`35694380112`](https://github.com/colinedwardwood/open-health-export/actions/runs/35694380112) **11/12**; only iPad 5 failed (`testDisclosureAndControlsInPseudoLocale` Dynamic Type on Data-tab DatePicker).
+DatePicker titles hosted as SwiftUI text; Data title uses one scalable body font. Local iPad `testDisclosureAndControlsInPseudoLocale` **33s green**.
 
 | Next | Status |
 |---|---|
-| Push DatePicker DT suppression | ready (matrix finished) |
-| macos-build (6 ios-ui) | after push · 50–90 min |
-| accessibility-matrix 12/12 | after macos-build · 60–90 min |
-| Local iPhone + iPad UI suites | iPad **77/0**; iPhone xcresult incomplete after runner vanished |
+| macos-build (6 ios-ui) | after this push · 50–90 min |
+| accessibility-matrix 12/12 | dispatch after macos-build green |
+| Local iPhone + iPad UI suites | iPad **77/0** on `a047513`; iPhone aborted; re-run after this HEAD |
 | `main` branch protection | last slice only |
 
 Watch XXXL launch flake — no extra code unless it repeats.
