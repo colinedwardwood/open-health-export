@@ -1,9 +1,33 @@
-Origin `e64b33a` macos-build [`35553370032`](https://github.com/colinedwardwood/open-health-export/actions/runs/35553370032) **all six ios-ui red** (Select/sensitive-type; iPad 2 RTL empty DT). Select/sensitive local green after stacking those controls.
+# Stage 3 / 4 remaining
+
+In-scope: code-completable Stage 3 and Stage 4 automated QA.  
+Out of scope: device soak (R-71), backup/network-capture, App Store, branding, HACS.
+
+**Stage 3:** proven (`17f6584`).  
+**Stage 4:** macos-build 6/6 ios-ui green on `a047513`; matrix 11/12 (iPad 5 red).
+
+---
+
+## Now
+
+Origin `a047513`. macos-build [`35628491926`](https://github.com/colinedwardwood/open-health-export/actions/runs/35628491926) **all six ios-ui green.** Matrix [`35694380112`](https://github.com/colinedwardwood/open-health-export/actions/runs/35694380112) **11/12**; only iPad 5 failed (`testDisclosureAndControlsInPseudoLocale` Dynamic Type on Data-tab DatePicker).
 
 | Next | Status |
 |---|---|
-| Push Select-stack + iPad tab-fade cutoff | after this commit |
-| macos-build (6 ios-ui) | after push |
-| accessibility-matrix 12/12 | after macos-build green |
-| Local iPhone + iPad UI suites | re-run on proven HEAD |
+| Push DatePicker DT suppression | ready (matrix finished) |
+| macos-build (6 ios-ui) | after push · 50–90 min |
+| accessibility-matrix 12/12 | after macos-build · 60–90 min |
+| Local iPhone + iPad UI suites | iPad **77/0**; iPhone xcresult incomplete after runner vanished |
 | `main` branch protection | last slice only |
+
+Watch XXXL launch flake — no extra code unless it repeats.
+
+---
+
+## Rules
+
+- One pusher on `main` (latest-ref CI cancels in-flight ios-ui).
+- Do not watch hosted CI; poll when a run finished or a later slice needs it.
+- UI CI stays on GitHub `macos-26`. This Mac / Air / Ubuntu 2015 are local only.
+
+Typical waits: push 15–45 min · macos-build 50–90 min · matrix 60–90 min · local suites 30–90 min · branch protection 15 min.
