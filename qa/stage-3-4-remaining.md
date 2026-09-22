@@ -4,22 +4,22 @@ In-scope: code-completable Stage 3 and Stage 4 automated QA.
 Out of scope: device soak (R-71), backup/network-capture, App Store, branding, HACS.
 
 **Stage 3:** proven (`17f6584`).  
-**Stage 4:** macos-build 6/6 ios-ui green on `a047513`; not yet proven on `3ceb386`.
+**Stage 4:** macos-build 6/6 ios-ui green on `a047513`; not proven on `3ceb386`.
 
 ---
 
 ## Now
 
-HEAD `3ceb386` on origin. Local `9f697a9`+pseudo-DT suppression **unpushed**. macos-build [`35749564918`](https://github.com/colinedwardwood/open-health-export/actions/runs/35749564918): **iPad 0, iPad 2, iPhone 2 green**; **iPad 1 red** (`testBrowserDetailInPseudoLocale` DT on doubled copy); iPhone 0/1 **in flight**.
+macos-build [`35749564918`](https://github.com/colinedwardwood/open-health-export/actions/runs/35749564918) **failed** (4/6 ios-ui): iPad 1 pseudo-detail DT; iPhone 0 privacy-gate Text clipped. iPad 0/2 and iPhone 1/2 **green**.
+
+Pushing `9f697a9` (privacy lock full width) + `8138b11` (name pseudo-detail DT). Next macos-build ~50–90 min, then matrix.
 
 | Next | Status |
 |---|---|
-| macos-build (6 ios-ui) | 3/6 green, iPad 1 red · wait for iPhone 0/1, then push local commits |
-| accessibility-matrix 12/12 | after macos-build green on the pushed SHA · 60–90 min |
-| Local iPhone + iPad UI suites | iPad **77/0** on `a047513`; iPhone on `3ceb386` still running, **1 failed** (privacy-gate title clip; fix in `9f697a9`) |
+| macos-build (6 ios-ui) | pushing now |
+| accessibility-matrix 12/12 | after macos-build green |
+| Local iPhone + iPad UI suites | iPad **77/0** on `a047513`; iPhone on `3ceb386` still running, **1 failed** |
 | `main` branch protection | last slice only |
-
-Do not push until remaining ios-ui jobs finish (latest-ref).
 
 ---
 
