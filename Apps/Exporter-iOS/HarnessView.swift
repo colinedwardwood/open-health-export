@@ -2519,7 +2519,7 @@ struct HarnessView: View {
                 .font(.body.weight(.semibold))
                 .foregroundStyle(.primary)
                 .lineLimit(nil)
-                .fixedSize(horizontal: false, vertical: true)
+                .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("browser-title")
             if selectedDetail != nil {
@@ -2549,8 +2549,11 @@ struct HarnessView: View {
                     ? "Demo values. This is what App Review sees without HealthKit history."
                     : "Health values read on \(DeviceNoun.thisDevice)."
             )
-                .wrappingFillCaption()
-                .fontWeight(browserDemoMode ? .semibold : .regular)
+                .font(browserDemoMode ? .body.weight(.semibold) : .body)
+                .foregroundStyle(.primary)
+                .lineLimit(nil)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             if selectedDetail == nil, browserSelecting {
                 Button("Use Core Daily") {
@@ -2588,9 +2591,6 @@ struct HarnessView: View {
                         scopeDestinationID = id
                         Task { await loadDestinationScope(id) }
                     }
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
                     .fontWeight(scopeDestinationID == id ? .semibold : .regular)
                     .buttonStyle(HarnessButtonStyle())
                     .accessibilityIdentifier("scope-destination-\(id)")
@@ -2639,13 +2639,8 @@ struct HarnessView: View {
                     Task { await loadBrowserSamples(metric: detail.metric) }
                 } label: {
                     Text(browserLoadingHealth ? "Loading Health data…" : "Load 30 days from Health")
-                        .font(.body)
-                        .foregroundStyle(.primary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(HarnessButtonStyle())
                 .disabled(browserLoadingHealth)
                 .accessibilityIdentifier("browser-load-health")
                 dataBrowserDetail(detail)
@@ -4223,7 +4218,8 @@ private struct HarnessButtonStyle: ButtonStyle {
         configuration.label
             .font(.body)
             .foregroundStyle(.primary)
-            .fixedSize(horizontal: false, vertical: true)
+            .lineLimit(nil)
+            .multilineTextAlignment(.leading)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .contentShape(Rectangle())
             .opacity(configuration.isPressed ? 0.7 : 1)
@@ -4233,12 +4229,14 @@ private struct HarnessButtonStyle: ButtonStyle {
 extension View {
     /// Body type, primary contrast, and wrap. Do not force a 44-point minimum at
     /// the default size: that pushed Status copy into the iPad tab fade.
+    /// Do not use `fixedSize(vertical: true)`: hosted Xcode 26.6 then reports
+    /// Dynamic Type as partially unsupported on captions and control titles.
     func wrappingPrimaryCaption() -> some View {
         self
             .font(.body)
             .foregroundStyle(.primary)
             .lineLimit(nil)
-            .fixedSize(horizontal: false, vertical: true)
+            .multilineTextAlignment(.leading)
     }
 
     /// Same as wrappingPrimaryCaption, but occupies the proposed width so RTL

@@ -4,22 +4,23 @@ In-scope: code-completable Stage 3 and Stage 4 automated QA.
 Out of scope: device soak (R-71), backup/network-capture, App Store, branding, HACS.
 
 **Stage 3:** proven (`17f6584`).  
-**Stage 4:** macos-build 6/6 ios-ui green on `a047513`; matrix 11/12 (iPad 5 red).
+**Stage 4:** macos-build 6/6 ios-ui green on `a047513`; not proven on `6ca0a71`.
 
 ---
 
 ## Now
 
-DatePicker titles hosted as SwiftUI text; Data title uses one scalable body font. Local iPad `testDisclosureAndControlsInPseudoLocale` **33s green**.
+macos-build [`35741241924`](https://github.com/colinedwardwood/open-health-export/actions/runs/35741241924) **failed**: iPad 1 `testBrowserDetailInPseudoLocale` DT (Latest / Load Health); iPad 2 `browser-select` DT (demo honesty / MQTT) and DarkBold `-56`. Local Xcode 27 still green.
 
 | Next | Status |
 |---|---|
-| macos-build (6 ios-ui) | after this push · 50–90 min |
-| accessibility-matrix 12/12 | dispatch after macos-build green |
-| Local iPhone + iPad UI suites | iPad **77/0** on `a047513`; iPhone aborted; re-run after this HEAD |
+| Push wrap-without-fixedSize | after local iPad detail+select |
+| macos-build (6 ios-ui) | after push · 50–90 min |
+| accessibility-matrix 12/12 | after macos-build green |
+| Local iPhone + iPad UI suites | iPad **77/0** on `a047513`; iPhone aborted |
 | `main` branch protection | last slice only |
 
-Watch XXXL launch flake — no extra code unless it repeats.
+Watch XXXL / DarkBold `-56` — no extra code unless it repeats without a DT fail.
 
 ---
 
