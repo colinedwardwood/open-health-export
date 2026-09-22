@@ -621,37 +621,49 @@ struct HarnessView: View {
     }
 
     private var privacyLock: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "lock.fill")
-                .font(.largeTitle)
-                .accessibilityHidden(true)
-            Text("Open Health Exporter is locked")
-                .wrappingFillCaption()
-                .fontWeight(.semibold)
-                .accessibilityIdentifier("privacy-gate-locked-title")
-            Text("Unlocking protects this screen only. Background exports and destination delivery continue without a prompt.")
-                .wrappingFillCaption()
-                .multilineTextAlignment(.center)
-                .accessibilityIdentifier("privacy-gate-background-scope")
-            if appPrivacyGate.authenticationFailed {
-                Text("Authentication was not completed.")
-                    .wrappingFillCaption()
-                    .accessibilityIdentifier("privacy-gate-failure")
-            }
-            Button(
-                appPrivacyGate.state == .authenticating ? "Authenticating…" : "Unlock"
-            ) {
-                Task {
-                    await appPrivacyGate.authenticateIfNeeded(enabled: appPrivacyGateEnabled)
+        ZStack {
+            Color(uiColor: .systemBackground)
+            VStack(spacing: 16) {
+                Image(systemName: "lock.fill")
+                    .font(.largeTitle)
+                    .accessibilityHidden(true)
+                Text("Open Health Exporter is locked")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(nil)
+                    .multilineTextAlignment(.center)
+                    .frame(minWidth: 0, maxWidth: .infinity)
+                    .accessibilityIdentifier("privacy-gate-locked-title")
+                Text("Unlocking protects this screen only. Background exports and destination delivery continue without a prompt.")
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .lineLimit(nil)
+                    .multilineTextAlignment(.center)
+                    .frame(minWidth: 0, maxWidth: .infinity)
+                    .accessibilityIdentifier("privacy-gate-background-scope")
+                if appPrivacyGate.authenticationFailed {
+                    Text("Authentication was not completed.")
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                        .lineLimit(nil)
+                        .multilineTextAlignment(.center)
+                        .frame(minWidth: 0, maxWidth: .infinity)
+                        .accessibilityIdentifier("privacy-gate-failure")
                 }
+                Button(
+                    appPrivacyGate.state == .authenticating ? "Authenticating…" : "Unlock"
+                ) {
+                    Task {
+                        await appPrivacyGate.authenticateIfNeeded(enabled: appPrivacyGateEnabled)
+                    }
+                }
+                .buttonStyle(HarnessButtonStyle())
+                .disabled(appPrivacyGate.state == .authenticating)
+                .accessibilityIdentifier("privacy-gate-unlock")
             }
-            .buttonStyle(HarnessButtonStyle())
-            .disabled(appPrivacyGate.state == .authenticating)
-            .accessibilityIdentifier("privacy-gate-unlock")
+            .padding()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
-        .background(Color(uiColor: .systemBackground))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("privacy-gate")
     }
