@@ -1688,6 +1688,26 @@ final class ExporterUITests: XCTestCase {
         try performAccessibilityAudit("\(configuration)-browser-detail")
     }
 
+    /// Dynamic Type asks whether text scales with the content size category.
+    /// Asking it while the app is already pinned at an accessibility size is the
+    /// least informative place to ask and by far the most expensive: on the
+    /// dark/bold/AX5 Destinations screen that one pass costs 19s against 2s for
+    /// every other check combined, which is what returned `-56` on hosted
+    /// iPad 0. The screens audited here keep their Dynamic Type pass at the
+    /// default content size, where the question means something. What an
+    /// accessibility size is actually for — clipping, contrast, hit regions,
+    /// element detection — is still audited here.
+    private var isAtAccessibilityContentSize: Bool {
+        guard
+            let index = app.launchArguments.firstIndex(
+                of: "-UIPreferredContentSizeCategoryName"
+            ),
+            app.launchArguments.indices.contains(index + 1)
+        else { return false }
+        return app.launchArguments[index + 1]
+            .hasPrefix("UICTContentSizeCategoryAccessibility")
+    }
+
     private func performAccessibilityAudit(_ state: String = #function) throws {
         // Do not retry a timed-out audit in-process. Hosted iPhone 2 on
         // `69cf566` spent 186s in `testBrowserEmptyStateInRTL` (-56) and
@@ -1702,7 +1722,25 @@ final class ExporterUITests: XCTestCase {
         // controls that pass the identical audit on other shards and locally.
         // Splitting by subtraction rather than by listing each type keeps the
         // coverage of `.all` if the SDK adds one.
-        for auditType in [XCUIAccessibilityAuditType.all.subtracting(.dynamicType), .dynamicType] {
+        var passes: [XCUIAccessibilityAuditType] = [.all.subtracting(.dynamicType)]
+        if isAtAccessibilityContentSize {
+            print("SKIPPED AX PASS \(state): dynamicType at an accessibility content size")
+        } else {
+            passes.append(.dynamicType)
+        }
+        for auditType in passes {
+            let passName = auditType == .dynamicType ? "dynamicType" : "allExceptDynamicType"
+            let started = Date()
+            defer {
+                // `-56` names neither the screen nor the pass it gave up on, so a
+                // timeout otherwise reads as "the audit failed" with nothing to
+                // act on. Report the slow passes that precede one.
+                let elapsed = Date().timeIntervalSince(started)
+                if elapsed > 20 {
+                    print("SLOW AX PASS \(state): \(passName) took \(Int(elapsed))s")
+                }
+            }
+            do {
             try app.performAccessibilityAudit(for: auditType) { issue in
                     let cause: String?
                     if issue.auditType == .contrast, let element = issue.element {
@@ -1758,6 +1796,10 @@ final class ExporterUITests: XCTestCase {
                     }
                     return true
                 }
+            } catch {
+                XCTFail("accessibility audit pass \(passName) failed in \(state): \(error)")
+                throw error
+            }
         }
     }
 

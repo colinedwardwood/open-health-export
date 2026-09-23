@@ -4,42 +4,49 @@ In-scope: code-completable Stage 3 and Stage 4 automated QA.
 Out of scope: device soak (R-71), backup/network-capture, App Store, branding, HACS.
 
 **Stage 3:** proven (`17f6584`).  
-**Stage 4:** macos-build **5/6** on `f28604c`. Only iPad 2 red.
+**Stage 4:** macos-build **5/6** on `8d3ba8f`. Only iPad 0 red, one test.
 
 ---
 
 ## Now
 
-[`35880413239`](https://github.com/colinedwardwood/open-health-export/actions/runs/35880413239) on `f28604c`: iPhone 0/1/2 and iPad 0/1 **green**, iPad 2 red.
+Pushing: audit Dynamic Type at the default content size only.
 
-**Every Dynamic Type finding is gone**, on every shard. So are the launch
-timeouts and termination failures. Splitting the Dynamic Type audit into its
-own pass and booting the simulator before xcodebuild fixed both classes.
+Measured on the dark/bold/AX5 Destinations screen, the pass that would not
+finish:
 
-iPad 2's only remaining failure is audit `-56` "failed to complete in time":
-`testDarkBoldAX5AccessibilitySettingsPassAudit` on both iterations (82s, 84s),
-and `testBrowserDetailInRTL` once, which then passed on retry.
+```
+allExceptDynamicType  2s
+dynamicType          19s
+```
 
-Pushing now: that test audited three screens in one process, so the third
-inherited the cost of the first two. It is now three cases, one screen each,
-with no audit removed. Locally 11.7s + 30.7s + 37.5s, all green.
+Hosted runs ~2x slower, which lands on the observed 38–46s `-56` failures.
+Asking whether text scales while already pinned at the maximum size is the
+least informative place to ask. Destinations keeps its Dynamic Type audit at
+the default size in `testEveryDestinationDisplayStatePassesAccessibilityAudit`.
+Clipping, contrast, hit regions, and element detection still run at AX5.
+
+Locally after the change: Destinations 37.4s → 18.1s, Controls 31.9s → 11.7s,
+AX3XL 35.2s → 13.1s, all green, and the two default-size audits confirm they
+still run the Dynamic Type pass.
 
 ## Fixed and confirmed on hosted
 
 | Fix | Commit | Evidence |
 |---|---|---|
-| privacy-gate `Text clipped` | `abfb8dc` | iPhone 0 green, twice |
+| privacy-gate `Text clipped` | `abfb8dc` | iPhone 0 green |
 | `otlp-url` keyboard focus | `6ce9079` | iPhone 1 green |
 | Dynamic Type drift | `cd0ddcf` | no DT finding on any shard |
 | simulator launch timeouts | `f28604c` | iPad 0/1 green |
+| three AX5 screens in one process | `8d3ba8f` | iPad 2 green |
 
-## Local coverage with the split audit
+## Local coverage
 
-All three iPad shards green: 26/26, 26/26, 25/25 — 77 tests, no findings.
+All three iPad shards green with the split audit: 26/26, 26/26, 25/25.
 
 | Next | Status |
 |---|---|
-| macos-build 6/6 | pushing DarkBold split |
+| macos-build 6/6 | pushing Dynamic Type scope |
 | accessibility-matrix 12/12 | after macos-build green |
 | `main` branch protection | last slice only |
 
