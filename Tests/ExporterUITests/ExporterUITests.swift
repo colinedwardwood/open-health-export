@@ -1677,7 +1677,15 @@ final class ExporterUITests: XCTestCase {
         // timeouts. `-retry-tests-on-failure` relaunches cleanly; stacking
         // inner retries does not.
         let chrome = AccessibilityChromeSnapshot(app: app)
-        try app.performAccessibilityAudit { issue in
+        // Dynamic Type is the expensive pass: it re-renders the screen at every
+        // content size, while the rest only walk the tree once. Sharing one
+        // budget with it is what produced `-56` "Audit failed to complete in
+        // time" on hosted iPad 0, and Dynamic Type findings on `.font(.body)`
+        // controls that pass the identical audit on other shards and locally.
+        // Splitting by subtraction rather than by listing each type keeps the
+        // coverage of `.all` if the SDK adds one.
+        for auditType in [XCUIAccessibilityAuditType.all.subtracting(.dynamicType), .dynamicType] {
+            try app.performAccessibilityAudit(for: auditType) { issue in
                     let cause: String?
                     if issue.auditType == .contrast, let element = issue.element {
                         cause = self.suppressionCause(for: element, chrome: chrome)
@@ -1732,6 +1740,7 @@ final class ExporterUITests: XCTestCase {
                     }
                     return true
                 }
+        }
     }
 
     /// Xcode 26 audits system-rendered empty SwiftUI text-field placeholders and
