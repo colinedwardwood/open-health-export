@@ -85,6 +85,12 @@ jobs:
           DEVICE_FAMILY: ${{ matrix.family }}
         run: |
           DESTINATION_ID="$(bash scripts/ui-test-simulator.sh "$DEVICE_FAMILY")"
+          # Boot before xcodebuild, not during it. Left to boot lazily, the first
+          # `app.launch()` races the runtime coming up and reads as "Timed out
+          # while launching application via Xcode" after 85s, which fails the
+          # shard for a reason that has nothing to do with the app.
+          xcrun simctl boot "$DESTINATION_ID" || true
+          xcrun simctl bootstatus "$DESTINATION_ID" -b
           # One simulator per runner. Three clones on a runner this size timed out
           # launching the app, which reads as a test failure and is not one. The
           # parallelism lives in the shards now, where it costs no simulator memory.

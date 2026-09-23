@@ -38,6 +38,11 @@ jobs:
           # content lands relative to the bars, so auditing whichever device the image
           # lists first makes a finding impossible to reproduce.
           destination="$(bash scripts/ui-test-simulator.sh "$DEVICE_FAMILY")"
+          # Boot before xcodebuild, not during it: a lazy boot races the first
+          # `app.launch()` and reads as a launch timeout, failing the shard for
+          # a reason that has nothing to do with the app.
+          xcrun simctl boot "$destination" || true
+          xcrun simctl bootstatus "$destination" -b
           # shellcheck disable=SC2046
           xcodebuild test \
             -project OpenHealthExporter.xcodeproj \
