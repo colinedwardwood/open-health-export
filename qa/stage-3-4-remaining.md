@@ -4,48 +4,42 @@ In-scope: code-completable Stage 3 and Stage 4 automated QA.
 Out of scope: device soak (R-71), backup/network-capture, App Store, branding, HACS.
 
 **Stage 3:** proven (`17f6584`).  
-**Stage 4:** macos-build 6/6 ios-ui green on `a047513`; not proven since.
+**Stage 4:** macos-build **5/6** on `f28604c`. Only iPad 2 red.
 
 ---
 
 ## Now
 
-[`35863237805`](https://github.com/colinedwardwood/open-health-export/actions/runs/35863237805) on `abfb8dc`: 3/6. iPhone 0, iPhone 2, iPad 1 **green**.
+[`35880413239`](https://github.com/colinedwardwood/open-health-export/actions/runs/35880413239) on `f28604c`: iPhone 0/1/2 and iPad 0/1 **green**, iPad 2 red.
 
-| Shard | Cause | State |
+**Every Dynamic Type finding is gone**, on every shard. So are the launch
+timeouts and termination failures. Splitting the Dynamic Type audit into its
+own pass and booting the simulator before xcodebuild fixed both classes.
+
+iPad 2's only remaining failure is audit `-56` "failed to complete in time":
+`testDarkBoldAX5AccessibilitySettingsPassAudit` on both iterations (82s, 84s),
+and `testBrowserDetailInRTL` once, which then passed on retry.
+
+Pushing now: that test audited three screens in one process, so the third
+inherited the cost of the first two. It is now three cases, one screen each,
+with no audit removed. Locally 11.7s + 30.7s + 37.5s, all green.
+
+## Fixed and confirmed on hosted
+
+| Fix | Commit | Evidence |
 |---|---|---|
-| iPhone 0 | privacy-gate `Text clipped` | **fixed** in `abfb8dc`, hosted green |
-| iPhone 1 | `otlp-url` never took keyboard focus | fix pushed, 9/9 locally |
-| iPad 0, iPad 2 | Dynamic Type "partially unsupported" | **open — see below** |
+| privacy-gate `Text clipped` | `abfb8dc` | iPhone 0 green, twice |
+| `otlp-url` keyboard focus | `6ce9079` | iPhone 1 green |
+| Dynamic Type drift | `cd0ddcf` | no DT finding on any shard |
+| simulator launch timeouts | `f28604c` | iPad 0/1 green |
 
-The `-56` audit timeouts did not recur on `abfb8dc`.
+## Local coverage with the split audit
 
-## The open question: hosted Dynamic Type
-
-Hosted Xcode 26.6 reports Dynamic Type on elements that are correct:
-`scope-destination-*` are `Button` + `HarnessButtonStyle`, which is `.font(.body)`
-and `minHeight: 44` — a scaling font and a floor, not a fixed height.
-`browser-title` and `Export unit: bpm` are plain `.font(.body)` captions.
-
-The findings **drift between runs**, which is the reason not to keep chasing them:
-
-| Run | iPad 0 | iPad 1 | iPad 2 |
-|---|---|---|---|
-| `3ceb386` | green | DT | green |
-| `8b6ce46` | `-56` | green | green |
-| `abfb8dc` | DT | green | DT |
-
-Audits also run 91–206s on the failing shards, and the same screens pass
-locally on Xcode 27 in ~33s. That points at audit execution under runner
-contention, not at the app. `wrappingPrimaryCaption` already carries a note
-that hosted 26.6 reports Dynamic Type spuriously when `fixedSize` is applied.
-
-Chasing this element-by-element has not converged over three runs at ~60 min
-each. Needs a decision before more cycles are spent.
+All three iPad shards green: 26/26, 26/26, 25/25 — 77 tests, no findings.
 
 | Next | Status |
 |---|---|
-| Dynamic Type approach | **awaiting decision** |
+| macos-build 6/6 | pushing DarkBold split |
 | accessibility-matrix 12/12 | after macos-build green |
 | `main` branch protection | last slice only |
 

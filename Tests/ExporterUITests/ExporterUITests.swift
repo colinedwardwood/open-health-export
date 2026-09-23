@@ -311,7 +311,12 @@ final class ExporterUITests: XCTestCase {
         try performAccessibilityAudit()
     }
 
-    func testDarkBoldAX5AccessibilitySettingsPassAudit() throws {
+    /// Dark, bold, and AX5 at once is the heaviest state the suite audits, and
+    /// auditing three screens in one process put the third one past the audit's
+    /// own deadline: hosted iPad 2 returned `-56` on both iterations while the
+    /// same screens pass locally. One screen per case keeps every audit and
+    /// makes a timeout name the screen it happened on.
+    private func launchDarkBoldAX5() {
         app.terminate()
         app.launchEnvironment["OHE_ACCESSIBILITY_MATRIX"] = "combined"
         app.launchArguments += [
@@ -323,9 +328,22 @@ final class ExporterUITests: XCTestCase {
             app.buttons["disclosure-continue"]
                 .waitForExistence(timeout: uiWait)
         )
+    }
+
+    func testDarkBoldAX5DisclosurePassesAudit() throws {
+        launchDarkBoldAX5()
         try performAccessibilityAudit("dark-bold-ax5-disclosure")
+    }
+
+    func testDarkBoldAX5ControlsPassAudit() throws {
+        launchDarkBoldAX5()
         enterControls()
         try performAccessibilityAudit("dark-bold-ax5-controls")
+    }
+
+    func testDarkBoldAX5DestinationsPassAudit() throws {
+        launchDarkBoldAX5()
+        enterControls()
         _ = scrollDestinations(app.staticTexts["destination-title"])
         try performAccessibilityAudit("dark-bold-ax5-destinations")
     }
