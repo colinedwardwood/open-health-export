@@ -627,11 +627,16 @@ struct HarnessView: View {
                 Image(systemName: "lock.fill")
                     .font(.largeTitle)
                     .accessibilityHidden(true)
+                // The lock screen is not inside a scroll view, so it has room to
+                // grow vertically. Take the ideal height the way
+                // `healthKitUnavailable` does: without it the audit reads copy
+                // that exactly fills one line as clipped.
                 Text("Open Health Exporter is locked")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(nil)
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(minWidth: 0, maxWidth: .infinity)
                     .accessibilityIdentifier("privacy-gate-locked-title")
                 Text("Unlocking protects this screen only. Background exports and destination delivery continue without a prompt.")
@@ -639,6 +644,7 @@ struct HarnessView: View {
                     .foregroundStyle(.primary)
                     .lineLimit(nil)
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(minWidth: 0, maxWidth: .infinity)
                     .accessibilityIdentifier("privacy-gate-background-scope")
                 if appPrivacyGate.authenticationFailed {
@@ -647,6 +653,7 @@ struct HarnessView: View {
                         .foregroundStyle(.primary)
                         .lineLimit(nil)
                         .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
                         .frame(minWidth: 0, maxWidth: .infinity)
                         .accessibilityIdentifier("privacy-gate-failure")
                 }
