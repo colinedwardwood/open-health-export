@@ -4,21 +4,49 @@ In-scope: code-completable Stage 3 and Stage 4 automated QA.
 Out of scope: device soak (R-71), backup/network-capture, App Store, branding, HACS.
 
 **Stage 3:** proven (`17f6584`).  
-**Stage 4:** macos-build 6/6 ios-ui green on `a047513`; not proven on `3ceb386`.
+**Stage 4:** macos-build 6/6 ios-ui green on `a047513`; not proven since.
 
 ---
 
 ## Now
 
-macos-build [`35749564918`](https://github.com/colinedwardwood/open-health-export/actions/runs/35749564918) **failed** (4/6 ios-ui): iPad 1 pseudo-detail DT; iPhone 0 privacy-gate Text clipped. iPad 0/2 and iPhone 1/2 **green**.
+[`35863237805`](https://github.com/colinedwardwood/open-health-export/actions/runs/35863237805) on `abfb8dc`: 3/6. iPhone 0, iPhone 2, iPad 1 **green**.
 
-Pushing `9f697a9` (privacy lock full width) + `8138b11` (name pseudo-detail DT). Next macos-build ~50–90 min, then matrix.
+| Shard | Cause | State |
+|---|---|---|
+| iPhone 0 | privacy-gate `Text clipped` | **fixed** in `abfb8dc`, hosted green |
+| iPhone 1 | `otlp-url` never took keyboard focus | fix pushed, 9/9 locally |
+| iPad 0, iPad 2 | Dynamic Type "partially unsupported" | **open — see below** |
+
+The `-56` audit timeouts did not recur on `abfb8dc`.
+
+## The open question: hosted Dynamic Type
+
+Hosted Xcode 26.6 reports Dynamic Type on elements that are correct:
+`scope-destination-*` are `Button` + `HarnessButtonStyle`, which is `.font(.body)`
+and `minHeight: 44` — a scaling font and a floor, not a fixed height.
+`browser-title` and `Export unit: bpm` are plain `.font(.body)` captions.
+
+The findings **drift between runs**, which is the reason not to keep chasing them:
+
+| Run | iPad 0 | iPad 1 | iPad 2 |
+|---|---|---|---|
+| `3ceb386` | green | DT | green |
+| `8b6ce46` | `-56` | green | green |
+| `abfb8dc` | DT | green | DT |
+
+Audits also run 91–206s on the failing shards, and the same screens pass
+locally on Xcode 27 in ~33s. That points at audit execution under runner
+contention, not at the app. `wrappingPrimaryCaption` already carries a note
+that hosted 26.6 reports Dynamic Type spuriously when `fixedSize` is applied.
+
+Chasing this element-by-element has not converged over three runs at ~60 min
+each. Needs a decision before more cycles are spent.
 
 | Next | Status |
 |---|---|
-| macos-build (6 ios-ui) | pushing now |
+| Dynamic Type approach | **awaiting decision** |
 | accessibility-matrix 12/12 | after macos-build green |
-| Local iPhone + iPad UI suites | iPad **77/0** on `a047513`; iPhone on `3ceb386` still running, **1 failed** |
 | `main` branch protection | last slice only |
 
 ---

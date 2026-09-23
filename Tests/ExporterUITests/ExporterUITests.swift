@@ -1921,8 +1921,17 @@ final class ExporterUITests: XCTestCase {
         // tapping again, not by waiting longer for a keyboard that is not coming.
         // Hosted simulators often connect the hardware keyboard, so no software
         // Keyboard row appears; `hasKeyboardFocus` is the signal in that mode.
-        for _ in 0 ..< 3 {
-            field.tap()
+        //
+        // Repeating an identical tap is not a retry. A field the scroll view has
+        // left mid-deceleration, or seated under chrome that still reports it
+        // hittable, swallows every element tap the same way, so the later
+        // attempts aim at the field's own coordinate space instead.
+        for attempt in 0 ..< 4 {
+            if attempt >= 2 {
+                field.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            } else {
+                field.tap()
+            }
             let deadline = Date().addingTimeInterval(min(10, uiWait))
             while Date() < deadline {
                 if fieldAcceptsTyping(field) { break }
@@ -1932,7 +1941,10 @@ final class ExporterUITests: XCTestCase {
         }
         XCTAssertTrue(
             fieldAcceptsTyping(field),
-            "keyboard never appeared for \(field.identifier)"
+            "keyboard never appeared for \(field.identifier): "
+                + "frame=\(field.frame) window=\(app.windows.firstMatch.frame) "
+                + "hittable=\(field.isHittable) enabled=\(field.isEnabled) "
+                + "keyboards=\(app.keyboards.count)"
         )
         field.typeText(text)
         dismissKeyboard()
