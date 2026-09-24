@@ -4,13 +4,15 @@ In-scope: code-completable Stage 3 and Stage 4 automated QA.
 Out of scope: device soak (R-71), backup/network-capture, App Store, branding, HACS.
 
 **Stage 3:** proven (`17f6584`).  
-**Stage 4:** macos-build **5/6** on `8d3ba8f`. Only iPad 0 red, one test.
+**Stage 4:** automated QA proven on `960d4b7`.
 
 ---
 
-## Now
+## Final automated evidence
 
-Pushing: audit Dynamic Type at the default content size only.
+- macos-build [`35899467284`](https://github.com/colinedwardwood/open-health-export/actions/runs/35899467284): **6/6 ios-ui green**, full workflow green.
+- accessibility-matrix [`35920493866`](https://github.com/colinedwardwood/open-health-export/actions/runs/35920493866): **12/12 green**.
+- Local iPad shards with the split audit: **26/26, 26/26, 25/25**.
 
 Measured on the dark/bold/AX5 Destinations screen, the pass that would not
 finish:
@@ -39,16 +41,11 @@ still run the Dynamic Type pass.
 | Dynamic Type drift | `cd0ddcf` | no DT finding on any shard |
 | simulator launch timeouts | `f28604c` | iPad 0/1 green |
 | three AX5 screens in one process | `8d3ba8f` | iPad 2 green |
-
-## Local coverage
-
-All three iPad shards green with the split audit: 26/26, 26/26, 25/25.
+| Dynamic Type at accessibility sizes | `960d4b7` | 6/6 + 12/12 green |
 
 | Next | Status |
 |---|---|
-| macos-build 6/6 | pushing Dynamic Type scope |
-| accessibility-matrix 12/12 | after macos-build green |
-| `main` branch protection | last slice only |
+| `main` branch protection | final repository setting |
 
 ---
 
