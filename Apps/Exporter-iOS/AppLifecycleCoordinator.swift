@@ -77,6 +77,7 @@ final class ExporterAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
         HarnessExport.attachNetworkActivityLedger()
         BackgroundTaskCoordinator.register()
         ContinuedBackfillCoordinator.register()
+        BackgroundTaskCoordinator.submit()
         Task {
             try? await AppLifecycleCoordinator.shared.startObserversIfEligible()
             _ = try? await HarnessExport.recoverInterruptedExports()
@@ -183,16 +184,44 @@ enum BackgroundTaskCoordinator {
         }
     }
 
+    private static let submitFailureKey = "ohe.backgroundSubmitFailure"
+
+    /// Submitting again replaces the pending request with the same identifier, so this
+    /// is safe on every launch and foreground (#29).
     static func submit() {
         let refresh = BGAppRefreshTaskRequest(identifier: refreshIdentifier)
         refresh.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
-        try? BGTaskScheduler.shared.submit(refresh)
 
         let processing = BGProcessingTaskRequest(identifier: processingIdentifier)
         processing.earliestBeginDate = Date(timeIntervalSinceNow: 60 * 60)
         processing.requiresNetworkConnectivity = false
         processing.requiresExternalPower = false
-        try? BGTaskScheduler.shared.submit(processing)
+
+        var failures: [String] = []
+        for (name, request) in [("refresh", refresh as BGTaskRequest), ("processing", processing)] {
+            do {
+                try BGTaskScheduler.shared.submit(request)
+            } catch {
+                #if targetEnvironment(simulator)
+                // The simulator refuses every background task request.
+                continue
+                #else
+                failures.append("\(name) (code \((error as NSError).code))")
+                #endif
+            }
+        }
+        if failures.isEmpty {
+            UserDefaults.standard.removeObject(forKey: submitFailureKey)
+        } else {
+            UserDefaults.standard.set(failures.joined(separator: ", "), forKey: submitFailureKey)
+        }
+    }
+
+    static func submitFailureSummary() -> String? {
+        guard let failures = UserDefaults.standard.string(forKey: submitFailureKey) else {
+            return nil
+        }
+        return "iOS refused to schedule background exports: \(failures). Exports still run when the app opens."
     }
 
     private static func handle(_ task: BGTask, trigger: RunTrigger) {

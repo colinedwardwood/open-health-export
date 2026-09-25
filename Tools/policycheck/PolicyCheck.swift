@@ -234,6 +234,15 @@ struct PolicyCheck {
             )
             exit(1)
         }
+        // #29: BGAppRefreshTaskRequest is refused without `fetch`, and the refusal is
+        // only visible as a thrown submit error.
+        let backgroundModes = try loadInfoPlist(exporterInfo)["UIBackgroundModes"] as? [String] ?? []
+        for mode in ["fetch", "processing"] where !backgroundModes.contains(mode) {
+            FileHandle.standardError.write(
+                Data("iOS UIBackgroundModes is missing \(mode)\n".utf8)
+            )
+            exit(1)
+        }
         print("policycheck iOS background task identifiers: ok")
         let harnessExport = try String(
             contentsOf: apps.appendingPathComponent("Exporter-iOS/HarnessExport.swift"),
