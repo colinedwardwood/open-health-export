@@ -130,9 +130,9 @@ developer-operated Health-data service. Authoritative egress:
 [`compliance/egress-inventory.json`](compliance/egress-inventory.json).
 
 The sole built-in network host is the security advisory feed
-`https://advisories.openhealthexporter.org/advisories/v1.json`. It is fetched only
-on a user-visible foreground launch, never during export, and is disableable in
-the app. The GET carries marketing major.minor in `User-Agent` and nothing else
+`https://advisories.openhealthexporter.org/advisories/v1.json`. Fetching is off by
+default. If you turn it on, it runs only on a user-visible foreground launch after
+the first-run disclosure, never during export. The GET carries marketing major.minor in `User-Agent` and nothing else
 identifying. Block it at your resolver if you do not want the fetch. Plain HTTP
 on the LAN is allowed only through `NSAllowsLocalNetworking`. Any
 `NSAllowsArbitraryLoads` key in an app Info.plist fails `policycheck`.

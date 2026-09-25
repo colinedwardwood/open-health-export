@@ -627,6 +627,11 @@ enum HarnessExport {
     }
 
     @MainActor
+    static func advisoryLastVerified() -> Date? {
+        (UserDefaults.standard.object(forKey: "ohe.advisoryLastVerifiedEpoch") as? TimeInterval)
+            .map { Date(timeIntervalSince1970: $0) }
+    }
+
     static func fetchSecurityAdvisory(enabled: Bool) async throws -> AdvisoryPresentation {
         let defaults = UserDefaults.standard
         let state = AdvisoryState(
@@ -1961,6 +1966,17 @@ enum HarnessExport {
     }
 
     static func resetSeededSurfacesForUITests() throws {
+        // Each case starts from the shipped advisory defaults and an empty network
+        // ledger, so a default-configuration case sees what a new install sees.
+        for key in [
+            "ohe.advisoryEnabled",
+            "ohe.advisoryLastAttemptEpoch",
+            "ohe.advisoryLastVerifiedEpoch",
+            "ohe.advisoryLastSeenSeq",
+        ] {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+        EgressAttemptLog.wipePersistent()
         if let directory = StatusSnapshotLocation.directory() {
             try? FileManager.default.removeItem(at: directory)
         }
