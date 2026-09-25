@@ -32,8 +32,8 @@
     {
       "id": "keychain-entitlement-as-not-found",
       "file": "Sources/NetEgress/KeychainSecretStore.swift",
-      "find": "status == errSecMissingEntitlement ? .unavailable : .notFound",
-      "replace": "status == errSecMissingEntitlement ? .notFound : .unavailable",
+      "find": "case errSecItemNotFound:",
+      "replace": "case errSecItemNotFound, errSecMissingEntitlement:",
       "filter": "r33KeychainAddMapsMissingEntitlementToUnavailable",
       "host": "darwin"
     }
