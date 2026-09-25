@@ -72,7 +72,7 @@ ohe_workflow_is_fork_safe() {
   grep -F 'ubuntu-24.04-arm' "$workflow" >/dev/null
   grep -F 'macos-26' "$workflow" >/dev/null
   grep -F 'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683' "$workflow" >/dev/null
-  grep -F 'swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc' "$workflow" >/dev/null
+  grep -F './.github/actions/setup-swift' "$workflow" >/dev/null
 }
 
 ohe_self_test() {

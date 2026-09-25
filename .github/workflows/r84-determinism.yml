@@ -32,7 +32,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc # v3
+      - uses: ./.github/actions/setup-swift
         if: matrix.setup_swift
         with:
           swift-version: "6.3.3"
