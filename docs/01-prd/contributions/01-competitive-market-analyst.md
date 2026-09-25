@@ -248,6 +248,13 @@ written for that reality. If the PRD's success criteria assume more, they are wr
 
 ## Requirements I own
 
+> **Correction, 2026-09-25 (#40):** this Stage 1 contribution says the incumbent keys its
+> watermark on HealthKit write time. That mechanism is wrong: Health Auto Export issue #56 says
+> write-time detection is correct. The real defects are a time-window cursor ("Since Last
+> Sync") that truncates late-written sleep, and daily summaries that are not recomputed for
+> back-filled days. PRD §1 carries the corrected, sourced wording. The requirement below
+> stands unchanged.
+
 | ID | Requirement | Priority | Rationale | How we verify |
 |---|---|---|---|---|
 | **MA-01** | Incremental export must be correct under late-arriving and backfilled samples: the watermark is keyed on sample **measurement** time, and any aggregate window touched by a newly-observed sample is re-emitted regardless of how old that window is. | **Must** | The single evidenced defect class that permanently corrupts downstream databases and is not Apple's fault [15][16]. This is the product's reason to exist. | Write a HealthKit sample dated 30 days in the past; the next incremental run must re-emit the daily aggregate for that historical date. Second test: write sleep samples with an evening start and a next-morning write time; the exported night must span the full session, not the post-watermark fragment. |

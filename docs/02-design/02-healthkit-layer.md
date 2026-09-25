@@ -889,7 +889,7 @@ The budget constant itself comes from R-71: we currently assume 25 of ~30 second
 has published the wake duration granted to an `HKObserverQuery` background launch (the Stage 1
 expert flagged this as unverified and I could find nothing in the SDK to change that). If R-71
 measures a p10 of 12 seconds, page sizes and checkpoint granularity change. Designing against
-an unmeasured 25 would be the same class of error as the incumbent's write-time watermark.
+an unmeasured 25 would be the same class of error as a time-window cursor that silently drops late-written data.
 
 ### Device lock (C-02)
 
