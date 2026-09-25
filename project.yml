@@ -13,6 +13,12 @@ configFiles:
   Release: Brand.xcconfig
 settings:
   base:
+    # One version for the app, its widget and the Mac companion (#32). Release and
+    # from-source builds override the build number and commit with
+    # scripts/version-settings.sh; these are the unstamped defaults.
+    MARKETING_VERSION: 0.1.0
+    CURRENT_PROJECT_VERSION: 1
+    OHE_SOURCE_COMMIT: unspecified
     IPHONEOS_DEPLOYMENT_TARGET: "18.0"
     SWIFT_STRICT_CONCURRENCY: complete
     SWIFT_VERSION: "6.0"
@@ -46,9 +52,6 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MACCATALYST: NO
         GENERATE_INFOPLIST_FILE: NO
-        CURRENT_PROJECT_VERSION: 1
-        MARKETING_VERSION: 0.1.0
-        OHE_SOURCE_COMMIT: unspecified
     dependencies:
       - package: open-health-exporter
         product: ExportCore
@@ -101,8 +104,6 @@ targets:
         CODE_SIGN_ENTITLEMENTS: Apps/StatusWidget/StatusWidget.entitlements
         SKIP_INSTALL: YES
         GENERATE_INFOPLIST_FILE: NO
-        CURRENT_PROJECT_VERSION: 1
-        MARKETING_VERSION: 0.1.0
     dependencies:
       - package: open-health-exporter
         product: ExportCore
@@ -130,8 +131,6 @@ targets:
         CODE_SIGN_ENTITLEMENTS: Apps/Companion-macOS/Companion.entitlements
         MACOSX_DEPLOYMENT_TARGET: "15.0"
         GENERATE_INFOPLIST_FILE: NO
-        CURRENT_PROJECT_VERSION: 1
-        MARKETING_VERSION: 0.1.0
     dependencies:
       - package: open-health-exporter
         product: ExportCore

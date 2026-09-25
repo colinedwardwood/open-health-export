@@ -244,6 +244,22 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck iOS background task identifiers: ok")
+        // #32: every bundle takes its version and build from the project settings, so
+        // the app and its extension cannot drift apart or ship a hard-coded build 1.
+        for plist in [
+            "Exporter-iOS/Info.plist", "StatusWidget/Info.plist", "Companion-macOS/Info.plist",
+        ] {
+            let values = try loadInfoPlist(apps.appendingPathComponent(plist))
+            guard values["CFBundleShortVersionString"] as? String == "$(MARKETING_VERSION)",
+                  values["CFBundleVersion"] as? String == "$(CURRENT_PROJECT_VERSION)"
+            else {
+                FileHandle.standardError.write(
+                    Data("Apps/\(plist) must take its version and build from build settings\n".utf8)
+                )
+                exit(1)
+            }
+        }
+        print("policycheck bundle versions come from build settings: ok")
         let harnessExport = try String(
             contentsOf: apps.appendingPathComponent("Exporter-iOS/HarnessExport.swift"),
             encoding: .utf8

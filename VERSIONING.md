@@ -23,9 +23,14 @@ stability commitment (R-12), independent of the app's release cycle.
    against the committed freeze baseline and fails on any B-class change, including whitespace
    that would alter the published schema. New behaviour goes in a new directory. Within a MINOR,
    changes must be additive and the fixtures from the previous MINOR must still validate.
-4. **Build numbers are monotonic and never reused.** `CFBundleVersion` is the CI run number or
-   commit count. Apple rejects duplicates, and roll-forward depends on there always being a
-   higher number available.
+4. **Build numbers are monotonic and never reused.** `CFBundleVersion` is
+   `git rev-list --count HEAD` on a full clone, stamped with the source commit by
+   `scripts/version-settings.sh`; `scripts/check-built-versions.sh` fails a build whose app and
+   widget disagree or whose commit is `unspecified`. Apple rejects duplicates, and roll-forward
+   depends on there always being a higher number available. **Hotfix rule:** a fix ships from a
+   commit on `main`, never from a branch cut from an older tag, so its count is always higher
+   than every build already uploaded. The app, the widget and the Mac companion share one
+   `MARKETING_VERSION` and build number, set once in `project.yml`.
 5. **HACS reads the HA repository's latest GitHub *release* tag as the remote version**, and a
    plain tag is not enough — it must be a full release. So the HA stream's tags and its
    `manifest.json` `version` must agree. That agreement is a CI check in the HA repo, which this
