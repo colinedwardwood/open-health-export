@@ -21,7 +21,7 @@
       "network": true,
       "destination": "https://advisories.openhealthexporter.org/advisories/v1.json",
       "destinationControl": "project",
-      "trigger": "At most once per 24 hours on a user-visible foreground launch; user-disableable",
+      "trigger": "Off by default. When the user turns it on: at most once per 24 hours on a user-visible foreground launch after the first-run disclosure",
       "data": [
         "HTTP GET with empty body",
         "coarse app major.minor in User-Agent",

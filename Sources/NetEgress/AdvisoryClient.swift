@@ -150,11 +150,13 @@ public enum AdvisoryClient {
     ) async throws -> AdvisoryFetchResult {
         var next = state
         if !state.enabled {
-            let last = lastCheckedCopy(state.lastVerifiedEpoch ?? state.lastAttemptEpoch)
+            let lastChecked = state.lastVerifiedEpoch ?? state.lastAttemptEpoch
             return AdvisoryFetchResult(
                 state: next,
                 presentation: AdvisoryPresentation(
-                    banner: AdvisoryStaleness.disabledCopy(lastChecked: last)
+                    banner: lastChecked.map {
+                        AdvisoryStaleness.disabledCopy(lastChecked: lastCheckedCopy($0))
+                    } ?? AdvisoryStaleness.offCopy
                 ),
                 ledgerOutcome: "advisory:disabled"
             )
@@ -226,15 +228,12 @@ public enum AdvisoryClient {
         now: Date
     ) -> AdvisoryPresentation {
         let last = state.lastVerifiedEpoch.map { Date(timeIntervalSince1970: $0) }
-        let banner = AdvisoryStaleness.isStale(lastVerified: last, now: now)
-            ? AdvisoryStaleness.staleCopy
-            : nil
+        let banner = AdvisoryStaleness.bannerCopy(lastVerified: last, now: now)
         return AdvisoryPresentation(items: items, banner: banner, fetched: fetched)
     }
 
-    private static func lastCheckedCopy(_ epoch: TimeInterval?) -> String {
-        guard let epoch else { return "never" }
-        return ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: epoch))
+    private static func lastCheckedCopy(_ epoch: TimeInterval) -> String {
+        ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: epoch))
     }
 
     private static func appendLedger(

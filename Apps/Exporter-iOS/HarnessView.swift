@@ -185,8 +185,10 @@ struct HarnessView: View {
         }
         return text
     }
+    /// Off until the advisory channel has a registered host and real signatures (#14,
+    /// #30). The fetch is also held until the disclosure is acknowledged.
     @AppStorage("ohe.advisoryEnabled")
-    private var advisoryEnabled = true
+    private var advisoryEnabled = false
     @State private var advisoryBanner: String?
     @State private var advisoryItems: [AdvisoryItem] = []
     @State private var destinationChangeBanner: String?
@@ -2479,6 +2481,8 @@ struct HarnessView: View {
 
     @MainActor
     private func refreshSecurityAdvisory() async {
+        // No network egress of any kind before the person has read what the app does.
+        guard disclosureAcknowledged else { return }
         do {
             let presentation = try await HarnessExport.fetchSecurityAdvisory(
                 enabled: advisoryEnabled
@@ -2486,7 +2490,10 @@ struct HarnessView: View {
             advisoryBanner = presentation.banner
             advisoryItems = presentation.items
         } catch {
-            advisoryBanner = AdvisoryStaleness.staleCopy
+            advisoryBanner = AdvisoryStaleness.bannerCopy(
+                lastVerified: HarnessExport.advisoryLastVerified(),
+                now: Date()
+            )
             advisoryItems = []
         }
     }

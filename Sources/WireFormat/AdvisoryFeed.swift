@@ -259,9 +259,19 @@ public enum AdvisoryDocument {
 public enum AdvisoryStaleness {
     public static let freshWindow: TimeInterval = 30 * 24 * 60 * 60
     public static let staleCopy = "security advisories are stale"
+    public static let neverCheckedCopy = "security advisories have not been checked yet"
+    public static let offCopy = "security advisories are off"
 
     public static func disabledCopy(lastChecked: String) -> String {
-        "security advisories are off — last checked \(lastChecked)"
+        "\(offCopy) — last checked \(lastChecked)"
+    }
+
+    /// Nil while fresh. A feed that has never verified is reported as unchecked, not
+    /// stale: nothing was ever current, so "stale" would imply a lapse that did not
+    /// happen (#30).
+    public static func bannerCopy(lastVerified: Date?, now: Date) -> String? {
+        guard let lastVerified else { return neverCheckedCopy }
+        return isStale(lastVerified: lastVerified, now: now) ? staleCopy : nil
     }
 
     public static func isStale(lastVerified: Date?, now: Date) -> Bool {

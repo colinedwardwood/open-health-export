@@ -1108,21 +1108,61 @@ final class ExporterUITests: XCTestCase {
         XCTAssertEqual(app.state, .runningForeground)
     }
 
-    /// #27 / #37: launch exactly as a new install does, with the advisory fetch at its
-    /// shipped default rather than the suite's usual override.
-    func testDefaultConfigurationLaunchSurvivesTheAdvisoryFetch() {
+    /// #27: with the advisory fetch switched on, the launch that makes the request
+    /// survives it, and the network ledger records the host. That second assertion is
+    /// what makes the empty ledger in the fresh-install case below mean something.
+    func testEnabledAdvisoryFetchSurvivesAndIsRecorded() {
         app.terminate()
-        // A string is not a TimeInterval, so the app reads "never attempted" and does not
-        // skip the fetch because an earlier run on this simulator already made one.
         app.launchArguments = [
-            "-ohe.disclosureAcknowledged", "false",
-            "-ohe.advisoryLastAttemptEpoch", "never",
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "true",
         ]
         app.launch()
-        XCTAssertTrue(app.buttons["disclosure-continue"].waitForExistence(timeout: uiWait))
-        // The advisory request starts on appearance; give it time to fail or finish.
+        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: uiWait))
+        // The request starts on appearance; give it time to fail or finish.
         RunLoop.current.run(until: Date().addingTimeInterval(5))
         XCTAssertEqual(app.state, .runningForeground)
+        XCTAssertTrue(
+            networkActivityLabels().contains { $0.contains("advisories.") },
+            networkActivityLabels().joined(separator: " | ")
+        )
+    }
+
+    /// #30: a new install makes no advisory request before the disclosure is read,
+    /// and none afterwards while the toggle is at its shipped default.
+    func testFreshInstallMakesNoAdvisoryRequest() {
+        app.terminate()
+        app.launchArguments = ["-ohe.disclosureAcknowledged", "false"]
+        app.launch()
+        XCTAssertTrue(app.buttons["disclosure-continue"].waitForExistence(timeout: uiWait))
+        RunLoop.current.run(until: Date().addingTimeInterval(5))
+
+        // Relaunch past the disclosure without the reset, so the ledger keeps whatever
+        // the first launch recorded.
+        app.terminate()
+        app.launchEnvironment = [:]
+        app.launchArguments = ["-ohe.disclosureAcknowledged", "true"]
+        app.launch()
+        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: uiWait))
+        RunLoop.current.run(until: Date().addingTimeInterval(5))
+        let labels = networkActivityLabels()
+        XCTAssertFalse(labels.isEmpty)
+        XCTAssertFalse(
+            labels.contains { $0.contains("advisories.") },
+            labels.joined(separator: " | ")
+        )
+    }
+
+    private func networkActivityLabels() -> [String] {
+        selectRootTab(2)
+        scrollDestinations(app.buttons["destination-ledger-verify"]).tap()
+        XCTAssertTrue(
+            scrollDestinations(app.staticTexts["network-activity-title"])
+                .waitForExistence(timeout: uiWait)
+        )
+        return app.staticTexts.matching(
+            NSPredicate(format: "identifier BEGINSWITH 'network-activity-'")
+        ).allElementsBoundByIndex.map(\.label)
     }
 
     func testPaddedPairingPayloadShowsWhitespaceNoteAndParses() {

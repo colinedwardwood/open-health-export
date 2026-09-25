@@ -225,8 +225,34 @@ private actor ToggleDestinationSink: DestinationSink {
         emptyBody: try emptyBodyFile()
     )
     #expect(failed.ledgerOutcome == "advisory:failed")
-    #expect(failed.presentation.banner == AdvisoryStaleness.staleCopy)
+    #expect(failed.presentation.banner == AdvisoryStaleness.neverCheckedCopy)
     #expect(failed.presentation.fetched == false)
+}
+
+/// #30: "stale" implies something was once current. Until a feed has verified, the
+/// banner says it has not been checked; after a verified feed ages out, it is stale.
+@Test func advisoryBannerSeparatesNeverCheckedFromStale() {
+    let now = Date(timeIntervalSince1970: AdvisoryStaleness.freshWindow * 2)
+    #expect(AdvisoryStaleness.bannerCopy(lastVerified: nil, now: now) == AdvisoryStaleness.neverCheckedCopy)
+    #expect(AdvisoryStaleness.bannerCopy(lastVerified: Date(timeIntervalSince1970: 0), now: now) == AdvisoryStaleness.staleCopy)
+    #expect(AdvisoryStaleness.bannerCopy(lastVerified: now, now: now) == nil)
+}
+
+@Test func disabledAdvisoriesThatWereNeverCheckedDoNotClaimALastCheck() async throws {
+    let transport = RecordingHTTPTransport(
+        response: OutboundHTTPResponse(status: 200, body: Data())
+    )
+    let result = try await AdvisoryClient.fetch(
+        transport: transport,
+        store: MemoryStateStore(),
+        state: AdvisoryState(enabled: false),
+        now: checkInstant,
+        marketingVersion: "0.1.0",
+        foregroundVisible: true,
+        emptyBody: try emptyBodyFile()
+    )
+    #expect(result.presentation.banner == AdvisoryStaleness.offCopy)
+    #expect(await transport.requests.isEmpty)
 }
 
 @Test func staleCopyDistinguishesSilenceFromSuppression() {
