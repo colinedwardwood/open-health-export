@@ -165,6 +165,8 @@ private func mosquittoPasswdExecutable() -> String? {
     return nil
 }
 
+// openssl and broker subprocesses need Process, which iOS does not have (#38).
+#if os(macOS) || os(Linux)
 @Suite(.serialized)
 struct MosquittoSubprocessTests {
 @Test(
@@ -383,7 +385,7 @@ func mosquittoQoS1SurvivesBrokerRestart() async throws {
 }
 }
 
-#if canImport(Network)
+#if canImport(Network) && os(macOS)
 /// Serialized with the other broker-spawning tests: each case binds a listener and
 /// imports PKCS#12 material, and running them alongside the rest of the suite
 /// leaves brokers and TLS imports contending until the run stops making progress.
@@ -582,3 +584,4 @@ private func waitForMosquitto(port: UInt16) async throws {
     }
     throw MQTTError.truncated
 }
+#endif

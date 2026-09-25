@@ -30,7 +30,9 @@ import Testing
 
 @Test func r33KeychainAddMapsMissingEntitlementToUnavailable() {
     #expect(KeychainSecretStore.mapAddStatus(errSecMissingEntitlement) == .unavailable)
-    #expect(KeychainSecretStore.mapAddStatus(errSecDuplicateItem) == .notFound)
+    #expect(KeychainSecretStore.mapAddStatus(errSecDuplicateItem) == .failed(errSecDuplicateItem))
+    #expect(KeychainSecretStore.map(errSecItemNotFound) == .notFound)
+    #expect(KeychainSecretStore.map(errSecInteractionNotAllowed) == .unavailable)
 }
 
 @Test func r33KeychainStoreEitherRoundsTripOrNamesTheEntitlementGap() async throws {

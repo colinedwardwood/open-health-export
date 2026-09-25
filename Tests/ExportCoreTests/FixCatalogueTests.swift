@@ -104,11 +104,14 @@ enum FixCatalogue {
     }
 }
 
+// Exit tests are not available on iOS (#38).
+#if os(macOS) || os(Linux)
 @Test func r83ProcessKillIsObservableOnHostTargets() async {
     await #expect(processExitsWith: .exitCode(9)) {
         _exit(9)
     }
 }
+#endif
 
 enum FixWitness {
     static func run(_ id: String) async throws {

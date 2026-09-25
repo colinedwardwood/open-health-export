@@ -14,6 +14,8 @@ private func repoRoot() -> URL {
         .deletingLastPathComponent()
 }
 
+// Reads the macOS SDK headers from the host; there is no host SDK on iOS.
+#if os(macOS)
 @Test func hk03LiveSDKHeaderIsCoveredByTheCommittedIdentifierPin() throws {
     let sdkRoot = try sdkPath()
     let header = sdkRoot
@@ -32,6 +34,7 @@ private func repoRoot() -> URL {
     let generator = object?["generatedWithXcode"] as? String ?? ""
     #expect(!generator.isEmpty, "the pin must name the Xcode version that produced its header")
 }
+#endif
 
 @Test func hk03CatalogueQuantityTypesHaveLegalAggregationStyles() throws {
     for declaration in MetricCatalog.selectable
@@ -56,6 +59,7 @@ private func repoRoot() -> URL {
     }
 }
 
+#if os(macOS)
 private func sdkPath() throws -> URL {
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
@@ -73,4 +77,5 @@ private func sdkPath() throws -> URL {
         .trimmingCharacters(in: .whitespacesAndNewlines)
     return URL(fileURLWithPath: path)
 }
+#endif
 #endif
