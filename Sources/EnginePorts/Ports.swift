@@ -982,6 +982,9 @@ public enum SecretStoreError: Error, Equatable, LocalizedError {
     /// host is unsigned (`errSecMissingEntitlement`). Callers must not treat this
     /// as a missing item.
     case unavailable
+    /// Any other keychain status, kept so a failure says what actually happened
+    /// instead of passing for a missing item (#62).
+    case failed(Int32)
 
     public var errorDescription: String? {
         switch self {
@@ -989,6 +992,8 @@ public enum SecretStoreError: Error, Equatable, LocalizedError {
             "The saved credential was not found."
         case .unavailable:
             "Saved credentials are unavailable on this device."
+        case .failed(let status):
+            "The credential store reported an error (OSStatus \(status))."
         }
     }
 }

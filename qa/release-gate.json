@@ -37,6 +37,7 @@
     "licence-headers",
     "export-core",
     "darwin-package",
+    "package-tests-ios",
     "ios-build",
     "smoke-launch",
     "ios-ui (0, iPhone)",

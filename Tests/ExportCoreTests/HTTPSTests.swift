@@ -783,7 +783,28 @@ private func writeHTTPSPayload() throws -> (URL, BatchID) {
     #expect(try Gzip.decompress(recorded[0].body).isEmpty == false)
 }
 
-#if canImport(Network)
+/// #38 / #27: the transport factory the app uses. On iOS it once returned a
+/// background-session transport whose first upload threw an uncaught exception; the
+/// iOS package run (scripts/ios-package-tests.sh) is what exercises that platform.
+@Test func systemHTTPTransportUploadsAFileOverLoopbackHTTP() async throws {
+    let server = ScriptableHTTPServer()
+    try server.start()
+    defer { server.stop() }
+    server.enqueue(ScriptableHTTPServer.Script(status: 204))
+    let (file, batchID) = try writeHTTPSPayload()
+    let destination = try HTTPSDestination(
+        urlString: server.origin.appendingPathComponent("hook").absoluteString,
+        allowedHosts: ["127.0.0.1"],
+        allowInsecureHTTP: true
+    )
+    let sink = HTTPSSink(destination: destination, transport: SystemHTTPTransport.make())
+    let receipt = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
+    #expect(receipt.statusOnly)
+    #expect(server.requests().count == 1)
+}
+
+// openssl and broker subprocesses need Process, which iOS does not have (#38).
+#if canImport(Network) && os(macOS)
 @Suite(.serialized)
 struct HTTPSPinnedLoopbackTests {
 @Test func httpsEnablePinsSelfSignedLoopbackAndURLSessionHonoursThePin() async throws {

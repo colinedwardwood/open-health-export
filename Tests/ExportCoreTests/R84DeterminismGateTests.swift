@@ -20,6 +20,8 @@ private enum R84DeterminismFixture {
     }
 }
 
+// Runs the gate script through Process, which iOS does not have (#38).
+#if os(macOS) || os(Linux)
 @Test func r84ScriptSelfTestAcceptsCommittedUTCDigests() throws {
     let script = R84DeterminismFixture.root.appendingPathComponent(
         "scripts/check-r84-determinism.sh"
@@ -39,6 +41,7 @@ private enum R84DeterminismFixture {
     #expect(process.terminationStatus == 0, "self-test failed: \(err)\(out)")
     #expect(out.contains("r84-determinism self-test: ok"))
 }
+#endif
 
 @Test func p8R84G1UtcFixtureIsByteStableAcrossOneHundredEncodes() throws {
     let input = try R84DeterminismFixture.data(

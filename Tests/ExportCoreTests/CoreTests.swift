@@ -3107,6 +3107,8 @@ private func runUntilProcessExitSeam() async throws {
     _exit(3)
 }
 
+// Exit tests are not available on iOS (#38).
+#if os(macOS) || os(Linux)
 @Test func p3ProcessExitAtEverySeamResumesWithoutLoss() async throws {
     for seed in 1 ... 4 {
         for location in ExportFaultLocation.allCases {
@@ -3174,7 +3176,10 @@ private func runUntilProcessExitSeam() async throws {
         }
     }
 }
+#endif
 
+// Exit tests are not available on iOS (#38).
+#if os(macOS) || os(Linux)
 @Test func p14ProcessExitDuringAnchorPersistLeavesThePriorCheckpointComplete() async throws {
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-p14-process-exit-\(UUID().uuidString)")
@@ -3210,6 +3215,7 @@ private func runUntilProcessExitSeam() async throws {
     #expect(cursor?.anchorBlob == Data([0x14]))
     #expect(try await reopened.transact { try $0.pendingBatches() }.isEmpty)
 }
+#endif
 #endif
 
 /// ADR-R8: a wake that may not migrate must find out before it touches a table, and it

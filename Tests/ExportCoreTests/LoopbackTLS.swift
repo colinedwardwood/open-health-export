@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-#if canImport(Network)
+// openssl and broker subprocesses need Process, which iOS does not have (#38).
+#if canImport(Network) && os(macOS)
 import Foundation
 import NetEgress
 import Security

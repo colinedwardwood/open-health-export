@@ -29,7 +29,21 @@ public struct KeychainSecretStore: SecretStore, Sendable {
     }
 
     static func mapAddStatus(_ status: OSStatus) -> SecretStoreError {
-        status == errSecMissingEntitlement ? .unavailable : .notFound
+        map(status)
+    }
+
+    /// #62: only a genuinely absent item is `.notFound`. A missing entitlement, a
+    /// locked device or an unavailable keychain is `.unavailable`, and anything else
+    /// keeps its status rather than reading as "no credential saved".
+    static func map(_ status: OSStatus) -> SecretStoreError {
+        switch status {
+        case errSecItemNotFound:
+            .notFound
+        case errSecMissingEntitlement, errSecInteractionNotAllowed, errSecNotAvailable:
+            .unavailable
+        default:
+            .failed(status)
+        }
     }
 
     static func storeQuery(
@@ -54,12 +68,14 @@ public struct KeychainSecretStore: SecretStore, Sendable {
             kSecAttrService as String: service,
             kSecAttrAccount as String: handle.rawValue,
             kSecAttrSynchronizable as String: false,
+            kSecUseDataProtectionKeychain as String: true,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
-        guard status == errSecSuccess, let data = item as? Data, !data.isEmpty else {
+        guard status == errSecSuccess else { throw Self.map(status) }
+        guard let data = item as? Data, !data.isEmpty else {
             throw SecretStoreError.notFound
         }
         return [UInt8](data)
@@ -74,10 +90,11 @@ public struct KeychainSecretStore: SecretStore, Sendable {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrSynchronizable as String: false,
+            kSecUseDataProtectionKeychain as String: true,
         ]
         let status = SecItemDelete(query as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw SecretStoreError.notFound
+            throw Self.map(status)
         }
     }
 
@@ -87,10 +104,11 @@ public struct KeychainSecretStore: SecretStore, Sendable {
             kSecAttrService as String: service,
             kSecAttrAccount as String: handle.rawValue,
             kSecAttrSynchronizable as String: false,
+            kSecUseDataProtectionKeychain as String: true,
         ]
         let status = SecItemDelete(query as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw SecretStoreError.notFound
+            throw Self.map(status)
         }
     }
 }
