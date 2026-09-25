@@ -1,7 +1,8 @@
 # Security
 
-This project handles HealthKit data. Please report vulnerabilities privately to the address
-listed on the GitHub Security Advisories tab for this repository.
+This project handles HealthKit data. Please report vulnerabilities privately through
+GitHub's private vulnerability reporting:
+<https://github.com/colinedwardwood/open-health-export/security/advisories/new>.
 
 There is currently one maintainer and no deputy. **Target** for an initial
 acknowledgement of a private report is 14 days. That is a target, not a staffed SLA;

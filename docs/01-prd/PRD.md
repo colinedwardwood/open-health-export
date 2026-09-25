@@ -603,13 +603,30 @@ so Stage 2 knows what was traded away.
 | D-05 | **iOS 18.0 minimum** | Trades a slightly larger test matrix for reach. Still above the incumbents' iOS 17.0; the residual reach cost is recorded in RK-8 |
 | D-06 | **Deferred pending formal clearance search** | `Tributary` recommended, `Curlew` fallback. No name may be committed to code, listing or docs before clearance. The descriptive repo name remains the fallback |
 | D-07 | **Ratified** — R-66's sensitive-type exclusion list stands | |
-| D-08 | **Free binary, donations and actively-sought named sponsorship, all collected outside the app** | Conditional on R-110: no functionality, update or build access may ever be gated on sponsoring. Visible funding is the strongest available answer to RK-1 |
+| D-08 | *Superseded by D-08a (2026-09-25).* **Free binary, donations and actively-sought named sponsorship, all collected outside the app** | Conditional on R-110: no functionality, update or build access may ever be gated on sponsoring. Visible funding is the strongest available answer to RK-1 |
 | D-09 | **Accepted** — permanent blindness to outbound fleet telemetry | Scoped to outbound only; R-38 preserves the ability to warn users. To be recorded as an ADR |
 | D-10 | **Resolved — owner-directed, no maintainer recruitment** | R-105a and R-105b are not pursued. R-106 and R-108 preserve the honest continuity path: public source, reproducible builds, and separately identified forks |
 | D-11 | **R-09 defaults adopted**: 256 MB queue cap, oldest-first eviction, persisted user-visible gap record, one-tap re-export | The one place the product deliberately loses health data now has an owner |
 | D-12 | **Legal budget available**; R-112 stands | Required before charging, and now also for the D-03 CRA steward-vs-manufacturer analysis |
 | D-13 | **Trader status declared against the legal entity's address** | Follows from D-03; removes the personal-safety concern that made this a decision |
 | D-14 | **Near-full-time capacity, full scope**, with MQTT and the Mac companion both restored | ~87 EW, ~20–26 months. See §7.1 for the two sequencing constraints this imposes on Stage 2 |
+
+### 11.0a Amendments, 2026-09-25 (PRD v1.2)
+
+Taken by the owner after the launch review (tracking issue #131). Where a row below
+changes an earlier decision, the earlier row in 11.0 is kept for the record and marked
+superseded.
+
+| ID | Decision | Notes |
+|---|---|---|
+| D-03 | **Organisation enrolment confirmed.** The app ships under the owner's existing corporate Apple Developer team | Settles the individual-vs-organisation question in #13/#23. Seller and trader details come from that entity |
+| D-06 | **Bundle identifiers use the neutral root `com.cewdesign.exporter`**; the product name stays open pending clearance (#22) | #11, #35. The name lives only in `Brand.xcconfig` |
+| D-08a | **Paid: free download plus a one-time US$14.99 lifetime unlock**, Family Sharing on, no subscription. Source builds stay fully unlocked | Supersedes D-08 (#10). Charging still waits on the counsel opinion (#21), per R-112 |
+| D-15 | **iPhone-only for 1.0**; iPad later | #12, #33 |
+| D-16 | **Mac companion ships in 1.1**, after its pairing protocol is redesigned | #15, #110 |
+| D-17 | **No EU/EEA storefronts at launch.** Add them once the counsel opinion and a Cyber Resilience Act reporting process exist | #19, RK-10 |
+| D-18 | **The advisory feed is built properly for 1.0**: Ed25519 signatures with offline keys (#65, done), on a host the owner controls (#20, #67). Off by default until then (#30) | #14 |
+| D-19 | **No branch protection on `main` during the beta**; the previous rules are saved for reinstatement before public release | #16 |
 
 ### 11.1 Original decision framing
 
