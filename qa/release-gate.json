@@ -38,6 +38,7 @@
     "export-core",
     "darwin-package",
     "ios-build",
+    "smoke-launch",
     "ios-ui (0, iPhone)",
     "ios-ui (1, iPhone)",
     "ios-ui (2, iPhone)",

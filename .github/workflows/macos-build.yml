@@ -73,6 +73,39 @@ jobs:
           path: ${{ runner.temp }}/ohe-dd/Build/Products
           retention-days: 1
 
+  smoke-launch:
+    # #37: the configuration a new install gets. Release build, fresh simulator, no
+    # launch arguments or UI-test hooks, one attempt and no retries.
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - name: Install build tools
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Build the Release app for the simulator
+        run: |
+          stamp=()
+          while IFS= read -r setting; do stamp+=("$setting"); done < <(./scripts/version-settings.sh)
+          xcodebuild \
+            -project OpenHealthExporter.xcodeproj \
+            -scheme ExporteriOS \
+            -sdk iphonesimulator \
+            -configuration Release \
+            -derivedDataPath "$RUNNER_TEMP/ohe-release" \
+            CODE_SIGNING_ALLOWED=NO \
+            "${stamp[@]}" \
+            build
+      - name: Launch a clean install with no overrides
+        env:
+          OHE_SMOKE_SETTLE_SECONDS: "30"
+        run: |
+          ./scripts/smoke-launch.sh \
+            "$RUNNER_TEMP/ohe-release/Build/Products/Release-iphonesimulator/OpenHealthExporter.app"
+
   ios-ui:
     needs: ios-build
     runs-on: macos-26
