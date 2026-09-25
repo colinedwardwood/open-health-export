@@ -115,14 +115,16 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
     /// Changing the journal mode can return SQLITE_BUSY without consulting the busy
     /// handler while another connection is converting the same fresh file.
     private func execRetryingWhileBusy(_ sql: String) throws {
-        let deadline = Date().addingTimeInterval(Double(Self.busyTimeoutMilliseconds) / 1000)
+        let pauseMicroseconds: Int32 = 20_000
+        var attemptsLeft = Self.busyTimeoutMilliseconds * 1000 / pauseMicroseconds
         while true {
             do {
                 return try exec(sql)
             } catch let StorageError.execFailed(message)
                 where message.contains("locked") || message.contains("busy") {
-                guard Date() < deadline else { throw StorageError.execFailed(message) }
-                usleep(20_000)
+                guard attemptsLeft > 0 else { throw StorageError.execFailed(message) }
+                attemptsLeft -= 1
+                usleep(useconds_t(pauseMicroseconds))
             }
         }
     }
