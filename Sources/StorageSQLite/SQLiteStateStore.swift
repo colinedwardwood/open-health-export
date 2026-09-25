@@ -29,20 +29,34 @@ public struct SQLiteOpenPolicy: Sendable {
     }
 }
 
-public enum StorageError: Error, Equatable {
+public enum StorageError: Error, Equatable, LocalizedError {
     case openFailed(String)
     case execFailed(String)
     case bindFailed
     /// ADR-R8: the store was opened by a caller that may not migrate, and the on-disk
     /// schema is not the expected one. Nothing was read and nothing is wrong.
     case migrationPending(onDisk: Int, expected: Int)
+
+    public var errorDescription: String? {
+        switch self {
+        case .openFailed(let message): "The export state store could not be opened (\(message))."
+        case .execFailed(let message): "The export state store reported an error (\(message))."
+        case .bindFailed: "The export state store could not bind a value."
+        case let .migrationPending(onDisk, expected):
+            "The export state store needs an upgrade from schema \(onDisk) to \(expected) on the next launch."
+        }
+    }
 }
 
 private let sqliteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
+/// One connection per instance. `transactionLock` is held from BEGIN to COMMIT, so two
+/// tasks sharing an instance cannot interleave statements inside one transaction; the
+/// handle is otherwise only written in `init` and `deinit` (#26).
 public final class SQLiteStateStore: StateStore, @unchecked Sendable {
     fileprivate var db: OpaquePointer?
     private let policy: SQLiteOpenPolicy
+    private let transactionLock = NSLock()
 
     public init(path: String, policy: SQLiteOpenPolicy = SQLiteOpenPolicy()) throws {
         self.policy = policy
@@ -56,52 +70,116 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
             throw StorageError.openFailed(String(cString: sqlite3_errmsg(handle)))
         }
         db = handle
-        try exec("PRAGMA journal_mode=WAL;")
+        do {
+            try configureAndMigrate(handle: handle)
+        } catch {
+            // A throwing initializer does not run `deinit`, so the handle is closed here.
+            sqlite3_close(handle)
+            db = nil
+            throw error
+        }
+    }
+
+    /// Several parts of the app open the store at once on a first launch. The busy
+    /// timeout goes on before any statement so a second opener waits for the first
+    /// instead of failing with "database is locked", and every schema change runs in one
+    /// immediate transaction so openers take turns and an interrupted upgrade rolls back
+    /// whole (#25).
+    private func configureAndMigrate(handle: OpaquePointer) throws {
+        sqlite3_busy_timeout(handle, Self.busyTimeoutMilliseconds)
+        try execRetryingWhileBusy("PRAGMA journal_mode=WAL;")
         try exec("PRAGMA synchronous=FULL;")
-        try exec("PRAGMA busy_timeout=5000;")
         try exec("PRAGMA journal_size_limit=4194304;")
         try exec("PRAGMA wal_autocheckpoint=1000;")
         // ADR-R8 phase R0: an integer compare, before any table is touched. A caller that
         // may not migrate has to learn this here rather than part-way through a migration.
         let onDisk = try Self.readUserVersion(db: handle)
         if !policy.allowsSchemaMigration, onDisk != Self.expectedSchemaVersion {
-            // A throwing initializer does not run `deinit`, so the handle is closed here.
-            sqlite3_close(handle)
-            db = nil
             throw StorageError.migrationPending(onDisk: onDisk, expected: Self.expectedSchemaVersion)
         }
-        try migrate()
-        for sql in [
-            "ALTER TABLE pending_batches ADD COLUMN byte_count INTEGER NOT NULL DEFAULT 0;",
-            "ALTER TABLE pending_batches ADD COLUMN metric TEXT NOT NULL DEFAULT '';",
-            "ALTER TABLE pending_batches ADD COLUMN created_at_epoch REAL;",
-            "ALTER TABLE pending_batches ADD COLUMN range_start_day TEXT;",
-            "ALTER TABLE pending_batches ADD COLUMN range_end_day TEXT;",
-            "ALTER TABLE pending_batches ADD COLUMN eviction_class TEXT NOT NULL DEFAULT 'normal';",
-            "ALTER TABLE gaps ADD COLUMN metric TEXT NOT NULL DEFAULT '';",
-            "ALTER TABLE gaps ADD COLUMN range_start_day TEXT;",
-            "ALTER TABLE gaps ADD COLUMN range_end_day TEXT;",
-            "ALTER TABLE gaps ADD COLUMN expected_records INTEGER NOT NULL DEFAULT 0;",
-            "ALTER TABLE journal ADD COLUMN trigger TEXT NOT NULL DEFAULT 'manual';",
-            "ALTER TABLE journal ADD COLUMN samples_read INTEGER NOT NULL DEFAULT 0;",
-            "ALTER TABLE journal ADD COLUMN samples_committed INTEGER NOT NULL DEFAULT 0;",
-            "ALTER TABLE journal ADD COLUMN samples_acked INTEGER NOT NULL DEFAULT 0;",
-            "ALTER TABLE ledger ADD COLUMN sequence INTEGER NOT NULL DEFAULT 0;",
-            "ALTER TABLE ledger ADD COLUMN previous_hash TEXT NOT NULL DEFAULT '';",
-            "ALTER TABLE ledger ADD COLUMN entry_hash TEXT NOT NULL DEFAULT '';",
-            "ALTER TABLE ledger ADD COLUMN byte_count INTEGER NOT NULL DEFAULT 0;",
-            "ALTER TABLE ledger ADD COLUMN detail TEXT NOT NULL DEFAULT '';",
-            "ALTER TABLE ledger ADD COLUMN wall_time_epoch REAL NOT NULL DEFAULT 0;",
-            "ALTER TABLE type_status ADD COLUMN generation INTEGER NOT NULL DEFAULT 1;",
-            "ALTER TABLE journal ADD COLUMN wall_time_epoch REAL NOT NULL DEFAULT 0;",
-            "ALTER TABLE journal ADD COLUMN error_class TEXT;",
-            "ALTER TABLE journal ADD COLUMN projected_at_epoch REAL;",
-            "ALTER TABLE journal ADD COLUMN history_facts TEXT;",
-        ] {
-            do { try exec(sql) } catch { _ = error }
+        try exec("BEGIN IMMEDIATE;")
+        do {
+            try migrate()
+            try addMissingColumns()
+            try migrateDeliveryAudit()
+            try migrateLedgerChain()
+            try exec("COMMIT;")
+        } catch {
+            try? exec("ROLLBACK;")
+            throw error
         }
-        try migrateDeliveryAudit()
-        try migrateLedgerChain()
+    }
+
+    private static let busyTimeoutMilliseconds: Int32 = 5000
+
+    /// Changing the journal mode can return SQLITE_BUSY without consulting the busy
+    /// handler while another connection is converting the same fresh file.
+    private func execRetryingWhileBusy(_ sql: String) throws {
+        let deadline = Date().addingTimeInterval(Double(Self.busyTimeoutMilliseconds) / 1000)
+        while true {
+            do {
+                return try exec(sql)
+            } catch let StorageError.execFailed(message)
+                where message.contains("locked") || message.contains("busy") {
+                guard Date() < deadline else { throw StorageError.execFailed(message) }
+                usleep(20_000)
+            }
+        }
+    }
+
+    /// Columns added after a table first shipped. `CREATE TABLE IF NOT EXISTS` in
+    /// `migrate()` already carries them for a new store; an older store gets only the
+    /// ones it lacks, and a failure is an error rather than something to skip.
+    private static let addedColumns: [(table: String, column: String, definition: String)] = [
+        ("pending_batches", "byte_count", "INTEGER NOT NULL DEFAULT 0"),
+        ("pending_batches", "metric", "TEXT NOT NULL DEFAULT ''"),
+        ("pending_batches", "created_at_epoch", "REAL"),
+        ("pending_batches", "range_start_day", "TEXT"),
+        ("pending_batches", "range_end_day", "TEXT"),
+        ("pending_batches", "eviction_class", "TEXT NOT NULL DEFAULT 'normal'"),
+        ("gaps", "metric", "TEXT NOT NULL DEFAULT ''"),
+        ("gaps", "range_start_day", "TEXT"),
+        ("gaps", "range_end_day", "TEXT"),
+        ("gaps", "expected_records", "INTEGER NOT NULL DEFAULT 0"),
+        ("journal", "trigger", "TEXT NOT NULL DEFAULT 'manual'"),
+        ("journal", "samples_read", "INTEGER NOT NULL DEFAULT 0"),
+        ("journal", "samples_committed", "INTEGER NOT NULL DEFAULT 0"),
+        ("journal", "samples_acked", "INTEGER NOT NULL DEFAULT 0"),
+        ("ledger", "sequence", "INTEGER NOT NULL DEFAULT 0"),
+        ("ledger", "previous_hash", "TEXT NOT NULL DEFAULT ''"),
+        ("ledger", "entry_hash", "TEXT NOT NULL DEFAULT ''"),
+        ("ledger", "byte_count", "INTEGER NOT NULL DEFAULT 0"),
+        ("ledger", "detail", "TEXT NOT NULL DEFAULT ''"),
+        ("ledger", "wall_time_epoch", "REAL NOT NULL DEFAULT 0"),
+        ("type_status", "generation", "INTEGER NOT NULL DEFAULT 1"),
+        ("journal", "wall_time_epoch", "REAL NOT NULL DEFAULT 0"),
+        ("journal", "error_class", "TEXT"),
+        ("journal", "projected_at_epoch", "REAL"),
+        ("journal", "history_facts", "TEXT"),
+    ]
+
+    private func addMissingColumns() throws {
+        var existing: [String: Set<String>] = [:]
+        for added in Self.addedColumns {
+            if existing[added.table] == nil {
+                existing[added.table] = try columnNames(of: added.table)
+            }
+            guard existing[added.table]?.contains(added.column) == false else { continue }
+            try exec("ALTER TABLE \(added.table) ADD COLUMN \(added.column) \(added.definition);")
+            existing[added.table]?.insert(added.column)
+        }
+    }
+
+    private func columnNames(of table: String) throws -> Set<String> {
+        let stmt = try prepare("PRAGMA table_info(\(table));")
+        defer { sqlite3_finalize(stmt) }
+        var names: Set<String> = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let name = sqlite3_column_text(stmt, 1) {
+                names.insert(String(cString: name))
+            }
+        }
+        return names
     }
 
     /// v20: one audit row per destination. A single-column primary key meant the
@@ -358,21 +436,25 @@ public final class SQLiteStateStore: StateStore, @unchecked Sendable {
     public func transact<T: Sendable>(
         _ body: (any StateTransaction) throws -> T
     ) async throws -> T {
-        try exec("BEGIN IMMEDIATE;")
-        do {
-            let tx = SQLiteTransaction(store: self)
-            let result = try body(tx)
-            try exec("COMMIT;")
-            return result
-        } catch {
-            try? exec("ROLLBACK;")
-            throw error
+        try transactionLock.withLock {
+            try exec("BEGIN IMMEDIATE;")
+            do {
+                let tx = SQLiteTransaction(store: self)
+                let result = try body(tx)
+                try exec("COMMIT;")
+                return result
+            } catch {
+                try? exec("ROLLBACK;")
+                throw error
+            }
         }
     }
 
     /// I6 Red: reclaim WAL pages without dropping live pending batches.
     public func checkpointWAL() throws {
-        try exec("PRAGMA wal_checkpoint(TRUNCATE);")
+        try transactionLock.withLock {
+            try exec("PRAGMA wal_checkpoint(TRUNCATE);")
+        }
     }
 
     public func wipe(atEpoch: TimeInterval) async throws {

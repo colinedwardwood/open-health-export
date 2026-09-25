@@ -363,7 +363,7 @@ enum HarnessExport {
 
     static func destinationScope(_ destinationID: String) async throws -> DestinationExportScope {
         let root = try applicationSupportRoot()
-        let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         return try await store.transact { tx in
             try tx.loadDestinationScope(destinationID: destinationID)
                 ?? DestinationExportScope(destinationID: destinationID)
@@ -610,7 +610,7 @@ enum HarnessExport {
             endExclusive: scope.endExclusive
         )
         let root = try applicationSupportRoot()
-        let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         try await store.transact { try $0.upsertDestinationScope(sanitized) }
     }
 
@@ -619,9 +619,7 @@ enum HarnessExport {
         previousMetrics: Set<MetricID>
     ) async throws {
         let root = try applicationSupportRoot()
-        let store = try SQLiteStateStore(
-            path: root.appendingPathComponent("state.sqlite").path
-        )
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         try await saveDestinationScope(scope)
         for metric in scope.metrics.subtracting(previousMetrics) {
             try await store.reenableType(metric: metric, reason: "user_selected")
@@ -646,9 +644,7 @@ enum HarnessExport {
         if !FileManager.default.fileExists(atPath: emptyBody.path) {
             try Data().write(to: emptyBody, options: .atomic)
         }
-        let store = try SQLiteStateStore(
-            path: root.appendingPathComponent("state.sqlite").path
-        )
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         let result = try await AdvisoryClient.fetch(
             transport: SystemHTTPTransport.make(),
             store: store,
@@ -698,7 +694,7 @@ enum HarnessExport {
         guard let root = try? applicationSupportRoot() else { return false }
         let path = root.appendingPathComponent("state.sqlite").path
         do {
-            let probe = try SQLiteStateStore(
+            let probe = try StateStoreHost.store(
                 path: path,
                 policy: SQLiteOpenPolicy(allowsSchemaMigration: false)
             )
@@ -794,7 +790,7 @@ enum HarnessExport {
         let dest = folderAccess?.url
         let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
 
-        let store = try SQLiteStateStore(path: sqliteURL.path)
+        let store = try StateStoreHost.store(path: sqliteURL.path)
         let gapIDsBefore = try await store.transact {
             Set(try $0.loadGaps().map(\.batchID))
         }
@@ -1223,9 +1219,7 @@ enum HarnessExport {
         }
         defer { withExtendedLifetime(folderAccess) {} }
         let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
-        let store = try SQLiteStateStore(
-            path: root.appendingPathComponent("state.sqlite").path
-        )
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         let context = TemporalContext.utcHost
         let observations = HealthKitDayObservationSource(
             context: context,
@@ -1337,9 +1331,7 @@ enum HarnessExport {
         }
         defer { withExtendedLifetime(folderAccess) {} }
         let scratch = try protectedPayloadDirectory(named: "backfill-scratch", under: root)
-        let store = try SQLiteStateStore(
-            path: root.appendingPathComponent("state.sqlite").path
-        )
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         let context = TemporalContext.utcHost
         let observations = HealthKitDayObservationSource(context: context, limit: samplePageLimit())
 
@@ -1469,9 +1461,7 @@ enum HarnessExport {
 
     static func queueEvictionGaps() async throws -> [GapRecord] {
         let root = try applicationSupportRoot()
-        let store = try SQLiteStateStore(
-            path: root.appendingPathComponent("state.sqlite").path
-        )
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         return try await store.transact {
             try $0.loadGaps().filter {
                 $0.rangeDescription.hasPrefix("queue_eviction:")
@@ -1501,9 +1491,7 @@ enum HarnessExport {
             return
         }
         let root = try applicationSupportRoot()
-        let store = try SQLiteStateStore(
-            path: root.appendingPathComponent("state.sqlite").path
-        )
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         try await store.transact { tx in
             try tx.appendLedger(
                 EgressEntry(
@@ -1545,9 +1533,7 @@ enum HarnessExport {
         }
         defer { withExtendedLifetime(folderAccess) {} }
         let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
-        let store = try SQLiteStateStore(
-            path: root.appendingPathComponent("state.sqlite").path
-        )
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         let context = TemporalContext.utcHost
         let now = Date().ISO8601Format()
         let exporterID = try installationID()
@@ -1621,7 +1607,7 @@ enum HarnessExport {
         defer { withExtendedLifetime(folderAccess) {} }
         let dest = folderAccess.url
         let scratch = try protectedPayloadDirectory(named: "demo-scratch", under: root)
-        let store = try SQLiteStateStore(path: sqliteURL.path)
+        let store = try StateStoreHost.store(path: sqliteURL.path)
         let (verified, events) = try verifiedLocalFile(root: root, destinationDirectory: dest)
         try await emitTrustNotices(events)
         let context = TemporalContext.utcHost
@@ -1671,7 +1657,7 @@ enum HarnessExport {
         let root = try applicationSupportRoot()
         let sqliteURL = root.appendingPathComponent("state.sqlite")
         let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
-        let store = try SQLiteStateStore(path: sqliteURL.path)
+        let store = try StateStoreHost.store(path: sqliteURL.path)
         let (verified, emission) = try await verifiedCompanionDestination(
             session: session,
             root: root,
@@ -1919,9 +1905,7 @@ enum HarnessExport {
 
     static func anchorHolds() async throws -> [AnchorHold] {
         let root = try applicationSupportRoot()
-        let store = try SQLiteStateStore(
-            path: root.appendingPathComponent("state.sqlite").path
-        )
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         return try await store.transact { try $0.loadAnchorHolds() }
     }
 
@@ -1929,9 +1913,7 @@ enum HarnessExport {
     /// releases the hold; the run reads it rather than inferring intent from a retry.
     static func authoriseAnchorReexport(metric: MetricID) async throws {
         let root = try applicationSupportRoot()
-        let store = try SQLiteStateStore(
-            path: root.appendingPathComponent("state.sqlite").path
-        )
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         try await store.transact { tx in
             guard var hold = try tx.loadAnchorHold(metric: metric) else { return }
             hold.decision = .reexportAuthorized
@@ -1942,9 +1924,7 @@ enum HarnessExport {
     /// QA-17's other answer: stop this type rather than pay to send its history again.
     static func stopExportingHeldType(metric: MetricID) async throws {
         let root = try applicationSupportRoot()
-        let store = try SQLiteStateStore(
-            path: root.appendingPathComponent("state.sqlite").path
-        )
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         try await store.transact { tx in
             let generation = try tx.loadTypeStatus(metric: metric)?.generation ?? 1
             try tx.upsertTypeStatus(
@@ -2012,9 +1992,7 @@ enum HarnessExport {
 
     static func clearAnchorHoldsForUITests() async throws {
         let root = try applicationSupportRoot()
-        let store = try SQLiteStateStore(
-            path: root.appendingPathComponent("state.sqlite").path
-        )
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         try await store.transact { tx in
             for hold in try tx.loadAnchorHolds() {
                 try tx.clearAnchorHold(metric: hold.metric)
@@ -2046,9 +2024,7 @@ enum HarnessExport {
     /// UI test can assert what the user sees when it happens.
     static func seedAnchorHoldForUITests(metric: MetricID) async throws {
         let root = try applicationSupportRoot()
-        let store = try SQLiteStateStore(
-            path: root.appendingPathComponent("state.sqlite").path
-        )
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         try await store.transact { tx in
             try tx.upsertAnchorHold(
                 AnchorHold(
@@ -2064,7 +2040,7 @@ enum HarnessExport {
 
     static func ledgerLines() async throws -> [String] {
         let root = try applicationSupportRoot()
-        let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         let entries = try await store.transact { tx in
             try tx.loadLedger()
         }
@@ -2102,9 +2078,7 @@ enum HarnessExport {
 
     static func historyEvents() async throws -> [RunEvent] {
         let root = try applicationSupportRoot()
-        let store = try SQLiteStateStore(
-            path: root.appendingPathComponent("state.sqlite").path
-        )
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         let events = try await store.transact { try $0.loadJournal() }
         return RunHistory.problemsFirst(events)
     }
@@ -2133,9 +2107,7 @@ enum HarnessExport {
         )
         let body = "{\"uuid\":\"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\"}\n"
         try Data(body.utf8).write(to: payloadURL)
-        let store = try SQLiteStateStore(
-            path: root.appendingPathComponent("state.sqlite").path
-        )
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         let event = RunEvent(
             runID: RunID(rawValue: "run-heartRate"),
             outcomeKind: "failed",
@@ -2170,17 +2142,13 @@ enum HarnessExport {
 
     static func sentThroughDay(metric: MetricID) async throws -> String? {
         let root = try applicationSupportRoot()
-        let store = try SQLiteStateStore(
-            path: root.appendingPathComponent("state.sqlite").path
-        )
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         return try await BrowserSendState.sentThroughDay(metric: metric, store: store)
     }
 
     static func indexHorizonDay() async throws -> String? {
         let root = try applicationSupportRoot()
-        let store = try SQLiteStateStore(
-            path: root.appendingPathComponent("state.sqlite").path
-        )
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         return try await BrowserSendState.indexHorizonDay(store: store)
     }
 
@@ -2190,9 +2158,7 @@ enum HarnessExport {
             return "Wake attribution: no measured delivery deadline is configured."
         }
         let root = try applicationSupportRoot()
-        let store = try SQLiteStateStore(
-            path: root.appendingPathComponent("state.sqlite").path
-        )
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         let journal = try await store.transact { try $0.loadJournal() }
         let attribution = WakeAttribution.classify(
             wakes: try wakeLedger().records(),
@@ -2386,9 +2352,7 @@ enum HarnessExport {
         try await emitTrustNotices(events, destination: pending.destinationLabel)
         try await requestScopeAuthorizationIfConfigured(pending.destinationID)
         if pending.allowInsecureHTTP {
-            let store = try SQLiteStateStore(
-                path: root.appendingPathComponent("state.sqlite").path
-            )
+            let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
             try await store.transact { tx in
                 try tx.appendLedger(
                     EgressEntry(
@@ -2552,9 +2516,7 @@ enum HarnessExport {
         try await emitTrustNotices(events, destination: pending.host)
         try await requestScopeAuthorizationIfConfigured("mqtt")
         if pending.allowInsecure {
-            let store = try SQLiteStateStore(
-                path: root.appendingPathComponent("state.sqlite").path
-            )
+            let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
             try await store.transact { tx in
                 try tx.appendLedger(
                     EgressEntry(
@@ -2826,9 +2788,7 @@ enum HarnessExport {
         defer { synchronizeDestinationExportRole("mqtt") }
         let root = try applicationSupportRoot()
         let verified = try await verifiedMQTTDestination(root: root)
-        let store = try SQLiteStateStore(
-            path: root.appendingPathComponent("state.sqlite").path
-        )
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
         let context = TemporalContext.utcHost
         let now = Date().ISO8601Format()
@@ -3018,9 +2978,7 @@ enum HarnessExport {
             destinationID: destinationID,
             root: root
         )
-        let store = try SQLiteStateStore(
-            path: root.appendingPathComponent("state.sqlite").path
-        )
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
         let context = TemporalContext.utcHost
         let now = Date().ISO8601Format()
@@ -3131,7 +3089,7 @@ enum HarnessExport {
 
     static func stopExportingHeartRate() async throws {
         let root = try applicationSupportRoot()
-        let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         // A stop drops the queued payload for every sink that was owed it, so the
         // ledger entry names them all rather than whichever one came first.
         let owed = healthDestinationIDs.filter { isDestinationEnabled($0) }
@@ -3145,7 +3103,7 @@ enum HarnessExport {
 
     static func expireQueuesAndNotify() async throws -> QueueExpiryResult {
         let root = try applicationSupportRoot()
-        let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         let now = Date().timeIntervalSince1970
         let result = try await store.expirePending(
             nowEpoch: now,
@@ -3168,7 +3126,7 @@ enum HarnessExport {
     /// UX-26: seal leftover open runs after process death, then tell the person.
     static func recoverInterruptedExports() async throws -> String? {
         let root = try applicationSupportRoot()
-        let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         let now = Date().timeIntervalSince1970
         let sealed = try await InterruptedRunRecovery.seal(store: store, nowEpoch: now)
         guard let first = sealed.min(by: { $0.startedAtEpoch < $1.startedAtEpoch }) else {
@@ -3384,9 +3342,7 @@ enum HarnessExport {
 
     static func previewOTLP() async throws -> (preview: String, payload: Data) {
         let root = try applicationSupportRoot()
-        let store = try SQLiteStateStore(
-            path: root.appendingPathComponent("state.sqlite").path
-        )
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         let events = try await store.transact { try $0.loadJournal() }
         let payload = OTLPPreview.payload(events: events)
         return (OTLPPreview.text(payload: payload), payload)
@@ -3431,9 +3387,7 @@ enum HarnessExport {
             )
         }
         if allowInsecureHTTP {
-            let store = try SQLiteStateStore(
-                path: root.appendingPathComponent("state.sqlite").path
-            )
+            let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
             try await store.transact { tx in
                 try tx.appendLedger(
                     EgressEntry(
@@ -3503,9 +3457,7 @@ enum HarnessExport {
         guard let endpoint = settings.endpoint else {
             throw OTLPExportError.endpointRequired
         }
-        let store = try SQLiteStateStore(
-            path: root.appendingPathComponent("state.sqlite").path
-        )
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         let now = Date().timeIntervalSince1970
         let selection = try await store.transact { tx in
             OTLPBacklog.select(events: try tx.loadJournal(), nowEpoch: now)
@@ -3665,7 +3617,7 @@ enum HarnessExport {
 
     static func wipeEverything() async throws {
         let root = try applicationSupportRoot()
-        let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         try await DestructiveWipe.perform(
             store: store,
             secretStores: [
@@ -3680,6 +3632,7 @@ enum HarnessExport {
         )
         try await vault().forget()
         EgressAttemptLog.wipePersistent()
+        StateStoreHost.evict(path: root.appendingPathComponent("demo-state.sqlite").path)
         for name in [
             "exports",
             "scratch",
@@ -3778,9 +3731,7 @@ enum HarnessExport {
         let suppressed = TrustNoticePosting.suppressedCount(deliveries)
         guard suppressed > 0 else { return }
         let root = try applicationSupportRoot()
-        let store = try SQLiteStateStore(
-            path: root.appendingPathComponent("state.sqlite").path
-        )
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         try await store.transact { tx in
             try tx.appendLedger(
                 EgressEntry(
@@ -4017,7 +3968,7 @@ enum HarnessExport {
         }
         let store: SQLiteStateStore
         do {
-            store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+            store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         } catch {
             return WipeInventory(
                 destinationCount: destinations.count,
@@ -4059,7 +4010,7 @@ enum HarnessExport {
         )
         guard !changes.isEmpty else { return false }
 
-        let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         // A revoked type drops what every enabled destination was owed, so the
         // ledger entry names them all rather than the archive folder alone.
         let owed = healthDestinationIDs.filter { isDestinationEnabled($0) }
@@ -4088,7 +4039,7 @@ enum HarnessExport {
 
     static func reenableCoreActivityAfterAuthorizationRequest() async throws {
         let root = try applicationSupportRoot()
-        let store = try SQLiteStateStore(path: root.appendingPathComponent("state.sqlite").path)
+        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         for metric in try await selectedMetrics() {
             try await store.reenableType(
                 metric: metric,
