@@ -43,9 +43,7 @@ public struct PendingDeliveryRunner: Sendable {
             )
         }
         if let delivery = owed.first {
-            return try await HTTPTransferSchedule.$current.withValue(.discretionaryRetry) {
-                try await sendOnce(delivery: delivery)
-            }
+            return try await sendOnce(delivery: delivery)
         }
         let batches = try await store.transact { tx in
             try tx.pendingBatches().filter { batch in
@@ -53,14 +51,12 @@ public struct PendingDeliveryRunner: Sendable {
             }
         }
         guard let batch = batches.first else { return [] }
-        return try await HTTPTransferSchedule.$current.withValue(.discretionaryRetry) {
-            try await sendAttempt(
-                batch: batch,
-                expectedRecords: batch.expectedRecords,
-                grant: scope,
-                project: false
-            )
-        }
+        return try await sendAttempt(
+            batch: batch,
+            expectedRecords: batch.expectedRecords,
+            grant: scope,
+            project: false
+        )
     }
 
     private func sendOnce(delivery: PendingDelivery) async throws -> [DeliveryReceipt] {

@@ -851,6 +851,46 @@ struct HTTPSPinnedLoopbackTests {
     await server.stop()
 }
 
+/// #27: trust used to come from a process-wide host-keyed pin map shared by every
+/// transport, so the last destination to write its pin decided for all of them. Each
+/// transport now decides from its own pin, whatever runs alongside it on the same host.
+@Test func httpsTransportsOnTheSameHostKeepTheirOwnPins() async throws {
+    let material = try LoopbackTLS.material()
+    let server = try LocalHTTPSServer(parameters: LocalHTTPSServer.tlsParameters(identity: material.identity))
+    let port = try await server.start()
+    let url = URL(string: "https://127.0.0.1:\(port)/hook")!
+    let (file, _) = try writeHTTPSPayload()
+    let wrong = PinRecord(
+        leafSPKISha256: String(repeating: "ab", count: 32),
+        issuerSPKISha256: String(repeating: "cd", count: 32),
+        firstSeen: "2024-01-01T00:00:00Z",
+        policy: .leaf
+    )
+    let right = material.pin
+    let outcomes = await withTaskGroup(of: (Bool, Bool).self) { group in
+        for index in 0..<12 {
+            let pinned = index.isMultiple(of: 2)
+            group.addTask {
+                let transport = URLSessionHTTPTransport(pin: pinned ? right : wrong)
+                let request = OutboundHTTPRequest(
+                    method: "POST",
+                    url: url,
+                    headers: ["Content-Type": "application/x-ndjson"],
+                    bodyFile: file
+                )
+                let succeeded = (try? await transport.execute(request)) != nil
+                return (pinned, succeeded)
+            }
+        }
+        var collected: [(Bool, Bool)] = []
+        for await outcome in group { collected.append(outcome) }
+        return collected
+    }
+    #expect(outcomes.count == 12)
+    #expect(outcomes.allSatisfy { pinned, succeeded in pinned == succeeded })
+    await server.stop()
+}
+
 @Test func httpsSinkPostsOverHTTP2WhenThePeerAdvertisesALPN() async throws {
     let material = try LoopbackTLS.material()
     let server = try LocalHTTP2Server(parameters: LocalHTTP2Server.tlsParameters(identity: material.identity))

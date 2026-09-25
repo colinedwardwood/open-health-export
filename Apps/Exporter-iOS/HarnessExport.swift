@@ -2972,11 +2972,11 @@ enum HarnessExport {
             allowInsecureHTTP: saved.allowInsecureHTTP,
             authorizationBearer: bearer
         )
-        let base = try SystemHTTPTransport.make(
+        let base = BackgroundTaskHTTPTransport(inner: try SystemHTTPTransport.make(
             probing: destination.url,
             allowedHosts: allowedHosts,
             allowInsecureHTTP: saved.allowInsecureHTTP
-        )
+        ))
         let transport: any HTTPTransport
         if let leaf = saved.leafSPKISha256, let issuer = saved.issuerSPKISha256 {
             transport = PinningHTTPTransport(
