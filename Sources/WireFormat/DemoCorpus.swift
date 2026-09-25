@@ -133,15 +133,15 @@ public enum DemoCorpus {
         ),
         SampleSourceIdentity(
             name: "Synthetic CGM",
-            bundleIdentifier: "example.synthetic.cgm"
+            bundleIdentifier: "org.openhealthexporter.synthetic.cgm"
         ),
         SampleSourceIdentity(
             name: "Synthetic Scale",
-            bundleIdentifier: "example.synthetic.scale"
+            bundleIdentifier: "org.openhealthexporter.synthetic.scale"
         ),
         SampleSourceIdentity(
             name: "Synthetic Workout App",
-            bundleIdentifier: "example.synthetic.workout"
+            bundleIdentifier: "org.openhealthexporter.synthetic.workout"
         ),
         SampleSourceIdentity(
             name: "Synthetic Manual Entry",

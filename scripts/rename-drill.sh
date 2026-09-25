@@ -7,8 +7,10 @@
 # prove the built bundles never mention the real root. Anything that does is an
 # identifier hard-coded outside Brand.xcconfig.
 #
-# Accepted exception: the advisory host (#65 moves it); the frozen spec `$id` is
-# not compiled into any binary.
+# Accepted exceptions: the advisory host (#65 moves it); the frozen spec `$id`, which
+# is not compiled into any binary; and the synthetic demo sources
+# `org.openhealthexporter.synthetic.*`, which the frozen tier-0 fixture records. None
+# of them is the identifier root this drill guards.
 set -euo pipefail
 root_dir="$(cd "$(dirname "$0")/.." && pwd)"
 real_root="$(sed -n 's/^PRODUCT_BUNDLE_IDENTIFIER_ROOT = //p' "$root_dir/Brand.xcconfig")"
