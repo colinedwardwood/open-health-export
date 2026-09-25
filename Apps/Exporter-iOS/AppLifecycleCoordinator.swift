@@ -84,17 +84,6 @@ final class ExporterAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
         return true
     }
 
-    func application(
-        _ application: UIApplication,
-        handleEventsForBackgroundURLSession identifier: String,
-        completionHandler: @escaping () -> Void
-    ) {
-        HTTPBackgroundSession.finishEvents(
-            for: identifier,
-            completionHandler: completionHandler
-        )
-    }
-
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse

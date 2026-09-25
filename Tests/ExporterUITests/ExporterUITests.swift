@@ -1083,6 +1083,48 @@ final class ExporterUITests: XCTestCase {
         )
     }
 
+    /// #27: every iOS HTTP path used to create an upload task on a background URLSession,
+    /// which throws an uncaught exception before any connection. A closed loopback port
+    /// is enough to reach that point; the test only needs the app to survive and report.
+    func testHomeAssistantWebhookTestReportsFailureWithoutCrashing() {
+        enterDestinations()
+        type("http://127.0.0.1:9", into: scrollDestinations(app.textFields["home-assistant-url"]))
+        dismissKeyboard()
+        type(
+            "ui-test-webhook",
+            into: scrollDestinations(app.secureTextFields["home-assistant-webhook-id"])
+        )
+        dismissKeyboard()
+        let insecure = scrollDestinations(app.switches["home-assistant-insecure"])
+        if (insecure.value as? String) != "1" {
+            insecure.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        }
+        scrollDestinations(app.buttons["home-assistant-enable"]).tap()
+        let result = app.staticTexts["home-assistant-test-line-0"]
+        XCTAssertTrue(
+            result.waitForExistence(timeout: uiWait),
+            visibleIdentifiers().joined(separator: ",")
+        )
+        XCTAssertEqual(app.state, .runningForeground)
+    }
+
+    /// #27 / #37: launch exactly as a new install does, with the advisory fetch at its
+    /// shipped default rather than the suite's usual override.
+    func testDefaultConfigurationLaunchSurvivesTheAdvisoryFetch() {
+        app.terminate()
+        // A string is not a TimeInterval, so the app reads "never attempted" and does not
+        // skip the fetch because an earlier run on this simulator already made one.
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "false",
+            "-ohe.advisoryLastAttemptEpoch", "never",
+        ]
+        app.launch()
+        XCTAssertTrue(app.buttons["disclosure-continue"].waitForExistence(timeout: uiWait))
+        // The advisory request starts on appearance; give it time to fail or finish.
+        RunLoop.current.run(until: Date().addingTimeInterval(5))
+        XCTAssertEqual(app.state, .runningForeground)
+    }
+
     func testPaddedPairingPayloadShowsWhitespaceNoteAndParses() {
         app.terminate()
         app.launchEnvironment["OHE_SEED_PAIRING_PASTE"] = "1"
