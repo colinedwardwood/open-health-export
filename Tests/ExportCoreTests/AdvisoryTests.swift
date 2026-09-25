@@ -3,6 +3,9 @@
 
 import CorrectnessEngine
 import CoreDomain
+#if canImport(CryptoKit)
+import CryptoKit
+#endif
 import CoreTemporal
 import DestinationTrust
 import EnginePorts
@@ -40,6 +43,22 @@ private func sampleFeed(seq: Int = 1, keyID: String = AdvisoryPinnedKeys.activeI
         ]
     )
 }
+
+#if canImport(CryptoKit)
+/// Test-only signing keys. The production private keys never exist in this repository.
+private let testActiveKey = Curve25519.Signing.PrivateKey()
+private let testSuccessorKey = Curve25519.Signing.PrivateKey()
+private let testVerifier = AdvisoryVerifier(publicKeys: [
+    AdvisoryPinnedKeys.activeID: testActiveKey.publicKey.rawRepresentation,
+    AdvisoryPinnedKeys.successorID: testSuccessorKey.publicKey.rawRepresentation,
+])
+
+private func signed(_ feed: AdvisoryFeed, by key: Curve25519.Signing.PrivateKey? = nil) throws -> Data {
+    let signer = key ?? (feed.keyID == AdvisoryPinnedKeys.successorID ? testSuccessorKey : testActiveKey)
+    let signature = try signer.signature(for: AdvisoryCanonical.bytes(feed))
+    return AdvisoryCanonical.envelopeJSON(feed, signatureHex: Hex.encode(signature))
+}
+#endif
 
 private let checkInstant = Date(timeIntervalSince1970: 1_767_225_600) // 2026-01-02T00:00:00Z
 
@@ -103,54 +122,65 @@ private actor ToggleDestinationSink: DestinationSink {
     }
 }
 
+#if canImport(CryptoKit)
 @Test func advisoryDocumentVerifiesActiveAndSuccessorKeys() throws {
     let active = try AdvisoryDocument.parse(
-        try AdvisoryCanonical.envelopeJSON(sampleFeed()),
+        try signed(sampleFeed()),
         lastSeenSeq: 0,
-        now: checkInstant
+        now: checkInstant,
+        verifier: testVerifier
     )
     #expect(active.seq == 1)
     #expect(active.items.count == 1)
     let successor = try AdvisoryDocument.parse(
-        try AdvisoryCanonical.envelopeJSON(sampleFeed(seq: 2, keyID: AdvisoryPinnedKeys.successorID)),
+        try signed(sampleFeed(seq: 2, keyID: AdvisoryPinnedKeys.successorID)),
         lastSeenSeq: 1,
-        now: checkInstant
+        now: checkInstant,
+        verifier: testVerifier
     )
     #expect(successor.keyID == AdvisoryPinnedKeys.successorID)
 }
+#endif
 
+#if canImport(CryptoKit)
 @Test func advisoryDocumentRejectsRollbackExpiryAndBehaviourFields() throws {
     #expect(throws: AdvisoryError.rollback) {
         _ = try AdvisoryDocument.parse(
-            try AdvisoryCanonical.envelopeJSON(sampleFeed(seq: 1)),
+            try signed(sampleFeed(seq: 1)),
             lastSeenSeq: 1,
-            now: checkInstant
+            now: checkInstant,
+            verifier: testVerifier
         )
     }
     #expect(throws: AdvisoryError.expired) {
         _ = try AdvisoryDocument.parse(
-            try AdvisoryCanonical.envelopeJSON(sampleFeed()),
+            try signed(sampleFeed()),
             lastSeenSeq: 0,
-            now: Date(timeIntervalSince1970: 1_798_761_600) // 2027-01-01
+            now: Date(timeIntervalSince1970: 1_798_761_600), // 2027-01-01
+            verifier: testVerifier
         )
     }
-    var json = String(decoding: try AdvisoryCanonical.envelopeJSON(sampleFeed()), as: UTF8.self)
+    var json = String(decoding: try signed(sampleFeed()), as: UTF8.self)
     json = json.replacingOccurrences(
         of: "\"url\":",
         with: "\"disable_export\":true,\"url\":"
     )
     #expect(throws: AdvisoryError.extraField("disable_export")) {
-        _ = try AdvisoryDocument.parse(Data(json.utf8), lastSeenSeq: 0, now: checkInstant)
+        _ = try AdvisoryDocument.parse(
+            Data(json.utf8), lastSeenSeq: 0, now: checkInstant, verifier: testVerifier
+        )
     }
 }
+#endif
 
 @Test func advisoryItemIsPresentationOnly() {
     let names = Mirror(reflecting: sampleFeed().items[0]).children.compactMap(\.label)
     #expect(names == ["id", "published", "severity", "affected", "description", "url"])
 }
 
+#if canImport(CryptoKit)
 @Test func advisoryFetchIsLedgeredAndDisableable() async throws {
-    let body = try AdvisoryCanonical.envelopeJSON(sampleFeed())
+    let body = try signed(sampleFeed())
     let transport = RecordingHTTPTransport(response: OutboundHTTPResponse(status: 200, body: body))
     let store = MemoryStateStore()
     let result = try await AdvisoryClient.fetch(
@@ -160,7 +190,8 @@ private actor ToggleDestinationSink: DestinationSink {
         now: checkInstant,
         marketingVersion: "0.1.0",
         foregroundVisible: true,
-        emptyBody: try emptyBodyFile()
+        emptyBody: try emptyBodyFile(),
+        verifier: testVerifier
     )
     #expect(result.ledgerOutcome == "advisory:verified")
     #expect(result.presentation.fetched)
@@ -182,6 +213,7 @@ private actor ToggleDestinationSink: DestinationSink {
     #expect(skipped.presentation.banner?.hasPrefix("security advisories are off") == true)
     #expect(await transport.requests.count == 1)
 }
+#endif
 
 @Test func backgroundWakeDoesNotFetchAdvisories() async throws {
     let transport = RecordingHTTPTransport(
@@ -461,3 +493,56 @@ private actor ToggleDestinationSink: DestinationSink {
         NoticeCopy.render(allowed.notification!).title == "Export overdue"
     )
 }
+
+#if canImport(CryptoKit)
+/// #65: only the compiled public keys verify. A feed signed by any other key, including
+/// one that anyone could generate, is rejected, and so is a test-signed feed under the
+/// production keys.
+@Test func advisoryFeedsSignedByAnyOtherKeyAreRejected() throws {
+    let stranger = Curve25519.Signing.PrivateKey()
+    #expect(throws: AdvisoryError.badSignature) {
+        _ = try AdvisoryDocument.parse(
+            try signed(sampleFeed(), by: stranger),
+            lastSeenSeq: 0,
+            now: checkInstant,
+            verifier: testVerifier
+        )
+    }
+    #expect(throws: AdvisoryError.badSignature) {
+        _ = try AdvisoryDocument.parse(try signed(sampleFeed()), lastSeenSeq: 0, now: checkInstant)
+    }
+}
+
+/// #65: one feed with a huge sequence number would otherwise freeze the counter so that
+/// no later genuine advisory could be shown.
+@Test func advisorySequenceJumpsBeyondTheCeilingAreRejected() throws {
+    #expect(throws: AdvisoryError.sequenceJump) {
+        _ = try AdvisoryDocument.parse(
+            try signed(sampleFeed(seq: AdvisoryDocument.maximumSequenceStep + 1)),
+            lastSeenSeq: 0,
+            now: checkInstant,
+            verifier: testVerifier
+        )
+    }
+    let accepted = try AdvisoryDocument.parse(
+        try signed(sampleFeed(seq: AdvisoryDocument.maximumSequenceStep)),
+        lastSeenSeq: 0,
+        now: checkInstant,
+        verifier: testVerifier
+    )
+    #expect(accepted.seq == AdvisoryDocument.maximumSequenceStep)
+}
+
+/// #65: the compiled keys are real Ed25519 public keys, distinct, and not the old
+/// development constants.
+@Test func pinnedAdvisoryKeysAreDistinctEd25519PublicKeys() throws {
+    for hex in [AdvisoryPinnedKeys.activePublicKeyHex, AdvisoryPinnedKeys.successorPublicKeyHex] {
+        let raw = try #require(Hex.decode(hex))
+        #expect(raw.count == 32)
+        _ = try Curve25519.Signing.PublicKey(rawRepresentation: raw)
+        #expect(raw != Data(repeating: 0x0a, count: 32))
+        #expect(raw != Data(repeating: 0x0b, count: 32))
+    }
+    #expect(AdvisoryPinnedKeys.activePublicKeyHex != AdvisoryPinnedKeys.successorPublicKeyHex)
+}
+#endif

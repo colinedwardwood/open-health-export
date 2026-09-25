@@ -244,6 +244,21 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck iOS background task identifiers: ok")
+        // #65: advisories verify against compiled Ed25519 public keys only. A shared-key
+        // MAC, or signing code inside a linked module, would let anyone who reads the
+        // source mint a "verified" advisory.
+        let advisoryFeed = try String(
+            contentsOf: sources.appendingPathComponent("WireFormat/AdvisoryFeed.swift"),
+            encoding: .utf8
+        )
+        for token in ["HMACSHA256", "repeating: 0x0a", "repeating: 0x0b", "func sign("]
+            where advisoryFeed.contains(token) {
+            FileHandle.standardError.write(
+                Data("#65: Sources/WireFormat/AdvisoryFeed.swift must not contain \(token)\n".utf8)
+            )
+            exit(1)
+        }
+        print("policycheck advisory feed verifies Ed25519 only: ok")
         // #32: every bundle takes its version and build from the project settings, so
         // the app and its extension cannot drift apart or ship a hard-coded build 1.
         for plist in [
@@ -2501,7 +2516,7 @@ struct PolicyCheck {
     }
 
     static func adjacencyManifest(fromDump dump: Any) throws -> [String: Any] {
-        let darwinOnly: Set<String> = ["HealthKitSource", "HealthKitSourceTests"]
+        let darwinOnly: Set<String> = ["HealthKitSource", "HealthKitSourceTests", "advisory-sign"]
         guard let package = dump as? [String: Any],
               let targets = package["targets"] as? [[String: Any]]
         else {
