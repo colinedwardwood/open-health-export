@@ -199,7 +199,20 @@ public struct ExportRun: Sendable {
         return FanoutRunResult(outcome: outcome, destinations: await collector.rows())
     }
 
+    /// Waits for any other run of this metric in the process to finish first (#31).
     public func run() async throws -> RunOutcome {
+        await MetricRunGate.shared.acquire(metric)
+        do {
+            let outcome = try await runHoldingGate()
+            await MetricRunGate.shared.release(metric)
+            return outcome
+        } catch {
+            await MetricRunGate.shared.release(metric)
+            throw error
+        }
+    }
+
+    private func runHoldingGate() async throws -> RunOutcome {
         let startedAt = clock.now()
         var lastMark = startedAt
         var timings: [RunStepTiming] = []
