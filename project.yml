@@ -49,7 +49,8 @@ targets:
         PRODUCT_NAME: $(PRODUCT_NAME)
         INFOPLIST_FILE: Apps/Exporter-iOS/Info.plist
         CODE_SIGN_ENTITLEMENTS: Apps/Exporter-iOS/Exporter.entitlements
-        TARGETED_DEVICE_FAMILY: "1,2"
+        # iPhone-only for 1.0 (#12, #33). iPad users can still run the iPhone build.
+        TARGETED_DEVICE_FAMILY: "1"
         SUPPORTS_MACCATALYST: NO
         GENERATE_INFOPLIST_FILE: NO
     dependencies:

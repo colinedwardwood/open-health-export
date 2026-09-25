@@ -50,7 +50,7 @@ version **0.1.0** currently emits wire profile `ohe.wire/1` from `spec/v1.0.0`
 
 | Platform | Minimum / toolchain | Release support |
 |---|---|---|
-| iOS (iPhone and iPad) | 18.0 | Planned v1 commercial App Store release; not submitted |
+| iOS (iPhone) | 18.0 | Planned v1 commercial App Store release; not submitted |
 | macOS companion | 15.0 | Intended as a notarised Developer ID app, not Mac App Store; notarisation is an external gate and is not done |
 | Linux core | Swift 6.3.3 | Package build and tests only |
 
