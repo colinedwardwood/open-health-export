@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+#if canImport(CryptoKit)
+import CryptoKit
+#endif
 import Foundation
 
 /// Presentation-only advisory item. No field here may map to export behaviour (R-38 / T-43).
@@ -57,11 +60,16 @@ public enum AdvisoryError: Error, Equatable {
     case unknownKey
     case badSignature
     case rollback
+    /// #65: a sequence number far beyond the last one seen. Accepting it would freeze
+    /// the counter so that no later genuine feed could ever be shown.
+    case sequenceJump
     case notYetValid
     case expired
 }
 
-/// Compiled HMAC pins. Rotation is an app update, never a feed-driven key.
+/// Compiled Ed25519 public keys (#65). Rotation is an app update; a feed can never
+/// introduce a key. The private halves are held offline by the owner, never in this
+/// repository or in the app, and signing lives in `Tools/advisory-sign`.
 public enum AdvisoryPinnedKeys {
     public static let host = "advisories.openhealthexporter.org"
     public static let path = "/advisories/v1.json"
@@ -69,16 +77,60 @@ public enum AdvisoryPinnedKeys {
     public static let activeID = "active"
     public static let successorID = "successor"
 
-    /// Development pins compiled into the binary. Not Ed25519; same rotation rule.
-    public static let active = Data(repeating: 0x0a, count: 32)
-    public static let successor = Data(repeating: 0x0b, count: 32)
+    public static let activePublicKeyHex = "d27e27c91a4f62e6735f6f07605c20581f7f819e74410f271c69e07d2acf2112"
+    public static let successorPublicKeyHex = "e1928a0697f45676aa1bafaf6686796adf05d4ab0eff52926d2285f1f65d3e6f"
+}
 
-    public static func key(id: String) -> Data? {
-        switch id {
-        case activeID: active
-        case successorID: successor
-        default: nil
+/// Checks a detached Ed25519 signature over the canonical feed bytes.
+public struct AdvisoryVerifier: Sendable {
+    /// Raw 32-byte public keys by key ID.
+    public var publicKeys: [String: Data]
+
+    public init(publicKeys: [String: Data]) {
+        self.publicKeys = publicKeys
+    }
+
+    public static let pinned = AdvisoryVerifier(publicKeys: [
+        AdvisoryPinnedKeys.activeID: Hex.decode(AdvisoryPinnedKeys.activePublicKeyHex) ?? Data(),
+        AdvisoryPinnedKeys.successorID: Hex.decode(AdvisoryPinnedKeys.successorPublicKeyHex) ?? Data(),
+    ])
+
+    public func verify(signatureHex: String, keyID: String, message: Data) throws {
+        guard let raw = publicKeys[keyID], raw.count == 32 else {
+            throw AdvisoryError.unknownKey
         }
+        #if canImport(CryptoKit)
+        guard
+            let signature = Hex.decode(signatureHex.lowercased()),
+            signature.count == 64,
+            let key = try? Curve25519.Signing.PublicKey(rawRepresentation: raw),
+            key.isValidSignature(signature, for: message)
+        else {
+            throw AdvisoryError.badSignature
+        }
+        #else
+        // No Ed25519 implementation on this platform, so nothing can be verified.
+        throw AdvisoryError.badSignature
+        #endif
+    }
+}
+
+public enum Hex {
+    public static func decode(_ hex: String) -> Data? {
+        guard hex.count.isMultiple(of: 2) else { return nil }
+        var data = Data(capacity: hex.count / 2)
+        var index = hex.startIndex
+        while index < hex.endIndex {
+            let next = hex.index(index, offsetBy: 2)
+            guard let byte = UInt8(hex[index..<next], radix: 16) else { return nil }
+            data.append(byte)
+            index = next
+        }
+        return data
+    }
+
+    public static func encode(_ data: Data) -> String {
+        data.map { String(format: "%02x", $0) }.joined()
     }
 }
 
@@ -101,17 +153,11 @@ public enum AdvisoryCanonical {
             + "}"
     }
 
-    public static func sign(_ feed: AdvisoryFeed) throws -> String {
-        guard let key = AdvisoryPinnedKeys.key(id: feed.keyID) else {
-            throw AdvisoryError.unknownKey
-        }
-        return HMACSHA256.hex(key: key, message: bytes(feed))
-    }
-
-    public static func envelopeJSON(_ feed: AdvisoryFeed) throws -> Data {
-        let signature = try sign(feed)
-        return Data(
-            ("{\"feed\":" + string(feed) + ",\"signature\":" + jsonString(signature) + "}")
+    /// The published document: the canonical feed and a signature made offline over
+    /// `bytes(feed)`. The app never signs.
+    public static func envelopeJSON(_ feed: AdvisoryFeed, signatureHex: String) -> Data {
+        Data(
+            ("{\"feed\":" + string(feed) + ",\"signature\":" + jsonString(signatureHex) + "}")
                 .utf8
         )
     }
@@ -155,7 +201,16 @@ public enum AdvisoryDocument {
     ]
     private static let envelopeKeys: Set<String> = ["feed", "signature"]
 
-    public static func parse(_ data: Data, lastSeenSeq: Int, now: Date) throws -> AdvisoryFeed {
+    /// The publisher increments `seq` by one per feed. A larger jump than this is
+    /// refused rather than trusted, so one feed cannot move the counter out of reach.
+    public static let maximumSequenceStep = 1_000
+
+    public static func parse(
+        _ data: Data,
+        lastSeenSeq: Int,
+        now: Date,
+        verifier: AdvisoryVerifier = .pinned
+    ) throws -> AdvisoryFeed {
         guard
             let root = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         else {
@@ -170,15 +225,16 @@ public enum AdvisoryDocument {
         }
         try rejectUnknown(feedObject.keys, allowed: feedKeys)
         let feed = try decodeFeed(feedObject)
-        guard let key = AdvisoryPinnedKeys.key(id: feed.keyID) else {
-            throw AdvisoryError.unknownKey
-        }
-        let expected = HMACSHA256.hex(key: key, message: AdvisoryCanonical.bytes(feed))
-        guard expected == signature.lowercased() else {
-            throw AdvisoryError.badSignature
-        }
+        try verifier.verify(
+            signatureHex: signature,
+            keyID: feed.keyID,
+            message: AdvisoryCanonical.bytes(feed)
+        )
         guard feed.seq > lastSeenSeq else {
             throw AdvisoryError.rollback
+        }
+        guard feed.seq - lastSeenSeq <= maximumSequenceStep else {
+            throw AdvisoryError.sequenceJump
         }
         let validFrom = try parseInstant(feed.validFrom)
         let expiresAt = try parseInstant(feed.expiresAt)

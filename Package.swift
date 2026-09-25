@@ -175,6 +175,12 @@ targets.append(contentsOf: [
         dependencies: ["EnginePorts", "CoreDomain", "CoreTemporal", "MetricCatalog", "RunJournal"],
         swiftSettings: [.define("OHE_HAS_HEALTHKIT")]
     ),
+    // #65: signs advisory feeds offline with CryptoKit; never linked into the app.
+    .executableTarget(
+        name: "advisory-sign",
+        dependencies: ["WireFormat"],
+        path: "Tools/advisory-sign"
+    ),
     .testTarget(
         name: "HealthKitSourceTests",
         dependencies: ["HealthKitSource", "EnginePorts", "CoreDomain", "CoreTemporal", "MetricCatalog", "RunJournal"]

@@ -146,7 +146,8 @@ public enum AdvisoryClient {
         now: Date,
         marketingVersion: String,
         foregroundVisible: Bool,
-        emptyBody: URL
+        emptyBody: URL,
+        verifier: AdvisoryVerifier = .pinned
     ) async throws -> AdvisoryFetchResult {
         var next = state
         if !state.enabled {
@@ -189,7 +190,8 @@ public enum AdvisoryClient {
             let feed = try AdvisoryDocument.parse(
                 response.body,
                 lastSeenSeq: state.lastSeenSeq,
-                now: now
+                now: now,
+                verifier: verifier
             )
             next.lastVerifiedEpoch = now.timeIntervalSince1970
             next.lastSeenSeq = feed.seq
