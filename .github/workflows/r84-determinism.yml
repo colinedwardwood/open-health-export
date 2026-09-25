@@ -4,6 +4,7 @@
 name: r84-determinism
 on:
   push:
+    branches: [main]
   pull_request:
 permissions:
   contents: read

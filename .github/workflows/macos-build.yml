@@ -4,6 +4,7 @@
 name: macos-build
 on:
   push:
+    branches: [main]
   pull_request:
 concurrency:
   # CI establishes the state of the current ref, not every intermediate push.
