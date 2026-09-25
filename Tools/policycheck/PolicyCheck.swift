@@ -359,6 +359,7 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck privacy manifests declare zero collection: ok")
+        try checkRequiredReasonAPIs(root: root)
         try checkLocalGovernance(root: root, manifest: manifest)
         try checkATS(root: root)
         let ambient = ["Date()", "Calendar.current", "TimeZone.current", "Locale.current"]
@@ -670,6 +671,60 @@ struct PolicyCheck {
             }
         }
         print("policycheck ATS local-networking only: ok")
+    }
+
+    /// #34: App Store Connect rejects an upload (ITMS-91053) when a bundle calls a
+    /// required-reason API its privacy manifest does not declare. Each bundle is checked
+    /// against its own sources plus every package source, since all of them may be
+    /// linked in; over-declaring is allowed, under-declaring is not.
+    static func checkRequiredReasonAPIs(root: URL) throws {
+        let categories: [(category: String, tokens: [String])] = [
+            ("NSPrivacyAccessedAPICategoryUserDefaults", ["UserDefaults", "@AppStorage"]),
+            ("NSPrivacyAccessedAPICategoryFileTimestamp", [
+                "attributesOfItem", "creationDateKey", "contentModificationDateKey",
+                "fileModificationDate", "getattrlist",
+            ]),
+            ("NSPrivacyAccessedAPICategorySystemBootTime", ["systemUptime", "mach_absolute_time"]),
+            ("NSPrivacyAccessedAPICategoryDiskSpace", [
+                "volumeAvailableCapacity", "systemFreeSize", "statfs(",
+            ]),
+            ("NSPrivacyAccessedAPICategoryActiveKeyboards", ["activeInputModes"]),
+        ]
+        let bundles: [(manifest: String, sources: [String])] = [
+            ("Apps/Exporter-iOS/PrivacyInfo.xcprivacy", ["Apps/Exporter-iOS", "Apps/AppShared", "Sources"]),
+            ("Apps/StatusWidget/PrivacyInfo.xcprivacy", ["Apps/StatusWidget", "Apps/AppShared", "Sources"]),
+            ("Apps/Companion-macOS/PrivacyInfo.xcprivacy", ["Apps/Companion-macOS", "Sources"]),
+        ]
+        var violations: [String] = []
+        for bundle in bundles {
+            var text = ""
+            for directory in bundle.sources {
+                let url = root.appendingPathComponent(directory)
+                guard let files = FileManager.default.enumerator(at: url, includingPropertiesForKeys: nil)
+                else { continue }
+                for case let file as URL in files where file.pathExtension == "swift" {
+                    text += try String(contentsOf: file, encoding: .utf8)
+                }
+            }
+            let values = try loadInfoPlist(root.appendingPathComponent(bundle.manifest))
+            let declared = Set(
+                (values["NSPrivacyAccessedAPITypes"] as? [[String: Any]] ?? []).compactMap { entry in
+                    (entry["NSPrivacyAccessedAPITypeReasons"] as? [String])?.isEmpty == false
+                        ? entry["NSPrivacyAccessedAPIType"] as? String
+                        : nil
+                }
+            )
+            for (category, tokens) in categories where !declared.contains(category) {
+                if let token = tokens.first(where: text.contains) {
+                    violations.append("\(bundle.manifest): uses \(token) but does not declare \(category)")
+                }
+            }
+        }
+        if !violations.isEmpty {
+            FileHandle.standardError.write(Data((violations.joined(separator: "\n") + "\n").utf8))
+            exit(1)
+        }
+        print("policycheck required-reason APIs are declared: ok")
     }
 
     static func loadInfoPlist(_ url: URL) throws -> [String: Any] {
