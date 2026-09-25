@@ -4,6 +4,7 @@
 name: dco
 on:
   push:
+    branches: [main]
   pull_request:
 concurrency:
   group: dco-${{ github.workflow }}-${{ github.ref }}

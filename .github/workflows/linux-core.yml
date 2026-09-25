@@ -4,6 +4,7 @@
 name: linux-core
 on:
   push:
+    branches: [main]
   pull_request:
 concurrency:
   # A newer commit is the evidence candidate for this ref. Retaining superseded
