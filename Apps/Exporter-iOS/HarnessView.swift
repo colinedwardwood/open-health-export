@@ -549,6 +549,10 @@ struct HarnessView: View {
                 await appPrivacyGate.authenticateIfNeeded(enabled: appPrivacyGateEnabled)
                 try? await HarnessExport.recordNotificationSuppressionIfNeeded()
                 await startHealthObserversIfEligible()
+                BackgroundTaskCoordinator.submit()
+                if let summary = BackgroundTaskCoordinator.submitFailureSummary() {
+                    status = summary
+                }
                 await refreshSecurityAdvisory()
                 await refreshCoverageWindows()
             }
