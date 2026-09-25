@@ -68,7 +68,7 @@ private enum R84DeterminismFixture {
     #expect(workflow.contains("ubuntu-24.04-arm"))
     #expect(workflow.contains("macos-26"))
     #expect(workflow.contains("actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683"))
-    #expect(workflow.contains("swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc"))
+    #expect(workflow.contains("./.github/actions/setup-swift"))
     #expect(workflow.contains("contents: read"))
     #expect(!workflow.contains("macos-13"))
     #expect(!workflow.contains("pull_request_target"))

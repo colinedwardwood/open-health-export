@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc
+      - uses: ./.github/actions/setup-swift
         with:
           swift-version: "6.3.3"
       - name: Start Mosquitto
@@ -46,7 +46,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc
+      - uses: ./.github/actions/setup-swift
         with:
           swift-version: "6.3.3"
       - name: Start Home Assistant 2026.9.2
@@ -76,7 +76,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc
+      - uses: ./.github/actions/setup-swift
         with:
           swift-version: "6.3.3"
       - name: Start Home Assistant 2025.9.4
@@ -106,7 +106,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: swift-actions/setup-swift@d8e84bc3a450686a95474d7d6fa4a3301498debc
+      - uses: ./.github/actions/setup-swift
         with:
           swift-version: "6.3.3"
       - name: Start OpenTelemetry Collector 0.160.0
