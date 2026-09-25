@@ -52,7 +52,8 @@ research says that specific product should not be built, for two independent rea
 several OSS Apple Health exporters ship today, including `health-md` (AGPL-3.0, on the App
 Store since February 2026) and `health4ai`. "Swift native" is invisible to users. "Reliable"
 cannot be ours, because the reliability ceiling is Apple's and we inherit it exactly. Free is
-not a wedge against an incumbent whose automation tier costs $5.99/year.
+not a wedge against an incumbent whose automation tier costs $6.99/year ($24.99 lifetime;
+App Store listing, accessed 2026-09-24).
 
 **Three headline capabilities are not deliverable as imagined.** The Mac cannot read HealthKit
 at all. Scheduled background export is not something iOS offers. Storing health data in iCloud
@@ -61,10 +62,19 @@ is prohibited by App Review.
 There is a real product underneath, and the research found it by looking at what users
 complain about rather than at the incumbent's feature list. The category's defining failure is
 not missing features — it is **silent, undetected failure**: exports stop, or report success
-while delivering nothing, and nobody notices for weeks. Compounding it, the incumbent's
-incremental sync keys its watermark on HealthKit *write* time, so retroactively-inserted
-samples are permanently missed downstream — which means sleep, the metric people most want, is
-systematically truncated.
+while delivering nothing, and nobody notices for weeks. Compounding it, late-written data is
+handled badly in two different ways. Exporters that sync by *time window since the last run*
+miss samples written after that window closed, which truncates sleep under the incumbent's
+"Since Last Sync" mode (workaround: a wide "Standard" range plus a receiver that deduplicates;
+github.com/anym001/healthlog/pull/60). Exporters that sync by *what was added* catch the late
+sample but must also recompute the past day's totals, which the incumbent's summaries do not
+(github.com/Lybron/health-auto-export/issues/56, open). `health-md` has the same class of bug
+open (github.com/CodyBontecou/health-md/issues/158). We do both by default: an anchored read of
+what was added, and re-emitting every day it touches. All three accessed 2026-09-24.
+
+*Correction, 2026-09-25 (#40): an earlier version said the incumbent keys its watermark on
+HealthKit write time. Its issue #56 says write-time detection is correct; the defects are the
+time-window cursor and stale daily totals described above.*
 
 So the product is repositioned:
 
@@ -73,13 +83,17 @@ So the product is repositioned:
 
 Correctness and legibility are the wedge. They are unglamorous, evidenced, and — unlike "open
 source" or "native" — they are things the incumbent is measurably bad at. Notably, our nearest
-OSS competitor `health-md` charges via StoreKit and collects pseudonymous product events; we
-would be the one that does neither.
+OSS competitor `health-md` charges via StoreKit ($19.99 one-time, $39.99 family) and its
+listing text discloses pseudonymous product events, although its privacy label says "Data Not
+Collected" (App Store listing, accessed 2026-09-24).
 
 Two honest downsides, stated once and plainly:
 
-**This is a small market.** The incumbent has **389 US ratings after roughly ten years**. A
-realistic ceiling is low thousands of users.
+**This is a small market.** The incumbent has **400 US ratings (4.33) after roughly ten years**
+(first released 2016-05-21; iTunes lookup, accessed 2026-09-24). A realistic ceiling is low
+thousands of users. Newer entrants crowd it further: the Home Assistant iOS companion app's
+HealthKit sensors (free, in Labs since July 2026), HealthSync for Home Assistant, HealthSave,
+Health Webhook, Conduit, and AI-export apps such as AI Health Export.
 
 **This is a large build for a small team.** §7.1 costs v1 at roughly 75–85 engineer-weeks
 against an assumed 4–8 maintainer-hours per week. That arithmetic does not close, and §7.1
@@ -146,13 +160,18 @@ Guideline 5.1.3(i) as well.
 
 ### PC-5 — The open-source differentiator is already taken
 
-`health-md` (AGPL-3.0, App Store, February 2026) already does iPhone→Mac transfer over
-Multipeer Connectivity and lists iCloud Drive among its destinations. `health4ai` already does
-observer queries with background sync.
+`health-md` (AGPL-3.0, App Store since 2026-02-04) lists an Obsidian vault, iCloud Drive, a
+local folder, API endpoints and a connected Mac among its destinations, and now also ships on
+watchOS, visionOS, Android and a CLI. `health4ai` (MIT, TestFlight only) does observer queries
+with background sync into a user-owned Supabase project, plus an MCP server. The Home Assistant
+iOS companion app (Apache-2.0, free) added HealthKit sensors in Labs in July 2026 and sleep in
+2026.9.1; it sends the latest value timestamped at push time, not the sample's own time
+(github.com/home-assistant/iOS/issues/5670). All accessed 2026-09-24.
 
 Worth noting for positioning: `health-md`'s App Store listing states it "automatically
 collects limited pseudonymous product events using a random app-install ID", and it monetises
-via StoreKit 2. The nearest OSS competitor charges and phones home.
+via StoreKit 2 ($19.99 one-time, $39.99 family). Its privacy label nonetheless says "Data Not
+Collected". The nearest OSS competitor charges and phones home.
 
 **Consequence:** we compete on correctness and honesty, not on licence.
 
@@ -563,6 +582,7 @@ Deliberately not used: GitHub stars.
 | RK-10 | **CRA scope changes.** Donations keep us out of scope only while access is unconditional (R-110); charging makes us a manufacturer with CE marking and conformity assessment from December 2027. The guidance (C(2026) 5252, adopted 27 July 2026) is **expressly non-binding** — only the CJEU can interpret authoritatively | Low now, Medium if D-08 changes | High | R-110 keeps the condition true; review trigger on any monetisation change; R-112 legal opinion before charging |
 | RK-11 | **The app is used as a stalkerware payload** | Medium | Critical | R-40, R-41, R-31, R-27 as a fifth surface concealment does not reach. iOS 18 Hide-and-Require-Face-ID defeats Home Screen presence and notification previews; SPIKE-COERCE measures remaining rungs. R-30's ledger alone is passive and reports to nobody |
 | RK-12 | **v1 as scoped is 3–6 years at realistic volunteer capacity** (§7.1) | High | Critical | D-14. Recommendation: option 2, a 25–30 EW v1 that ships only the wedge |
+| RK-13 | **Home Assistant's own companion app closes the gap.** Its HealthKit sensors are free, Labs-only and latest-value-only today (added July 2026); a history-aware version would take the Home Assistant audience | Medium | High | Position on full history, late-data correctness and run visibility rather than "gets Health into Home Assistant". Review trigger: every WWDC and every Home Assistant companion release that touches HealthKit (#40) |
 
 ---
 

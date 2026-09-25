@@ -1,5 +1,12 @@
 # Adversarial Review — Stage 1 PRD
 
+> **Correction, 2026-09-25 (#40):** this review refers to the incumbent's "write-time
+> watermark". That mechanism is wrong: Health Auto Export issue #56 says write-time detection is
+> correct. The real defects are a time-window cursor ("Since Last Sync") that truncates
+> late-written sleep, and daily summaries that are not recomputed for back-filled days. PRD §1
+> carries the corrected, sourced wording.
+
+
 **Reviewer:** Adversarial Reviewer, Stage 1
 **Artifact:** `docs/01-prd/PRD.md` (DRAFT v0.1, 2026-09-02)
 **Date:** 2026-09-02
