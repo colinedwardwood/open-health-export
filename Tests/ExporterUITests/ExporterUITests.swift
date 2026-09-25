@@ -4,6 +4,9 @@
 import UIKit
 import XCTest
 
+/// The app's URL scheme is its identifier root from Brand.xcconfig (#35).
+private let appURLScheme = "com.cewdesign.exporter"
+
 @MainActor
 final class ExporterUITests: XCTestCase {
     /// CI runs three simulator clones on a shared runner, where every launch and
@@ -416,7 +419,7 @@ final class ExporterUITests: XCTestCase {
         ]
         app.launchEnvironment["OHE_SEED_DESTINATION_STATUS"] = "success"
         app.launchEnvironment["OHE_OPEN_URL"] =
-            "openhealthexporter://status?destination=home-assistant"
+            "\(appURLScheme)://status?destination=home-assistant"
         app.launch()
         let status = app.staticTexts["status-line"]
         XCTAssertTrue(status.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
@@ -437,7 +440,7 @@ final class ExporterUITests: XCTestCase {
         ]
         app.launchEnvironment["OHE_SEED_DESTINATION_STATUS"] = "failed"
         app.launchEnvironment["OHE_OPEN_URL"] =
-            "openhealthexporter://error?destination=home-assistant&archetype=hostUnresolvable"
+            "\(appURLScheme)://error?destination=home-assistant&archetype=hostUnresolvable"
         app.launch()
         let part0 = identified("error-part-0")
         XCTAssertTrue(

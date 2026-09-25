@@ -17,7 +17,7 @@ Do not rely on app deletion alone to remove Keychain items. Current iOS behavior
 2. Select the folder previously used for received archives.
 3. Choose **Delete everything received**, then confirm. The companion deletes only payloads named by its receipt ledger, the ledger itself, and its stored pairing. It does not glob-delete unrelated `.ndjson` files.
 4. Quit the companion and move the app to the Trash.
-5. Open **Keychain Access**, search the login keychain for `app.openhealthexporter.mac.psk`, and delete any remaining item with that service name.
+5. Open **Keychain Access**, search the login keychain for `com.cewdesign.exporter.mac.psk` (earlier pre-release builds used `app.openhealthexporter.mac.psk`), and delete any remaining item with that service name.
 6. Inspect any other folders you previously selected and remove archives you intentionally retained there.
 
 Dragging a macOS app to the Trash does not remove its login-keychain items. The manual Keychain step is therefore required after uninstall if the in-app deletion action was not completed or could not be verified.

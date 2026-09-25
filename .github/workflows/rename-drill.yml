@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# #35: builds with a nonsense identifier root in Brand.xcconfig and fails if any
+# built bundle still carries the real one. Weekly, and on demand before a release,
+# rather than on every pull request, because it is two Release builds.
+name: rename-drill
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  rename-drill:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install build tools
+        run: brew install xcodegen
+      - name: Swap the identifier root and search the built bundles for the old one
+        run: ./scripts/rename-drill.sh

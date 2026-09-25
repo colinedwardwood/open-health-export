@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #if os(macOS)
+import CoreDomain
 import Foundation
 import Network
 
@@ -9,7 +10,7 @@ import Network
 public actor CompanionListener {
     private let service: BonjourService
     private let parameters: NWParameters
-    private let queue = DispatchQueue(label: "app.openhealthexporter.companion.listen")
+    private let queue = DispatchQueue(label: IdentifierRoot.qualified("companion.listen"))
     private var listener: NWListener?
     private var waiters: [CheckedContinuation<any ByteStream, Error>] = []
     private var accepted: [any ByteStream] = []

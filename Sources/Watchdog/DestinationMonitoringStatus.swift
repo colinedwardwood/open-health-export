@@ -42,7 +42,7 @@ public struct DestinationMonitoringStatus: Sendable, Equatable, Codable {
 }
 
 public struct WidgetStatusRoute: Sendable, Equatable {
-    public static let scheme = "openhealthexporter"
+    public static var scheme: String { IdentifierRoot.value }
     public static let host = "status"
 
     public var destinationID: String?

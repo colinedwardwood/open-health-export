@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import CoreDomain
 import Foundation
 import NetEgress
 #if canImport(Network)
@@ -11,7 +12,7 @@ enum NetworkPathMonitorCache {
     #if canImport(Network)
     private static let monitor: NWPathMonitor = {
         let monitor = NWPathMonitor()
-        monitor.start(queue: DispatchQueue(label: "app.openhealthexporter.path"))
+        monitor.start(queue: DispatchQueue(label: IdentifierRoot.qualified("path")))
         return monitor
     }()
     #endif

@@ -1804,9 +1804,10 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
             == WidgetStatusRoute(destinationID: "archive folder/primary")
     )
     #expect(WidgetStatusRoute(url: URL(string: "https://example.com/status")!) == nil)
-    #expect(WidgetStatusRoute(url: URL(string: "openhealthexporter://other")!) == nil)
-    #expect(ExportNowRoute(url: URL(string: "openhealthexporter://export-now")!) != nil)
-    #expect(ExportNowRoute(url: URL(string: "openhealthexporter://status")!) == nil)
+    let scheme = WidgetStatusRoute.scheme
+    #expect(WidgetStatusRoute(url: URL(string: "\(scheme)://other")!) == nil)
+    #expect(ExportNowRoute(url: URL(string: "\(scheme)://export-now")!) != nil)
+    #expect(ExportNowRoute(url: URL(string: "\(scheme)://status")!) == nil)
     #expect(ExportNowRoute().url.host == "export-now")
 }
 
@@ -6255,12 +6256,8 @@ private func anchorHoldFixture(
         contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift"),
         encoding: .utf8
     )
-    for service in [
-        "app.openhealthexporter.ios.psk",
-        "app.openhealthexporter.ios.https",
-        "app.openhealthexporter.mqtt",
-    ] {
-        #expect(harness.contains("KeychainSecretStore(service: \"\(service)\")"))
+    for service in ["ios.psk", "ios.https", "mqtt"] {
+        #expect(harness.contains("KeychainSecretStore(service: IdentifierRoot.qualified(\"\(service)\"))"))
     }
     for artifact in [
         "exports",

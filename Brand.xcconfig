@@ -3,6 +3,12 @@
 
 // D-06 is open. This is the only file that may contain a user-visible product name.
 PRODUCT_NAME = OpenHealthExporter
-PRODUCT_BUNDLE_IDENTIFIER_ROOT = app.openhealthexporter
 DISPLAY_NAME = Open Health Exporter
-APP_GROUP_IDENTIFIER = group.app.openhealthexporter.shared
+
+// #11 / #35: the neutral, owner-held root every identifier derives from: bundle IDs,
+// the App Group, background tasks, the URL scheme, keychain services and log
+// subsystems. It carries no product name, so the name can change without stranding
+// credentials or App Store records. scripts/rename-drill.sh proves nothing else
+// hard-codes it.
+PRODUCT_BUNDLE_IDENTIFIER_ROOT = com.cewdesign.exporter
+APP_GROUP_IDENTIFIER = group.$(PRODUCT_BUNDLE_IDENTIFIER_ROOT)

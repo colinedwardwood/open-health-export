@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #if canImport(Network)
+import CoreDomain
 import Foundation
 import Network
 
 /// Finds the paired Mac companion on the local network. Discovery is not authorization: the
 /// browser reports names, and only a name equal to the one captured at pairing may be dialled.
 public actor CompanionDiscovery {
-    private let queue = DispatchQueue(label: "app.openhealthexporter.discovery")
+    private let queue = DispatchQueue(label: IdentifierRoot.qualified("discovery"))
     private var browser: NWBrowser?
     private var waiters: [CheckedContinuation<[String], Error>] = []
     private var seen: Set<String> = []

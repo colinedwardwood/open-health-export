@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #if canImport(os)
+import CoreDomain
 import os
 #endif
 
 /// R-50: first-party logs go through `os.Logger`, never a swift-log facade.
 public enum OHELog {
     #if canImport(os)
-    private static let logger = Logger(subsystem: "app.openhealthexporter", category: "core")
+    private static let logger = Logger(subsystem: IdentifierRoot.value, category: "core")
     #endif
 
     public static func notice(_ publicText: String) {

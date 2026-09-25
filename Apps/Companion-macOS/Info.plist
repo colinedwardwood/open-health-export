@@ -20,6 +20,8 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>OHESourceCommit</key>
 	<string>$(OHE_SOURCE_COMMIT)</string>
+	<key>OHEIdentifierRoot</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER_ROOT)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSMinimumSystemVersion</key>

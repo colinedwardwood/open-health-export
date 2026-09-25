@@ -18,6 +18,8 @@
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
+	<key>OHEIdentifierRoot</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER_ROOT)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>OHEAppGroupIdentifier</key>
@@ -26,10 +28,10 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>app.openhealthexporter.status</string>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER_ROOT).status</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>openhealthexporter</string>
+				<string>$(PRODUCT_BUNDLE_IDENTIFIER_ROOT)</string>
 			</array>
 		</dict>
 	</array>
@@ -39,9 +41,9 @@
 	<true/>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>app.openhealthexporter.refresh</string>
-		<string>app.openhealthexporter.processing</string>
-		<string>app.openhealthexporter.backfill</string>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER_ROOT).refresh</string>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER_ROOT).processing</string>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER_ROOT).backfill</string>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>

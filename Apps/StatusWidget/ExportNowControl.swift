@@ -1,13 +1,14 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import CoreDomain
 import AppIntents
 import SwiftUI
 import Watchdog
 import WidgetKit
 
 struct ExportNowControl: ControlWidget {
-    static let kind = "app.openhealthexporter.exportNow"
+    static let kind = IdentifierRoot.qualified("exportNow")
 
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: Self.kind) {

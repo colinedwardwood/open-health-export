@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #if canImport(Security)
+import CoreDomain
 import Foundation
 import RunJournal
 import Security
@@ -20,7 +21,7 @@ public actor SecureEnclaveLedgerSeal: ResettableLedgerHeadSeal {
     private var cachedKey: SecKey?
 
     public init(
-        applicationTag: String = "app.openhealthexporter.ledger-head",
+        applicationTag: String = IdentifierRoot.qualified("ledger-head"),
         useSecureEnclave: Bool = true,
         permanent: Bool = true
     ) {
