@@ -4222,6 +4222,9 @@ struct HarnessView: View {
     private func startHealthObserversIfEligible() async {
         do {
             try await AppLifecycleCoordinator.shared.startObserversIfEligible()
+            if let summary = HarnessExport.observerRegistrationFailureSummary() {
+                status = summary
+            }
         } catch {
             status = "Background Health delivery registration failed: \(error.localizedDescription)"
         }
