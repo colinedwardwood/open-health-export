@@ -1843,7 +1843,7 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     #expect(intents.contains("struct ExportTypeWindowIntent"))
     #expect(intents.contains("CombinedExportSummary.shortcutKind"))
     #expect(intents.contains("ReturnsValue<ShortcutExportKind>"))
-    #expect(intents.contains("ohe.exportWindowHours"))
+    #expect(intents.contains("SettingKey.exportWindowHours"))
     #expect(intents.contains("\"Export now with \\(.applicationName)\""))
 }
 

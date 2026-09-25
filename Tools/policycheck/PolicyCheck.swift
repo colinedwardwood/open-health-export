@@ -93,6 +93,24 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck app targets use no direct network APIs: ok")
+        // #42: every UserDefaults key lives in SettingsStore.swift, so a key cannot be
+        // misspelt in one place or read with a different type in another.
+        var rawSettingKeys: [String] = []
+        if let appFiles = FileManager.default.enumerator(at: apps, includingPropertiesForKeys: nil) {
+            for case let file as URL in appFiles
+            where file.pathExtension == "swift" && file.lastPathComponent != "SettingsStore.swift" {
+                let text = try String(contentsOf: file, encoding: .utf8)
+                if text.contains("\"ohe.") { rawSettingKeys.append(file.path) }
+            }
+        }
+        if !rawSettingKeys.isEmpty {
+            FileHandle.standardError.write(
+                Data(("raw \"ohe.\" setting keys outside SettingsStore.swift:\n"
+                    + rawSettingKeys.joined(separator: "\n") + "\n").utf8)
+            )
+            exit(1)
+        }
+        print("policycheck setting keys live in SettingsStore: ok")
         if !pasteboardBypasses.isEmpty {
             FileHandle.standardError.write(
                 Data(

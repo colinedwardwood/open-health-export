@@ -288,7 +288,7 @@ enum LeakMutant: String, CaseIterable {
     #expect(viewHarness.contains("@State private var browserSelection = Set<MetricID>()"))
     #expect(viewHarness.contains("Button(\"Use Core Daily\")"))
     #expect(viewHarness.contains("applyCoreDailyPreset()"))
-    #expect(viewHarness.contains("ohe.preset.coreDaily.appliedVersion"))
+    #expect(viewHarness.contains("SettingKey.presetCoreDailyAppliedVersion"))
     #expect(viewHarness.contains("HarnessExport.isDestinationEnabled(scopeDestinationID)"))
     #expect(viewHarness.contains("? scope.metrics.subtracting(priorUnion)"))
     #expect(viewHarness.contains("startInclusive: scopeStartDate"))

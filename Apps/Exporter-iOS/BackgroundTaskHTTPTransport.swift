@@ -12,7 +12,7 @@ struct BackgroundTaskHTTPTransport: HTTPTransport {
     let inner: any HTTPTransport
 
     func execute(_ request: OutboundHTTPRequest) async throws -> OutboundHTTPResponse {
-        let assertion = await BackgroundAssertion(name: "ohe.https.export")
+        let assertion = await BackgroundAssertion(name: SettingsStore.exportBackgroundTaskName)
         do {
             let response = try await inner.execute(request)
             await assertion.end()

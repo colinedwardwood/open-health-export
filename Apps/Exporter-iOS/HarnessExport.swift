@@ -274,7 +274,7 @@ enum HarnessExport {
     /// UX-29: the 413 shorten-window action writes `ohe.exportWindowHours`; HealthKit
     /// pages follow that owned setting so the next batch is smaller.
     static func samplePageLimit() -> Int {
-        let stored = UserDefaults.standard.object(forKey: "ohe.exportWindowHours") as? Int
+        let stored = UserDefaults.standard.object(forKey: SettingKey.exportWindowHours.rawValue) as? Int
         return SamplePaging.pageLimit(
             windowHours: stored ?? 24,
             thermalHalved: isThermalDeferred()
@@ -292,7 +292,7 @@ enum HarnessExport {
     }
 
     static func freshnessCadenceSeconds() -> TimeInterval {
-        let stored = UserDefaults.standard.object(forKey: "ohe.freshnessIntervalMinutes") as? Int
+        let stored = UserDefaults.standard.object(forKey: SettingKey.freshnessIntervalMinutes.rawValue) as? Int
         return TimeInterval(max(1, stored ?? 15) * 60)
     }
 
@@ -310,7 +310,7 @@ enum HarnessExport {
     }
 
     static func allowsMeteredNetwork(destinationID: String) -> Bool {
-        UserDefaults.standard.bool(forKey: "ohe.\(destinationID).allowsMeteredNetwork")
+        UserDefaults.standard.bool(forKey: SettingsStore.allowsMeteredNetworkKey(destinationID))
     }
 
     static func networkPathConditions() -> NetworkPathConditions {
@@ -418,7 +418,7 @@ enum HarnessExport {
 
     static func destinationExportRole(_ destinationID: String) -> DestinationExportRole {
         if let raw = UserDefaults.standard.string(
-            forKey: "ohe.\(destinationID).exportRole"
+            forKey: SettingsStore.exportRoleKey(destinationID)
         ), let stored = DestinationExportRole(rawValue: raw) {
             return stored
         }
@@ -544,7 +544,7 @@ enum HarnessExport {
     ) throws {
         UserDefaults.standard.set(
             role.rawValue,
-            forKey: "ohe.\(destinationID).exportRole"
+            forKey: SettingsStore.exportRoleKey(destinationID)
         )
         guard let snapshotURL = StatusSnapshotLocation.url(destinationID: destinationID),
               var snapshot = try? DestinationSnapshotFile.read(from: snapshotURL)
@@ -628,7 +628,7 @@ enum HarnessExport {
 
     @MainActor
     static func advisoryLastVerified() -> Date? {
-        (UserDefaults.standard.object(forKey: "ohe.advisoryLastVerifiedEpoch") as? TimeInterval)
+        (UserDefaults.standard.object(forKey: SettingKey.advisoryLastVerifiedEpoch.rawValue) as? TimeInterval)
             .map { Date(timeIntervalSince1970: $0) }
     }
 
@@ -637,12 +637,12 @@ enum HarnessExport {
         let state = AdvisoryState(
             enabled: enabled,
             lastAttemptEpoch: defaults.object(
-                forKey: "ohe.advisoryLastAttemptEpoch"
+                forKey: SettingKey.advisoryLastAttemptEpoch.rawValue
             ) as? TimeInterval,
             lastVerifiedEpoch: defaults.object(
-                forKey: "ohe.advisoryLastVerifiedEpoch"
+                forKey: SettingKey.advisoryLastVerifiedEpoch.rawValue
             ) as? TimeInterval,
-            lastSeenSeq: defaults.integer(forKey: "ohe.advisoryLastSeenSeq")
+            lastSeenSeq: defaults.integer(forKey: SettingKey.advisoryLastSeenSeq.rawValue)
         )
         let root = try applicationSupportRoot()
         let emptyBody = root.appendingPathComponent("advisory-request-body")
@@ -663,15 +663,15 @@ enum HarnessExport {
         )
         defaults.set(
             result.state.lastAttemptEpoch,
-            forKey: "ohe.advisoryLastAttemptEpoch"
+            forKey: SettingKey.advisoryLastAttemptEpoch.rawValue
         )
         defaults.set(
             result.state.lastVerifiedEpoch,
-            forKey: "ohe.advisoryLastVerifiedEpoch"
+            forKey: SettingKey.advisoryLastVerifiedEpoch.rawValue
         )
         defaults.set(
             result.state.lastSeenSeq,
-            forKey: "ohe.advisoryLastSeenSeq"
+            forKey: SettingKey.advisoryLastSeenSeq.rawValue
         )
         return result.presentation
     }
@@ -964,7 +964,7 @@ enum HarnessExport {
         return lines
     }
 
-    private static let lastScheduledFullReconcileEpochKey = "ohe.lastScheduledFullReconcileEpoch"
+    private static let lastScheduledFullReconcileEpochKey = SettingKey.lastScheduledFullReconcileEpoch.rawValue
 
     /// O-9: a low-priority full reconcile on a daily cadence, skipped when the
     /// queue is already in I6 Amber so live deltas are not evicted.
@@ -1486,7 +1486,7 @@ enum HarnessExport {
         let systemDenied = await LocalUserNotifier().authorizationDenied()
         let denied = forcedDenied || systemDenied
         let defaults = UserDefaults.standard
-        let key = "ohe.notificationsPreviouslyDenied"
+        let key = SettingKey.notificationsPreviouslyDenied.rawValue
         let previouslyDenied = forcedDenied ? false : defaults.bool(forKey: key)
         defer { defaults.set(denied, forKey: key) }
         guard NotificationSuppression.shouldRecord(
@@ -1969,10 +1969,10 @@ enum HarnessExport {
         // Each case starts from the shipped advisory defaults and an empty network
         // ledger, so a default-configuration case sees what a new install sees.
         for key in [
-            "ohe.advisoryEnabled",
-            "ohe.advisoryLastAttemptEpoch",
-            "ohe.advisoryLastVerifiedEpoch",
-            "ohe.advisoryLastSeenSeq",
+            SettingKey.advisoryEnabled.rawValue,
+            SettingKey.advisoryLastAttemptEpoch.rawValue,
+            SettingKey.advisoryLastVerifiedEpoch.rawValue,
+            SettingKey.advisoryLastSeenSeq.rawValue,
         ] {
             UserDefaults.standard.removeObject(forKey: key)
         }
@@ -1982,7 +1982,7 @@ enum HarnessExport {
         }
         for destinationID in healthDestinationIDs {
             UserDefaults.standard.removeObject(
-                forKey: "ohe.\(destinationID).exportRole"
+                forKey: SettingsStore.exportRoleKey(destinationID)
             )
         }
         // Destination reports survive across XCUITest cases in one simulator.
@@ -3222,11 +3222,11 @@ enum HarnessExport {
     }
 
     static func storedCompanionTraceparent() -> Bool {
-        UserDefaults.standard.bool(forKey: "ohe.companion.propagateTraceparent")
+        UserDefaults.standard.bool(forKey: SettingKey.companionPropagateTraceparent.rawValue)
     }
 
     static func setCompanionTraceparent(_ enabled: Bool) throws {
-        UserDefaults.standard.set(enabled, forKey: "ohe.companion.propagateTraceparent")
+        UserDefaults.standard.set(enabled, forKey: SettingKey.companionPropagateTraceparent.rawValue)
         let root = try applicationSupportRoot()
         let url = companionTestReportURL(root: root)
         guard let data = try? Data(contentsOf: url),
@@ -4108,7 +4108,7 @@ enum HarnessExport {
         return coordinator
     }
 
-    private static let observerFailuresKey = "ohe.observerRegistrationFailures"
+    private static let observerFailuresKey = SettingKey.observerRegistrationFailures.rawValue
 
     /// #28: a type whose observer could not register still exports on foreground and
     /// scheduled wakes, but it will not wake the app itself. That has to be visible.

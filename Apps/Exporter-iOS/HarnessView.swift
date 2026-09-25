@@ -19,7 +19,7 @@ import WireFormat
 
 struct HarnessView: View {
     @Environment(\.scenePhase) private var scenePhase
-    @AppStorage("ohe.appPrivacyGateEnabled")
+    @AppStorage(SettingKey.appPrivacyGateEnabled.rawValue)
     private var appPrivacyGateEnabled = false
     @State private var appPrivacyGate: AppPrivacyGate
 
@@ -48,7 +48,7 @@ struct HarnessView: View {
     @State private var showSettings = false
     @State private var showHealthPriming = false
     @State private var primingTypeCount = 0
-    @AppStorage("ohe.disclosureAcknowledged")
+    @AppStorage(SettingKey.disclosureAcknowledged.rawValue)
     private var disclosureAcknowledged = false
     @State private var status = "Waiting for disclosure acknowledgement."
     @State private var results: [String] = []
@@ -67,15 +67,15 @@ struct HarnessView: View {
     @State private var mqttPasswordDescriptor: String?
     @State private var mqttPKCS12PasswordDescriptor: String?
     @State private var allowInsecureHTTP = false
-    @AppStorage("ohe.https.allowsMeteredNetwork")
+    @AppStorage(SettingsStore.allowsMeteredNetworkKey("https"))
     private var allowMeteredHTTPS = false
-    @AppStorage("ohe.home-assistant.allowsMeteredNetwork")
+    @AppStorage(SettingsStore.allowsMeteredNetworkKey("home-assistant"))
     private var allowMeteredHomeAssistant = false
-    @AppStorage("ohe.mqtt.allowsMeteredNetwork")
+    @AppStorage(SettingsStore.allowsMeteredNetworkKey("mqtt"))
     private var allowMeteredMQTT = false
-    @AppStorage("ohe.companion.allowsMeteredNetwork")
+    @AppStorage(SettingsStore.allowsMeteredNetworkKey("companion"))
     private var allowMeteredCompanion = false
-    @AppStorage("ohe.otlp.allowsMeteredNetwork")
+    @AppStorage(SettingsStore.allowsMeteredNetworkKey("otlp"))
     private var allowMeteredOTLP = false
     @State private var propagateTraceparent = false
     @State private var companionTraceparent = false
@@ -86,9 +86,9 @@ struct HarnessView: View {
     @State private var mqttQoS: UInt8 = 1
     @State private var userFacingError: UserFacingErrorObject?
     @State private var seededUserFacingErrors: [UserFacingErrorObject] = []
-    @AppStorage("ohe.exportWindowHours")
+    @AppStorage(SettingKey.exportWindowHours.rawValue)
     private var exportWindowHours = 24
-    @AppStorage("ohe.freshnessIntervalMinutes")
+    @AppStorage(SettingKey.freshnessIntervalMinutes.rawValue)
     private var freshnessIntervalMinutes = 15
     @State private var mqttUsername = ""
     @State private var mqttPassword = ""
@@ -118,9 +118,9 @@ struct HarnessView: View {
     @State private var diagnosticPayload: Data?
     @State private var diagnosticGate = DiagnosticPreviewGate()
     @State private var diagnosticShareURL: URL?
-    @AppStorage("ohe.diagnosticMinimumRuns")
+    @AppStorage(SettingKey.diagnosticMinimumRuns.rawValue)
     private var diagnosticMinimumRuns = 30
-    @AppStorage("ohe.diagnosticWindowHours")
+    @AppStorage(SettingKey.diagnosticWindowHours.rawValue)
     private var diagnosticWindowHours = 24
     @State private var destinationStatusLines: [String] = []
     @State private var destinationSnapshots: [DestinationStatusSnapshot] = []
@@ -160,19 +160,19 @@ struct HarnessView: View {
     @State private var browserIndexHorizonDay: String?
     @State private var browserLoadingHealth = false
     @State private var foregroundCatchUpStarted = false
-    @AppStorage("ohe.browserOnlyWithData")
+    @AppStorage(SettingKey.browserOnlyWithData.rawValue)
     private var browserOnlyWithData = true
-    @AppStorage("ohe.preset.coreDaily.appliedVersion")
+    @AppStorage(SettingKey.presetCoreDailyAppliedVersion.rawValue)
     private var coreDailyAppliedVersion = 0
     @State private var coreDailyUpgrade: MetricPresetDiff?
     /// SEC-45: one-time, so it persists past the run that acknowledged it.
-    @AppStorage("ohe.shareProtectionAcknowledged")
+    @AppStorage(SettingKey.shareProtectionAcknowledged.rawValue)
     private var shareProtectionAcknowledged = false
-    @AppStorage("ohe.browserDemoMode")
+    @AppStorage(SettingKey.browserDemoMode.rawValue)
     private var browserDemoMode = false
-    @AppStorage("ohe.displayUnitPreference")
+    @AppStorage(SettingKey.displayUnitPreference.rawValue)
     private var displayUnitPreference: DisplayUnitPreference = .automatic
-    @AppStorage("ohe.clockDisplay")
+    @AppStorage(SettingKey.clockDisplay.rawValue)
     private var clockDisplay: ClockDisplay = .system
     @State private var healthKitUnitPolicy: UnitDisplayPolicy?
 
@@ -195,7 +195,7 @@ struct HarnessView: View {
     }
     /// Off until the advisory channel has a registered host and real signatures (#14,
     /// #30). The fetch is also held until the disclosure is acknowledged.
-    @AppStorage("ohe.advisoryEnabled")
+    @AppStorage(SettingKey.advisoryEnabled.rawValue)
     private var advisoryEnabled = false
     @State private var advisoryBanner: String?
     @State private var advisoryItems: [AdvisoryItem] = []
@@ -437,7 +437,7 @@ struct HarnessView: View {
                 // lands in the read-only argument domain, where the app's own write
                 // could never take effect and the warning could never be dismissed.
                 if ProcessInfo.processInfo.environment["OHE_SEED_SHARE_ACK"] == "clear" {
-                    UserDefaults.standard.removeObject(forKey: "ohe.shareProtectionAcknowledged")
+                    UserDefaults.standard.removeObject(forKey: SettingKey.shareProtectionAcknowledged.rawValue)
                 }
                 if ProcessInfo.processInfo.environment["OHE_SEED_HISTORY_PAYLOAD"] == "1" {
                     try? await HarnessExport.prepareHistoryPayloadSeedForUITests()
