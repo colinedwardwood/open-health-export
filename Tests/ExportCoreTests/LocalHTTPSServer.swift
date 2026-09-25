@@ -9,6 +9,8 @@ import Security
 
 /// Local HTTPS/1.1 listener for Darwin contract tests (QA-10 TLS). Lives in Tests/.
 actor LocalHTTPSServer {
+    /// Application bytes received after the TLS handshake (#66: must stay 0 until trust is confirmed).
+    private(set) var receivedBytes = 0
     private let listener: NWListener
     private let queue = DispatchQueue(label: "ohe.https.loopback")
     private var status = 204
@@ -71,6 +73,7 @@ actor LocalHTTPSServer {
                 }
             }
             if chunk.isEmpty { break }
+            receivedBytes += chunk.count
             inbound.append(chunk)
             guard inbound.range(of: Data("\r\n\r\n".utf8)) != nil else { continue }
             let payload = body

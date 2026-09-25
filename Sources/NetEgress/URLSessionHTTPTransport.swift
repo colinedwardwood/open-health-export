@@ -180,7 +180,9 @@ final class HTTPSessionDelegate: NSObject, URLSessionDelegate, URLSessionTaskDel
             }
             return
         }
-        completionHandler(.useCredential, URLCredential(trust: trust))
+        // #66: no pin means ordinary system trust. A self-signed destination gets a pin
+        // only after its fingerprint is confirmed, and is then handled above.
+        completionHandler(.performDefaultHandling, nil)
         #else
         completionHandler(.performDefaultHandling, nil)
         #endif
@@ -234,9 +236,10 @@ private struct IdentityProbingHTTPTransport: HTTPTransport {
 
     func identityProbe() async throws -> TLSIdentity? {
         guard endpoint.usesTLS else { return nil }
+        // Reads the certificate so it can be shown; the stream never sends (#66).
         let stream = NWByteStream(
             endpoint: endpoint,
-            options: .init(failFastOnWaiting: true)
+            options: .init(failFastOnWaiting: true, capturesUntrustedIdentity: true)
         )
         try await stream.open()
         let identity = await stream.identity()

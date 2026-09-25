@@ -42,6 +42,9 @@ public actor NWByteStream: ByteStream {
         public var preSharedKey: PreSharedKey?
         /// Optional PKCS#12 client certificate for brokers that require mTLS. Not SE-backed.
         public var clientIdentity: TLSClientIdentity?
+        /// #66: finish a handshake with an untrusted certificate only so its identity can
+        /// be shown for confirmation. Such a stream refuses to send any bytes.
+        public var capturesUntrustedIdentity: Bool
 
         public init(
             pin: PinRecord? = nil,
@@ -50,7 +53,8 @@ public actor NWByteStream: ByteStream {
             readTimeout: Duration = .seconds(15),
             failFastOnWaiting: Bool = false,
             preSharedKey: PreSharedKey? = nil,
-            clientIdentity: TLSClientIdentity? = nil
+            clientIdentity: TLSClientIdentity? = nil,
+            capturesUntrustedIdentity: Bool = false
         ) {
             self.pin = pin
             self.requireTLS13 = requireTLS13
@@ -59,6 +63,7 @@ public actor NWByteStream: ByteStream {
             self.failFastOnWaiting = failFastOnWaiting
             self.preSharedKey = preSharedKey
             self.clientIdentity = clientIdentity
+            self.capturesUntrustedIdentity = capturesUntrustedIdentity
         }
     }
 
@@ -167,6 +172,11 @@ public actor NWByteStream: ByteStream {
 
     public func send(_ data: Data) async throws {
         try await open()
+        if options.capturesUntrustedIdentity, options.pin == nil,
+           let observed = observation.current, !observed.isSystemTrusted
+        {
+            throw StreamError.untrustedCertificate
+        }
         EgressAttemptLog.record(kind: .byteStream, host: recordedHost(), bytes: data.count)
         guard let connection else { throw StreamError.notOpen }
         sendToken += 1
@@ -237,6 +247,11 @@ public actor NWByteStream: ByteStream {
             } catch {
                 return StreamError.pinMismatch
             }
+        }
+        if options.pin == nil, !options.capturesUntrustedIdentity,
+           let observed = observation.current, !observed.isSystemTrusted
+        {
+            return StreamError.untrustedCertificate
         }
         if LocalNetworkDenial.isDenial(error, needsLocalGrant: dialNeedsLocalNetworkGrant) {
             return StreamError.localNetworkDenied
@@ -392,6 +407,7 @@ public actor NWByteStream: ByteStream {
         }
         let observation = self.observation
         let pin = options.pin
+        let capturesUntrusted = options.capturesUntrustedIdentity
         sec_protocol_options_set_verify_block(security, { metadata, trustRef, complete in
             let trust = sec_trust_copy_ref(trustRef).takeRetainedValue()
             guard
@@ -419,9 +435,9 @@ public actor NWByteStream: ByteStream {
                 }
                 return
             }
-            // First use: capture the leaf and accept it so DestinationSetup can pin
-            // (R-31). System trust cannot TOFU a self-signed home broker.
-            complete(true)
+            // #66: with no pin, only a chain the system trusts may carry data. A
+            // self-signed home broker is captured for confirmation and nothing more.
+            complete(identity.isSystemTrusted || capturesUntrusted)
         }, queue)
         return NWParameters(tls: tls)
     }

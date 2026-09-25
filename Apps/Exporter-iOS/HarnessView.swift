@@ -35,7 +35,15 @@ struct HarnessView: View {
         case mqtt
     }
 
+    /// #66: a destination whose certificate is not publicly trusted. Nothing has been
+    /// sent to it; setup waits for the person to compare the fingerprint.
+    private struct UntrustedCertificatePrompt {
+        var kind: PendingConfirmationKind
+        var identity: TLSIdentity
+    }
+
     @State private var phase: Phase = .disclosure
+    @State private var untrustedCertificate: UntrustedCertificatePrompt?
     @State private var rootTab = AppRootTabs.status
     @State private var showSettings = false
     @State private var showHealthPriming = false
@@ -317,6 +325,16 @@ struct HarnessView: View {
         )) {
             if let confirmationCard {
                 destinationConfirmation(confirmationCard)
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { untrustedCertificate != nil },
+            set: { presented in
+                if !presented { untrustedCertificate = nil }
+            }
+        )) {
+            if let untrustedCertificate {
+                untrustedCertificateConfirmation(untrustedCertificate)
             }
         }
         .onAppear {
@@ -3423,8 +3441,80 @@ struct HarnessView: View {
         }
     }
 
+    /// Returns true when the error was an untrusted certificate, which is shown for
+    /// fingerprint comparison rather than as a failure (#66).
     @MainActor
-    private func testHTTPS() async {
+    private func promptForUntrustedCertificate(
+        _ error: Error,
+        kind: PendingConfirmationKind
+    ) -> Bool {
+        guard case TrustConfirmation.required(let identity) = error else { return false }
+        confirmationCard = nil
+        confirmationKind = nil
+        untrustedCertificate = UntrustedCertificatePrompt(kind: kind, identity: identity)
+        status = "Compare the server's fingerprint before continuing. Nothing was sent."
+        return true
+    }
+
+    private func untrustedCertificateConfirmation(
+        _ prompt: UntrustedCertificatePrompt
+    ) -> some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("This certificate is not publicly trusted")
+                        .font(.headline)
+                        .accessibilityAddTraits(.isHeader)
+                    Text("Nothing has been sent to \(prompt.identity.leafSubject) yet: no test data, no credentials and no Health data.")
+                        .wrappingFillCaption()
+                    Text("Public-key fingerprint (SHA-256)")
+                        .wrappingFillCaption()
+                        .fontWeight(.semibold)
+                    Text(TLSIdentity.grouped(prompt.identity.leafSPKISha256))
+                        .font(.body.monospaced())
+                        .textSelection(.enabled)
+                        .accessibilityIdentifier("untrusted-certificate-fingerprint")
+                    Text("Continue only if this exactly matches the fingerprint your server or broker shows. If you did not set up a self-signed certificate yourself, cancel.")
+                        .wrappingFillCaption()
+                    Button {
+                        let confirmed = prompt
+                        untrustedCertificate = nil
+                        Task { await retryTrusting(confirmed) }
+                    } label: {
+                        Text("Trust this certificate and test")
+                            .wrappingActionLabel()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("untrusted-certificate-trust")
+                    Button(role: .cancel) {
+                        untrustedCertificate = nil
+                        status = "Ready. Nothing was sent to the untrusted server."
+                    } label: {
+                        Text("Cancel")
+                            .wrappingActionLabel()
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("untrusted-certificate-cancel")
+                }
+                .padding()
+            }
+        }
+    }
+
+    @MainActor
+    private func retryTrusting(_ prompt: UntrustedCertificatePrompt) async {
+        switch prompt.kind {
+        case .https:
+            await testHTTPS(confirmedIdentity: prompt.identity)
+        case .homeAssistant:
+            await testHomeAssistantWebhook(confirmedIdentity: prompt.identity)
+        case .mqtt:
+            await testMQTT(confirmedIdentity: prompt.identity)
+        }
+    }
+
+    @MainActor
+    private func testHTTPS(confirmedIdentity: TLSIdentity? = nil) async {
         phase = .working
         let httpsURLNormalized = CredentialFieldHygiene.url(httpsURL).normalized
         let httpsScheme = URL(string: httpsURLNormalized)?.scheme?.lowercased() == "https"
@@ -3445,7 +3535,8 @@ struct HarnessView: View {
                 }(),
                 importedLocalIdentifier:
                     importedDestinationDraft?.configuration.kind == .https
-                        ? importedDestinationDraft?.localIdentifier : nil
+                        ? importedDestinationDraft?.localIdentifier : nil,
+                confirmedLeafSPKISha256: confirmedIdentity?.leafSPKISha256
             ) { current, total, step in
                 Task { @MainActor in
                     status = NamedWorkProgress.test(
@@ -3459,6 +3550,10 @@ struct HarnessView: View {
             userFacingError = nil
             status = "Ready. Confirm this server before any Health data moves."
         } catch {
+            if promptForUntrustedCertificate(error, kind: .https) {
+                phase = .ready
+                return
+            }
             confirmationCard = nil
             confirmationKind = nil
             if case SetupError.testFailed(let step) = error {
@@ -3472,7 +3567,7 @@ struct HarnessView: View {
     }
 
     @MainActor
-    private func testHomeAssistantWebhook() async {
+    private func testHomeAssistantWebhook(confirmedIdentity: TLSIdentity? = nil) async {
         phase = .working
         let base = CredentialFieldHygiene.url(
             homeAssistantBaseURL
@@ -3495,7 +3590,8 @@ struct HarnessView: View {
                 importedLocalIdentifier:
                     importedDestinationDraft?.configuration.kind
                         == .homeAssistant
-                        ? importedDestinationDraft?.localIdentifier : nil
+                        ? importedDestinationDraft?.localIdentifier : nil,
+                confirmedLeafSPKISha256: confirmedIdentity?.leafSPKISha256
             ) { current, total, step in
                 Task { @MainActor in
                     status = NamedWorkProgress.test(
@@ -3509,6 +3605,10 @@ struct HarnessView: View {
             userFacingError = nil
             status = "Ready. Confirm this Home Assistant webhook before any Health data moves."
         } catch {
+            if promptForUntrustedCertificate(error, kind: .homeAssistant) {
+                phase = .ready
+                return
+            }
             confirmationCard = nil
             confirmationKind = nil
             if case SetupError.testFailed(let step) = error {
@@ -3527,7 +3627,7 @@ struct HarnessView: View {
     }
 
     @MainActor
-    private func testMQTT() async {
+    private func testMQTT(confirmedIdentity: TLSIdentity? = nil) async {
         phase = .working
         let mqttURLNormalized = CredentialFieldHygiene.url(mqttURL).normalized
         let mqttScheme = URL(string: mqttURLNormalized)?.scheme
@@ -3565,7 +3665,8 @@ struct HarnessView: View {
                 qos: mqttQoS,
                 importedLocalIdentifier:
                     importedDestinationDraft?.configuration.kind == .mqtt
-                        ? importedDestinationDraft?.localIdentifier : nil
+                        ? importedDestinationDraft?.localIdentifier : nil,
+                confirmedIdentity: confirmedIdentity
             ) { current, total, step in
                 Task { @MainActor in
                     status = NamedWorkProgress.test(
@@ -3589,6 +3690,10 @@ struct HarnessView: View {
                 status = "Ready. Confirm this server before any Health data moves."
             }
         } catch {
+            if promptForUntrustedCertificate(error, kind: .mqtt) {
+                phase = .ready
+                return
+            }
             confirmationCard = nil
             confirmationKind = nil
             if case SetupError.testFailed(let step) = error {

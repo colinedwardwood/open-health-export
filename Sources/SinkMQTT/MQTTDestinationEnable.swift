@@ -28,6 +28,7 @@ public enum MQTTDestinationEnable {
         canaryCode: String = "OHE1-MQTT",
         meteredPolicy: MeteredNetworkPolicy = .refuseMetered,
         pathConditions: NetworkPathConditions = .clear,
+        confirmedLeafSPKISha256: String? = nil,
         onProgress: DestinationTestProgress? = nil
     ) async throws -> MQTTDestinationProbe {
         let prepared = try await prepare(
@@ -40,6 +41,7 @@ public enum MQTTDestinationEnable {
             canaryCode: canaryCode,
             meteredPolicy: meteredPolicy,
             pathConditions: pathConditions,
+            confirmedLeafSPKISha256: confirmedLeafSPKISha256,
             onProgress: onProgress
         )
         guard prepared.report.allowsEnablement else {
@@ -82,7 +84,8 @@ public enum MQTTDestinationEnable {
         pinPolicy: PinPolicy = .leaf,
         canaryCode: String = "OHE1-MQTT",
         meteredPolicy: MeteredNetworkPolicy = .refuseMetered,
-        pathConditions: NetworkPathConditions = .clear
+        pathConditions: NetworkPathConditions = .clear,
+        confirmedLeafSPKISha256: String? = nil
     ) async throws -> (
         destination: VerifiedDestination,
         events: [TrustEvent],
@@ -99,7 +102,8 @@ public enum MQTTDestinationEnable {
             pinPolicy: pinPolicy,
             canaryCode: canaryCode,
             meteredPolicy: meteredPolicy,
-            pathConditions: pathConditions
+            pathConditions: pathConditions,
+            confirmedLeafSPKISha256: confirmedLeafSPKISha256
         )
         let committed = try commit(probe: probe, pipe: pipe)
         return (
@@ -131,6 +135,7 @@ public enum MQTTDestinationEnable {
         canaryCode: String,
         meteredPolicy: MeteredNetworkPolicy,
         pathConditions: NetworkPathConditions,
+        confirmedLeafSPKISha256: String?,
         onProgress: DestinationTestProgress?
     ) async throws -> (
         setup: DestinationSetup,
@@ -162,6 +167,11 @@ public enum MQTTDestinationEnable {
         if destination.url.scheme?.lowercased() == "mqtts" {
             guard let observed else {
                 throw EgressError.transport("mqtts destination returned no TLS identity")
+            }
+            // #66: the test sends CONNECT with the broker credentials. Stop first unless
+            // the system trusts this certificate or the person confirmed this exact one.
+            guard TrustConfirmation.permits(observed, confirmedLeafSPKISha256: confirmedLeafSPKISha256) else {
+                throw TrustConfirmation.required(observed)
             }
             try setup.recordPin(from: observed, at: emittedAt, policy: pinPolicy)
         } else {

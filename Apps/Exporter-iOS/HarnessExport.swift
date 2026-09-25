@@ -2212,6 +2212,7 @@ enum HarnessExport {
         webhookID: String,
         allowInsecureHTTP: Bool,
         importedLocalIdentifier: String? = nil,
+        confirmedLeafSPKISha256: String? = nil,
         onProgress: DestinationTestProgress? = nil
     ) async throws -> DestinationConfirmationCard {
         let endpoint = try HomeAssistantWebhookPreset.endpoint(
@@ -2230,6 +2231,7 @@ enum HarnessExport {
                     from: endpoint
                 ).absoluteString,
             importedLocalIdentifier: importedLocalIdentifier,
+            confirmedLeafSPKISha256: confirmedLeafSPKISha256,
             onProgress: onProgress
         )
     }
@@ -2243,6 +2245,7 @@ enum HarnessExport {
         webhookID: String? = nil,
         persistedURLString: String? = nil,
         importedLocalIdentifier: String? = nil,
+        confirmedLeafSPKISha256: String? = nil,
         onProgress: DestinationTestProgress? = nil
     ) async throws -> DestinationConfirmationCard {
         guard let host = URL(string: urlString)?.host?.lowercased(), !host.isEmpty else {
@@ -2271,6 +2274,7 @@ enum HarnessExport {
                     allowsMeteredNetwork(destinationID: destinationID)
                 ),
                 pathConditions: networkPathConditions(),
+                confirmedLeafSPKISha256: confirmedLeafSPKISha256,
                 onProgress: onProgress
             )
         }
@@ -2405,6 +2409,7 @@ enum HarnessExport {
         password: String? = nil,
         qos: UInt8 = 1,
         importedLocalIdentifier: String? = nil,
+        confirmedIdentity: TLSIdentity? = nil,
         onProgress: DestinationTestProgress? = nil
     ) async throws -> DestinationConfirmationCard {
         guard let host = URL(string: urlString)?.host?.lowercased(), !host.isEmpty else {
@@ -2425,8 +2430,27 @@ enum HarnessExport {
             clientPKCS12Password: clientPKCS12Password,
             exporterID: exporterID
         )
-        let sink = try MQTTSink.overNetwork(destination: destination, pin: nil)
         let now = Date().ISO8601Format()
+        // #66: the first attempt may only read the broker's certificate. Once the person
+        // has confirmed an untrusted one, the retry is pinned to exactly that certificate.
+        let sink: MQTTSink
+        if let confirmedIdentity {
+            sink = try MQTTSink.overNetwork(
+                destination: destination,
+                pin: PinRecord(
+                    leafSPKISha256: confirmedIdentity.leafSPKISha256,
+                    issuerSPKISha256: confirmedIdentity.issuerSPKISha256,
+                    firstSeen: now,
+                    policy: .leaf
+                )
+            )
+        } else {
+            sink = try MQTTSink.overNetwork(
+                destination: destination,
+                pin: nil,
+                capturesUntrustedIdentity: true
+            )
+        }
         let probe = try await MQTTDestinationEnable.probe(
             destination: destination,
             pipe: sink.pipe,
@@ -2434,6 +2458,7 @@ enum HarnessExport {
             emittedAt: now,
             meteredPolicy: .fromAllowsMetered(allowsMeteredNetwork(destinationID: "mqtt")),
             pathConditions: networkPathConditions(),
+            confirmedLeafSPKISha256: confirmedIdentity?.leafSPKISha256,
             onProgress: onProgress
         )
         await PendingDestination.shared.setMQTT(PendingMQTT(

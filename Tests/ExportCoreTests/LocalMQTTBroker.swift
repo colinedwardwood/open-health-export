@@ -10,6 +10,8 @@ import Security
 /// A localhost MQTT 3.1.1 broker for Darwin tests. Lives in Tests/, not Sources/, so it may
 /// use `NWListener` without becoming an iOS listening socket.
 actor LocalMQTTBroker {
+    /// Application bytes received after the TLS handshake (#66: must stay 0 until trust is confirmed).
+    private(set) var receivedBytes = 0
     private let listener: NWListener
     private let queue = DispatchQueue(label: "ohe.mqtt.loopback")
 
@@ -70,6 +72,7 @@ actor LocalMQTTBroker {
                 }
             }
             if chunk.isEmpty { break }
+            receivedBytes += chunk.count
             inbound.append(chunk)
             while inbound.count >= 2 {
                 let packet: (kind: MQTTPacketKind, flags: UInt8, body: Data, consumed: Int)
