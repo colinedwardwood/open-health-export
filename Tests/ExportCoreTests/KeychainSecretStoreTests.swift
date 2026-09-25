@@ -9,7 +9,7 @@ import Testing
 @testable import NetEgress
 
 @Test func r33KeychainPSKAddQueryIsDeviceOnlyNonSynchronizingAndAvailableAfterFirstUnlock() throws {
-    let service = "app.openhealthexporter.test.\(UUID().uuidString)"
+    let service = "invalid.test.keychain.\(UUID().uuidString)"
     let handle = SecretHandle(rawValue: "r33")
     let attributes = KeychainSecretStore.storeQuery(
         bytes: [0x33, 0x01],
@@ -34,7 +34,7 @@ import Testing
 }
 
 @Test func r33KeychainStoreEitherRoundsTripOrNamesTheEntitlementGap() async throws {
-    let store = KeychainSecretStore(service: "app.openhealthexporter.test.\(UUID().uuidString)")
+    let store = KeychainSecretStore(service: "invalid.test.keychain.\(UUID().uuidString)")
     let handle = SecretHandle(rawValue: "r33-live")
     let bytes: [UInt8] = [0x33, 0x02]
     do {

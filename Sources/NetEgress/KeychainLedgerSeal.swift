@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #if canImport(Security)
+import CoreDomain
 import EnginePorts
 import Foundation
 import RunJournal
@@ -14,7 +15,7 @@ public struct KeychainLedgerSeal: ResettableLedgerHeadSeal, Sendable {
     public var handle: SecretHandle
 
     public init(
-        store: any SecretStore = KeychainSecretStore(service: "app.openhealthexporter.ledger"),
+        store: any SecretStore = KeychainSecretStore(service: IdentifierRoot.qualified("ledger")),
         handle: SecretHandle = SecretHandle(rawValue: "ledger-head")
     ) {
         self.store = store

@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import CoreDomain
 import CompanionWire
 import Foundation
 import NetEgress
@@ -18,7 +19,7 @@ enum CompanionPersistence {
         let root = base.appendingPathComponent("OpenHealthExporterCompanion", isDirectory: true)
         try fm.createDirectory(at: root, withIntermediateDirectories: true)
         return PairingVault(
-            store: KeychainSecretStore(service: "app.openhealthexporter.mac.psk"),
+            store: KeychainSecretStore(service: IdentifierRoot.qualified("mac.psk")),
             recordFile: root.appendingPathComponent("pairing.json")
         )
     }

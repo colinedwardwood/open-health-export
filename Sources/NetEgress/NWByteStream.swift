@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #if canImport(Network)
+import CoreDomain
 import Foundation
 import Network
 import Security
@@ -89,7 +90,7 @@ public actor NWByteStream: ByteStream {
         self.target = .hostPort(endpoint)
         self.options = options
         self.resolver = resolver
-        self.queue = DispatchQueue(label: "app.openhealthexporter.egress.\(endpoint.host)")
+        self.queue = DispatchQueue(label: IdentifierRoot.qualified("egress.\(endpoint.host)"))
     }
 
     /// Dials the paired Mac companion by service name; the phone never listens (R-34).
@@ -97,7 +98,7 @@ public actor NWByteStream: ByteStream {
         self.target = .bonjour(service)
         self.options = options
         self.resolver = SystemAddressResolver()
-        self.queue = DispatchQueue(label: "app.openhealthexporter.egress.\(service.name)")
+        self.queue = DispatchQueue(label: IdentifierRoot.qualified("egress.\(service.name)"))
     }
 
     private func recordedHost() -> String {

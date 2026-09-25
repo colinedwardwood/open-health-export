@@ -105,7 +105,7 @@ import Testing
 #if canImport(Security)
 @Test func p256LedgerSealSignsAndDetectsHeadChangesWithoutSecureEnclaveInTests() async throws {
     let seal = SecureEnclaveLedgerSeal(
-        applicationTag: "app.openhealthexporter.test.ephemeral",
+        applicationTag: "invalid.test.ephemeral",
         useSecureEnclave: false,
         permanent: false
     )

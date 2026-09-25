@@ -2204,7 +2204,7 @@ enum HarnessExport {
     }
 
     private static func httpsKeychainService(_ destinationID: String) -> String {
-        "app.openhealthexporter.ios.\(destinationID)"
+        IdentifierRoot.qualified("ios.\(destinationID)")
     }
 
     static func prepareHomeAssistantWebhook(
@@ -2502,7 +2502,7 @@ enum HarnessExport {
             try? FileManager.default.removeItem(at: pkcs12URL)
         }
         let passwordStore = KeychainSecretStore(
-            service: "app.openhealthexporter.mqtt"
+            service: IdentifierRoot.qualified("mqtt")
         )
         let passwordHandle = SecretHandle(rawValue: "mqtt_password")
         if let password = pending.password {
@@ -2617,7 +2617,7 @@ enum HarnessExport {
         from saved: MQTTVerificationRecord,
         root: URL
     ) async throws -> String? {
-        let store = KeychainSecretStore(service: "app.openhealthexporter.mqtt")
+        let store = KeychainSecretStore(service: IdentifierRoot.qualified("mqtt"))
         let handle = SecretHandle(rawValue: "mqtt_pkcs12_password")
         if let leftover = saved.clientPKCS12Password, !leftover.isEmpty {
             try await store.store(Array(leftover.utf8), handle: handle)
@@ -2759,7 +2759,7 @@ enum HarnessExport {
         if saved.hasPassword == true {
             password = String(
                 decoding: try await KeychainSecretStore(
-                    service: "app.openhealthexporter.mqtt"
+                    service: IdentifierRoot.qualified("mqtt")
                 ).load(SecretHandle(rawValue: "mqtt_password")),
                 as: UTF8.self
             )
@@ -3637,10 +3637,10 @@ enum HarnessExport {
         try await DestructiveWipe.perform(
             store: store,
             secretStores: [
-                KeychainSecretStore(service: "app.openhealthexporter.ios.psk"),
-                KeychainSecretStore(service: "app.openhealthexporter.ios.https"),
-                KeychainSecretStore(service: "app.openhealthexporter.ios.home-assistant"),
-                KeychainSecretStore(service: "app.openhealthexporter.mqtt"),
+                KeychainSecretStore(service: IdentifierRoot.qualified("ios.psk")),
+                KeychainSecretStore(service: IdentifierRoot.qualified("ios.https")),
+                KeychainSecretStore(service: IdentifierRoot.qualified("ios.home-assistant")),
+                KeychainSecretStore(service: IdentifierRoot.qualified("mqtt")),
             ],
             ledgerSeal: resettableLedgerHeadSeal(),
             ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
@@ -4127,7 +4127,7 @@ enum HarnessExport {
     static func vault() throws -> PairingVault {
         let root = try applicationSupportRoot()
         return PairingVault(
-            store: KeychainSecretStore(service: "app.openhealthexporter.ios.psk"),
+            store: KeychainSecretStore(service: IdentifierRoot.qualified("ios.psk")),
             recordFile: root.appendingPathComponent("pairing.json")
         )
     }

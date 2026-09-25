@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #if canImport(Security)
+import CoreDomain
 import EnginePorts
 import Foundation
 import Security
@@ -12,7 +13,7 @@ import Security
 public struct KeychainSecretStore: SecretStore, Sendable {
     public var service: String
 
-    public init(service: String = "app.openhealthexporter.psk") {
+    public init(service: String = IdentifierRoot.qualified("psk")) {
         self.service = service
     }
 

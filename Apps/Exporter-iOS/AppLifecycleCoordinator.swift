@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import CoreDomain
 import BackgroundTasks
 import CorrectnessEngine
 import EnginePorts
@@ -101,7 +102,7 @@ final class ExporterAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
 
 @MainActor
 enum ContinuedBackfillCoordinator {
-    static let identifier = "app.openhealthexporter.backfill"
+    static let identifier = IdentifierRoot.qualified("backfill")
     private static let modeKey = "ohe.backfillMode"
 
     static func register() {
@@ -154,8 +155,8 @@ enum ContinuedBackfillCoordinator {
 
 @MainActor
 enum BackgroundTaskCoordinator {
-    static let refreshIdentifier = "app.openhealthexporter.refresh"
-    static let processingIdentifier = "app.openhealthexporter.processing"
+    static let refreshIdentifier = IdentifierRoot.qualified("refresh")
+    static let processingIdentifier = IdentifierRoot.qualified("processing")
 
     static func register() {
         BGTaskScheduler.shared.register(

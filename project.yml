@@ -3,7 +3,9 @@
 
 name: OpenHealthExporter
 options:
-  bundleIdPrefix: app.openhealthexporter
+  # Every target sets PRODUCT_BUNDLE_IDENTIFIER from Brand.xcconfig; this prefix only
+  # names targets that do not.
+  bundleIdPrefix: com.cewdesign.exporter
   deploymentTarget:
     iOS: "18.0"
     macOS: "15.0"

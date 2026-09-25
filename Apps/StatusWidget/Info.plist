@@ -16,6 +16,8 @@
 	<string>XPC!</string>
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
+	<key>OHEIdentifierRoot</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER_ROOT)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>OHEAppGroupIdentifier</key>
