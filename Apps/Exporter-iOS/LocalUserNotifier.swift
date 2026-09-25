@@ -9,7 +9,7 @@ import Watchdog
 
 private actor NotificationCooldowns {
     static let shared = NotificationCooldowns()
-    private let defaultsKey = "ohe.notificationCooldown.v1"
+    private let defaultsKey = SettingKey.notificationCooldownV1.rawValue
 
     func claim(_ notice: UserNotice, nowEpoch: TimeInterval) -> Bool {
         var state = UserDefaults.standard.data(forKey: defaultsKey)

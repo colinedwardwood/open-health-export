@@ -159,7 +159,7 @@ struct ExportOnePageIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ReturnsValue<ShortcutExportKind> {
         if let reason = ShortcutExportAuthorization.denyReason(
-            disclosureAcknowledged: UserDefaults.standard.bool(forKey: "ohe.disclosureAcknowledged"),
+            disclosureAcknowledged: UserDefaults.standard.bool(forKey: SettingKey.disclosureAcknowledged.rawValue),
             destinationEnabled: HarnessExport.hasAutomaticExport(trigger: .shortcut)
         ) {
             if reason.contains("disclosure") {
@@ -189,7 +189,7 @@ struct ExportTypeWindowIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ReturnsValue<ShortcutExportKind> {
         if let reason = ShortcutExportAuthorization.denyReason(
-            disclosureAcknowledged: UserDefaults.standard.bool(forKey: "ohe.disclosureAcknowledged"),
+            disclosureAcknowledged: UserDefaults.standard.bool(forKey: SettingKey.disclosureAcknowledged.rawValue),
             destinationEnabled: HarnessExport.hasAutomaticExport(trigger: .shortcut)
         ) {
             if reason.contains("disclosure") {
@@ -197,7 +197,7 @@ struct ExportTypeWindowIntent: AppIntent {
             }
             throw ShortcutExportError.destinationDisabled
         }
-        UserDefaults.standard.set(max(1, windowHours), forKey: "ohe.exportWindowHours")
+        UserDefaults.standard.set(max(1, windowHours), forKey: SettingKey.exportWindowHours.rawValue)
         let lines = try await HarnessExport.runOnePageEachMetric(
             metrics: [MetricID(rawValue: metricIdentifier)],
             trigger: .shortcut

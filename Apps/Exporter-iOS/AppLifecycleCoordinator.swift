@@ -42,7 +42,7 @@ final class AppLifecycleCoordinator {
 
     func startObserversIfEligible() async throws {
         guard HealthKitAvailability.isAvailable() else { return }
-        guard UserDefaults.standard.bool(forKey: "ohe.disclosureAcknowledged") else {
+        guard UserDefaults.standard.bool(forKey: SettingKey.disclosureAcknowledged.rawValue) else {
             return
         }
         let revoked = try await HarnessExport.observeAuthorizationChanges()
@@ -103,7 +103,7 @@ final class ExporterAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
 @MainActor
 enum ContinuedBackfillCoordinator {
     static let identifier = IdentifierRoot.qualified("backfill")
-    private static let modeKey = "ohe.backfillMode"
+    private static let modeKey = SettingKey.backfillMode.rawValue
 
     static func register() {
         guard #available(iOS 26.0, *) else { return }
@@ -185,7 +185,7 @@ enum BackgroundTaskCoordinator {
         }
     }
 
-    private static let submitFailureKey = "ohe.backgroundSubmitFailure"
+    private static let submitFailureKey = SettingKey.backgroundSubmitFailure.rawValue
 
     /// Submitting again replaces the pending request with the same identifier, so this
     /// is safe on every launch and foreground (#29).

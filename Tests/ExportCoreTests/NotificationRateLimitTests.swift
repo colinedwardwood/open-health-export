@@ -94,7 +94,7 @@ import Watchdog
         ),
         encoding: .utf8
     )
-    #expect(notifier.contains("ohe.notificationCooldown.v1"))
+    #expect(notifier.contains("SettingKey.notificationCooldownV1"))
     #expect(notifier.contains(#""dest.\(notice.destinationID)""#))
     #expect(notifier.contains(#""failure.\(notice.destinationID)""#))
     #expect(notifier.contains("FailureNotificationPayload.userInfo(for:"))
