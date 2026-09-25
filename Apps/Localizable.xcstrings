@@ -2839,6 +2839,50 @@
           }
         }
       }
+    },
+    "This certificate is not publicly trusted": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This certificate is not publicly trusted"
+          }
+        }
+      }
+    },
+    "Public-key fingerprint (SHA-256)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Public-key fingerprint (SHA-256)"
+          }
+        }
+      }
+    },
+    "Continue only if this exactly matches the fingerprint your server or broker shows. If you did not set up a self-signed certificate yourself, cancel.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue only if this exactly matches the fingerprint your server or broker shows. If you did not set up a self-signed certificate yourself, cancel."
+          }
+        }
+      }
+    },
+    "Trust this certificate and test": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trust this certificate and test"
+          }
+        }
+      }
     }
   }
 }

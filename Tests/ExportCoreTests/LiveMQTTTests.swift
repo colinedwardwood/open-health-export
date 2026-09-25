@@ -82,7 +82,9 @@ struct LiveMQTTTests {
     await broker.stop()
 }
 
-@Test func mqttsFirstUseAcceptsSelfSignedBrokerAndEnableRecordsThePin() async throws {
+/// #66: the first probe of a self-signed broker reads its certificate and stops before
+/// CONNECT, which would carry the credentials; the confirmed retry pins it.
+@Test func mqttsSelfSignedBrokerGetsNoConnectUntilTheFingerprintIsConfirmed() async throws {
     let material = try LoopbackTLS.material()
     let broker = try LocalMQTTBroker(parameters: LocalMQTTBroker.tlsParameters(identity: material.identity))
     let port = try await broker.start()
@@ -92,18 +94,49 @@ struct LiveMQTTTests {
         clientID: "c1",
         topic: "ohe/health"
     )
-    let stream = NWByteStream(
-        endpoint: try StreamEndpoint.parse(
-            "mqtts://127.0.0.1:\(port)",
-            allowedHosts: ["127.0.0.1"]
-        ),
-        options: NWByteStream.Options(failFastOnWaiting: true)
+    let endpoint = try StreamEndpoint.parse(
+        "mqtts://127.0.0.1:\(port)",
+        allowedHosts: ["127.0.0.1"]
+    )
+    let capture = NWByteStream(
+        endpoint: endpoint,
+        options: NWByteStream.Options(failFastOnWaiting: true, capturesUntrustedIdentity: true)
+    )
+    var unconfirmed: TLSIdentity?
+    do {
+        _ = try await MQTTDestinationEnable.complete(
+            destination: destination,
+            pipe: ByteStreamMQTTPipe(stream: capture),
+            exporterID: "00000000-0000-4000-8000-000000000090",
+            emittedAt: "2026-01-01T00:00:00Z"
+        )
+        Issue.record("an untrusted broker enabled without confirmation")
+    } catch let TrustConfirmation.required(identity) {
+        unconfirmed = identity
+    }
+    await capture.close()
+    #expect(unconfirmed?.leafSPKISha256 == material.pin.leafSPKISha256)
+    #expect(await broker.receivedBytes == 0)
+
+    let confirmed = try #require(unconfirmed)
+    let pinned = NWByteStream(
+        endpoint: endpoint,
+        options: NWByteStream.Options(
+            pin: PinRecord(
+                leafSPKISha256: confirmed.leafSPKISha256,
+                issuerSPKISha256: confirmed.issuerSPKISha256,
+                firstSeen: "2026-01-01T00:00:00Z",
+                policy: .leaf
+            ),
+            failFastOnWaiting: true
+        )
     )
     let completed = try await MQTTDestinationEnable.complete(
         destination: destination,
-        pipe: ByteStreamMQTTPipe(stream: stream),
+        pipe: ByteStreamMQTTPipe(stream: pinned),
         exporterID: "00000000-0000-4000-8000-000000000090",
-        emittedAt: "2026-01-01T00:00:00Z"
+        emittedAt: "2026-01-01T00:00:00Z",
+        confirmedLeafSPKISha256: confirmed.leafSPKISha256
     )
     #expect(completed.identity?.leafSPKISha256 == material.pin.leafSPKISha256)
     #expect(completed.identity?.notBefore.hasSuffix("Z") == true)

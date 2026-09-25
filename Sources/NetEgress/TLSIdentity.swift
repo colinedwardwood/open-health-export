@@ -18,6 +18,14 @@ public enum AddressClass: String, Sendable, Equatable {
 }
 
 public struct TLSIdentity: Sendable, Equatable {
+    /// "publicCA" when the chain passed the system trust evaluation; "untrusted" for a
+    /// self-signed or private-CA certificate, which may only carry data once its
+    /// fingerprint is confirmed and pinned (#66).
+    public static let systemTrustedAnchor = "publicCA"
+    public static let untrustedAnchor = "untrusted"
+
+    public var isSystemTrusted: Bool { trustAnchorKind == Self.systemTrustedAnchor }
+
     public var leafSPKISha256: String
     public var issuerSPKISha256: String
     public var tlsVersion: String

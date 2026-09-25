@@ -12,6 +12,9 @@ public enum StreamError: Error, Equatable, LocalizedError {
     case readTimeout
     case transport(String)
     case pinMismatch
+    /// #66: the certificate is not trusted by the system and no confirmed pin covers
+    /// it. Nothing was sent.
+    case untrustedCertificate
     case badPort
     case badServiceName
     case badPreSharedKey
@@ -40,6 +43,8 @@ public enum StreamError: Error, Equatable, LocalizedError {
             "The destination transport failed."
         case .pinMismatch:
             "The destination identity changed. Export stopped before sending data."
+        case .untrustedCertificate:
+            "The destination's certificate is not trusted and its fingerprint has not been confirmed. Nothing was sent."
         case .badPort:
             "The destination port is invalid."
         case .badServiceName:

@@ -61,7 +61,7 @@ public enum TransportFault {
             case .badPort, .badServiceName, .badPreSharedKey, .unsupportedPlatform:
                 // Misconfiguration we produced, not a network verdict; never retried as one.
                 return .internalFault(String(describing: stream))
-            case .pinMismatch, .addressClassViolation:
+            case .pinMismatch, .untrustedCertificate, .addressClassViolation:
                 return nil
             }
         }

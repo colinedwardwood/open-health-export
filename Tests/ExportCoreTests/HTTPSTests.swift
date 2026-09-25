@@ -807,26 +807,47 @@ private func writeHTTPSPayload() throws -> (URL, BatchID) {
 #if canImport(Network) && os(macOS)
 @Suite(.serialized)
 struct HTTPSPinnedLoopbackTests {
-@Test func httpsEnablePinsSelfSignedLoopbackAndURLSessionHonoursThePin() async throws {
+/// #66: a self-signed server gets nothing, not even the canary, until the person
+/// confirms its fingerprint; setup then continues pinned to exactly that certificate.
+@Test func httpsSelfSignedEnableSendsNothingUntilTheFingerprintIsConfirmed() async throws {
     let material = try LoopbackTLS.material()
     let server = try LocalHTTPSServer(parameters: LocalHTTPSServer.tlsParameters(identity: material.identity))
     let port = try await server.start()
     let destination = try HTTPSDestination(
         urlString: "https://127.0.0.1:\(port)/hook",
-        allowedHosts: ["127.0.0.1"]
+        allowedHosts: ["127.0.0.1"],
+        authorizationBearer: "not-for-an-unconfirmed-peer"
     )
     let transport = try SystemHTTPTransport.make(
         probing: destination.url,
         allowedHosts: ["127.0.0.1"]
     )
+    var unconfirmed: TLSIdentity?
+    do {
+        _ = try await HTTPSDestinationEnable.complete(
+            destination: destination,
+            transport: transport,
+            exporterID: "00000000-0000-4000-8000-000000000025",
+            emittedAt: "2026-01-01T00:00:00Z"
+        )
+        Issue.record("an untrusted certificate enabled without confirmation")
+    } catch let TrustConfirmation.required(identity) {
+        unconfirmed = identity
+    }
+    #expect(unconfirmed?.leafSPKISha256 == material.pin.leafSPKISha256)
+    #expect(unconfirmed?.isSystemTrusted == false)
+    #expect(await server.receivedBytes == 0)
+
     let completed = try await HTTPSDestinationEnable.complete(
         destination: destination,
         transport: transport,
         exporterID: "00000000-0000-4000-8000-000000000025",
-        emittedAt: "2026-01-01T00:00:00Z"
+        emittedAt: "2026-01-01T00:00:00Z",
+        confirmedLeafSPKISha256: unconfirmed?.leafSPKISha256
     )
     #expect(completed.identity?.leafSPKISha256 == material.pin.leafSPKISha256)
     #expect(completed.report.allowsEnablement)
+    #expect(await server.receivedBytes > 0)
     let preview = String(decoding: completed.preview, as: UTF8.self)
     #expect(preview.contains("\"kind\":\"canary\""))
     #expect(preview.contains("\"code\":\"OHE1-HTTPS\""))
@@ -838,6 +859,52 @@ struct HTTPSPinnedLoopbackTests {
     )
     let receipt = try await sink.send(fileHandle: file.path, idempotencyKey: batchID)
     #expect(receipt.statusOnly)
+    await server.stop()
+}
+
+/// #66: with no pin, a self-signed certificate gets ordinary system trust, so an
+/// unpinned request (the advisory feed, OTLP, a record saved without a pin) fails and
+/// no request reaches the server.
+@Test func unpinnedURLSessionRejectsASelfSignedServer() async throws {
+    let material = try LoopbackTLS.material()
+    let server = try LocalHTTPSServer(parameters: LocalHTTPSServer.tlsParameters(identity: material.identity))
+    let port = try await server.start()
+    let (file, _) = try writeHTTPSPayload()
+    let request = OutboundHTTPRequest(
+        method: "POST",
+        url: URL(string: "https://127.0.0.1:\(port)/hook")!,
+        headers: ["Authorization": "Bearer not-for-an-untrusted-peer"],
+        bodyFile: file
+    )
+    await #expect(throws: (any Error).self) {
+        _ = try await URLSessionHTTPTransport().execute(request)
+    }
+    #expect(await server.receivedBytes == 0)
+    await server.stop()
+}
+
+/// #66: a stream opened only to read an untrusted certificate refuses to send, and an
+/// ordinary unpinned stream refuses the handshake as untrusted.
+@Test func untrustedCertificateStreamsNeverSend() async throws {
+    let material = try LoopbackTLS.material()
+    let server = try LocalHTTPSServer(parameters: LocalHTTPSServer.tlsParameters(identity: material.identity))
+    let port = try await server.start()
+    let endpoint = try StreamEndpoint.parse("https://127.0.0.1:\(port)", allowedHosts: ["127.0.0.1"])
+    let capture = NWByteStream(
+        endpoint: endpoint,
+        options: .init(failFastOnWaiting: true, capturesUntrustedIdentity: true)
+    )
+    try await capture.open()
+    #expect(await capture.identity()?.isSystemTrusted == false)
+    await #expect(throws: StreamError.untrustedCertificate) {
+        try await capture.send(Data("GET / HTTP/1.1\r\n\r\n".utf8))
+    }
+    await capture.close()
+    let plain = NWByteStream(endpoint: endpoint, options: .init(failFastOnWaiting: true))
+    await #expect(throws: StreamError.untrustedCertificate) {
+        try await plain.open()
+    }
+    #expect(await server.receivedBytes == 0)
     await server.stop()
 }
 

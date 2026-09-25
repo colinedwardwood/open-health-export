@@ -18,6 +18,9 @@ extension TLSIdentity {
         let issuerSPKI = issuer
             .flatMap { try? SPKIDigest.sha256Hex(certificateDER: SecCertificateCopyData($0) as Data) }
         let leafDER = SecCertificateCopyData(leaf) as Data
+        // #66: record whether the chain is trusted. Callers decide what an untrusted
+        // chain may do; it is never treated as trusted by default.
+        let systemTrusted = SecTrustEvaluateWithError(trust, nil)
         let dates = try? SPKIDigest.validity(certificateDER: leafDER)
         return TLSIdentity(
             leafSPKISha256: leafSPKI,
@@ -30,7 +33,7 @@ extension TLSIdentity {
             notAfter: dates?.notAfter ?? "",
             resolvedAddress: "",
             addressClass: .unknown,
-            trustAnchorKind: "pin"
+            trustAnchorKind: systemTrusted ? systemTrustedAnchor : untrustedAnchor
         )
     }
 }

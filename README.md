@@ -104,9 +104,13 @@ Supported sinks in this tree:
   Discovery is not authorization.
 
 HTTPS and MQTT destinations show a confirmation card with the grouped certificate
-fingerprint and a dry-run canary **before** Health data can move. An
-unacknowledged destination change keeps a non-dismissible in-app banner until you
-acknowledge it.
+fingerprint and a dry-run canary **before** Health data can move. A certificate
+that is not publicly trusted (self-signed, or from a private CA) is sent nothing,
+not even the canary or its credentials, until you compare its fingerprint with the
+one your server shows and confirm it; the destination is then pinned to exactly
+that certificate. Without a pin, every TLS connection requires ordinary system
+trust. An unacknowledged destination change keeps a non-dismissible in-app banner
+until you acknowledge it.
 
 Every new destination starts with **zero Health types** and cannot export until
 you choose its types and date range. **Use Core Daily** applies the 27 named

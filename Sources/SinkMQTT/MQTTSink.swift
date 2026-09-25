@@ -237,7 +237,14 @@ extension MQTTSink {
     /// Dials with `NetEgress`'s byte stream. A pin is the trust decision for `mqtts`
     /// (self-signed home brokers). Plaintext `mqtt` uses POSIX TCP so Linux CI can
     /// reach a real Mosquitto; TLS remains Darwin-only.
-    public static func overNetwork(destination: MQTTDestination, pin: PinRecord?) throws -> MQTTSink {
+    /// `capturesUntrustedIdentity` is for the first setup probe only: it lets the TLS
+    /// handshake finish with a self-signed broker so its fingerprint can be shown, and
+    /// the stream then refuses to send anything (#66).
+    public static func overNetwork(
+        destination: MQTTDestination,
+        pin: PinRecord?,
+        capturesUntrustedIdentity: Bool = false
+    ) throws -> MQTTSink {
         let endpoint = try streamEndpoint(for: destination)
         if endpoint.usesTLS {
             #if canImport(Network)
@@ -253,7 +260,8 @@ extension MQTTSink {
                 options: NWByteStream.Options(
                     pin: pin,
                     failFastOnWaiting: true,
-                    clientIdentity: clientIdentity
+                    clientIdentity: clientIdentity,
+                    capturesUntrustedIdentity: capturesUntrustedIdentity
                 )
             )
             return MQTTSink(destination: destination, pipe: ByteStreamMQTTPipe(stream: stream))

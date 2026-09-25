@@ -26,6 +26,7 @@ public enum HTTPSDestinationEnable {
         canaryCode: String = "OHE1-HTTPS",
         meteredPolicy: MeteredNetworkPolicy = .refuseMetered,
         pathConditions: NetworkPathConditions = .clear,
+        confirmedLeafSPKISha256: String? = nil,
         onProgress: DestinationTestProgress? = nil
     ) async throws -> HTTPSDestinationProbe {
         let prepared = try await prepare(
@@ -37,6 +38,7 @@ public enum HTTPSDestinationEnable {
             canaryCode: canaryCode,
             meteredPolicy: meteredPolicy,
             pathConditions: pathConditions,
+            confirmedLeafSPKISha256: confirmedLeafSPKISha256,
             onProgress: onProgress
         )
         guard prepared.report.allowsEnablement else {
@@ -84,7 +86,8 @@ public enum HTTPSDestinationEnable {
         pinPolicy: PinPolicy = .leaf,
         canaryCode: String = "OHE1-HTTPS",
         meteredPolicy: MeteredNetworkPolicy = .refuseMetered,
-        pathConditions: NetworkPathConditions = .clear
+        pathConditions: NetworkPathConditions = .clear,
+        confirmedLeafSPKISha256: String? = nil
     ) async throws -> (
         destination: VerifiedDestination,
         events: [TrustEvent],
@@ -100,7 +103,8 @@ public enum HTTPSDestinationEnable {
             pinPolicy: pinPolicy,
             canaryCode: canaryCode,
             meteredPolicy: meteredPolicy,
-            pathConditions: pathConditions
+            pathConditions: pathConditions,
+            confirmedLeafSPKISha256: confirmedLeafSPKISha256
         )
         let committed = try commit(probe: probe, transport: transport)
         return (
@@ -121,6 +125,7 @@ public enum HTTPSDestinationEnable {
         canaryCode: String,
         meteredPolicy: MeteredNetworkPolicy,
         pathConditions: NetworkPathConditions,
+        confirmedLeafSPKISha256: String?,
         onProgress: DestinationTestProgress?
     ) async throws -> (
         setup: DestinationSetup,
@@ -148,6 +153,11 @@ public enum HTTPSDestinationEnable {
         if destination.url.scheme?.lowercased() == "https" {
             guard let identity else {
                 throw EgressError.transport("HTTPS destination returned no TLS identity")
+            }
+            // #66: stop before the canary, which carries the bearer token, unless the
+            // system trusts this certificate or the person confirmed this exact one.
+            guard TrustConfirmation.permits(identity, confirmedLeafSPKISha256: confirmedLeafSPKISha256) else {
+                throw TrustConfirmation.required(identity)
             }
             try setup.recordPin(
                 from: identity,
