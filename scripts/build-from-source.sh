@@ -11,6 +11,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ./scripts/generate-project.sh
+# Stamp the build number and source commit when full git history is present (#32).
+stamp="$(./scripts/version-settings.sh --optional)"
 xcodebuild \
   -project OpenHealthExporter.xcodeproj \
   -scheme ExporteriOS \
@@ -19,6 +21,7 @@ xcodebuild \
   CODE_SIGN_IDENTITY="-" \
   CODE_SIGNING_ALLOWED=YES \
   DEVELOPMENT_TEAM= \
+  $stamp \
   build
 xcodebuild \
   -project OpenHealthExporter.xcodeproj \
@@ -28,4 +31,5 @@ xcodebuild \
   CODE_SIGN_IDENTITY="-" \
   CODE_SIGNING_ALLOWED=YES \
   DEVELOPMENT_TEAM= \
+  $stamp \
   build
