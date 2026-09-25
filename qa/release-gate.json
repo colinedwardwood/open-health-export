@@ -39,11 +39,8 @@
     "darwin-package",
     "ios-build",
     "ios-ui (0, iPhone)",
-    "ios-ui (0, iPad)",
     "ios-ui (1, iPhone)",
-    "ios-ui (1, iPad)",
     "ios-ui (2, iPhone)",
-    "ios-ui (2, iPad)",
     "from-source",
     "mac-companion",
     "release-artifact-scan",
@@ -69,13 +66,7 @@
     "full-state-matrix (iPhone, 2)",
     "full-state-matrix (iPhone, 3)",
     "full-state-matrix (iPhone, 4)",
-    "full-state-matrix (iPhone, 5)",
-    "full-state-matrix (iPad, 0)",
-    "full-state-matrix (iPad, 1)",
-    "full-state-matrix (iPad, 2)",
-    "full-state-matrix (iPad, 3)",
-    "full-state-matrix (iPad, 4)",
-    "full-state-matrix (iPad, 5)"
+    "full-state-matrix (iPhone, 5)"
   ],
   "requiredMatrix": {
     "iOS": "18.0",
