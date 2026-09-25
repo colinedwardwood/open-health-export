@@ -4069,14 +4069,43 @@ enum HarnessExport {
             wakeLedger: try wakeLedger()
         )
         let metrics = try await selectedMetrics()
-        guard !metrics.isEmpty else { return coordinator }
-        try await coordinator.start(
+        guard !metrics.isEmpty else {
+            recordObserverRegistrationFailures([:])
+            return coordinator
+        }
+        let registration = try await coordinator.start(
             metrics: metrics
         ) { metric in
             try? await observeAuthorizationChanges()
             await ObserverExportGate.shared.enqueue(metric)
         }
+        recordObserverRegistrationFailures(registration.failures)
         return coordinator
+    }
+
+    private static let observerFailuresKey = "ohe.observerRegistrationFailures"
+
+    /// #28: a type whose observer could not register still exports on foreground and
+    /// scheduled wakes, but it will not wake the app itself. That has to be visible.
+    private static func recordObserverRegistrationFailures(_ failures: [MetricID: String]) {
+        if failures.isEmpty {
+            UserDefaults.standard.removeObject(forKey: observerFailuresKey)
+        } else {
+            UserDefaults.standard.set(
+                Dictionary(uniqueKeysWithValues: failures.map { ($0.key.rawValue, $0.value) }),
+                forKey: observerFailuresKey
+            )
+        }
+    }
+
+    static func observerRegistrationFailureSummary() -> String? {
+        guard let failures = UserDefaults.standard.dictionary(forKey: observerFailuresKey)
+            as? [String: String], !failures.isEmpty
+        else { return nil }
+        let names = failures.keys.sorted()
+            .map { $0.replacingOccurrences(of: "_", with: " ") }
+            .joined(separator: ", ")
+        return "Background Health delivery is not registered for: \(names). These still export when the app opens or iOS schedules a run."
     }
 
     private static func companionTestReportURL(root: URL) -> URL {

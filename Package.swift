@@ -177,7 +177,7 @@ targets.append(contentsOf: [
     ),
     .testTarget(
         name: "HealthKitSourceTests",
-        dependencies: ["HealthKitSource", "EnginePorts", "CoreDomain", "CoreTemporal", "MetricCatalog"]
+        dependencies: ["HealthKitSource", "EnginePorts", "CoreDomain", "CoreTemporal", "MetricCatalog", "RunJournal"]
     ),
 ])
 #endif

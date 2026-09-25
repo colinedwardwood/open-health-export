@@ -206,7 +206,9 @@ enum BackgroundTaskCoordinator {
                     submit()
                     return
                 }
-                try await AppLifecycleCoordinator.shared.startObserversIfEligible()
+                // #28: observer registration is best-effort on a wake. Failing it must
+                // not skip the export pass the wake exists for.
+                try? await AppLifecycleCoordinator.shared.startObserversIfEligible()
                 if HarnessExport.hasAutomaticExport(trigger: trigger) {
                     _ = try await HarnessExport.runOnePageEachMetric(trigger: trigger)
                 }
