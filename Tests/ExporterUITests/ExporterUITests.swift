@@ -7,6 +7,10 @@ import XCTest
 /// The app's URL scheme is its identifier root from Brand.xcconfig (#35).
 private let appURLScheme = "com.cewdesign.exporter"
 
+/// #39: UIKit's own raw value. The hand-written "...AccessibilityExtraExtraExtraLarge"
+/// is not a content size category, so every "AX5" case used to run at the default size.
+private let ax5ContentSize = UIContentSizeCategory.accessibilityExtraExtraExtraLarge.rawValue
+
 @MainActor
 final class ExporterUITests: XCTestCase {
     /// CI runs three simulator clones on a shared runner, where every launch and
@@ -301,11 +305,28 @@ final class ExporterUITests: XCTestCase {
         try performAccessibilityAudit("browser-detail")
     }
 
+    /// #39 canary: the AX5 cases mean nothing unless the size is actually applied. The
+    /// disclaimer wraps onto several more lines at AX5 than at the default size.
+    func testAX5ContentSizeIsActuallyApplied() {
+        let disclaimer = app.staticTexts["first-run-disclaimer"]
+        XCTAssertTrue(disclaimer.waitForExistence(timeout: uiWait))
+        let defaultHeight = disclaimer.frame.height
+        app.terminate()
+        app.launchArguments += ["-UIPreferredContentSizeCategoryName", ax5ContentSize]
+        app.launch()
+        XCTAssertTrue(disclaimer.waitForExistence(timeout: uiWait))
+        XCTAssertGreaterThanOrEqual(
+            disclaimer.frame.height,
+            defaultHeight * 2,
+            "AX5 \(disclaimer.frame.height)pt vs default \(defaultHeight)pt"
+        )
+    }
+
     func testAccessibilityExtraExtraExtraLargeContentSize() throws {
         app.terminate()
         app.launchArguments += [
             "-UIPreferredContentSizeCategoryName",
-            "UICTContentSizeCategoryAccessibilityExtraExtraExtraLarge",
+            ax5ContentSize,
         ]
         app.launch()
         XCTAssertTrue(app.buttons["disclosure-continue"].waitForExistence(timeout: uiWait))
@@ -324,7 +345,7 @@ final class ExporterUITests: XCTestCase {
         app.launchEnvironment["OHE_ACCESSIBILITY_MATRIX"] = "combined"
         app.launchArguments += [
             "-UIPreferredContentSizeCategoryName",
-            "UICTContentSizeCategoryAccessibilityExtraExtraExtraLarge",
+            ax5ContentSize,
         ]
         app.launch()
         XCTAssertTrue(
