@@ -591,15 +591,8 @@ enum HarnessExport {
         )
     }
 
-    private static func requestScopeAuthorizationIfConfigured(
-        _ destinationID: String
-    ) async throws {
-        let scope = try await destinationScope(destinationID)
-        guard scope.isConfigured else { return }
-        try await HealthKitAuthorization.requestReadAccess(
-            metrics: scope.metrics.sorted { $0.rawValue < $1.rawValue }
-        )
-    }
+    // #42: forwarder; remove when the product UI calls the service.
+    private static func requestScopeAuthorizationIfConfigured(_ destinationID: String) async throws { try await AppHealth.service.requestReadAccess(for: try await destinationScope(destinationID)) }
 
     static func saveDestinationScope(_ scope: DestinationExportScope) async throws {
         let allowed = Set(MetricCatalog.selectable.map(\.id))
@@ -3978,110 +3971,21 @@ enum HarnessExport {
         )
     }
 
-    static func wakeLedger() throws -> WakeLedger {
-        let root = try applicationSupportRoot()
-        return WakeLedger(path: root.appendingPathComponent("wake-ledger.log").path)
-    }
+    // #42: forwarder; remove when the product UI calls the service.
+    static func wakeLedger() throws -> WakeLedger { try AppHealth.service.wakeLedger() }
 
+    // #42: forwarder; remove when the product UI calls the service.
     @discardableResult
-    static func observeAuthorizationChanges() async throws -> Bool {
-        let root = try applicationSupportRoot()
-        let metrics = try await selectedMetrics()
-        guard !metrics.isEmpty else { return false }
-        let grant = HealthAuthorizationGrant(
-            id: "core-activity",
-            metrics: metrics
-        )
-        let observer = HealthAuthorizationObserver(
-            recordURL: root.appendingPathComponent("health-authorization.json")
-        )
-        let changes = try await observer.observe(
-            grants: [grant],
-            atEpoch: Date().timeIntervalSince1970
-        )
-        guard !changes.isEmpty else { return false }
+    static func observeAuthorizationChanges() async throws -> Bool { try await AppHealth.service.observeAuthorizationChanges() }
 
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        // A revoked type drops what every enabled destination was owed, so the
-        // ledger entry names them all rather than the archive folder alone.
-        let owed = healthDestinationIDs.filter { isDestinationEnabled($0) }
-        for change in changes {
-            for metric in change.grant.metrics {
-                try await store.purgeType(
-                    metric: metric,
-                    reason: "authorization_revoked:\(change.grant.id)",
-                    destination: owed.isEmpty
-                        ? "no enabled destination"
-                        : owed.joined(separator: ","),
-                    atEpoch: change.observedAtEpoch
-                )
-            }
-            await HealthKitBackgroundDelivery.disable(metrics: change.grant.metrics)
-            _ = try await LocalUserNotifier().notify(
-                UserNotice(
-                    kind: .healthAccessRevoked,
-                    destination: change.grant.id
-                )
-            )
-        }
-        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
-        return true
-    }
+    // #42: forwarder; remove when the product UI calls the service.
+    static func reenableCoreActivityAfterAuthorizationRequest() async throws { try await AppHealth.service.reenableAfterAuthorizationRequest() }
 
-    static func reenableCoreActivityAfterAuthorizationRequest() async throws {
-        let root = try applicationSupportRoot()
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        for metric in try await selectedMetrics() {
-            try await store.reenableType(
-                metric: metric,
-                reason: "user_requested_core_activity"
-            )
-        }
-    }
+    // #42: forwarder; remove when the product UI calls the service.
+    static func startHealthObservers() async throws -> HealthKitObserverCoordinator { try await AppHealth.service.startObservers { await ObserverExportGate.shared.enqueue($0) } }
 
-    static func startHealthObservers() async throws -> HealthKitObserverCoordinator {
-        let coordinator = HealthKitObserverCoordinator(
-            wakeLedger: try wakeLedger()
-        )
-        let metrics = try await selectedMetrics()
-        guard !metrics.isEmpty else {
-            recordObserverRegistrationFailures([:])
-            return coordinator
-        }
-        let registration = try await coordinator.start(
-            metrics: metrics
-        ) { metric in
-            try? await observeAuthorizationChanges()
-            await ObserverExportGate.shared.enqueue(metric)
-        }
-        recordObserverRegistrationFailures(registration.failures)
-        return coordinator
-    }
-
-    private static let observerFailuresKey = SettingKey.observerRegistrationFailures.rawValue
-
-    /// #28: a type whose observer could not register still exports on foreground and
-    /// scheduled wakes, but it will not wake the app itself. That has to be visible.
-    private static func recordObserverRegistrationFailures(_ failures: [MetricID: String]) {
-        if failures.isEmpty {
-            UserDefaults.standard.removeObject(forKey: observerFailuresKey)
-        } else {
-            UserDefaults.standard.set(
-                Dictionary(uniqueKeysWithValues: failures.map { ($0.key.rawValue, $0.value) }),
-                forKey: observerFailuresKey
-            )
-        }
-    }
-
-    static func observerRegistrationFailureSummary() -> String? {
-        guard let failures = UserDefaults.standard.dictionary(forKey: observerFailuresKey)
-            as? [String: String], !failures.isEmpty
-        else { return nil }
-        let names = failures.keys.sorted()
-            .map { $0.replacingOccurrences(of: "_", with: " ") }
-            .joined(separator: ", ")
-        return "Background Health delivery is not registered for: \(names). These still export when the app opens or iOS schedules a run."
-    }
+    // #42: forwarder; remove when the product UI calls the service.
+    static func observerRegistrationFailureSummary() -> String? { AppHealth.service.observerRegistrationFailureSummary() }
 
     private static func companionTestReportURL(root: URL) -> URL {
         root.appendingPathComponent("companion-test.json")
