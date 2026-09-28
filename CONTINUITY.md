@@ -1,6 +1,6 @@
 # Project continuity
 
-Open Health Exporter is an owner-directed commercial open-source project. It is
+KeepMyMetrics is an owner-directed commercial open-source project. It is
 not recruiting maintainers. This document describes what remains possible if
 the owner is unavailable; it does not imply that a deputy or credential escrow
 exists.

@@ -1,6 +1,6 @@
 # Privacy policy
 
-Open Health Exporter is designed without accounts, advertising, analytics, crash reporting,
+KeepMyMetrics is designed without accounts, advertising, analytics, crash reporting,
 or a developer-operated Health-data service.
 
 The project does not collect, sell, or share personal information. It does not send product

@@ -1,9 +1,14 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// D-06 is open. This is the only file that may contain a user-visible product name.
-PRODUCT_NAME = OpenHealthExporter
-DISPLAY_NAME = Open Health Exporter
+// D-06: the product is KeepMyMetrics (owner decision 2026-09-25; counsel clearance in #22).
+// This is the only file that may contain a user-visible product name.
+PRODUCT_NAME = KeepMyMetrics
+// The App Store name, which store/en/name.txt must match.
+STORE_NAME = KeepMyMetrics
+// The label under the icon, and the name iOS shows in Settings and in Health's app
+// list. Kept to 12 characters so it does not truncate on the home screen.
+DISPLAY_NAME = Keep Metrics
 
 // #11 / #35: the neutral, owner-held root every identifier derives from: bundle IDs,
 // the App Group, background tasks, the URL scheme, keychain services and log

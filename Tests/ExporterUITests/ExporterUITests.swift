@@ -167,7 +167,7 @@ final class ExporterUITests: XCTestCase {
         )
         XCTAssertEqual(
             scrollSettings(app.staticTexts["wipe-health-path"]).label,
-            "To turn access off: Health → your profile picture → Privacy → Apps → Open Health Exporter."
+            "To turn access off: Health → your profile picture → Privacy → Apps → Keep Metrics."
         )
         XCTAssertEqual(
             scrollSettings(app.staticTexts["wipe-mac-limit"]).label,
@@ -198,7 +198,7 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(app.otherElements["privacy-gate"].exists)
         XCTAssertEqual(
             app.staticTexts["privacy-gate-locked-title"].label,
-            "Open Health Exporter is locked"
+            "Keep Metrics is locked"
         )
         XCTAssertTrue(
             app.staticTexts["privacy-gate-background-scope"].label.contains("Background exports")
@@ -232,7 +232,7 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(app.otherElements["privacy-gate"].exists)
         XCTAssertEqual(
             app.staticTexts["privacy-gate-locked-title"].label,
-            "Open Health Exporter is locked"
+            "Keep Metrics is locked"
         )
         XCTAssertFalse(app.buttons["health-request"].exists)
     }

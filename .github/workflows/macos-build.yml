@@ -75,7 +75,7 @@ jobs:
       - name: App and widget carry one version, build and source commit
         run: |
           ./scripts/check-built-versions.sh \
-            "$RUNNER_TEMP/ohe-dd/Build/Products/Debug-iphonesimulator/OpenHealthExporter.app"
+            "$RUNNER_TEMP/ohe-dd/Build/Products/Debug-iphonesimulator/KeepMyMetrics.app"
       - name: Publish the built products for the test shards
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -114,7 +114,7 @@ jobs:
           OHE_SMOKE_SETTLE_SECONDS: "30"
         run: |
           ./scripts/smoke-launch.sh \
-            "$RUNNER_TEMP/ohe-release/Build/Products/Release-iphonesimulator/OpenHealthExporter.app"
+            "$RUNNER_TEMP/ohe-release/Build/Products/Release-iphonesimulator/KeepMyMetrics.app"
 
   ios-ui:
     needs: ios-build

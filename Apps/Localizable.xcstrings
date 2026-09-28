@@ -2752,17 +2752,6 @@
         }
       }
     },
-    "Open Health Exporter is locked": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Open Health Exporter is locked"
-          }
-        }
-      }
-    },
     "Require Face ID, Touch ID, or device passcode to open the app": {
       "extractionState": "manual",
       "localizations": {
@@ -2880,6 +2869,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trust this certificate and test"
+          }
+        }
+      }
+    },
+    "%@ is locked": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is locked"
           }
         }
       }

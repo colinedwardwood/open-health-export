@@ -440,7 +440,7 @@ import Testing
         "with-telemetry",
         "without-telemetry",
         "OHE_OBS25_SIZE_BASELINE",
-        "Release-iphoneos/OpenHealthExporter.app",
+        "Release-iphoneos/KeepMyMetrics.app",
     ] {
         #expect(gate.contains(evidence), "OBS-25 A/B gate lacks \(evidence)")
     }

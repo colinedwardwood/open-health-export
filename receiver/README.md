@@ -1,4 +1,4 @@
-# Open Health Exporter reference receiver
+# KeepMyMetrics reference receiver
 
 This is not a medical device. It does not diagnose or treat anything.
 

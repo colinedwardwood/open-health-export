@@ -1,4 +1,4 @@
-# Open Health Exporter
+# KeepMyMetrics
 
 An Apple Health exporter that tells you the truth about what it did.
 

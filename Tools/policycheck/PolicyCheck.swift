@@ -1311,10 +1311,10 @@ struct PolicyCheck {
     /// Fielding it only in App Store Connect would make the gate unenforceable.
     static func checkStoreCopy(root: URL, disclaimer: String) throws {
         let brand = try String(contentsOf: root.appendingPathComponent("Brand.xcconfig"), encoding: .utf8)
-        var displayName = "Open Health Exporter"
+        var displayName = ""
         for raw in brand.split(whereSeparator: \.isNewline) {
             let line = String(raw).trimmingCharacters(in: .whitespaces)
-            if line.hasPrefix("DISPLAY_NAME") {
+            if line.hasPrefix("STORE_NAME") {
                 displayName = line.split(separator: "=", maxSplits: 1)
                     .last?
                     .trimmingCharacters(in: .whitespaces) ?? displayName
@@ -1356,7 +1356,7 @@ struct PolicyCheck {
                 problems.append("\(relative) is missing the canonical disclaimer")
             }
             if field == "name", text != displayName {
-                problems.append("\(relative) must match Brand.xcconfig DISPLAY_NAME (\(displayName))")
+                problems.append("\(relative) must match Brand.xcconfig STORE_NAME (\(displayName))")
             }
         }
         if !problems.isEmpty {
@@ -1870,7 +1870,7 @@ struct PolicyCheck {
             libraries.append("- zlib (CZlib)")
         }
         return """
-        Open Health Exporter
+        KeepMyMetrics
         Copyright (c) 2026 Colin Edward Wood and contributors
 
         Licensed under AGPL-3.0-or-later with the additional permission in COPYING.

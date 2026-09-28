@@ -626,6 +626,7 @@ superseded.
 | D-16 | **Mac companion ships in 1.1**, after its pairing protocol is redesigned | #15, #110 |
 | D-17 | **No EU/EEA storefronts at launch.** Add them once the counsel opinion and a Cyber Resilience Act reporting process exist | #19, RK-10 |
 | D-18 | **The advisory feed is built properly for 1.0**: Ed25519 signatures with offline keys (#65, done), on a host the owner controls (#20, #67). Off by default until then (#30) | #14 |
+| D-06a | **The product name is KeepMyMetrics** (owner decision after two screened rounds of about 90 candidates). Store name "KeepMyMetrics", subtitle "Your vitals, on your server"; the home-screen label and in-app name is "Keep Metrics" (12 characters, so it does not truncate). `keepmymetrics.com` and `.app` were unregistered when checked | Counsel must still clear it (#22), in particular against the registered "keep metrics®" mark of an e-commerce accounting firm. Supersedes the open part of D-06 |
 | D-19 | **No branch protection on `main` during the beta**; the previous rules are saved for reinstatement before public release | #16 |
 
 ### 11.1 Original decision framing

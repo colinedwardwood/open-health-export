@@ -38,7 +38,7 @@ build() {
     CODE_SIGNING_ALLOWED=NO \
     "$@" \
     build >/dev/null
-  measure "$work/$label/Release-iphoneos/OpenHealthExporter.app"
+  measure "$work/$label/Release-iphoneos/KeepMyMetrics.app"
 }
 
 ./scripts/generate-project.sh >/dev/null
