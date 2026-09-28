@@ -28,12 +28,6 @@ import Watchdog
 import WidgetKit
 import WireFormat
 
-private struct QueuedWithoutAttemptSink: DestinationSink {
-    func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt {
-        throw DestinationSendError.destinationUnreachable
-    }
-}
-
 #if !OHE_OBS25_SIZE_BASELINE
 private struct OTLPDestinationRecord: Codable {
     var urlString: String
@@ -123,115 +117,6 @@ struct MQTTVerificationRecord: Codable {
     var importedLocalIdentifier: String?
 }
 
-private actor CountingBackfillObservations: DayObservationSource {
-    let base: HealthKitDayObservationSource
-    private var samplesRead = 0
-
-    init(base: HealthKitDayObservationSource) {
-        self.base = base
-    }
-
-    func samples(metric: MetricID, day: String) async throws -> [SampleRecord] {
-        let samples = try await base.samples(metric: metric, day: day)
-        samplesRead += samples.count
-        return samples
-    }
-
-    func count() -> Int {
-        samplesRead
-    }
-}
-
-private struct HealthBackfillProcessor: BackfillChunkProcessor {
-    var observations: HealthKitDayObservationSource
-    var statistics: HealthKitStatisticsSource
-    /// Every sink this job was planned for. History is the one read a user waits
-    /// minutes for: it is read once and fans out, so an archive-only backfill would
-    /// leave the other sinks holding today's data and nothing before it, and a
-    /// sweep per sink would multiply the read the R-75 budget measures.
-    var destinations: [RunDestination]
-    var store: any StateStore
-    var scratchDirectory: URL
-    var exporterID: String
-    var temporal: TemporalContext
-    var ledgerHeadSeal: any LedgerHeadSeal
-    var ledgerSealURL: URL
-    var externalStatusDirectory: URL?
-
-    func process(
-        metric: MetricID,
-        days: [String],
-        mode: BackfillMode
-    ) async throws -> BackfillChunkResult {
-        let owed = destinations.filter {
-            $0.scope.map { $0.metrics.contains(metric) } ?? true
-        }
-        guard !owed.isEmpty else {
-            return BackfillChunkResult(samplesRead: 0, batchesEnqueued: 0)
-        }
-        let counted = CountingBackfillObservations(base: observations)
-        let now = Date().ISO8601Format()
-        let rows = DestinationRowCollector()
-        var sweep = ReconcileSweep(
-            observations: counted,
-            destination: owed[0].destination,
-            store: store,
-            metric: metric,
-            scratchDirectory: scratchDirectory,
-            destinationName: owed[0].id,
-            envelope: WireEnvelope(
-                exporterId: exporterID,
-                seq: 1,
-                emittedAt: now,
-                observedAt: now
-            ),
-            temporal: temporal,
-            statistics: statistics,
-            trigger: .manual,
-            snapshotURL: owed[0].snapshotURL
-                ?? StatusSnapshotLocation.url(destinationID: owed[0].id),
-            externalStatusURL: externalStatusDirectory?
-                .appendingPathComponent("status.json"),
-            ledgerHeadSeal: ledgerHeadSeal,
-            ledgerSealURL: ledgerSealURL,
-            scope: owed[0].scope,
-            freshnessCadenceSeconds: HarnessExport.freshnessCadenceSeconds(),
-            deferForLowPower: HarnessExport.isLowPowerDeferred(),
-            destinations: owed
-        )
-        sweep.rowCollector = rows
-        let outcome = try await sweep.runBackfill(days: days, mode: mode)
-        HarnessExport.applyBackfillOutcomes(await rows.rows(), to: owed.map(\.id))
-        return BackfillChunkResult(
-            samplesRead: await counted.count(),
-            batchesEnqueued: outcome.kind == RunOutcome.Kind.successNothingDue ? 0 : 1
-        )
-    }
-}
-
-private actor ObserverExportGate {
-    static let shared = ObserverExportGate()
-    private var pending: Set<MetricID> = []
-    private var running = false
-
-    func enqueue(_ metric: MetricID) async {
-        guard HarnessExport.hasAutomaticExport(trigger: .observerQuery) else {
-            return
-        }
-        pending.insert(metric)
-        guard !running else { return }
-        running = true
-        defer { running = false }
-        while let next = pending.first {
-            pending.remove(next)
-            _ = try? await HarnessExport.runOnePageEachMetric(
-                metrics: [next],
-                trigger: .observerQuery
-            )
-        }
-    }
-}
-
 enum HarnessExport {
     static let healthDestinationIDs = [
         "local-file", "https", "home-assistant", "mqtt", "companion",
@@ -239,50 +124,35 @@ enum HarnessExport {
 
     /// UX-29: the 413 shorten-window action writes `ohe.exportWindowHours`; HealthKit
     /// pages follow that owned setting so the next batch is smaller.
-    static func samplePageLimit() -> Int {
-        let stored = UserDefaults.standard.object(forKey: SettingKey.exportWindowHours.rawValue) as? Int
-        return SamplePaging.pageLimit(
-            windowHours: stored ?? 24,
-            thermalHalved: isThermalDeferred()
-        )
-    }
+    // #42: forwarder; remove when the product UI calls the service.
+    static func samplePageLimit() -> Int { AppExport.service.samplePageLimit() }
 
-    static func gzipLevel() -> Int32 {
-        isThermalDeferred() ? Gzip.storedLevel : Gzip.speedLevel
-    }
+    // #42: forwarder; remove when the product UI calls the service.
+    static func gzipLevel() -> Int32 { AppExport.service.gzipLevel() }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func withThermalCompression<T>(
         _ body: () async throws -> T
     ) async rethrows -> T {
-        try await Gzip.$level.withValue(gzipLevel(), operation: body)
+        try await AppExport.service.withThermalCompression(body)
     }
 
-    static func freshnessCadenceSeconds() -> TimeInterval {
-        let stored = UserDefaults.standard.object(forKey: SettingKey.freshnessIntervalMinutes.rawValue) as? Int
-        return TimeInterval(max(1, stored ?? 15) * 60)
-    }
+    // #42: forwarder; remove when the product UI calls the service.
+    static func freshnessCadenceSeconds() -> TimeInterval { AppExport.service.freshnessCadenceSeconds() }
 
-    static func isLowPowerDeferred() -> Bool {
-        ProcessInfo.processInfo.isLowPowerModeEnabled
-    }
+    // #42: forwarder; remove when the product UI calls the service.
+    static func isLowPowerDeferred() -> Bool { AppExport.service.isLowPowerDeferred() }
 
-    static func isThermalDeferred() -> Bool {
-        switch ProcessInfo.processInfo.thermalState {
-        case .serious, .critical:
-            return true
-        default:
-            return false
-        }
-    }
+    // #42: forwarder; remove when the product UI calls the service.
+    static func isThermalDeferred() -> Bool { AppExport.service.isThermalDeferred() }
 
     // #42: forwarder; remove when the product UI calls the service.
     static func allowsMeteredNetwork(destinationID: String) -> Bool {
         AppDestinations.repository.allowsMeteredNetwork(destinationID)
     }
 
-    static func networkPathConditions() -> NetworkPathConditions {
-        NetworkPathMonitorCache.conditions()
-    }
+    // #42: forwarder; remove when the product UI calls the service.
+    static func networkPathConditions() -> NetworkPathConditions { AppExport.service.networkPathConditions() }
 
     // #42: forwarder; remove when the product UI calls the service.
     static func attachNetworkActivityLedger() {
@@ -339,94 +209,6 @@ enum HarnessExport {
         DestinationRepository.label(destinationID)
     }
 
-    private static func makeAutomaticRunDestination(
-        _ destinationID: String,
-        trigger: RunTrigger,
-        root: URL,
-        folderAccess: SecurityScopedAccess?
-    ) async throws -> (RunDestination, TraceparentEmission?) {
-        let scope = try await destinationScope(destinationID)
-        let role = destinationExportRole(destinationID)
-        let snapshotURL = StatusSnapshotLocation.url(destinationID: destinationID)
-        switch destinationID {
-        case "local-file":
-            guard let folderAccess else {
-                throw LocalExportFolderError.notSelected
-            }
-            let (verified, _) = try verifiedLocalFile(
-                root: root,
-                destinationDirectory: folderAccess.url
-            )
-            return (
-                RunDestination(
-                    id: destinationID,
-                    destination: verified,
-                    scope: scope,
-                    role: role,
-                    snapshotURL: snapshotURL
-                ),
-                nil
-            )
-        case "https", "home-assistant":
-            let (verified, emission) = try await verifiedHTTPSDestination(
-                destinationID: destinationID,
-                root: root
-            )
-            return (
-                RunDestination(
-                    id: destinationID,
-                    destination: verified,
-                    scope: scope,
-                    role: role,
-                    snapshotURL: snapshotURL
-                ),
-                emission
-            )
-        case "mqtt":
-            return (
-                RunDestination(
-                    id: destinationID,
-                    destination: try await verifiedMQTTDestination(root: root),
-                    scope: scope,
-                    role: role,
-                    snapshotURL: snapshotURL
-                ),
-                nil
-            )
-        case "companion":
-            if trigger.attemptsCompanionTransport {
-                let session = try await vault().load()
-                let (verified, emission) = try await verifiedCompanionDestination(
-                    session: session,
-                    root: root
-                )
-                return (
-                    RunDestination(
-                        id: destinationID,
-                        destination: verified,
-                        scope: scope,
-                        role: role,
-                        snapshotURL: snapshotURL
-                    ),
-                    emission
-                )
-            }
-            return (
-                RunDestination(
-                    id: destinationID,
-                    destination: .testing(QueuedWithoutAttemptSink()),
-                    scope: scope,
-                    role: role,
-                    snapshotURL: snapshotURL,
-                    attemptNow: false
-                ),
-                nil
-            )
-        default:
-            throw DestinationSendError.destinationUnreachable
-        }
-    }
-
     // #42: forwarder; remove when the product UI calls the service.
     static func setDestinationExportRole(
         _ role: DestinationExportRole,
@@ -477,399 +259,16 @@ enum HarnessExport {
         return id
     }
 
-    /// ADR-R8: a system-scheduled wake never migrates the store. It opens under a policy
-    /// that forbids migration, and if the on-disk schema is not this build's it journals
-    /// `migrationPending` and returns `true` so the caller finishes the wake without
-    /// exporting. Otherwise a multi-second migration runs inside a thirty-second wake and
-    /// is retried on every wake: a permanent outage that reads as a scheduling problem.
-    ///
-    /// Checked at the wake boundary rather than inside each store open, because the
-    /// decision belongs to the wake — the same migration on a foreground launch is fine.
-    static func deferWakeIfMigrationPending(trigger: RunTrigger) -> Bool {
-        guard let root = try? applicationSupportRoot() else { return false }
-        let path = root.appendingPathComponent("state.sqlite").path
-        do {
-            let probe = try StateStoreHost.store(
-                path: path,
-                policy: SQLiteOpenPolicy(allowsSchemaMigration: false)
-            )
-            withExtendedLifetime(probe) {}
-            return false
-        } catch StorageError.migrationPending(let onDisk, let expected) {
-            try? SQLiteStateStore.journalMigrationPending(
-                path: path,
-                runID: UUID().uuidString,
-                onDisk: onDisk,
-                expected: expected
-            )
-            return true
-        } catch {
-            // Any other open failure is the export path's problem to report, not ours.
-            return false
-        }
-    }
+    // #42: forwarder; remove when the product UI calls the service.
+    static func deferWakeIfMigrationPending(trigger: RunTrigger) -> Bool { AppExport.service.deferWakeIfMigrationPending(trigger: trigger) }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func runOnePageEachMetric(
         metrics: [MetricID]? = nil,
         trigger: RunTrigger = .manual,
         onProgress: (@Sendable (Int, Int) async -> Void)? = nil
     ) async throws -> [String] {
-        let plannedIDs = healthDestinationIDs.filter {
-            isDestinationEnabled($0) && allowsExport($0, trigger: trigger)
-        }
-        guard !plannedIDs.isEmpty else {
-            return [
-                "manualOnly: Automatic export skipped. This installation allows explicit exports only."
-            ]
-        }
-        defer {
-            for destinationID in plannedIDs {
-                synchronizeDestinationExportRole(destinationID)
-            }
-        }
-        let root = try applicationSupportRoot()
-        var folderAccess: SecurityScopedAccess?
-        if plannedIDs.contains("local-file") {
-            folderAccess = try localExportFolder(root: root)
-        }
-        defer { withExtendedLifetime(folderAccess) {} }
-
-        var destinations: [RunDestination] = []
-        var traceparentEmissions: [(String, TraceparentEmission)] = []
-        var unreconstructed: [String: ErrorClass] = [:]
-        for destinationID in plannedIDs {
-            do {
-                let (destination, emission) = try await makeAutomaticRunDestination(
-                    destinationID,
-                    trigger: trigger,
-                    root: root,
-                    folderAccess: folderAccess
-                )
-                destinations.append(destination)
-                if let emission {
-                    traceparentEmissions.append((destinationID, emission))
-                }
-            } catch {
-                // An enabled destination whose configuration or credential can no
-                // longer be rebuilt is not exporting, and saying nothing would let
-                // the other destinations' success stand in for it.
-                unreconstructed[destinationID] =
-                    (error as? DestinationSendError)?.errorClass ?? .internalFault
-            }
-        }
-        for (destinationID, errorClass) in unreconstructed.sorted(by: { $0.key < $1.key }) {
-            recordDestinationFailureSnapshot(destinationID, errorClass: errorClass)
-            await notifyDestinationFailure(
-                destinationID: destinationID,
-                destinationLabel: destinationLabel(destinationID)
-            )
-        }
-        guard !destinations.isEmpty else {
-            return ["blocked: No destination could be reconstructed for this export."]
-        }
-        let scopes = destinations.compactMap(\.scope)
-        for scope in scopes {
-            try ExportScopeGate.requireConfigured(scope)
-        }
-        let metrics = metrics
-            ?? Set(scopes.flatMap(\.metrics)).sorted { $0.rawValue < $1.rawValue }
-        for metric in metrics {
-            guard scopes.contains(where: { $0.metrics.contains(metric) }) else {
-                throw ExportScopeViolation.metricNotSelected(
-                    destinationID: destinations[0].id,
-                    metric: metric
-                )
-            }
-        }
-        let sqliteURL = root.appendingPathComponent("state.sqlite")
-        let dest = folderAccess?.url
-        let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
-
-        let store = try StateStoreHost.store(path: sqliteURL.path)
-        let gapIDsBefore = try await store.transact {
-            Set(try $0.loadGaps().map(\.batchID))
-        }
-        if let dest {
-            let (_, events) = try verifiedLocalFile(root: root, destinationDirectory: dest)
-            try await emitTrustNotices(events)
-        }
-        // Anything still owed from an earlier read goes before this one. A failed
-        // attempt leaves a durable obligation, and without this only the queue's
-        // time-to-live would ever clear it.
-        for destination in destinations where destination.attemptNow {
-            try await drainPendingDeliveries(
-                destination: destination.destination,
-                destinationName: destination.id,
-                store: store,
-                scope: destination.scope,
-                limit: drainLimit(trigger: trigger)
-            )
-        }
-        let context = TemporalContext.utcHost
-        let source = HealthKitAnchoredSource(
-            context: context,
-            limit: samplePageLimit(),
-            window: HealthKitQueryWindow(union: scopes)
-        )
-        let observations = HealthKitDayObservationSource(context: context, limit: samplePageLimit())
-        let statistics = HealthKitStatisticsSource(context: context)
-        let now = Date().ISO8601Format()
-        let exporterId = try installationID()
-        let ledgerSeal = ledgerHeadSeal()
-        let ledgerSealURL = root.appendingPathComponent("ledger-head-seal.json")
-
-        var lines: [String] = []
-        var kinds: [RunOutcome.Kind] = []
-        var kindsByDestination: [String: [RunOutcome.Kind]] = [:]
-        for (index, metric) in metrics.enumerated() {
-            await onProgress?(index + 1, metrics.count)
-            let primary = destinations[0]
-            let run = ExportRun(
-                source: source,
-                destination: primary.destination,
-                store: store,
-                metric: metric,
-                scratchDirectory: scratch,
-                destinationName: primary.id,
-                envelope: WireEnvelope(
-                    exporterId: exporterId,
-                    seq: 1,
-                    emittedAt: now,
-                    observedAt: now
-                ),
-                temporal: context,
-                statistics: statistics,
-                observations: observations,
-                characteristics: HealthKitCharacteristicSource(),
-                trigger: trigger,
-                snapshotURL: primary.snapshotURL,
-                externalStatusURL: dest?.appendingPathComponent("status.json"),
-                ledgerHeadSeal: ledgerSeal,
-                ledgerSealURL: ledgerSealURL,
-                scope: primary.scope,
-                freshnessCadenceSeconds: freshnessCadenceSeconds(),
-                deferForLowPower: isLowPowerDeferred(),
-                destinations: destinations
-            )
-            let result = try await run.runFanout()
-            let outcome = result.outcome
-            kinds.append(outcome.kind)
-            for destination in destinations {
-                // A destination answers for itself. Reporting the combined outcome
-                // against every sink told people a working archive folder had
-                // failed because an unrelated server was unreachable.
-                let own = result.kind(for: destination.id) ?? outcome.kind
-                kindsByDestination[destination.id, default: []].append(own)
-                await notifyIfFailed(
-                    own,
-                    destinationID: destination.id,
-                    destinationLabel: destinationLabel(destination.id)
-                )
-                if own == .success || own == .successNothingDue,
-                   let snapshotURL = destination.snapshotURL {
-                    await rescheduleOverdueNotification(snapshotURL: snapshotURL)
-                }
-            }
-            WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
-            lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
-
-            let trailing = destinations.filter(\.attemptNow)
-            if !trailing.isEmpty {
-                lines.append(
-                    try await trailingReconcileAfterDelta(
-                        observations: observations,
-                        destinations: trailing,
-                        store: store,
-                        metric: metric,
-                        scratchDirectory: scratch,
-                        envelope: WireEnvelope(
-                            exporterId: exporterId,
-                            seq: 1,
-                            emittedAt: now,
-                            observedAt: now
-                        ),
-                        temporal: context,
-                        statistics: statistics,
-                        trigger: trigger,
-                        externalStatusURL: dest?.appendingPathComponent("status.json"),
-                        ledgerHeadSeal: ledgerSeal,
-                        ledgerSealURL: ledgerSealURL
-                    )
-                )
-            }
-        }
-        let newQueueGap = try await store.transact {
-            try $0.loadGaps().contains {
-                !gapIDsBefore.contains($0.batchID)
-                    && $0.rangeDescription.hasPrefix("queue_eviction:")
-            }
-        }
-        if newQueueGap {
-            _ = try await LocalUserNotifier().notify(
-                UserNotice(kind: .queueEvicted, destination: "Configured destinations")
-            )
-        }
-        if trigger == .appForeground || trigger == .launch {
-            lines.append(
-                contentsOf: try await maybeScheduledFullReconcile(
-                    store: store,
-                    trigger: trigger
-                )
-            )
-        }
-        for (destinationID, emission) in traceparentEmissions where emission.autoDisabled {
-            if destinationID == "companion" {
-                try setCompanionTraceparent(false)
-            } else {
-                try setHTTPSTraceparent(false, destinationID: destinationID)
-            }
-            lines.append("traceparent auto-disabled after a header-plausible failure")
-        }
-        try await applyQueueRedIfNeeded(
-            store: store,
-            root: root,
-            destinationLabel: destinationLabel(destinations[0].id)
-        )
-        let combined = CombinedExportSummary.kind(kinds)
-        for destinationID in plannedIDs where unreconstructed[destinationID] == nil {
-            if let snapshotURL = StatusSnapshotLocation.url(destinationID: destinationID),
-               var snapshot = try? DestinationSnapshotFile.read(from: snapshotURL)
-            {
-                // This destination's own results across the types it was owed. A
-                // sink with no results of its own — one this trigger could only
-                // queue for — keeps the run's combined outcome, because nothing
-                // was attempted against it to say otherwise.
-                let own = kindsByDestination[destinationID].map(CombinedExportSummary.kind)
-                snapshot.applyLastOutcome((own ?? combined).rawValue)
-                snapshot.writtenAtEpoch = Date().timeIntervalSince1970
-                try DestinationSnapshotFile.write(snapshot, to: snapshotURL)
-            }
-        }
-        for destinationID in unreconstructed.keys.sorted() {
-            lines.append("\(destinationID): configuration could not be rebuilt for this export")
-        }
-        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
-        lines.insert(CombinedExportSummary.copy(kinds), at: 0)
-        lines.append("Files: \(dest?.path ?? scratch.path)")
-        return lines
-    }
-
-    private static let lastScheduledFullReconcileEpochKey = SettingKey.lastScheduledFullReconcileEpoch.rawValue
-
-    /// O-9: a low-priority full reconcile on a daily cadence, skipped when the
-    /// queue is already in I6 Amber so live deltas are not evicted.
-    private static func maybeScheduledFullReconcile(
-        store: any StateStore,
-        trigger: RunTrigger
-    ) async throws -> [String] {
-        let queued = try await store.transact { try $0.queuedBytes() }
-        if !CatchUpAdmission.allows(queuedBytes: queued) {
-            return ["scheduled full reconcile skipped: catch_up_parked"]
-        }
-        let defaults = UserDefaults.standard
-        let stored = defaults.double(forKey: lastScheduledFullReconcileEpochKey)
-        let lastEpoch = stored > 0 ? stored : nil
-        let nowEpoch = Date().timeIntervalSince1970
-        guard ScheduledReconcile.due(lastEpoch: lastEpoch, nowEpoch: nowEpoch) else {
-            return []
-        }
-        let lines = try await runFullReconcile(trigger: trigger)
-        defaults.set(nowEpoch, forKey: lastScheduledFullReconcileEpochKey)
-        return ["scheduled full reconcile"] + lines
-    }
-
-    /// I6 Red: drop derived attempt bodies, truncate the WAL, and raise the
-    /// approaching-loss notice. Live pending batches stay queued.
-    private static func applyQueueRedIfNeeded(
-        store: SQLiteStateStore,
-        root: URL,
-        destinationLabel: String
-    ) async throws {
-        let queued = try await store.transact { try $0.queuedBytes() }
-        guard QueueRed.occupancy(queuedBytes: queued) >= .red else { return }
-        _ = try QueueRed.purgeAttemptCaches(root: root)
-        try store.checkpointWAL()
-        try await store.transact { tx in
-            try tx.appendJournal(
-                RunEvent(
-                    runID: RunID(rawValue: "queue-red"),
-                    outcomeKind: "partial",
-                    detail: QueueRed.journalDetail,
-                    wallTimeEpoch: Date().timeIntervalSince1970
-                )
-            )
-        }
-        _ = try await LocalUserNotifier().notify(
-            UserNotice(kind: .queueApproachingLoss, destination: destinationLabel)
-        )
-    }
-
-    /// R-08: every live destination run also applies the trailing seven-day sweep.
-    /// Delta ExportRun does not itself reconcile. One trailing window is read once
-    /// and fanned out; a sweep per sink would re-observe the same days and let the
-    /// sinks be repaired from different observations of them.
-    private static func trailingReconcileAfterDelta(
-        observations: any DayObservationSource,
-        destinations: [RunDestination],
-        store: any StateStore,
-        metric: MetricID,
-        scratchDirectory: URL,
-        envelope: WireEnvelope,
-        temporal: TemporalContext,
-        statistics: (any StatisticsSource)?,
-        trigger: RunTrigger,
-        externalStatusURL: URL? = nil,
-        ledgerHeadSeal: (any LedgerHeadSeal)?,
-        ledgerSealURL: URL?
-    ) async throws -> String {
-        let covering = destinations.filter {
-            $0.scope.map { $0.metrics.contains(metric) } ?? true
-        }
-        guard !covering.isEmpty else {
-            return "\(metric.rawValue) reconcile: \(RunOutcome.Kind.successNothingDue.rawValue)"
-        }
-        let rows = DestinationRowCollector()
-        var sweep = ReconcileSweep(
-            observations: observations,
-            destination: covering[0].destination,
-            store: store,
-            metric: metric,
-            scratchDirectory: scratchDirectory,
-            destinationName: covering[0].id,
-            envelope: envelope,
-            temporal: temporal,
-            statistics: statistics,
-            trigger: trigger,
-            snapshotURL: covering[0].snapshotURL,
-            externalStatusURL: externalStatusURL,
-            ledgerHeadSeal: ledgerHeadSeal,
-            ledgerSealURL: ledgerSealURL,
-            scope: covering[0].scope,
-            freshnessCadenceSeconds: freshnessCadenceSeconds(),
-            deferForLowPower: isLowPowerDeferred(),
-            destinations: covering
-        )
-        sweep.rowCollector = rows
-        let reconciled = try await sweep.run(
-            throughDay: String(envelope.emittedAt.prefix(10))
-        )
-        let reported = await rows.rows()
-        applyDestinationOutcomes(reported, to: covering.map(\.id))
-        for destination in covering {
-            let kind = DestinationRunRow.kind(for: destination.id, in: reported)
-                ?? reconciled.kind
-            await notifyIfFailed(
-                kind,
-                destinationID: destination.id,
-                destinationLabel: destinationLabel(destination.id)
-            )
-            if kind == .success || kind == .successNothingDue,
-               let snapshotURL = destination.snapshotURL
-            {
-                await rescheduleOverdueNotification(snapshotURL: snapshotURL)
-            }
-        }
-        return "\(metric.rawValue) reconcile: \(reconciled.kind.rawValue)"
+        try await AppExport.service.runOnePageEachMetric(metrics: metrics, trigger: trigger, onProgress: onProgress)
     }
 
     // #42: forwarder; remove when the product UI calls the service.
@@ -887,42 +286,12 @@ enum HarnessExport {
         await AppStatus.status.notifyIfFailed(kind, destinationID: destinationID, destinationLabel: destinationLabel)
     }
 
-    /// Applies each sink's own result to its own status, for a run that fanned one
-    /// read out to several of them.
-    ///
-    /// A repair sweep writes the status of the destination it was constructed
-    /// around, which is one of N. The others were delivered to in the same sweep,
-    /// so leaving their status untouched left the widget and the destinations list
-    /// showing a result from an earlier run, and a sink that was just repaired
-    /// could still read as overdue. A sink with no row of its own keeps what it
-    /// had, because nothing was attempted against it.
-    /// Reachable from the backfill runner, which lives outside this type.
+    // #42: forwarder; remove when the product UI calls the service.
     static func applyBackfillOutcomes(
         _ rows: [DestinationRunRow],
         to destinationIDs: [String]
     ) {
-        applyDestinationOutcomes(rows, to: destinationIDs)
-    }
-
-    private static func applyDestinationOutcomes(
-        _ rows: [DestinationRunRow],
-        to destinationIDs: [String]
-    ) {
-        let now = Date().timeIntervalSince1970
-        for destinationID in destinationIDs {
-            guard let row = rows.first(where: { $0.destinationID == destinationID }),
-                  let kind = RunOutcome.Kind(rawValue: row.outcomeKind),
-                  let snapshotURL = StatusSnapshotLocation.url(destinationID: destinationID),
-                  var snapshot = try? DestinationSnapshotFile.read(from: snapshotURL)
-            else { continue }
-            snapshot.applyLastOutcome(kind.rawValue)
-            snapshot.errorClass = row.errorClass
-            if kind == .success || kind == .successNothingDue {
-                snapshot.lastSuccessEpoch = now
-            }
-            snapshot.writtenAtEpoch = now
-            try? DestinationSnapshotFile.write(snapshot, to: snapshotURL)
-        }
+        AppExport.service.applyBackfillOutcomes(rows, to: destinationIDs)
     }
 
     /// Marks one destination's own status as failed, for the case where the run
@@ -959,528 +328,46 @@ enum HarnessExport {
         await AppStatus.status.notifyDestinationFailure(destinationID: destinationID, destinationLabel: destinationLabel)
     }
 
-    /// R-08's history half. A full reconcile repairs what a delta cannot see, so
-    /// running it against the archive folder alone would leave every other sink with
-    /// history nobody ever repairs.
+    // #42: forwarder; remove when the product UI calls the service.
     static func runFullReconcile(
         metrics: [MetricID]? = nil,
         trigger: RunTrigger = .manual,
         onProgress: (@Sendable (Int, Int) async -> Void)? = nil
     ) async throws -> [String] {
-        let plannedIDs = healthDestinationIDs.filter {
-            isDestinationEnabled($0) && allowsExport($0, trigger: trigger)
-        }
-        guard !plannedIDs.isEmpty else {
-            return [
-                "manualOnly: Full reconcile skipped. This installation allows explicit exports only."
-            ]
-        }
-        defer {
-            for destinationID in plannedIDs {
-                synchronizeDestinationExportRole(destinationID)
-            }
-        }
-        let root = try applicationSupportRoot()
-        var folderAccess: SecurityScopedAccess?
-        if plannedIDs.contains("local-file") {
-            folderAccess = try localExportFolder(root: root)
-        }
-        defer { withExtendedLifetime(folderAccess) {} }
-        let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        let context = TemporalContext.utcHost
-        let observations = HealthKitDayObservationSource(
-            context: context,
-            limit: samplePageLimit()
-        )
-        let statistics = HealthKitStatisticsSource(context: context)
-        let now = Date().ISO8601Format()
-        let exporterID = try installationID()
-        let seal = ledgerHeadSeal()
-        var destinations: [RunDestination] = []
-        for destinationID in plannedIDs {
-            guard
-                let (destination, _) = try? await makeAutomaticRunDestination(
-                    destinationID,
-                    trigger: trigger,
-                    root: root,
-                    folderAccess: folderAccess
-                ),
-                // A sink with no transport in this context keeps its queued
-                // obligations; reconciling it here would have nowhere to send.
-                destination.attemptNow
-            else { continue }
-            destinations.append(destination)
-        }
-        guard !destinations.isEmpty else {
-            return ["blocked: No destination could be reconstructed for this reconcile."]
-        }
-        var lines: [String] = []
-        // One history read repairs every sink that was owed it. Sweeping per sink
-        // read the same days once per destination and let two sinks be repaired
-        // from two different observations of the same day.
-        let owed = metrics
-            ?? Set(destinations.compactMap(\.scope).flatMap(\.metrics))
-                .sorted { $0.rawValue < $1.rawValue }
-        for (index, metric) in owed.enumerated() {
-            let covering = destinations.filter {
-                $0.scope.map { $0.metrics.contains(metric) } ?? true
-            }
-            guard !covering.isEmpty else { continue }
-            await onProgress?(index + 1, owed.count)
-            let rows = DestinationRowCollector()
-            var sweep = ReconcileSweep(
-                observations: observations,
-                destination: covering[0].destination,
-                store: store,
-                metric: metric,
-                scratchDirectory: scratch,
-                destinationName: covering[0].id,
-                envelope: WireEnvelope(
-                    exporterId: exporterID,
-                    seq: 1,
-                    emittedAt: now,
-                    observedAt: now
-                ),
-                temporal: context,
-                statistics: statistics,
-                trigger: trigger,
-                snapshotURL: covering[0].snapshotURL,
-                externalStatusURL: folderAccess?.url
-                    .appendingPathComponent("status.json"),
-                ledgerHeadSeal: seal,
-                ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
-                scope: covering[0].scope,
-                freshnessCadenceSeconds: freshnessCadenceSeconds(),
-                deferForLowPower: isLowPowerDeferred(),
-                destinations: covering
-            )
-            sweep.rowCollector = rows
-            let outcome = try await sweep.runFullHistory(throughDay: String(now.prefix(10)))
-            let reported = await rows.rows()
-            applyDestinationOutcomes(reported, to: covering.map(\.id))
-            for destination in covering {
-                // A repair that failed for one sink is not news about the others.
-                await notifyIfFailed(
-                    DestinationRunRow.kind(for: destination.id, in: reported) ?? outcome.kind,
-                    destinationID: destination.id,
-                    destinationLabel: destinationLabel(destination.id)
-                )
-            }
-            lines.append(
-                "\(covering.map(\.id).joined(separator: ",")) \(metric.rawValue) full reconcile: \(outcome.kind.rawValue)"
-            )
-        }
-        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
-        if let dest = folderAccess?.url {
-            lines.append("Files: \(dest.path)")
-        }
-        return lines
+        try await AppExport.service.runFullReconcile(metrics: metrics, trigger: trigger, onProgress: onProgress)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func runBackfill(
         mode: BackfillMode,
         onProgress: (@Sendable (String) async -> Void)? = nil
     ) async throws -> [String] {
-        // Backfill is an explicit user action (R-11/O-5), so manual-only sinks count.
-        let plannedIDs = healthDestinationIDs.filter { isDestinationEnabled($0) }
-        guard !plannedIDs.isEmpty else {
-            return ["No destination is enabled, so there is nowhere to send history."]
-        }
-        defer {
-            for destinationID in plannedIDs {
-                synchronizeDestinationExportRole(destinationID)
-            }
-        }
-        let root = try applicationSupportRoot()
-        var folderAccess: SecurityScopedAccess?
-        if plannedIDs.contains("local-file") {
-            folderAccess = try localExportFolder(root: root)
-        }
-        defer { withExtendedLifetime(folderAccess) {} }
-        let scratch = try protectedPayloadDirectory(named: "backfill-scratch", under: root)
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        let context = TemporalContext.utcHost
-        let observations = HealthKitDayObservationSource(context: context, limit: samplePageLimit())
-
-        let checkpointURL = root.appendingPathComponent(
-            mode == .raw ? "backfill-raw.json" : "backfill-aggregate.json"
-        )
-        // A resumed job keeps the sinks it was planned for: a day marked complete
-        // means complete for those, and a sink enabled mid-job would silently
-        // inherit that completion. It gets its own job once this one finishes.
-        let resumed = try? BackfillCheckpoint.read(from: checkpointURL)
-        let owedIDs = resumed.map { checkpoint in
-            plannedIDs.filter { checkpoint.plan.destinations.contains($0) }
-        } ?? plannedIDs
-
-        var destinations: [RunDestination] = []
-        for destinationID in owedIDs {
-            guard
-                let (destination, _) = try? await makeAutomaticRunDestination(
-                    destinationID,
-                    trigger: .manual,
-                    root: root,
-                    folderAccess: folderAccess
-                ),
-                destination.attemptNow
-            else { continue }
-            destinations.append(destination)
-        }
-        guard !destinations.isEmpty else {
-            return ["blocked: No destination could be reconstructed for this backfill."]
-        }
-        let scopes = destinations.compactMap(\.scope)
-        for scope in scopes {
-            try ExportScopeGate.requireConfigured(scope)
-        }
-        var metrics: [MetricID] = []
-        var firstDay: String?
-        var lastDay: String?
-        let owedMetrics = Set(scopes.flatMap(\.metrics)).sorted { $0.rawValue < $1.rawValue }
-        for metric in owedMetrics {
-            guard let range = try? await observations.availableDayRange(metric: metric) else {
-                continue
-            }
-            // Each sink carries its own window, so the job spans their union and
-            // the per-sink sweep drops the days that sink never asked for.
-            for scope in scopes where scope.metrics.contains(metric) {
-                let scopeStartDay = String(
-                    (scope.startInclusive ?? .distantFuture).ISO8601Format().prefix(10)
-                )
-                let scopeEndDay = scope.endExclusive.map {
-                    String($0.addingTimeInterval(-1).ISO8601Format().prefix(10))
-                }
-                let lower = max(range.lowerBound, scopeStartDay)
-                let upper = min(range.upperBound, scopeEndDay ?? range.upperBound)
-                guard lower <= upper else { continue }
-                if !metrics.contains(metric) { metrics.append(metric) }
-                firstDay = min(firstDay ?? lower, lower)
-                lastDay = max(lastDay ?? upper, upper)
-            }
-        }
-        guard let firstDay, let lastDay, !metrics.isEmpty else {
-            return ["No supported Health history is available for backfill."]
-        }
-
-        let processor = HealthBackfillProcessor(
-            observations: observations,
-            statistics: HealthKitStatisticsSource(context: context),
-            destinations: destinations,
-            store: store,
-            scratchDirectory: scratch,
-            exporterID: try installationID(),
-            temporal: context,
-            ledgerHeadSeal: ledgerHeadSeal(),
-            ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
-            externalStatusDirectory: folderAccess?.url
-        )
-        let job = BackfillJob(
-            checkpointURL: checkpointURL,
-            processor: processor,
-            store: store,
-            deferForLowPower: isLowPowerDeferred(),
-            deferForThermal: isThermalDeferred()
-        )
-        if !FileManager.default.fileExists(atPath: checkpointURL.path) {
-            let hostModel = await UIDevice.current.model
-            try await job.create(
-                BackfillCheckpoint(
-                    jobID: UUID().uuidString,
-                    createdAt: Date().ISO8601Format(),
-                    hostModel: hostModel,
-                    plan: BackfillPlan(
-                        windowStartDay: firstDay,
-                        windowEndDay: lastDay,
-                        mode: mode,
-                        metrics: metrics,
-                        destinations: destinations.map(\.id)
-                    )
-                )
-            )
-        }
-        let completed = try await job.run(onProgress: onProgress)
-        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
-        if let parked = completed.progress.pausedReason {
-            return [
-                "\(mode.rawValue) backfill parked",
-                parked,
-                "Samples read: \(completed.progress.samplesRead)",
-                "Batches enqueued: \(completed.progress.batchesEnqueued)",
-                "Checkpoint: \(checkpointURL.path)",
-            ]
-        }
-        var lines = [
-            "\(mode.rawValue) backfill complete",
-            "Destinations: \(destinations.map(\.id).joined(separator: ", "))",
-            "Samples read: \(completed.progress.samplesRead)",
-            "Batches enqueued: \(completed.progress.batchesEnqueued)",
-            "Checkpoint: \(checkpointURL.path)",
-        ]
-        // The completion manifest describes the archive folder, so it is published
-        // only where there is a folder to publish it into.
-        if let destinationDirectory = folderAccess?.url {
-            let published = destinationDirectory.appendingPathComponent("archive-manifest.json")
-            try ArchiveCompletionManifest.make(from: completed).write(to: published)
-            lines.append("Manifest: \(published.path)")
-        }
-        return lines
+        try await AppExport.service.runBackfill(mode: mode, onProgress: onProgress)
     }
 
-    static func queueEvictionGaps() async throws -> [GapRecord] {
-        let root = try applicationSupportRoot()
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        return try await store.transact {
-            try $0.loadGaps().filter {
-                $0.rangeDescription.hasPrefix("queue_eviction:")
-                    && $0.rangeStartDay != nil
-                    && $0.rangeEndDay != nil
-            }
-        }
-    }
+    // #42: forwarder; remove when the product UI calls the service.
+    static func queueEvictionGaps() async throws -> [GapRecord] { try await AppExport.service.queueEvictionGaps() }
 
     // #42: forwarder; remove when the product UI calls the service.
     static func recordNotificationSuppressionIfNeeded() async throws {
         try await AppStatus.status.recordNotificationSuppressionIfNeeded(forcedDenied: AppStatus.seededNotificationsDenied)
     }
 
-    /// An evicted batch was owed to every destination that was planned when it was
-    /// read, so re-exporting the gap to the archive folder alone would leave the other
-    /// sinks permanently short those records.
-    static func reExportQueueGap(_ gap: GapRecord) async throws -> RunOutcome.Kind {
-        let plannedIDs = healthDestinationIDs.filter {
-            isDestinationEnabled($0) && allowsExport($0, trigger: .manual)
-        }
-        let root = try applicationSupportRoot()
-        var folderAccess: SecurityScopedAccess?
-        if plannedIDs.contains("local-file") {
-            folderAccess = try localExportFolder(root: root)
-        }
-        defer { withExtendedLifetime(folderAccess) {} }
-        let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        let context = TemporalContext.utcHost
-        let now = Date().ISO8601Format()
-        let exporterID = try installationID()
-        var owed: [RunDestination] = []
-        for destinationID in plannedIDs {
-            guard
-                let (destination, _) = try? await makeAutomaticRunDestination(
-                    destinationID,
-                    trigger: .manual,
-                    root: root,
-                    folderAccess: folderAccess
-                ),
-                destination.attemptNow,
-                destination.scope?.metrics.contains(gap.metric) ?? true
-            else { continue }
-            owed.append(destination)
-        }
-        guard !owed.isEmpty else { return .successNothingDue }
-        // The gap is a range of days, not a destination's problem: read it once and
-        // re-export it to everyone who was owed it.
-        let rows = DestinationRowCollector()
-        var sweep = ReconcileSweep(
-            observations: HealthKitDayObservationSource(
-                context: context,
-                limit: samplePageLimit()
-            ),
-            destination: owed[0].destination,
-            store: store,
-            metric: gap.metric,
-            scratchDirectory: scratch,
-            destinationName: owed[0].id,
-            envelope: WireEnvelope(
-                exporterId: exporterID,
-                seq: 1,
-                emittedAt: now,
-                observedAt: now
-            ),
-            temporal: context,
-            statistics: HealthKitStatisticsSource(context: context),
-            trigger: .manual,
-            snapshotURL: owed[0].snapshotURL,
-            externalStatusURL: folderAccess?.url
-                .appendingPathComponent("status.json"),
-            ledgerHeadSeal: ledgerHeadSeal(),
-            ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
-            scope: owed[0].scope,
-            freshnessCadenceSeconds: freshnessCadenceSeconds(),
-            deferForLowPower: isLowPowerDeferred(),
-            destinations: owed
-        )
-        sweep.rowCollector = rows
-        let outcome = try await sweep.run(gap: gap)
-        let reported = await rows.rows()
-        applyDestinationOutcomes(reported, to: owed.map(\.id))
-        for destination in owed {
-            await notifyIfFailed(
-                DestinationRunRow.kind(for: destination.id, in: reported) ?? outcome.kind,
-                destinationID: destination.id,
-                destinationLabel: destinationLabel(destination.id)
-            )
-        }
-        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
-        return outcome.kind
-    }
+    // #42: forwarder; remove when the product UI calls the service.
+    static func reExportQueueGap(_ gap: GapRecord) async throws -> RunOutcome.Kind { try await AppExport.service.reExportQueueGap(gap) }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func runDemoDataset(typedDestinationName: String) async throws -> [String] {
-        try DemoExportGate.confirmSending(to: "local-file", typed: typedDestinationName)
-        let root = try applicationSupportRoot()
-        let sqliteURL = root.appendingPathComponent("demo-state.sqlite")
-        let folderAccess = try localExportFolder(root: root)
-        defer { withExtendedLifetime(folderAccess) {} }
-        let dest = folderAccess.url
-        let scratch = try protectedPayloadDirectory(named: "demo-scratch", under: root)
-        let store = try StateStoreHost.store(path: sqliteURL.path)
-        let (verified, events) = try verifiedLocalFile(root: root, destinationDirectory: dest)
-        try await emitTrustNotices(events)
-        let context = TemporalContext.utcHost
-        let now = Date().ISO8601Format()
-        let exporterId = try installationID()
-        var envelope = WireEnvelope(
-            exporterId: exporterId,
-            seq: 1,
-            emittedAt: now,
-            observedAt: now,
-            demo: true
-        )
-        envelope.reason = "manual"
-        let source = DemoSampleSource(seed: 1, samplesPerMetric: 4)
-        let characteristics = DemoCharacteristicSource()
-        var lines: [String] = ["DEMO MODE — synthetic data, not HealthKit"]
-        for declaration in MetricCatalog.selectable {
-            let run = ExportRun(
-                source: source,
-                destination: verified,
-                store: store,
-                metric: declaration.id,
-                scratchDirectory: scratch,
-                destinationName: "local-file",
-                envelope: envelope,
-                temporal: context,
-                characteristics: characteristics,
-                trigger: .manual,
-                freshnessCadenceSeconds: freshnessCadenceSeconds(),
-                deferForLowPower: isLowPowerDeferred()
-            )
-            let outcome = try await run.run()
-            lines.append("\(declaration.id.rawValue): \(outcome.kind.rawValue) (demo)")
-        }
-        lines.append("Files: \(dest.path)")
-        return lines
+        try await AppExport.service.runDemoDataset(typedDestinationName: typedDestinationName)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func runCompanion(
         session: PairingSession,
         onTestProgress: DestinationTestProgress? = nil,
         onProgress: (@Sendable (Int, Int) async -> Void)? = nil
     ) async throws -> [String] {
-        defer { synchronizeDestinationExportRole("companion") }
-        let scope = try await destinationScope("companion")
-        try ExportScopeGate.requireConfigured(scope)
-        let root = try applicationSupportRoot()
-        let sqliteURL = root.appendingPathComponent("state.sqlite")
-        let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
-        let store = try StateStoreHost.store(path: sqliteURL.path)
-        let (verified, emission) = try await verifiedCompanionDestination(
-            session: session,
-            root: root,
-            onTestProgress: onTestProgress
-        )
-        try await drainPendingDeliveries(
-            destination: verified,
-            destinationName: "companion",
-            store: store,
-            scope: scope
-        )
-        try await requestScopeAuthorizationIfConfigured("companion")
-        let context = TemporalContext.utcHost
-        let source = HealthKitAnchoredSource(
-            context: context,
-            limit: samplePageLimit(),
-            window: HealthKitQueryWindow(scope: scope)
-        )
-        let observations = HealthKitDayObservationSource(context: context, limit: samplePageLimit())
-        let statistics = HealthKitStatisticsSource(context: context)
-        let now = Date().ISO8601Format()
-        let ledgerSeal = ledgerHeadSeal()
-        let ledgerSealURL = root.appendingPathComponent("ledger-head-seal.json")
-        var lines: [String] = []
-        let metrics = scope.metrics.sorted { $0.rawValue < $1.rawValue }
-        for (index, metric) in metrics.enumerated() {
-            await onProgress?(index + 1, metrics.count)
-            let run = ExportRun(
-                source: source,
-                destination: verified,
-                store: store,
-                metric: metric,
-                scratchDirectory: scratch,
-                destinationName: "companion",
-                envelope: WireEnvelope(
-                    exporterId: session.localInstallationID,
-                    seq: 1,
-                    emittedAt: now,
-                    observedAt: now
-                ),
-                temporal: context,
-                statistics: statistics,
-                observations: observations,
-                characteristics: HealthKitCharacteristicSource(),
-                snapshotURL: StatusSnapshotLocation.url(destinationID: "companion"),
-                ledgerHeadSeal: ledgerSeal,
-                ledgerSealURL: ledgerSealURL,
-                scope: scope,
-                freshnessCadenceSeconds: freshnessCadenceSeconds(),
-            deferForLowPower: isLowPowerDeferred()
-            )
-            let outcome = try await run.run()
-            await notifyIfFailed(
-                outcome.kind,
-                destinationID: "companion",
-                destinationLabel: "Mac companion"
-            )
-            WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
-            lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
-            lines.append(
-                try await trailingReconcileAfterDelta(
-                    observations: observations,
-                    destinations: [
-                        RunDestination(
-                            id: "companion",
-                            destination: verified,
-                            scope: scope,
-                            snapshotURL: StatusSnapshotLocation.url(destinationID: "companion")
-                        ),
-                    ],
-                    store: store,
-                    metric: metric,
-                    scratchDirectory: scratch,
-                    envelope: WireEnvelope(
-                        exporterId: session.localInstallationID,
-                        seq: 1,
-                        emittedAt: now,
-                        observedAt: now
-                    ),
-                    temporal: context,
-                    statistics: statistics,
-                    trigger: .manual,
-                    ledgerHeadSeal: ledgerSeal,
-                    ledgerSealURL: ledgerSealURL
-                )
-            )
-        }
-        if emission.autoDisabled {
-            try setCompanionTraceparent(false)
-            lines.append("traceparent auto-disabled after a header-plausible failure")
-        }
-        lines.append("Companion: \(session.serviceName)")
-        try await applyQueueRedIfNeeded(
-            store: store,
-            root: root,
-            destinationLabel: "Mac companion"
-        )
-        return lines
+        try await AppExport.service.runCompanion(session: session, onTestProgress: onTestProgress, onProgress: onProgress)
     }
 
     static func applicationSupportRoot() throws -> URL {
@@ -1559,41 +446,14 @@ enum HarnessExport {
         AppStatus.status.overdueBannerDetail()
     }
 
-    static func anchorHolds() async throws -> [AnchorHold] {
-        let root = try applicationSupportRoot()
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        return try await store.transact { try $0.loadAnchorHolds() }
-    }
+    // #42: forwarder; remove when the product UI calls the service.
+    static func anchorHolds() async throws -> [AnchorHold] { try await AppExport.service.anchorHolds() }
 
-    /// QA-17: the user chose to send the history again. Recording the decision is what
-    /// releases the hold; the run reads it rather than inferring intent from a retry.
-    static func authoriseAnchorReexport(metric: MetricID) async throws {
-        let root = try applicationSupportRoot()
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        try await store.transact { tx in
-            guard var hold = try tx.loadAnchorHold(metric: metric) else { return }
-            hold.decision = .reexportAuthorized
-            try tx.upsertAnchorHold(hold)
-        }
-    }
+    // #42: forwarder; remove when the product UI calls the service.
+    static func authoriseAnchorReexport(metric: MetricID) async throws { try await AppExport.service.authoriseAnchorReexport(metric: metric) }
 
-    /// QA-17's other answer: stop this type rather than pay to send its history again.
-    static func stopExportingHeldType(metric: MetricID) async throws {
-        let root = try applicationSupportRoot()
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        try await store.transact { tx in
-            let generation = try tx.loadTypeStatus(metric: metric)?.generation ?? 1
-            try tx.upsertTypeStatus(
-                TypeStatus(
-                    metric: metric,
-                    disabled: true,
-                    reason: "anchor_invalidated_user_stop",
-                    generation: generation
-                )
-            )
-            try tx.clearAnchorHold(metric: metric)
-        }
-    }
+    // #42: forwarder; remove when the product UI calls the service.
+    static func stopExportingHeldType(metric: MetricID) async throws { try await AppExport.service.stopExportingHeldType(metric: metric) }
 
     #if DEBUG
     /// Snapshot files and hold rows survive across XCUITest cases in one simulator.
@@ -2203,35 +1063,6 @@ enum HarnessExport {
         try await AppDestinations.records.mqttPKCS12Password(from: saved, root: root)
     }
 
-    /// A background wake has seconds, not minutes, and the read it was woken for
-    /// matters more than an old obligation. A foreground run can afford the backlog.
-    private static func drainLimit(trigger: RunTrigger) -> Int {
-        switch trigger {
-        case .manual, .widgetControl, .appForeground, .launch:
-            32
-        case .observerQuery, .bgAppRefresh, .bgProcessing, .shortcut:
-            4
-        }
-    }
-
-    private static func drainPendingDeliveries(
-        destination: VerifiedDestination,
-        destinationName: String,
-        store: SQLiteStateStore,
-        scope: DestinationExportScope?,
-        limit: Int = 32
-    ) async throws {
-        for _ in 0..<max(1, limit) {
-            let receipts = try await PendingDeliveryRunner(
-                destination: destination,
-                store: store,
-                destinationName: destinationName,
-                scope: scope
-            ).runOnce()
-            if receipts.isEmpty { return }
-        }
-    }
-
     private static func verifiedCompanionDestination(
         session: PairingSession,
         root: URL,
@@ -2356,110 +1187,24 @@ enum HarnessExport {
         return try setup.enable(sink: sink)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func runMQTTDestination(
         onProgress: (@Sendable (Int, Int) async -> Void)? = nil
     ) async throws -> [String] {
-        defer { synchronizeDestinationExportRole("mqtt") }
-        let root = try applicationSupportRoot()
-        let verified = try await verifiedMQTTDestination(root: root)
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
-        let context = TemporalContext.utcHost
-        let now = Date().ISO8601Format()
-        let exporterID = try installationID()
-        var lines: [String] = []
-        let scope = try await destinationScope("mqtt")
-        try ExportScopeGate.requireConfigured(scope)
-        let source = HealthKitAnchoredSource(
-            context: context,
-            limit: samplePageLimit(),
-            window: HealthKitQueryWindow(scope: scope)
-        )
-        let observations = HealthKitDayObservationSource(context: context)
-        let statistics = HealthKitStatisticsSource(context: context)
-        let snapshotURL = StatusSnapshotLocation.url(destinationID: "mqtt")
-        let ledgerSeal = ledgerHeadSeal()
-        let ledgerSealURL = root.appendingPathComponent("ledger-head-seal.json")
-        let metrics = scope.metrics.sorted { $0.rawValue < $1.rawValue }
-        for (index, metric) in metrics.enumerated() {
-            await onProgress?(index + 1, metrics.count)
-            let envelope = WireEnvelope(
-                exporterId: exporterID,
-                seq: 1,
-                emittedAt: now,
-                observedAt: now
-            )
-            let outcome = try await ExportRun(
-                source: source,
-                destination: verified,
-                store: store,
-                metric: metric,
-                scratchDirectory: scratch,
-                destinationName: "mqtt",
-                envelope: envelope,
-                temporal: context,
-                statistics: statistics,
-                observations: observations,
-                characteristics: HealthKitCharacteristicSource(),
-                trigger: .manual,
-                snapshotURL: snapshotURL,
-                ledgerHeadSeal: ledgerSeal,
-                ledgerSealURL: ledgerSealURL,
-                scope: scope,
-                freshnessCadenceSeconds: freshnessCadenceSeconds(),
-            deferForLowPower: isLowPowerDeferred()
-            ).run()
-            await notifyIfFailed(
-                outcome.kind,
-                destinationID: "mqtt",
-                destinationLabel: "MQTT destination"
-            )
-            lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
-            lines.append(
-                try await trailingReconcileAfterDelta(
-                    observations: observations,
-                    destinations: [
-                        RunDestination(
-                            id: "mqtt",
-                            destination: verified,
-                            scope: scope,
-                            snapshotURL: snapshotURL
-                        ),
-                    ],
-                    store: store,
-                    metric: metric,
-                    scratchDirectory: scratch,
-                    envelope: envelope,
-                    temporal: context,
-                    statistics: statistics,
-                    trigger: .manual,
-                    ledgerHeadSeal: ledgerSeal,
-                    ledgerSealURL: ledgerSealURL
-                )
-            )
-        }
-        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
-        try await applyQueueRedIfNeeded(
-            store: store,
-            root: root,
-            destinationLabel: "MQTT destination"
-        )
-        return lines
+        try await AppExport.service.runMQTTDestination(onProgress: onProgress)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func runHTTPSDestination(
         destinationID: String = "https",
         destinationLabel: String = "HTTPS destination",
         onProgress: (@Sendable (Int, Int) async -> Void)? = nil
     ) async throws -> [String] {
-        defer { synchronizeDestinationExportRole(destinationID) }
-        return try await withThermalCompression {
-            try await runHTTPSDestinationUnscoped(
-                destinationID: destinationID,
-                destinationLabel: destinationLabel,
-                onProgress: onProgress
-            )
-        }
+        try await AppExport.service.runHTTPSDestination(
+            destinationID: destinationID,
+            destinationLabel: destinationLabel,
+            onProgress: onProgress
+        )
     }
 
     private static func verifiedHTTPSDestination(
@@ -2542,105 +1287,6 @@ enum HarnessExport {
         return (verified, emission)
     }
 
-    private static func runHTTPSDestinationUnscoped(
-        destinationID: String,
-        destinationLabel: String,
-        onProgress: (@Sendable (Int, Int) async -> Void)?
-    ) async throws -> [String] {
-        let root = try applicationSupportRoot()
-        let (verified, emission) = try await verifiedHTTPSDestination(
-            destinationID: destinationID,
-            root: root
-        )
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        let scratch = try protectedPayloadDirectory(named: "scratch", under: root)
-        let context = TemporalContext.utcHost
-        let now = Date().ISO8601Format()
-        let exporterID = try installationID()
-        var lines: [String] = []
-        let scope = try await destinationScope(destinationID)
-        try ExportScopeGate.requireConfigured(scope)
-        let source = HealthKitAnchoredSource(
-            context: context,
-            limit: samplePageLimit(),
-            window: HealthKitQueryWindow(scope: scope)
-        )
-        let observations = HealthKitDayObservationSource(context: context)
-        let statistics = HealthKitStatisticsSource(context: context)
-        let snapshotURL = StatusSnapshotLocation.url(destinationID: destinationID)
-        let ledgerSeal = ledgerHeadSeal()
-        let ledgerSealURL = root.appendingPathComponent("ledger-head-seal.json")
-        let metrics = scope.metrics.sorted { $0.rawValue < $1.rawValue }
-        for (index, metric) in metrics.enumerated() {
-            await onProgress?(index + 1, metrics.count)
-            let envelope = WireEnvelope(
-                exporterId: exporterID,
-                seq: 1,
-                emittedAt: now,
-                observedAt: now
-            )
-            let outcome = try await ExportRun(
-                source: source,
-                destination: verified,
-                store: store,
-                metric: metric,
-                scratchDirectory: scratch,
-                destinationName: destinationID,
-                envelope: envelope,
-                temporal: context,
-                statistics: statistics,
-                observations: observations,
-                characteristics: HealthKitCharacteristicSource(),
-                trigger: .manual,
-                snapshotURL: snapshotURL,
-                ledgerHeadSeal: ledgerSeal,
-                ledgerSealURL: ledgerSealURL,
-                scope: scope,
-                freshnessCadenceSeconds: freshnessCadenceSeconds(),
-            deferForLowPower: isLowPowerDeferred()
-            ).run()
-            await notifyIfFailed(
-                outcome.kind,
-                destinationID: destinationID,
-                destinationLabel: destinationLabel
-            )
-            lines.append("\(metric.rawValue): \(outcome.kind.rawValue)")
-            lines.append(
-                try await trailingReconcileAfterDelta(
-                    observations: observations,
-                    destinations: [
-                        RunDestination(
-                            id: destinationID,
-                            destination: verified,
-                            scope: scope,
-                            snapshotURL: snapshotURL
-                        ),
-                    ],
-                    store: store,
-                    metric: metric,
-                    scratchDirectory: scratch,
-                    envelope: envelope,
-                    temporal: context,
-                    statistics: statistics,
-                    trigger: .manual,
-                    ledgerHeadSeal: ledgerSeal,
-                    ledgerSealURL: ledgerSealURL
-                )
-            )
-        }
-        if emission.autoDisabled {
-            try setHTTPSTraceparent(false, destinationID: destinationID)
-            lines.append("traceparent auto-disabled after a header-plausible failure")
-        }
-        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
-        try await applyQueueRedIfNeeded(
-            store: store,
-            root: root,
-            destinationLabel: destinationLabel
-        )
-        return lines
-    }
-
     static func enableLocalFileDestination(
         onProgress: DestinationTestProgress? = nil
     ) async throws -> [String] {
@@ -2661,76 +1307,14 @@ enum HarnessExport {
         return destinationStatusLines()
     }
 
-    static func stopExportingHeartRate() async throws {
-        let root = try applicationSupportRoot()
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        // A stop drops the queued payload for every sink that was owed it, so the
-        // ledger entry names them all rather than whichever one came first.
-        let owed = healthDestinationIDs.filter { isDestinationEnabled($0) }
-        try await store.purgeType(
-            metric: MetricCatalog.heartRate.id,
-            reason: "explicit_stop",
-            destination: owed.isEmpty ? "no enabled destination" : owed.joined(separator: ","),
-            atEpoch: Date().timeIntervalSince1970
-        )
-    }
+    // #42: forwarder; remove when the product UI calls the service.
+    static func stopExportingHeartRate() async throws { try await AppExport.service.stopExportingHeartRate() }
 
-    static func expireQueuesAndNotify() async throws -> QueueExpiryResult {
-        let root = try applicationSupportRoot()
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        let now = Date().timeIntervalSince1970
-        let result = try await store.expirePending(
-            nowEpoch: now,
-            destination: "configured destinations"
-        )
-        guard result.expiredBatches > 0 else { return result }
-        let entries = try await store.transact { try $0.loadLedger() }
-        try await LedgerHeadSealRecordFile.update(
-            entries: entries,
-            seal: ledgerHeadSeal(),
-            sealedAtEpoch: now,
-            url: root.appendingPathComponent("ledger-head-seal.json")
-        )
-        _ = try await LocalUserNotifier().notify(
-            UserNotice(kind: .queueExpired, destination: "Configured destinations")
-        )
-        return result
-    }
+    // #42: forwarder; remove when the product UI calls the service.
+    static func expireQueuesAndNotify() async throws -> QueueExpiryResult { try await AppExport.service.expireQueuesAndNotify() }
 
-    /// UX-26: seal leftover open runs after process death, then tell the person.
-    static func recoverInterruptedExports() async throws -> String? {
-        let root = try applicationSupportRoot()
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        let now = Date().timeIntervalSince1970
-        let sealed = try await InterruptedRunRecovery.seal(store: store, nowEpoch: now)
-        guard let first = sealed.min(by: { $0.startedAtEpoch < $1.startedAtEpoch }) else {
-            return nil
-        }
-        let snapshots = StatusSnapshotLocation.readAll()
-        let label = snapshots.first { $0.destinationID == first.destinationID }?.destinationLabel
-            ?? first.destinationID
-        let notice = UserNotice(
-            kind: .exportInterrupted,
-            destinationID: first.destinationID,
-            destination: label,
-            errorClass: ErrorClass.cancelledBySystem.rawValue,
-            startedAtEpoch: first.startedAtEpoch
-        )
-        _ = try await LocalUserNotifier().notify(notice)
-        for run in sealed {
-            guard let url = StatusSnapshotLocation.url(destinationID: run.destinationID),
-                  var snapshot = try? DestinationSnapshotFile.read(from: url)
-            else {
-                continue
-            }
-            snapshot.applyLastOutcome(RunOutcome.Kind.cancelledBySystem.rawValue)
-            snapshot.errorClass = ErrorClass.cancelledBySystem.rawValue
-            snapshot.writtenAtEpoch = now
-            try DestinationSnapshotFile.write(snapshot, to: url)
-        }
-        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
-        return NoticeCopy.render(notice).body
-    }
+    // #42: forwarder; remove when the product UI calls the service.
+    static func recoverInterruptedExports() async throws -> String? { try await AppExport.service.recoverInterruptedExports() }
 
     // #42: forwarder; remove when the product UI calls the service.
     static func storedHTTPSTraceparent() -> Bool {
@@ -3170,67 +1754,8 @@ enum HarnessExport {
     }
     #endif
 
-    static func wipeEverything() async throws {
-        let root = try applicationSupportRoot()
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        try await DestructiveWipe.perform(
-            store: store,
-            secretStores: [
-                KeychainSecretStore(service: IdentifierRoot.qualified("ios.psk")),
-                KeychainSecretStore(service: IdentifierRoot.qualified("ios.https")),
-                KeychainSecretStore(service: IdentifierRoot.qualified("ios.home-assistant")),
-                KeychainSecretStore(service: IdentifierRoot.qualified("mqtt")),
-            ],
-            ledgerSeal: resettableLedgerHeadSeal(),
-            ledgerSealURL: root.appendingPathComponent("ledger-head-seal.json"),
-            atEpoch: Date().timeIntervalSince1970
-        )
-        try await vault().forget()
-        EgressAttemptLog.wipePersistent()
-        StateStoreHost.evict(path: root.appendingPathComponent("demo-state.sqlite").path)
-        for name in [
-            "exports",
-            "scratch",
-            "backfill-scratch",
-            "demo-exports",
-            "demo-scratch",
-            "demo-state.sqlite",
-            "demo-state.sqlite-shm",
-            "demo-state.sqlite-wal",
-            "https-destination.json",
-            "home-assistant-destination.json",
-            "mqtt-destination.json",
-            "mqtt-client.p12",
-            "imported-destination-drafts.json",
-            "otlp-destination.json",
-            "local-file-test.json",
-            "local-export-folder.bookmark",
-            "companion-test.json",
-            "backfill-raw.json",
-            "backfill-aggregate.json",
-            "backfill-raw-manifest.json",
-            "backfill-aggregate-manifest.json",
-            "advisory-request-body",
-            "exporter-id",
-            "wake-ledger.log",
-            "health-authorization.json",
-            "network-activity.json",
-        ] {
-            try removeIfPresent(root.appendingPathComponent(name))
-        }
-        if let bundleID = Bundle.main.bundleIdentifier {
-            UserDefaults.standard.removePersistentDomain(forName: bundleID)
-        }
-        if let directory = StatusSnapshotLocation.directory() {
-            try removeIfPresent(directory)
-        }
-        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
-    }
-
-    private static func removeIfPresent(_ url: URL) throws {
-        guard FileManager.default.fileExists(atPath: url.path) else { return }
-        try FileManager.default.removeItem(at: url)
-    }
+    // #42: forwarder; remove when the product UI calls the service.
+    static func wipeEverything() async throws { try await AppExport.service.wipeEverything() }
 
     private static func verifiedLocalFile(
         root: URL,
@@ -3428,5 +1953,47 @@ enum HarnessExport {
         }
         try await emitTrustNotices([event], destination: "companion")
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+    }
+}
+
+// #42: ExportService reaches destination setup and storage helpers that still live in
+// this file. Each bridge goes when the helper it calls moves to its own service.
+extension HarnessExport {
+    static func exportVerifiedLocalFile(
+        root: URL,
+        destinationDirectory: URL
+    ) throws -> (VerifiedDestination, [TrustEvent]) {
+        try verifiedLocalFile(root: root, destinationDirectory: destinationDirectory)
+    }
+
+    static func exportVerifiedHTTPSDestination(
+        destinationID: String,
+        root: URL
+    ) async throws -> (VerifiedDestination, TraceparentEmission) {
+        try await verifiedHTTPSDestination(destinationID: destinationID, root: root)
+    }
+
+    static func exportVerifiedMQTTDestination(root: URL) async throws -> VerifiedDestination {
+        try await verifiedMQTTDestination(root: root)
+    }
+
+    static func exportVerifiedCompanionDestination(
+        session: PairingSession,
+        root: URL,
+        onTestProgress: DestinationTestProgress? = nil
+    ) async throws -> (VerifiedDestination, TraceparentEmission) {
+        try await verifiedCompanionDestination(session: session, root: root, onTestProgress: onTestProgress)
+    }
+
+    static func exportEmitTrustNotices(_ events: [TrustEvent]) async throws {
+        try await emitTrustNotices(events)
+    }
+
+    static func exportProtectedPayloadDirectory(named name: String, under root: URL) throws -> URL {
+        try protectedPayloadDirectory(named: name, under: root)
+    }
+
+    static func exportResettableLedgerHeadSeal() -> any ResettableLedgerHeadSeal {
+        resettableLedgerHeadSeal()
     }
 }

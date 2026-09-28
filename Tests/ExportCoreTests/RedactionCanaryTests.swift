@@ -246,10 +246,11 @@ enum LeakMutant: String, CaseIterable {
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
-    let exportHarness = try String(
-        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift"),
-        encoding: .utf8
-    )
+    // #42: the export runs moved to ExportService; its decisions to AppServices.
+    let exportHarness = try [
+        "Apps/Exporter-iOS/HarnessExport.swift",
+        "Apps/Exporter-iOS/Services/ExportService.swift",
+    ].map { try String(contentsOf: root.appendingPathComponent($0), encoding: .utf8) }.joined()
     let viewHarness = try String(
         contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
         encoding: .utf8
