@@ -4,7 +4,7 @@ Use the in-app deletion action before uninstalling when you want to remove expor
 
 ## iPhone and iPad
 
-1. Open Open Health Exporter and choose **Delete everything on this device**.
+1. Open KeepMyMetrics and choose **Delete everything on this device**.
 2. Confirm the second prompt. This removes destinations, queued payloads, logs, history, ledger data, pairing state, credentials, and the ledger signing identity.
 3. Remove the app normally.
 4. In **Settings > Health > Data Access & Devices**, revoke any remaining Health access if desired.

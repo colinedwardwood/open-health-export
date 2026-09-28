@@ -1,6 +1,6 @@
 # HIPAA context and covered-entity prohibition
 
-Open Health Exporter is a consumer-controlled tool. A user installs it, selects data from their
+KeepMyMetrics is a consumer-controlled tool. A user installs it, selects data from their
 own Health store, and directs that data to a destination they control. The project does not
 operate a Health-data receiver for users and is not claiming to be a HIPAA covered entity or
 business associate.

@@ -655,7 +655,7 @@ struct HarnessView: View {
                 // grow vertically. Take the ideal height the way
                 // `healthKitUnavailable` does: without it the audit reads copy
                 // that exactly fills one line as clipped.
-                Text("Open Health Exporter is locked")
+                Text("\(ProductName.display) is locked")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(nil)

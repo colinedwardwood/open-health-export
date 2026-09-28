@@ -90,7 +90,7 @@
   "templating": { "list": [] },
   "time": { "from": "now-15m", "to": "now" },
   "timezone": "utc",
-  "title": "Open Health Exporter receiver",
+  "title": "KeepMyMetrics receiver",
   "uid": "ohe-receiver",
   "version": 1
 }

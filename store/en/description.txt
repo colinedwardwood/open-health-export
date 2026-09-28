@@ -1,4 +1,4 @@
-Open Health Exporter sends the Apple Health types you choose to destinations you enable: a local folder, HTTPS, MQTT, or a Mac companion. It shows last success, last failure with a reason code, and an overdue banner when export has been quiet too long.
+KeepMyMetrics sends the Apple Health types you choose to destinations you enable: a local folder, HTTPS, MQTT, or a Mac companion. It shows last success, last failure with a reason code, and an overdue banner when export has been quiet too long.
 
 This is not a medical device. It does not diagnose or treat anything.
 

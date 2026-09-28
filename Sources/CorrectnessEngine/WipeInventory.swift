@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import CoreDomain
 import EnginePorts
 import Foundation
 
@@ -94,8 +95,9 @@ public enum WipeCopy {
     public static let receivedLimit =
         "We cannot delete data your destinations already received."
     public static let healthLimit = "We cannot turn off our own Health access."
-    public static let healthPath =
-        "To turn access off: Health → your profile picture → Privacy → Apps → Open Health Exporter."
+    public static var healthPath: String {
+        "To turn access off: Health → your profile picture → Privacy → Apps → \(ProductName.display)."
+    }
     public static let macLimit =
         "A Mac companion keeps its own copy. Use Delete everything received there. Deleting here does not reach it."
     public static let noneReceived = "No destination has received data yet."
