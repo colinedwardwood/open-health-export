@@ -626,56 +626,6 @@ enum HarnessExport {
         }
     }
 
-    @MainActor
-    static func advisoryLastVerified() -> Date? {
-        (UserDefaults.standard.object(forKey: SettingKey.advisoryLastVerifiedEpoch.rawValue) as? TimeInterval)
-            .map { Date(timeIntervalSince1970: $0) }
-    }
-
-    static func fetchSecurityAdvisory(enabled: Bool) async throws -> AdvisoryPresentation {
-        let defaults = UserDefaults.standard
-        let state = AdvisoryState(
-            enabled: enabled,
-            lastAttemptEpoch: defaults.object(
-                forKey: SettingKey.advisoryLastAttemptEpoch.rawValue
-            ) as? TimeInterval,
-            lastVerifiedEpoch: defaults.object(
-                forKey: SettingKey.advisoryLastVerifiedEpoch.rawValue
-            ) as? TimeInterval,
-            lastSeenSeq: defaults.integer(forKey: SettingKey.advisoryLastSeenSeq.rawValue)
-        )
-        let root = try applicationSupportRoot()
-        let emptyBody = root.appendingPathComponent("advisory-request-body")
-        if !FileManager.default.fileExists(atPath: emptyBody.path) {
-            try Data().write(to: emptyBody, options: .atomic)
-        }
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        let result = try await AdvisoryClient.fetch(
-            transport: SystemHTTPTransport.make(),
-            store: store,
-            state: state,
-            now: Date(),
-            marketingVersion: Bundle.main.object(
-                forInfoDictionaryKey: "CFBundleShortVersionString"
-            ) as? String ?? "0.0.0",
-            foregroundVisible: true,
-            emptyBody: emptyBody
-        )
-        defaults.set(
-            result.state.lastAttemptEpoch,
-            forKey: SettingKey.advisoryLastAttemptEpoch.rawValue
-        )
-        defaults.set(
-            result.state.lastVerifiedEpoch,
-            forKey: SettingKey.advisoryLastVerifiedEpoch.rawValue
-        )
-        defaults.set(
-            result.state.lastSeenSeq,
-            forKey: SettingKey.advisoryLastSeenSeq.rawValue
-        )
-        return result.presentation
-    }
-
     static func installationID() throws -> String {
         let root = try applicationSupportRoot()
         let exporterURL = root.appendingPathComponent("exporter-id")
@@ -1763,7 +1713,7 @@ enum HarnessExport {
         return lines
     }
 
-    private static func applicationSupportRoot() throws -> URL {
+    static func applicationSupportRoot() throws -> URL {
         let fm = FileManager.default
         let base = try fm.url(
             for: .applicationSupportDirectory,

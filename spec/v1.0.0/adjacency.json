@@ -2,6 +2,15 @@
   "package": "open-health-exporter",
   "targets": [
     {
+      "name": "AppServices",
+      "type": "regular",
+      "dependencies": [
+        "EnginePorts",
+        "NetEgress",
+        "WireFormat"
+      ]
+    },
+    {
       "name": "CSQLite",
       "type": "system",
       "dependencies": []
@@ -85,6 +94,7 @@
       "name": "ExportCoreTests",
       "type": "test",
       "dependencies": [
+        "AppServices",
         "CompanionReceive",
         "CompanionWire",
         "CoreDomain",

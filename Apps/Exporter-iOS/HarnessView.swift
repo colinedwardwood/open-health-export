@@ -2505,19 +2505,9 @@ struct HarnessView: View {
     private func refreshSecurityAdvisory() async {
         // No network egress of any kind before the person has read what the app does.
         guard disclosureAcknowledged else { return }
-        do {
-            let presentation = try await HarnessExport.fetchSecurityAdvisory(
-                enabled: advisoryEnabled
-            )
-            advisoryBanner = presentation.banner
-            advisoryItems = presentation.items
-        } catch {
-            advisoryBanner = AdvisoryStaleness.bannerCopy(
-                lastVerified: HarnessExport.advisoryLastVerified(),
-                now: Date()
-            )
-            advisoryItems = []
-        }
+        let presentation = await AppAdvisory.service.refresh(enabled: advisoryEnabled, now: Date())
+        advisoryBanner = presentation.banner
+        advisoryItems = presentation.items
     }
 
     private var dataBrowser: some View {
