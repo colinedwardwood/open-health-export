@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import AppServices
 import CompanionWire
 import CoreDomain
 import CoreTemporal
@@ -26,42 +27,6 @@ import UIKit
 import Watchdog
 import WidgetKit
 import WireFormat
-
-private struct CompanionVerificationRecord: Codable {
-    var serviceName: String
-    var macInstallationID: String
-    var report: DestinationTestReport
-    var propagateTraceparent: Bool?
-}
-
-private struct HTTPSVerificationRecord: Codable {
-    var urlString: String
-    var allowedHosts: [String]
-    var allowInsecureHTTP: Bool
-    var report: DestinationTestReport
-    var leafSPKISha256: String?
-    var issuerSPKISha256: String?
-    var firstSeen: String
-    var hasBearer: Bool
-    var bearerDescriptor: StoredCredentialDescriptor?
-    var webhookDescriptor: StoredCredentialDescriptor?
-    var propagateTraceparent: Bool?
-    var importedLocalIdentifier: String?
-}
-
-private enum LocalExportFolderError: LocalizedError {
-    case notSelected
-    case inaccessible
-
-    var errorDescription: String? {
-        switch self {
-        case .notSelected:
-            "Choose an archive folder in Files before enabling local export."
-        case .inaccessible:
-            "The archive folder is no longer accessible. Choose it again in Files."
-        }
-    }
-}
 
 private struct QueuedWithoutAttemptSink: DestinationSink {
     func send(fileHandle: String, idempotencyKey: BatchID) async throws -> DeliveryReceipt {
@@ -135,7 +100,8 @@ private final class PendingDestination {
     }
 }
 
-private struct MQTTVerificationRecord: Codable {
+/// Internal (not private) so DestinationRecordFiles in Services/AppDestinations.swift can read it.
+struct MQTTVerificationRecord: Codable {
     var urlString: String
     var allowedHosts: [String]
     var allowInsecure: Bool
@@ -309,8 +275,9 @@ enum HarnessExport {
         }
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func allowsMeteredNetwork(destinationID: String) -> Bool {
-        UserDefaults.standard.bool(forKey: SettingsStore.allowsMeteredNetworkKey(destinationID))
+        AppDestinations.repository.allowsMeteredNetwork(destinationID)
     }
 
     static func networkPathConditions() -> NetworkPathConditions {
@@ -361,93 +328,44 @@ enum HarnessExport {
         return lines
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func destinationScope(_ destinationID: String) async throws -> DestinationExportScope {
-        let root = try applicationSupportRoot()
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        return try await store.transact { tx in
-            try tx.loadDestinationScope(destinationID: destinationID)
-                ?? DestinationExportScope(destinationID: destinationID)
-        }
+        try await AppDestinations.repository.scope(destinationID)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func destinationScopes() async throws -> [DestinationExportScope] {
-        var scopes: [DestinationExportScope] = []
-        for destinationID in healthDestinationIDs {
-            scopes.append(try await destinationScope(destinationID))
-        }
-        return scopes
+        try await AppDestinations.repository.allScopes()
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func selectedMetrics() async throws -> [MetricID] {
-        let union = try await destinationScopes().reduce(into: Set<MetricID>()) {
-            guard isDestinationEnabled($1.destinationID) else { return }
-            $0.formUnion($1.metrics)
-        }
-        return union.sorted { $0.rawValue < $1.rawValue }
+        try await AppDestinations.repository.selectedMetrics()
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func isDestinationEnabled(_ destinationID: String) -> Bool {
-        guard let root = try? applicationSupportRoot() else { return false }
-        switch destinationID {
-        case "local-file":
-            return isLocalFileEnabled()
-        case "https", "home-assistant":
-            guard let data = try? Data(
-                contentsOf: httpsDestinationRecordURL(
-                    root: root,
-                    destinationID: destinationID
-                )
-            ), let record = try? JSONDecoder().decode(HTTPSVerificationRecord.self, from: data)
-            else { return false }
-            return record.report.allowsEnablement
-        case "mqtt":
-            guard let data = try? Data(
-                contentsOf: root.appendingPathComponent("mqtt-destination.json")
-            ), let record = try? JSONDecoder().decode(MQTTVerificationRecord.self, from: data)
-            else { return false }
-            return record.report.allowsEnablement
-        case "companion":
-            guard let data = try? Data(contentsOf: companionTestReportURL(root: root)),
-                  let record = try? JSONDecoder().decode(CompanionVerificationRecord.self, from: data)
-            else { return false }
-            return record.report.allowsEnablement
-        default:
-            return false
-        }
+        AppDestinations.repository.isEnabled(destinationID)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func destinationExportRole(_ destinationID: String) -> DestinationExportRole {
-        if let raw = UserDefaults.standard.string(
-            forKey: SettingsStore.exportRoleKey(destinationID)
-        ), let stored = DestinationExportRole(rawValue: raw) {
-            return stored
-        }
-        if let snapshotURL = StatusSnapshotLocation.url(destinationID: destinationID),
-           let snapshot = try? DestinationSnapshotFile.read(from: snapshotURL) {
-            return snapshot.exportRole
-        }
-        return .designated
+        AppDestinations.repository.exportRole(destinationID)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func allowsExport(_ destinationID: String, trigger: RunTrigger) -> Bool {
-        destinationExportRole(destinationID).allows(trigger)
+        AppDestinations.repository.allowsExport(destinationID, trigger: trigger)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func hasAutomaticExport(trigger: RunTrigger) -> Bool {
-        healthDestinationIDs.contains {
-            isDestinationEnabled($0) && allowsExport($0, trigger: trigger)
-        }
+        AppDestinations.repository.hasAutomaticExport(trigger: trigger)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     private static func destinationLabel(_ destinationID: String) -> String {
-        switch destinationID {
-        case "local-file": "Archive folder"
-        case "https": "HTTPS destination"
-        case "home-assistant": "Home Assistant"
-        case "mqtt": "MQTT destination"
-        case "companion": "Mac companion"
-        default: destinationID
-        }
+        DestinationRepository.label(destinationID)
     }
 
     private static func makeAutomaticRunDestination(
@@ -538,85 +456,43 @@ enum HarnessExport {
         }
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func setDestinationExportRole(
         _ role: DestinationExportRole,
         destinationID: String
     ) throws {
-        UserDefaults.standard.set(
-            role.rawValue,
-            forKey: SettingsStore.exportRoleKey(destinationID)
-        )
-        guard let snapshotURL = StatusSnapshotLocation.url(destinationID: destinationID),
-              var snapshot = try? DestinationSnapshotFile.read(from: snapshotURL)
-        else { return }
-        snapshot.applyExportRole(role)
-        snapshot.writtenAtEpoch = Date().timeIntervalSince1970
-        try DestinationSnapshotFile.write(snapshot, to: snapshotURL)
-        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+        try AppDestinations.repository.setExportRole(role, destinationID: destinationID)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     private static func synchronizeDestinationExportRole(_ destinationID: String) {
-        try? setDestinationExportRole(
-            destinationExportRole(destinationID),
-            destinationID: destinationID
-        )
+        AppDestinations.repository.synchronizeExportRole(destinationID)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func synchronizeDestinationExportRoles() {
-        for destinationID in healthDestinationIDs {
-            synchronizeDestinationExportRole(destinationID)
-        }
+        AppDestinations.repository.synchronizeExportRoles()
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func hasDestinationConfiguration(_ destinationID: String) -> Bool {
-        guard let root = try? applicationSupportRoot() else { return false }
-        let filename: String
-        switch destinationID {
-        case "https", "home-assistant":
-            filename = "\(destinationID)-destination.json"
-        case "mqtt":
-            filename = "mqtt-destination.json"
-        case "companion":
-            return FileManager.default.fileExists(
-                atPath: root.appendingPathComponent("companion-test.json").path
-            )
-                || FileManager.default.fileExists(
-                    atPath: root.appendingPathComponent("pairing.json").path
-                )
-        default:
-            return false
-        }
-        return FileManager.default.fileExists(
-            atPath: root.appendingPathComponent(filename).path
-        )
+        AppDestinations.repository.hasConfiguration(destinationID)
     }
 
     // #42: forwarder; remove when the product UI calls the service.
     private static func requestScopeAuthorizationIfConfigured(_ destinationID: String) async throws { try await AppHealth.service.requestReadAccess(for: try await destinationScope(destinationID)) }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func saveDestinationScope(_ scope: DestinationExportScope) async throws {
-        let allowed = Set(MetricCatalog.selectable.map(\.id))
-        let sanitized = try DestinationExportScope(
-            destinationID: scope.destinationID,
-            metrics: scope.metrics.intersection(allowed),
-            startInclusive: scope.startInclusive,
-            endExclusive: scope.endExclusive
-        )
-        let root = try applicationSupportRoot()
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        try await store.transact { try $0.upsertDestinationScope(sanitized) }
+        try await AppDestinations.repository.saveScope(scope)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func applyDestinationScope(
         _ scope: DestinationExportScope,
         previousMetrics: Set<MetricID>
     ) async throws {
-        let root = try applicationSupportRoot()
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        try await saveDestinationScope(scope)
-        for metric in scope.metrics.subtracting(previousMetrics) {
-            try await store.reenableType(metric: metric, reason: "user_selected")
-        }
+        try await AppDestinations.repository.applyScope(scope, previousMetrics: previousMetrics)
     }
 
     static func installationID() throws -> String {
@@ -2139,15 +2015,17 @@ enum HarnessExport {
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     private static func httpsDestinationRecordURL(
         root: URL,
         destinationID: String
     ) -> URL {
-        root.appendingPathComponent("\(destinationID)-destination.json")
+        DestinationSidecar.httpsRecord(destinationID: destinationID).url(in: root)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     private static func httpsKeychainService(_ destinationID: String) -> String {
-        IdentifierRoot.qualified("ios.\(destinationID)")
+        DestinationRepository.keychainService(destinationID)
     }
 
     static func prepareHomeAssistantWebhook(
@@ -2526,91 +2404,28 @@ enum HarnessExport {
         Task { await PendingDestination.shared.setMQTT(nil) }
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func storedCredentialSummaries() -> (
         httpsBearer: String?,
         homeAssistantWebhook: String?,
         mqttPassword: String?,
         mqttPKCS12Password: String?
     ) {
-        let root = try? applicationSupportRoot()
-        let https: String?
-        if let root,
-           let data = try? Data(contentsOf: root.appendingPathComponent("https-destination.json")),
-           let record = try? JSONDecoder().decode(HTTPSVerificationRecord.self, from: data),
-           let descriptor = record.bearerDescriptor,
-           descriptor.appearance != .absent
-        {
-            https = descriptor.summary
-        } else {
-            https = nil
-        }
-        let homeAssistant: String?
-        if let root,
-           let data = try? Data(
-               contentsOf: root.appendingPathComponent(
-                   "home-assistant-destination.json"
-               )
-           ),
-           let record = try? JSONDecoder().decode(
-               HTTPSVerificationRecord.self,
-               from: data
-           ),
-           let descriptor = record.webhookDescriptor,
-           descriptor.appearance != .absent
-        {
-            homeAssistant = descriptor.summary
-        } else {
-            homeAssistant = nil
-        }
-        let mqttPassword: String?
-        let mqttPKCS12: String?
-        if let root,
-           let data = try? Data(contentsOf: root.appendingPathComponent("mqtt-destination.json")),
-           let record = try? JSONDecoder().decode(MQTTVerificationRecord.self, from: data)
-        {
-            mqttPassword = record.passwordDescriptor.flatMap {
-                $0.appearance == .absent ? nil : $0.summary
-            }
-            mqttPKCS12 = record.pkcs12PasswordDescriptor.flatMap {
-                $0.appearance == .absent ? nil : $0.summary
-            }
-        } else {
-            mqttPassword = nil
-            mqttPKCS12 = nil
-        }
-        return (https, homeAssistant, mqttPassword, mqttPKCS12)
+        let summaries = AppDestinations.repository.credentialSummaries()
+        return (
+            summaries.httpsBearer,
+            summaries.homeAssistantWebhook,
+            summaries.mqttPassword,
+            summaries.mqttPKCS12Password
+        )
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     private static func mqttPKCS12Password(
         from saved: MQTTVerificationRecord,
         root: URL
     ) async throws -> String? {
-        let store = KeychainSecretStore(service: IdentifierRoot.qualified("mqtt"))
-        let handle = SecretHandle(rawValue: "mqtt_pkcs12_password")
-        if let leftover = saved.clientPKCS12Password, !leftover.isEmpty {
-            try await store.store(Array(leftover.utf8), handle: handle)
-            var migrated = saved
-            migrated.clientPKCS12Password = nil
-            migrated.hasClientPKCS12Password = true
-            if migrated.pkcs12PasswordDescriptor == nil
-                || migrated.pkcs12PasswordDescriptor?.appearance == .absent
-            {
-                migrated.pkcs12PasswordDescriptor = StoredCredentialDescriptor.capturing(
-                    leftover,
-                    appearance: .pkcs12Password,
-                    addedOnDay: saved.firstSeen ?? ""
-                )
-            }
-            try JSONEncoder().encode(migrated).write(
-                to: root.appendingPathComponent("mqtt-destination.json"),
-                options: .atomic
-            )
-            return leftover
-        }
-        if saved.hasClientPKCS12Password == true {
-            return String(decoding: try await store.load(handle), as: UTF8.self)
-        }
-        return nil
+        try await AppDestinations.records.mqttPKCS12Password(from: saved, root: root)
     }
 
     /// A background wake has seconds, not minutes, and the read it was woken for
@@ -3142,43 +2957,24 @@ enum HarnessExport {
         return NoticeCopy.render(notice).body
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func storedHTTPSTraceparent() -> Bool {
-        guard let root = try? applicationSupportRoot(),
-              let data = try? Data(contentsOf: root.appendingPathComponent("https-destination.json")),
-              let record = try? JSONDecoder().decode(HTTPSVerificationRecord.self, from: data)
-        else {
-            return false
-        }
-        return record.propagateTraceparent ?? false
+        AppDestinations.repository.httpsTraceparent()
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func setHTTPSTraceparent(_ enabled: Bool, destinationID: String = "https") throws {
-        let root = try applicationSupportRoot()
-        let url = httpsDestinationRecordURL(root: root, destinationID: destinationID)
-        guard let data = try? Data(contentsOf: url),
-              var record = try? JSONDecoder().decode(HTTPSVerificationRecord.self, from: data)
-        else {
-            return
-        }
-        record.propagateTraceparent = enabled
-        try JSONEncoder().encode(record).write(to: url, options: .atomic)
+        try AppDestinations.repository.setHTTPSTraceparent(enabled, destinationID: destinationID)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func storedCompanionTraceparent() -> Bool {
-        UserDefaults.standard.bool(forKey: SettingKey.companionPropagateTraceparent.rawValue)
+        AppDestinations.repository.companionTraceparent()
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func setCompanionTraceparent(_ enabled: Bool) throws {
-        UserDefaults.standard.set(enabled, forKey: SettingKey.companionPropagateTraceparent.rawValue)
-        let root = try applicationSupportRoot()
-        let url = companionTestReportURL(root: root)
-        guard let data = try? Data(contentsOf: url),
-              var record = try? JSONDecoder().decode(CompanionVerificationRecord.self, from: data)
-        else {
-            return
-        }
-        record.propagateTraceparent = enabled
-        try JSONEncoder().encode(record).write(to: url, options: .atomic)
+        try AppDestinations.repository.setCompanionTraceparent(enabled)
     }
 
     static func portableConfigurationExport() async throws -> URL {
@@ -3741,84 +3537,34 @@ enum HarnessExport {
         WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     private static func localFileTestReportURL(root: URL) -> URL {
-        root.appendingPathComponent("local-file-test.json")
+        DestinationSidecar.localFileTestReport.url(in: root)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     private static func localExportFolderBookmarkURL(root: URL) -> URL {
-        root.appendingPathComponent("local-export-folder.bookmark")
+        DestinationSidecar.localFolderBookmark.url(in: root)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func chooseLocalExportFolder(_ url: URL) throws -> String {
-        let root = try applicationSupportRoot()
-        let bookmark = try SecurityScopedBookmark.create(from: url)
-        try FileWriteKit.writeAtomically(
-            bookmark,
-            to: localExportFolderBookmarkURL(root: root)
-        )
-        try? FileManager.default.removeItem(at: localFileTestReportURL(root: root))
-        return url.lastPathComponent
+        try AppDestinations.repository.chooseLocalExportFolder(url)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func localExportFolderName() -> String? {
-        guard let root = try? applicationSupportRoot(),
-              let access = try? localExportFolder(root: root)
-        else {
-            return nil
-        }
-        return access.url.lastPathComponent
+        AppDestinations.repository.localExportFolderName()
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     private static func localExportFolder(root: URL) throws -> SecurityScopedAccess {
-        guard let bookmark = try? Data(
-            contentsOf: localExportFolderBookmarkURL(root: root)
-        ) else {
-            throw LocalExportFolderError.notSelected
-        }
-        let resolved = try SecurityScopedBookmark.resolve(bookmark)
-        let access: SecurityScopedAccess
-        #if DEBUG
-        // A seeded folder lives inside the app container and therefore has no scope to
-        // start. Narrowed to that case so a genuinely inaccessible picked folder still
-        // reports as inaccessible in DEBUG builds.
-        if resolved.url.path.hasPrefix(root.path) {
-            access = SecurityScopedAccess.unscoped(url: resolved.url)
-        } else {
-            do {
-                access = try SecurityScopedAccess(url: resolved.url)
-            } catch {
-                throw LocalExportFolderError.inaccessible
-            }
-        }
-        #else
-        do {
-            access = try SecurityScopedAccess(url: resolved.url)
-        } catch {
-            throw LocalExportFolderError.inaccessible
-        }
-        #endif
-        if resolved.isStale {
-            let refreshed = try SecurityScopedBookmark.create(
-                fromAccessibleURL: access.url
-            )
-            try FileWriteKit.writeAtomically(
-                refreshed,
-                to: localExportFolderBookmarkURL(root: root)
-            )
-        }
-        return access
+        try AppDestinations.folder.access(root: root)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func isLocalFileEnabled() -> Bool {
-        guard let root = try? applicationSupportRoot(),
-              let folderAccess = try? localExportFolder(root: root),
-              let data = try? Data(contentsOf: localFileTestReportURL(root: root)),
-              let report = try? JSONDecoder().decode(DestinationTestReport.self, from: data)
-        else {
-            return false
-        }
-        defer { withExtendedLifetime(folderAccess) {} }
-        return report.allowsEnablement
+        AppDestinations.repository.isLocalFileEnabled()
     }
 
     /// UX-45: hops for the onboarding and Settings explainer. Credential *kinds*
@@ -3987,8 +3733,9 @@ enum HarnessExport {
     // #42: forwarder; remove when the product UI calls the service.
     static func observerRegistrationFailureSummary() -> String? { AppHealth.service.observerRegistrationFailureSummary() }
 
+    // #42: forwarder; remove when the product UI calls the service.
     private static func companionTestReportURL(root: URL) -> URL {
-        root.appendingPathComponent("companion-test.json")
+        DestinationSidecar.companionTestReport.url(in: root)
     }
 
     private static func ledgerHeadSeal() -> any LedgerHeadSeal {

@@ -7,7 +7,9 @@
       "dependencies": [
         "CoreDomain",
         "EnginePorts",
+        "MetricCatalog",
         "NetEgress",
+        "Watchdog",
         "WireFormat"
       ]
     },
