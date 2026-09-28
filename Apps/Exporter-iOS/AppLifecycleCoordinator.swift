@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import AppServices
 import CoreDomain
 import BackgroundTasks
 import CorrectnessEngine
@@ -41,22 +42,27 @@ final class AppLifecycleCoordinator {
     }
 
     func startObserversIfEligible() async throws {
-        guard HealthKitAvailability.isAvailable() else { return }
-        guard UserDefaults.standard.bool(forKey: SettingKey.disclosureAcknowledged.rawValue) else {
-            return
-        }
-        let revoked = try await HarnessExport.observeAuthorizationChanges()
-        if revoked {
+        guard HealthObserverPolicy.mayObserve(
+            healthAvailable: HealthKitAvailability.isAvailable(),
+            disclosureAcknowledged: UserDefaults.standard.bool(
+                forKey: SettingKey.disclosureAcknowledged.rawValue
+            )
+        ) else { return }
+        let revoked = try await AppHealth.service.observeAuthorizationChanges()
+        switch HealthObserverPolicy.action(
+            revoked: revoked,
+            automaticExport: HarnessExport.hasAutomaticExport(trigger: .observerQuery),
+            running: healthObservers != nil
+        ) {
+        case .stop:
             stopObservers()
+        case .keep:
             return
+        case .start:
+            // The export gate the wakes feed stays with the export code for now.
+            healthObservers = try await HarnessExport.startHealthObservers()
+            BackgroundTaskCoordinator.submit()
         }
-        guard HarnessExport.hasAutomaticExport(trigger: .observerQuery) else {
-            stopObservers()
-            return
-        }
-        guard healthObservers == nil else { return }
-        healthObservers = try await HarnessExport.startHealthObservers()
-        BackgroundTaskCoordinator.submit()
     }
 
     func stopObservers() {

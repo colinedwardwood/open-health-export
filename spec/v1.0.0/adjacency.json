@@ -5,6 +5,7 @@
       "name": "AppServices",
       "type": "regular",
       "dependencies": [
+        "CoreDomain",
         "EnginePorts",
         "NetEgress",
         "WireFormat"
