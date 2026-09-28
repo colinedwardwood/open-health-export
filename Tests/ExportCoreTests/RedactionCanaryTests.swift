@@ -269,7 +269,12 @@ enum LeakMutant: String, CaseIterable {
         )
     )
     #expect(exportHarness.contains("destinationScope(destinationID)"))
-    #expect(exportHarness.contains("guard isDestinationEnabled($1.destinationID)"))
+    // #42: the enabled-destination union moved to DestinationRepository.
+    let repository = try String(
+        contentsOf: root.appendingPathComponent("Sources/AppServices/DestinationRepository.swift"),
+        encoding: .utf8
+    )
+    #expect(repository.contains("guard isEnabled($1.destinationID)"))
     #expect(exportHarness.contains("window: HealthKitQueryWindow(scope: scope)"))
     #expect(exportHarness.contains("try ExportScopeGate.requireConfigured(scope)"))
     #expect(exportHarness.contains(
