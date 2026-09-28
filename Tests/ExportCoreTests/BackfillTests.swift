@@ -262,10 +262,11 @@ private func backfillCheckpoint(
     #expect(view.contains("DestinationTestPlan.companion"))
     #expect(view.contains("NamedWorkProgress.measure("))
 
-    let harness = try String(
-        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift"),
-        encoding: .utf8
-    )
+    // #42: the export runs moved to ExportService; its decisions to AppServices.
+    let harness = try [
+        "Apps/Exporter-iOS/HarnessExport.swift",
+        "Apps/Exporter-iOS/Services/ExportService.swift",
+    ].map { try String(contentsOf: root.appendingPathComponent($0), encoding: .utf8) }.joined()
     #expect(harness.contains("archive-manifest.json"))
     for name in ["runHTTPSDestination", "runMQTTDestination", "runCompanion"] {
         guard let range = harness.range(of: "static func \(name)") else {

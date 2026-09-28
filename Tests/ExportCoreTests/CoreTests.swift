@@ -6258,10 +6258,12 @@ private func anchorHoldFixture(
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
-    let harness = try String(
-        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift"),
-        encoding: .utf8
-    )
+    // #42: the export runs moved to ExportService; its decisions to AppServices.
+    let harness = try [
+        "Apps/Exporter-iOS/HarnessExport.swift",
+        "Apps/Exporter-iOS/Services/ExportService.swift",
+        "Sources/AppServices/ExportPolicy.swift",
+    ].map { try String(contentsOf: root.appendingPathComponent($0), encoding: .utf8) }.joined()
     for service in ["ios.psk", "ios.https", "mqtt"] {
         #expect(harness.contains("KeychainSecretStore(service: IdentifierRoot.qualified(\"\(service)\"))"))
     }
@@ -6294,10 +6296,10 @@ private func anchorHoldFixture(
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
-    let harness = try String(
-        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift"),
-        encoding: .utf8
-    )
+    // #42: the export runs moved to ExportService; its decisions to AppServices.
+    let harness = try [
+        "Apps/Exporter-iOS/Services/ExportService.swift",
+    ].map { try String(contentsOf: root.appendingPathComponent($0), encoding: .utf8) }.joined()
     let calls = harness.components(separatedBy: "try await trailingReconcileAfterDelta(").count - 1
     #expect(calls == 4)
     // The automatic path fans one trailing window to every sink that can take it
@@ -6314,21 +6316,27 @@ private func anchorHoldFixture(
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
-    let harness = try String(
-        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift"),
+    // #42: the export runs moved to ExportService; its decisions to AppServices.
+    let service = try [
+        "Apps/Exporter-iOS/Services/ExportService.swift",
+    ].map { try String(contentsOf: root.appendingPathComponent($0), encoding: .utf8) }.joined()
+    let policy = try String(
+        contentsOf: root.appendingPathComponent("Sources/AppServices/ExportPolicy.swift"),
         encoding: .utf8
     )
-    #expect(harness.contains("maybeScheduledFullReconcile"))
-    #expect(harness.contains("CatchUpAdmission.allows"))
-    #expect(harness.contains("ScheduledReconcile.due"))
-    #expect(harness.contains("trigger == .appForeground || trigger == .launch"))
-    #expect(harness.contains("applyQueueRedIfNeeded"))
-    #expect(harness.contains("deferForLowPower: isLowPowerDeferred()"))
-    #expect(harness.contains("deferForThermal: isThermalDeferred()"))
-    #expect(harness.contains("thermalHalved: isThermalDeferred()"))
-    #expect(harness.contains("Gzip.$level.withValue(gzipLevel()"))
-    #expect(harness.contains("thermalState"))
-    #expect(harness.components(separatedBy: "try await applyQueueRedIfNeeded(").count - 1 == 4)
+    #expect(service.contains("maybeScheduledFullReconcile"))
+    #expect(service.contains("scheduledReconcile.decide(queuedBytes: queued"))
+    #expect(policy.contains("CatchUpAdmission.allows"))
+    #expect(policy.contains("ScheduledReconcile.due"))
+    #expect(policy.contains("trigger == .appForeground || trigger == .launch"))
+    #expect(service.contains("ScheduledReconcileGate.follows(trigger)"))
+    #expect(service.contains("applyQueueRedIfNeeded"))
+    #expect(service.contains("deferForLowPower: isLowPowerDeferred()"))
+    #expect(service.contains("deferForThermal: isThermalDeferred()"))
+    #expect(policy.contains("thermalHalved: isThermalDeferred()"))
+    #expect(service.contains("Gzip.$level.withValue(gzipLevel()"))
+    #expect(service.contains("thermalState"))
+    #expect(service.components(separatedBy: "try await applyQueueRedIfNeeded(").count - 1 == 4)
 }
 
 @Test func meteredNetworkOptInIsOffByDefaultOnEveryOutboundHealthPath() throws {
@@ -6336,10 +6344,11 @@ private func anchorHoldFixture(
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
-    let harness = try String(
-        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift"),
-        encoding: .utf8
-    )
+    // #42: the export runs moved to ExportService; its decisions to AppServices.
+    let harness = try [
+        "Apps/Exporter-iOS/HarnessExport.swift",
+        "Apps/Exporter-iOS/Services/ExportService.swift",
+    ].map { try String(contentsOf: root.appendingPathComponent($0), encoding: .utf8) }.joined()
     #expect(harness.contains("allowsMeteredNetwork(destinationID:"))
     #expect(harness.contains("NetworkPathMonitorCache.conditions()"))
     for destinationID in ["mqtt", "companion", "otlp"] {
