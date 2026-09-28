@@ -284,48 +284,19 @@ enum HarnessExport {
         NetworkPathMonitorCache.conditions()
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func attachNetworkActivityLedger() {
-        guard let root = try? applicationSupportRoot() else { return }
-        EgressAttemptLog.attachPersistent(
-            EgressAttemptLog.PersistentStore(
-                url: root.appendingPathComponent("network-activity.json"),
-                nowEpoch: { Date().timeIntervalSince1970 }
-            )
-        )
+        AppStatus.transparency.attachNetworkActivityLedger()
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func networkActivityLines() -> [String] {
-        attachNetworkActivityLedger()
-        let rows = EgressAttemptLog.persistentSnapshot()
-        var lines = [
-            EgressAttemptLog.selfReportedCaveat(sourceCommit: BuildIdentity.current.sourceCommit)
-        ]
-        if rows.isEmpty {
-            lines.append(EgressAttemptLog.emptyCopy)
-        } else {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .short
-            formatter.timeStyle = .short
-            for row in rows {
-                let first = formatter.string(from: Date(timeIntervalSince1970: row.firstSeenEpoch))
-                let last = formatter.string(from: Date(timeIntervalSince1970: row.lastSeenEpoch))
-                lines.append(
-                    "\(row.host) · \(row.count) · \(row.bytes) bytes · \(first) → \(last)"
-                )
-            }
-        }
-        return lines
+        AppStatus.transparency.networkActivityLines()
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func buildProvenanceLines() -> [String] {
-        let identity = BuildIdentity.current
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-            ?? "0.1.0"
-        var lines = [BuildIdentity.versionLine(version: version, commit: identity.sourceCommit)]
-        if let link = BuildIdentity.sourceLink(commit: identity.sourceCommit) {
-            lines.append(link)
-        }
-        return lines
+        AppStatus.transparency.buildProvenanceLines()
     }
 
     // #42: forwarder; remove when the product UI calls the service.
@@ -901,23 +872,19 @@ enum HarnessExport {
         return "\(metric.rawValue) reconcile: \(reconciled.kind.rawValue)"
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     private static func rescheduleOverdueNotification(snapshotURL: URL) async {
-        guard let snapshot = try? DestinationSnapshotFile.read(from: snapshotURL) else {
-            return
-        }
-        _ = try? await LocalUserNotifier().rescheduleExportOverdue(snapshot: snapshot)
+        guard let snapshot = try? DestinationSnapshotFile.read(from: snapshotURL) else { return }
+        await AppStatus.status.rescheduleOverdueNotification(for: snapshot)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     private static func notifyIfFailed(
         _ kind: RunOutcome.Kind,
         destinationID: String,
         destinationLabel: String
     ) async {
-        guard kind == .failed else { return }
-        await notifyDestinationFailure(
-            destinationID: destinationID,
-            destinationLabel: destinationLabel
-        )
+        await AppStatus.status.notifyIfFailed(kind, destinationID: destinationID, destinationLabel: destinationLabel)
     }
 
     /// Applies each sink's own result to its own status, for a run that fanned one
@@ -961,17 +928,12 @@ enum HarnessExport {
     /// Marks one destination's own status as failed, for the case where the run
     /// never reached it: its last outcome must not inherit the combined result of
     /// the destinations that did run.
+    // #42: forwarder; remove when the product UI calls the service.
     private static func recordDestinationFailureSnapshot(
         _ destinationID: String,
         errorClass: ErrorClass
     ) {
-        guard let snapshotURL = StatusSnapshotLocation.url(destinationID: destinationID),
-              var snapshot = try? DestinationSnapshotFile.read(from: snapshotURL)
-        else { return }
-        snapshot.applyLastOutcome(RunOutcome.Kind.failed.rawValue)
-        snapshot.errorClass = errorClass.rawValue
-        snapshot.writtenAtEpoch = Date().timeIntervalSince1970
-        try? DestinationSnapshotFile.write(snapshot, to: snapshotURL)
+        AppStatus.status.recordDestinationFailureSnapshot(destinationID, errorClass: errorClass)
     }
 
     /// A run that threw before any destination could report for itself. Naming the
@@ -981,38 +943,20 @@ enum HarnessExport {
     /// failure, or the first one this trigger was allowed to use. Returns the label
     /// that notice used, so on-screen text can say the same thing.
     @discardableResult
+    // #42: forwarder; remove when the product UI calls the service.
     static func notifyRunFailure(trigger: RunTrigger) async -> String? {
-        let planned = healthDestinationIDs.filter {
-            isDestinationEnabled($0) && allowsExport($0, trigger: trigger)
-        }
-        guard !planned.isEmpty else { return nil }
-        let failing = StatusSnapshotLocation.readAll().first {
-            planned.contains($0.destinationID) && $0.errorClass != nil
-        }?.destinationID
-        let destinationID = failing ?? planned[0]
-        let label = destinationLabel(destinationID)
-        await notifyDestinationFailure(
-            destinationID: destinationID,
-            destinationLabel: label
+        await AppStatus.status.notifyRunFailure(
+            planned: healthDestinationIDs.filter { isDestinationEnabled($0) && allowsExport($0, trigger: trigger) },
+            label: destinationLabel
         )
-        return label
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func notifyDestinationFailure(
         destinationID: String,
         destinationLabel: String
     ) async {
-        let errorClass = StatusSnapshotLocation.readAll().first {
-            $0.destinationID == destinationID
-        }?.errorClass
-        _ = try? await LocalUserNotifier().notify(
-            UserNotice(
-                kind: .exportFailed,
-                destinationID: destinationID,
-                destination: destinationLabel,
-                errorClass: errorClass
-            )
-        )
+        await AppStatus.status.notifyDestinationFailure(destinationID: destinationID, destinationLabel: destinationLabel)
     }
 
     /// R-08's history half. A full reconcile repairs what a delta cannot see, so
@@ -1295,52 +1239,9 @@ enum HarnessExport {
         }
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func recordNotificationSuppressionIfNeeded() async throws {
-        #if DEBUG
-        let forcedDenied = ProcessInfo.processInfo
-            .environment["OHE_SEED_NOTIFICATION_AUTHORIZATION"] == "denied"
-        #else
-        let forcedDenied = false
-        #endif
-        let systemDenied = await LocalUserNotifier().authorizationDenied()
-        let denied = forcedDenied || systemDenied
-        let defaults = UserDefaults.standard
-        let key = SettingKey.notificationsPreviouslyDenied.rawValue
-        let previouslyDenied = forcedDenied ? false : defaults.bool(forKey: key)
-        defer { defaults.set(denied, forKey: key) }
-        guard NotificationSuppression.shouldRecord(
-            previouslyDenied: previouslyDenied,
-            currentlyDenied: denied
-        ) else {
-            return
-        }
-        let root = try applicationSupportRoot()
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        try await store.transact { tx in
-            try tx.appendLedger(
-                EgressEntry(
-                    destination: "local-notifications",
-                    sampleCount: 0,
-                    outcomeKind: "security:notifications_denied",
-                    detail: "watchdog_escalation_suppressed",
-                    wallTimeEpoch: Date().timeIntervalSince1970
-                )
-            )
-        }
-        for snapshot in StatusSnapshotLocation.readAll() {
-            if let url = StatusSnapshotLocation.url(
-                destinationID: snapshot.destinationID
-            ) {
-                try DestinationSnapshotFile.recordSecurityEvents(
-                    1,
-                    destinationID: snapshot.destinationID,
-                    destinationLabel: snapshot.destinationLabel,
-                    writtenAtEpoch: Date().timeIntervalSince1970,
-                    at: url
-                )
-            }
-        }
-        WidgetCenter.shared.reloadAllTimelines()
+        try await AppStatus.status.recordNotificationSuppressionIfNeeded(forcedDenied: AppStatus.seededNotificationsDenied)
     }
 
     /// An evicted batch was owed to every destination that was planned when it was
@@ -1628,103 +1529,34 @@ enum HarnessExport {
     }
 
     @MainActor
+    // #42: forwarder; remove when the product UI calls the service.
     static func diagnosticBundle(
         minimumRuns: Int = 30,
         windowHours: Int = 24
     ) throws -> (preview: String, payload: Data) {
-        let assembler = BundleAssembler(
-            maxRuns: minimumRuns,
-            windowSeconds: TimeInterval(windowHours) * 60 * 60
-        )
-        let root = try applicationSupportRoot()
-        let journal = SQLiteDiagnosticReader.read(
-            path: root.appendingPathComponent("state.sqlite").path,
-            maxRuns: assembler.maxRuns,
-            windowSeconds: assembler.windowSeconds
-        )
-        let payload = try assembler.assemble(
-            header: DiagnosticHeader(
-                appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0",
-                osVersion: UIDevice.current.systemVersion,
-                deviceModel: UIDevice.current.model,
-                localeIdentifier: Locale.current.identifier,
-                utcOffsetMinutes: TimeZone.current.secondsFromGMT() / 60,
-                generatedAt: Date().ISO8601Format(),
-                degraded: journal.degraded,
-                sourceCommit: BuildIdentity.current.sourceCommit,
-                buildHash: BuildIdentity.current.buildHash
-            ),
-            events: journal.events
-        )
-        let text = String(decoding: payload, as: UTF8.self)
-        let prettyText: String
-        if let object = try? JSONSerialization.jsonObject(with: payload),
-           JSONSerialization.isValidJSONObject(object),
-           let pretty = try? JSONSerialization.data(
-               withJSONObject: object,
-               options: [.prettyPrinted, .sortedKeys]
-           ),
-           let decoded = String(data: pretty, encoding: .utf8)
-        {
-            prettyText = decoded
-        } else {
-            prettyText = text
-        }
-        let lines = assembler.previewLines(events: journal.events)
-        let preview = lines.isEmpty ? prettyText : lines.joined(separator: "\n") + "\n\n" + prettyText
-        return (preview, payload)
+        try AppStatus.transparency.diagnosticBundle(environment: AppStatus.diagnosticEnvironment(), minimumRuns: minimumRuns, windowHours: windowHours)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func destinationStatusLines() -> [String] {
-        let snapshots = StatusSnapshotLocation.readAll()
-        guard !snapshots.isEmpty else { return [DestinationStatusLine.emptyCopy] }
-        let now = Date().timeIntervalSince1970
-        return snapshots.map { snapshot in
-            DestinationStatusLine.render(snapshot, nowEpoch: now) {
-                Date(timeIntervalSince1970: $0).formatted(date: .abbreviated, time: .shortened)
-            }
-        }
+        AppStatus.status.destinationStatusLines()
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func freshnessDisclosureLines() -> [(id: String, text: String)] {
-        let snapshots = StatusSnapshotLocation.readAll()
-        return FreshnessClass.allCases.flatMap { freshnessClass in
-            let measured = snapshots.compactMap { snapshot -> (String, LocalFreshnessEstimate)? in
-                snapshot.freshnessEstimates[freshnessClass].map {
-                    (snapshot.destinationLabel, $0)
-                }
-            }
-            guard !measured.isEmpty else {
-                return [(
-                    "freshness-class-\(freshnessClass.rawValue)",
-                    FreshnessTarget.classDisclosure(freshnessClass)
-                )]
-            }
-            return measured.map { label, estimate in
-                (
-                    "freshness-\(freshnessClass.rawValue)-\(label)",
-                    "\(label) — \(FreshnessTarget.classDisclosure(freshnessClass, estimate: estimate))"
-                )
-            }
-        }
+        AppStatus.status.freshnessDisclosureLines()
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func destinationChangeBannerDetail() -> String? {
-        let snapshots = StatusSnapshotLocation.readAll()
-        guard DestinationChangeBanner.isVisible(snapshots) else { return nil }
-        return DestinationChangeBanner.detail(snapshots)
+        AppStatus.status.destinationChangeBannerDetail()
     }
 
     /// QA-15 / R-23: the in-app rung. Staleness is computed at read time, so a destination
     /// that succeeded once and then went quiet still surfaces without a server.
+    // #42: forwarder; remove when the product UI calls the service.
     static func overdueBannerDetail() -> String? {
-        let now = Date().timeIntervalSince1970
-        let overdue = StatusSnapshotLocation.readAll().filter {
-            $0.state(at: now) == .overdue
-        }
-        guard !overdue.isEmpty else { return nil }
-        let names = overdue.map(\.destinationLabel).joined(separator: ", ")
-        return "\(names). \(EscalationCopy.overdue)"
+        AppStatus.status.overdueBannerDetail()
     }
 
     static func anchorHolds() async throws -> [AnchorHold] {
@@ -1873,61 +1705,24 @@ enum HarnessExport {
     }
     #endif
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func ledgerLines() async throws -> [String] {
-        let root = try applicationSupportRoot()
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        let entries = try await store.transact { tx in
-            try tx.loadLedger()
-        }
-        let verification = await LedgerHeadSealRecordFile.verify(
-            entries: entries,
-            seal: ledgerHeadSeal(),
-            url: root.appendingPathComponent("ledger-head-seal.json")
-        )
-        var lines: [String]
-        switch verification {
-        case .valid(let head, let count):
-            let shortHead = head == LedgerChain.genesisHash ? "genesis" : String(head.prefix(12))
-            lines = ["Chain and device seal valid · \(count) entries · head \(shortHead)"]
-        case .chainInvalid(let sequence):
-            lines = ["WARNING: chain verification failed at sequence \(sequence)"]
-        case .sealMissing:
-            lines = ["WARNING: ledger head has not been device-sealed"]
-        case .headMismatch:
-            lines = ["WARNING: sealed head does not match the ledger"]
-        case .identityChanged:
-            lines = ["WARNING: ledger identity changed"]
-        }
-        lines.append(contentsOf: entries.suffix(50).reversed().map { entry in
-            let date = Date(timeIntervalSince1970: entry.wallTimeEpoch)
-                .formatted(date: .abbreviated, time: .shortened)
-            return "\(date) · \(entry.destination) · \(entry.outcomeKind) · \(entry.sampleCount) records · \(entry.byteCount) bytes"
-        })
-        return lines
+        try await AppStatus.history.ledgerLines()
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func ledgerIntegrityLine() async throws -> String {
-        let lines = try await ledgerLines()
-        return lines.first ?? "Ledger has not been written yet."
+        try await AppStatus.history.ledgerIntegrityLine()
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func historyEvents() async throws -> [RunEvent] {
-        let root = try applicationSupportRoot()
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        let events = try await store.transact { try $0.loadJournal() }
-        return RunHistory.problemsFirst(events)
+        try await AppStatus.history.historyEvents()
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func historyLines() async throws -> [String] {
-        let events = try await historyEvents()
-        guard !events.isEmpty else {
-            return [RunHistoryDetail.emptyStateCopy, RunHistoryDetail.retentionCopy]
-        }
-        var lines = [RunHistoryDetail.retentionCopy]
-        for event in events {
-            lines.append(contentsOf: RunHistoryDetail.lines(for: event))
-        }
-        return lines
+        try await AppStatus.history.historyLines()
     }
 
     #if DEBUG
@@ -1975,44 +1770,24 @@ enum HarnessExport {
     }
     #endif
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func sentThroughDay(metric: MetricID) async throws -> String? {
-        let root = try applicationSupportRoot()
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        return try await BrowserSendState.sentThroughDay(metric: metric, store: store)
+        try await AppStatus.history.sentThroughDay(metric: metric)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func indexHorizonDay() async throws -> String? {
-        let root = try applicationSupportRoot()
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        return try await BrowserSendState.indexHorizonDay(store: store)
+        try await AppStatus.history.indexHorizonDay()
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func wakeAttributionLine() async throws -> String {
-        let snapshots = StatusSnapshotLocation.readAll()
-        guard let expected = snapshots.compactMap(\.nextAttemptLatestEpoch).min() else {
-            return "Wake attribution: no measured delivery deadline is configured."
-        }
-        let root = try applicationSupportRoot()
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        let journal = try await store.transact { try $0.loadJournal() }
-        let attribution = WakeAttribution.classify(
-            wakes: try wakeLedger().records(),
-            lastJournal: journal.last,
-            nowEpoch: Date().timeIntervalSince1970,
-            expectedWakeByEpoch: expected
-        )
-        return "Wake attribution: \(attribution.userFacingCopy)"
+        try await AppStatus.status.wakeAttributionLine()
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func acknowledgeDestinationChanges() throws {
-        let now = Date().timeIntervalSince1970
-        for snapshot in StatusSnapshotLocation.readAll() where snapshot.unacknowledgedSecurityEventCount > 0 {
-            guard let url = StatusSnapshotLocation.url(destinationID: snapshot.destinationID) else {
-                continue
-            }
-            try DestinationSnapshotFile.acknowledgeSecurityEvents(writtenAtEpoch: now, at: url)
-        }
-        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+        try AppStatus.status.acknowledgeDestinationChanges()
     }
 
     // #42: forwarder; remove when the product UI calls the service.
@@ -3569,152 +3344,19 @@ enum HarnessExport {
 
     /// UX-45: hops for the onboarding and Settings explainer. Credential *kinds*
     /// only — never tokens, passwords, or PKCS#12 bytes.
+    // #42: forwarder; remove when the product UI calls the service.
     static func dataFlowHops() -> [DataFlowHop] {
-        guard let root = try? applicationSupportRoot() else { return [] }
-        var hops: [DataFlowHop] = []
-        if isLocalFileEnabled() {
-            hops.append(
-                DataFlowHop(
-                    id: "local-file",
-                    host: localExportFolderName().map { "Files · \($0)" }
-                        ?? "Files",
-                    transport: "Local files",
-                    credential: DataFlowHop.noNetwork
-                )
-            )
-        }
-        if let data = try? Data(contentsOf: root.appendingPathComponent("https-destination.json")),
-           let record = try? JSONDecoder().decode(HTTPSVerificationRecord.self, from: data),
-           record.report.allowsEnablement
-        {
-            hops.append(
-                DataFlowHop(
-                    id: "https",
-                    host: dataFlowHost(record.urlString),
-                    transport: record.allowInsecureHTTP ? "HTTP" : "HTTPS",
-                    credential: record.hasBearer ? DataFlowHop.bearerToken : DataFlowHop.noCredential
-                )
-            )
-        }
-        if let data = try? Data(
-            contentsOf: root.appendingPathComponent(
-                "home-assistant-destination.json"
-            )
-        ),
-           let record = try? JSONDecoder().decode(
-               HTTPSVerificationRecord.self,
-               from: data
-           ),
-           record.report.allowsEnablement
-        {
-            hops.append(
-                DataFlowHop(
-                    id: "home-assistant",
-                    host: dataFlowHost(record.urlString),
-                    transport:
-                        record.allowInsecureHTTP ? "HTTP webhook" : "HTTPS webhook",
-                    credential: DataFlowHop.webhookSecret
-                )
-            )
-        }
-        if let data = try? Data(contentsOf: root.appendingPathComponent("mqtt-destination.json")),
-           let record = try? JSONDecoder().decode(MQTTVerificationRecord.self, from: data),
-           record.report.allowsEnablement
-        {
-            let credential: String
-            if record.hasClientPKCS12 == true {
-                credential = DataFlowHop.clientCertificate
-            } else if record.username != nil || record.hasPassword == true {
-                credential = DataFlowHop.usernamePassword
-            } else {
-                credential = DataFlowHop.noCredential
-            }
-            hops.append(
-                DataFlowHop(
-                    id: "mqtt",
-                    host: dataFlowHost(record.urlString),
-                    transport: record.allowInsecure ? "MQTT" : "MQTTS",
-                    credential: credential
-                )
-            )
-        }
-        if let data = try? Data(contentsOf: companionTestReportURL(root: root)),
-           let record = try? JSONDecoder().decode(CompanionVerificationRecord.self, from: data),
-           record.report.allowsEnablement
-        {
-            hops.append(
-                DataFlowHop(
-                    id: "companion",
-                    host: record.serviceName,
-                    transport: "Mac companion",
-                    credential: DataFlowHop.pairing
-                )
-            )
-        }
-        #if !OHE_OBS25_SIZE_BASELINE
-        if let data = try? Data(contentsOf: root.appendingPathComponent("otlp-destination.json")),
-           let record = try? JSONDecoder().decode(OTLPDestinationRecord.self, from: data),
-           let host = URL(string: record.urlString)?.host
-        {
-            hops.append(
-                DataFlowHop(
-                    id: "otlp",
-                    host: host,
-                    transport: "OTLP HTTP",
-                    credential: DataFlowHop.noCredential
-                )
-            )
-        }
-        #endif
-        return hops
+        AppStatus.transparency.dataFlowHops()
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func dataFlowTypeCount() async -> Int {
-        (try? await selectedMetrics())?.count ?? 0
+        await AppStatus.transparency.dataFlowTypeCount()
     }
 
-    private static func dataFlowHost(_ urlString: String) -> String {
-        guard let url = URL(string: urlString), let host = url.host, !host.isEmpty else {
-            return urlString
-        }
-        if let port = url.port {
-            return "\(host):\(port)"
-        }
-        return host
-    }
-
+    // #42: forwarder; remove when the product UI calls the service.
     static func wipeInventory() async -> WipeInventory {
-        let hops = dataFlowHops()
-        let destinations = hops.filter { $0.id != "otlp" }
-        let credentials = hops.filter {
-            $0.credential != DataFlowHop.noNetwork
-                && $0.credential != DataFlowHop.noCredential
-        }
-        guard let root = try? applicationSupportRoot() else {
-            return WipeInventory(
-                destinationCount: destinations.count,
-                credentialCount: credentials.count
-            )
-        }
-        let store: SQLiteStateStore
-        do {
-            store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        } catch {
-            return WipeInventory(
-                destinationCount: destinations.count,
-                credentialCount: credentials.count
-            )
-        }
-        let pending = (try? await store.transact { try $0.pendingBatches() }) ?? []
-        let journal = (try? await store.transact { try $0.loadJournal() }) ?? []
-        let ledger = (try? await store.transact { try $0.loadLedger() }) ?? []
-        return WipeInventory.build(
-            destinationCount: destinations.count,
-            credentialCount: credentials.count,
-            pending: pending,
-            journal: journal,
-            ledger: ledger
-        )
+        await AppStatus.transparency.wipeInventory()
     }
 
     // #42: forwarder; remove when the product UI calls the service.
@@ -3738,7 +3380,7 @@ enum HarnessExport {
         DestinationSidecar.companionTestReport.url(in: root)
     }
 
-    private static func ledgerHeadSeal() -> any LedgerHeadSeal {
+    static func ledgerHeadSeal() -> any LedgerHeadSeal {
         resettableLedgerHeadSeal()
     }
 

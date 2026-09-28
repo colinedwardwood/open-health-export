@@ -47,7 +47,7 @@ let linuxCore: [Target] = [
     .target(name: "DestinationTrust", dependencies: ["EnginePorts", "NetEgress"]),
     // #42: app-facing services behind protocols, so the product UI stays thin and each
     // service is unit-tested here rather than only through the UI.
-    .target(name: "AppServices", dependencies: ["CoreDomain", "EnginePorts", "MetricCatalog", "NetEgress", "Watchdog", "WireFormat"]),
+    .target(name: "AppServices", dependencies: ["CoreDomain", "CorrectnessEngine", "DestinationTrust", "DiagnosticBundle", "EnginePorts", "MetricCatalog", "NetEgress", "RunJournal", "Watchdog", "WireFormat"]),
     .target(name: "SinkHTTP", dependencies: ["EnginePorts", "NetEgress", "WireFormat", "CoreDomain", "MetricCatalog", "RequestTemplate", "FileWriteKit", "DestinationTrust"]),
     .target(name: "SinkCompanion", dependencies: ["CompanionWire", "EnginePorts", "NetEgress", "WireFormat", "CoreDomain", "FileWriteKit", "DestinationTrust"]),
     .target(name: "CompanionReceive", dependencies: ["CompanionWire", "FileWriteKit", "NetEgress", "WireFormat"]),
