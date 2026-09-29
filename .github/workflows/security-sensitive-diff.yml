@@ -68,6 +68,9 @@ jobs:
     permissions:
       contents: read
       issues: write
+      # Labels on a pull request go through the issues API but need this scope too;
+      # without it the job fails with "Resource not accessible by integration".
+      pull-requests: write
     steps:
       - name: Apply security-review label
         env:
