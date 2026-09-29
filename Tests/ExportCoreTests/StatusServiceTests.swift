@@ -127,6 +127,23 @@ private func snapshot(
     #expect(lines[1].contains("Server"))
 }
 
+@Test func notificationErrorUsesTheNamedArchetypeAndTheDestinationLabel() {
+    let harness = Harness([snapshot("mqtt", label: "Broker")])
+    let error = harness.service.userFacingError(destinationID: "mqtt", archetype: .timeout)
+    #expect(error?.archetype == .timeout)
+    #expect(error?.destinationLabel == "Broker")
+}
+
+@Test func errorWithoutArchetypeComesFromTheSnapshotOrIsAbsent() {
+    let harness = Harness([
+        snapshot("https", lastOutcome: "failed", errorClass: "destinationUnreachable"),
+        snapshot("files"),
+    ])
+    #expect(harness.service.userFacingError(destinationID: "https", archetype: nil) != nil)
+    #expect(harness.service.userFacingError(destinationID: "files", archetype: nil) == nil)
+    #expect(harness.service.userFacingError(destinationID: "missing", archetype: nil) == nil)
+}
+
 @Test func overdueBannerNamesOnlyDestinationsPastTheirDeadline() {
     let harness = Harness([
         snapshot("https", label: "Server", lastSuccessEpoch: nowEpoch - 7200, overdueAfter: 3600),

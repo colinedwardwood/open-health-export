@@ -18,9 +18,24 @@ struct ExporterApp: App {
         )
     }
 
+    /// #43: release builds only ever show the product app; the harness is a debug
+    /// Developer screen, and a debug root only while the UI suite still drives it.
+    @ViewBuilder
+    private var root: some View {
+        #if DEBUG
+        if UITestFixtures.launchesHarness {
+            HarnessView(authenticator: UserPresenceAuthenticatorFactory.make())
+        } else {
+            RootView(authenticator: UserPresenceAuthenticatorFactory.make())
+        }
+        #else
+        RootView(authenticator: UserPresenceAuthenticatorFactory.make())
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
-            HarnessView(authenticator: UserPresenceAuthenticatorFactory.make())
+            root
                 .modifier(AccessibilityMatrixModifier())
         }
     }

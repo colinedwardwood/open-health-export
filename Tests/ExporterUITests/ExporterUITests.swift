@@ -30,6 +30,8 @@ final class ExporterUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment = [
             "OHE_RESET_SEEDED_SURFACES": "1",
+            // #43: the suite drives the harness until #56 re-points it at the product UI.
+            "OHE_ROOT": "harness",
         ]
         app.launchArguments = [
             "-ohe.disclosureAcknowledged", "false",
@@ -449,6 +451,26 @@ final class ExporterUITests: XCTestCase {
             status.label
         )
         XCTAssertTrue(destinationStatusElement(0).waitForExistence(timeout: uiWait))
+    }
+
+    /// #43: the product app routes a cold-launch link through AppModel, with no
+    /// harness in the way.
+    func testProductShellColdLaunchLinkOpensTheDestinationError() {
+        app.terminate()
+        app.launchEnvironment = [
+            "OHE_OPEN_URL": "\(appURLScheme)://error?destination=home-assistant&archetype=hostUnresolvable",
+        ]
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launch()
+        XCTAssertTrue(
+            app.staticTexts["shell-error-title"].waitForExistence(timeout: uiWait),
+            visibleIdentifiers().joined(separator: ",")
+        )
+        XCTAssertFalse(app.buttons["disclosure-continue"].exists)
     }
 
     func testFailureNotificationURLOpensFivePartErrorWithNoFurtherTap() {
@@ -1164,7 +1186,7 @@ final class ExporterUITests: XCTestCase {
         // Relaunch past the disclosure without the reset, so the ledger keeps whatever
         // the first launch recorded.
         app.terminate()
-        app.launchEnvironment = [:]
+        app.launchEnvironment = ["OHE_ROOT": "harness"]
         app.launchArguments = ["-ohe.disclosureAcknowledged", "true"]
         app.launch()
         XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: uiWait))

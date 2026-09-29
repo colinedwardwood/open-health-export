@@ -81,6 +81,20 @@ public struct StatusService: Sendable {
         }
     }
 
+    /// The five-part error a failure notification or a Status row opens (#43). The
+    /// archetype the link named wins; without one it comes from the snapshot, and a
+    /// destination with nothing wrong has no error to show.
+    public func userFacingError(
+        destinationID: String,
+        archetype: UserFacingErrorArchetype?
+    ) -> UserFacingErrorObject? {
+        UserFacingErrorPresentation.object(
+            route: UserFacingErrorRoute(destinationID: destinationID, archetype: archetype),
+            snapshot: snapshots.read(destinationID: destinationID),
+            nowEpoch: now().timeIntervalSince1970
+        )
+    }
+
     /// One line per freshness class: the measured estimate for each destination that
     /// has one, otherwise the class's target.
     public func freshnessDisclosureLines() -> [(id: String, text: String)] {
