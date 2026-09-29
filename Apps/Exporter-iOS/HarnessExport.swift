@@ -28,95 +28,6 @@ import Watchdog
 import WidgetKit
 import WireFormat
 
-#if !OHE_OBS25_SIZE_BASELINE
-private struct OTLPDestinationRecord: Codable {
-    var urlString: String
-    var allowedHosts: [String]
-    var allowInsecureHTTP: Bool
-    var previewDigest: String
-}
-#endif
-
-private struct PendingHTTPS {
-    var probe: HTTPSDestinationProbe
-    var destinationID: String
-    var destinationLabel: String
-    var host: String
-    var allowedHosts: [String]
-    var allowInsecureHTTP: Bool
-    var bearer: String?
-    var webhookID: String?
-    var persistedURLString: String?
-    var firstSeen: String
-    var importedLocalIdentifier: String?
-}
-
-private struct PendingMQTT {
-    var probe: MQTTDestinationProbe
-    var host: String
-    var allowedHosts: [String]
-    var allowInsecure: Bool
-    var clientID: String
-    var topic: String
-    var qos: UInt8
-    var clientPKCS12: Data?
-    var clientPKCS12Password: String?
-    var username: String?
-    var password: String?
-    var firstSeen: String
-    var importedLocalIdentifier: String?
-}
-
-@MainActor
-private final class PendingDestination {
-    static let shared = PendingDestination()
-    var https: PendingHTTPS?
-    var mqtt: PendingMQTT?
-
-    func setHTTPS(_ value: PendingHTTPS?) {
-        https = value
-    }
-
-    func takeHTTPS() -> PendingHTTPS? {
-        let value = https
-        https = nil
-        return value
-    }
-
-    func setMQTT(_ value: PendingMQTT?) {
-        mqtt = value
-    }
-
-    func takeMQTT() -> PendingMQTT? {
-        let value = mqtt
-        mqtt = nil
-        return value
-    }
-}
-
-/// Internal (not private) so DestinationRecordFiles in Services/AppDestinations.swift can read it.
-struct MQTTVerificationRecord: Codable {
-    var urlString: String
-    var allowedHosts: [String]
-    var allowInsecure: Bool
-    var clientID: String
-    var topic: String
-    var qos: UInt8?
-    var report: DestinationTestReport
-    var hasClientPKCS12: Bool?
-    var hasClientPKCS12Password: Bool?
-    /// Pre-Keychain JSON copies. Read on launch, then rewritten off disk.
-    var clientPKCS12Password: String?
-    var username: String?
-    var hasPassword: Bool?
-    var passwordDescriptor: StoredCredentialDescriptor?
-    var pkcs12PasswordDescriptor: StoredCredentialDescriptor?
-    var leafSPKISha256: String?
-    var issuerSPKISha256: String?
-    var firstSeen: String?
-    var importedLocalIdentifier: String?
-}
-
 enum HarnessExport {
     static let healthDestinationIDs = [
         "local-file", "https", "home-assistant", "mqtt", "companion",
@@ -651,18 +562,6 @@ enum HarnessExport {
     }
 
     // #42: forwarder; remove when the product UI calls the service.
-    private static func httpsDestinationRecordURL(
-        root: URL,
-        destinationID: String
-    ) -> URL {
-        DestinationSidecar.httpsRecord(destinationID: destinationID).url(in: root)
-    }
-
-    // #42: forwarder; remove when the product UI calls the service.
-    private static func httpsKeychainService(_ destinationID: String) -> String {
-        DestinationRepository.keychainService(destinationID)
-    }
-
     static func prepareHomeAssistantWebhook(
         baseURLString: String,
         webhookID: String,
@@ -671,27 +570,17 @@ enum HarnessExport {
         confirmedLeafSPKISha256: String? = nil,
         onProgress: DestinationTestProgress? = nil
     ) async throws -> DestinationConfirmationCard {
-        let endpoint = try HomeAssistantWebhookPreset.endpoint(
+        try await AppDestinationSetup.prepareHomeAssistantWebhook(
             baseURLString: baseURLString,
-            webhookID: webhookID
-        )
-        return try await prepareHTTPSDestination(
-            urlString: endpoint.absoluteString,
-            allowInsecureHTTP: allowInsecureHTTP,
-            bearer: nil,
-            destinationID: "home-assistant",
-            destinationLabel: "Home Assistant",
             webhookID: webhookID,
-            persistedURLString:
-                try HomeAssistantWebhookPreset.baseURL(
-                    from: endpoint
-                ).absoluteString,
+            allowInsecureHTTP: allowInsecureHTTP,
             importedLocalIdentifier: importedLocalIdentifier,
             confirmedLeafSPKISha256: confirmedLeafSPKISha256,
             onProgress: onProgress
         )
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func prepareHTTPSDestination(
         urlString: String,
         allowInsecureHTTP: Bool,
@@ -704,156 +593,31 @@ enum HarnessExport {
         confirmedLeafSPKISha256: String? = nil,
         onProgress: DestinationTestProgress? = nil
     ) async throws -> DestinationConfirmationCard {
-        guard let host = URL(string: urlString)?.host?.lowercased(), !host.isEmpty else {
-            throw EgressError.invalidURL
-        }
-        let allowedHosts: Set<String> = [host]
-        let destination = try HTTPSDestination(
+        try await AppDestinationSetup.prepareHTTPS(
             urlString: urlString,
-            allowedHosts: allowedHosts,
-            allowInsecureHTTP: allowInsecureHTTP,
-            authorizationBearer: bearer
-        )
-        let transport = try SystemHTTPTransport.make(
-            probing: destination.url,
-            allowedHosts: allowedHosts,
-            allowInsecureHTTP: allowInsecureHTTP
-        )
-        let now = Date().ISO8601Format()
-        let probe = try await withThermalCompression {
-            try await HTTPSDestinationEnable.probe(
-                destination: destination,
-                transport: transport,
-                exporterID: try installationID(),
-                emittedAt: now,
-                meteredPolicy: .fromAllowsMetered(
-                    allowsMeteredNetwork(destinationID: destinationID)
-                ),
-                pathConditions: networkPathConditions(),
-                confirmedLeafSPKISha256: confirmedLeafSPKISha256,
-                onProgress: onProgress
-            )
-        }
-        await PendingDestination.shared.setHTTPS(PendingHTTPS(
-            probe: probe,
-            destinationID: destinationID,
-            destinationLabel: destinationLabel,
-            host: host,
-            allowedHosts: allowedHosts.sorted(),
             allowInsecureHTTP: allowInsecureHTTP,
             bearer: bearer,
+            destinationID: destinationID,
+            destinationLabel: destinationLabel,
             webhookID: webhookID,
             persistedURLString: persistedURLString,
-            firstSeen: now,
-            importedLocalIdentifier: importedLocalIdentifier
-        ))
-        return DestinationConfirmationCard(
-            host: host,
-            identity: probe.identity,
-            preview: probe.preview,
-            insecureWithoutTLS: allowInsecureHTTP && probe.identity == nil
+            importedLocalIdentifier: importedLocalIdentifier,
+            confirmedLeafSPKISha256: confirmedLeafSPKISha256,
+            onProgress: onProgress
         )
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func confirmPendingHTTPSDestination(propagateTraceparent: Bool = false) async throws -> [String] {
-        guard let pending = await PendingDestination.shared.takeHTTPS() else {
-            throw SetupError.verificationRequired
-        }
-        try ExportScopeGate.requireConfigured(
-            try await destinationScope(pending.destinationID)
-        )
-        let probe = pending.probe
-        let events = probe.pendingEvents + [.destinationEnabled]
-        let record = HTTPSVerificationRecord(
-            urlString:
-                pending.persistedURLString
-                    ?? probe.destination.url.absoluteString,
-            allowedHosts: pending.allowedHosts,
-            allowInsecureHTTP: pending.allowInsecureHTTP,
-            report: probe.report,
-            leafSPKISha256: probe.identity?.leafSPKISha256,
-            issuerSPKISha256: probe.identity?.issuerSPKISha256,
-            firstSeen: pending.firstSeen,
-            hasBearer: pending.bearer != nil,
-            bearerDescriptor: StoredCredentialDescriptor.capturing(
-                pending.bearer,
-                appearance: .bearerToken,
-                addedOnDay: pending.firstSeen
-            ),
-            webhookDescriptor: StoredCredentialDescriptor.capturing(
-                pending.webhookID,
-                appearance: .webhookID,
-                addedOnDay: pending.firstSeen
-            ),
-            propagateTraceparent: propagateTraceparent,
-            importedLocalIdentifier: pending.importedLocalIdentifier
-        )
-        let root = try applicationSupportRoot()
-        let bearerStore = KeychainSecretStore(
-            service: httpsKeychainService(pending.destinationID)
-        )
-        let bearerHandle = SecretHandle(rawValue: "bearer")
-        if let bearer = pending.bearer {
-            try await bearerStore.store(Array(bearer.utf8), handle: bearerHandle)
-        } else {
-            try? await bearerStore.delete(bearerHandle)
-        }
-        let webhookHandle = SecretHandle(rawValue: "webhook-id")
-        if let webhookID = pending.webhookID {
-            try await bearerStore.store(
-                Array(webhookID.utf8),
-                handle: webhookHandle
-            )
-        } else {
-            try? await bearerStore.delete(webhookHandle)
-        }
-        try JSONEncoder().encode(record).write(
-            to: httpsDestinationRecordURL(
-                root: root,
-                destinationID: pending.destinationID
-            ),
-            options: .atomic
-        )
-        if let snapshotURL = StatusSnapshotLocation.url(
-            destinationID: pending.destinationID
-        ) {
-            try DestinationSnapshotFile.recordSecurityEvents(
-                events.count,
-                destinationID: pending.destinationID,
-                destinationLabel: pending.destinationLabel,
-                writtenAtEpoch: Date().timeIntervalSince1970,
-                at: snapshotURL
-            )
-        }
-        try await emitTrustNotices(events, destination: pending.destinationLabel)
-        try await requestScopeAuthorizationIfConfigured(pending.destinationID)
-        if pending.allowInsecureHTTP {
-            let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-            try await store.transact { tx in
-                try tx.appendLedger(
-                    EgressEntry(
-                        destination: pending.host,
-                        sampleCount: 0,
-                        outcomeKind: "security:insecure_http_enabled",
-                        detail: "explicit_user_opt_in",
-                        wallTimeEpoch: Date().timeIntervalSince1970
-                    )
-                )
-            }
-        }
-        return DestinationConfirmationCard(
-            host: pending.host,
-            identity: probe.identity,
-            preview: probe.preview,
-            insecureWithoutTLS: pending.allowInsecureHTTP && probe.identity == nil
-        ).lines
-            + probe.report.steps.map { "\($0.name.rawValue): \($0.outcome.rawValue)" }
+        try await AppDestinationSetup.service.confirmHTTPS(propagateTraceparent: propagateTraceparent)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func cancelPendingHTTPSDestination() {
-        Task { await PendingDestination.shared.setHTTPS(nil) }
+        Task { await AppDestinationSetup.service.cancelHTTPS() }
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func prepareMQTTDestination(
         urlString: String,
         allowInsecure: Bool,
@@ -868,175 +632,30 @@ enum HarnessExport {
         confirmedIdentity: TLSIdentity? = nil,
         onProgress: DestinationTestProgress? = nil
     ) async throws -> DestinationConfirmationCard {
-        guard let host = URL(string: urlString)?.host?.lowercased(), !host.isEmpty else {
-            throw EgressError.invalidURL
-        }
-        let allowedHosts: Set<String> = [host]
-        let exporterID = try installationID()
-        let destination = try MQTTDestination(
+        try await AppDestinationSetup.prepareMQTT(
             urlString: urlString,
-            allowedHosts: allowedHosts,
             allowInsecure: allowInsecure,
             clientID: clientID,
             topic: topic,
-            qos: try MQTTDestination.qos(configurationValue: qos),
-            username: username,
-            password: password,
             clientPKCS12: clientPKCS12,
             clientPKCS12Password: clientPKCS12Password,
-            exporterID: exporterID
-        )
-        let now = Date().ISO8601Format()
-        // #66: the first attempt may only read the broker's certificate. Once the person
-        // has confirmed an untrusted one, the retry is pinned to exactly that certificate.
-        let sink: MQTTSink
-        if let confirmedIdentity {
-            sink = try MQTTSink.overNetwork(
-                destination: destination,
-                pin: PinRecord(
-                    leafSPKISha256: confirmedIdentity.leafSPKISha256,
-                    issuerSPKISha256: confirmedIdentity.issuerSPKISha256,
-                    firstSeen: now,
-                    policy: .leaf
-                )
-            )
-        } else {
-            sink = try MQTTSink.overNetwork(
-                destination: destination,
-                pin: nil,
-                capturesUntrustedIdentity: true
-            )
-        }
-        let probe = try await MQTTDestinationEnable.probe(
-            destination: destination,
-            pipe: sink.pipe,
-            exporterID: try installationID(),
-            emittedAt: now,
-            meteredPolicy: .fromAllowsMetered(allowsMeteredNetwork(destinationID: "mqtt")),
-            pathConditions: networkPathConditions(),
-            confirmedLeafSPKISha256: confirmedIdentity?.leafSPKISha256,
+            username: username,
+            password: password,
+            qos: qos,
+            importedLocalIdentifier: importedLocalIdentifier,
+            confirmedIdentity: confirmedIdentity,
             onProgress: onProgress
         )
-        await PendingDestination.shared.setMQTT(PendingMQTT(
-            probe: probe,
-            host: host,
-            allowedHosts: allowedHosts.sorted(),
-            allowInsecure: allowInsecure,
-            clientID: clientID,
-            topic: topic,
-            qos: qos,
-            clientPKCS12: clientPKCS12,
-            clientPKCS12Password: clientPKCS12Password,
-            username: username,
-            password: password,
-            firstSeen: now,
-            importedLocalIdentifier: importedLocalIdentifier
-        ))
-        return DestinationConfirmationCard(
-            host: host,
-            identity: probe.identity,
-            preview: probe.preview,
-            insecureWithoutTLS: allowInsecure && probe.identity == nil
-        )
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func confirmPendingMQTTDestination() async throws -> [String] {
-        try ExportScopeGate.requireConfigured(try await destinationScope("mqtt"))
-        guard let pending = await PendingDestination.shared.takeMQTT() else {
-            throw SetupError.verificationRequired
-        }
-        let probe = pending.probe
-        let events = probe.pendingEvents + [.destinationEnabled]
-        let record = MQTTVerificationRecord(
-            urlString: probe.destination.url.absoluteString,
-            allowedHosts: pending.allowedHosts,
-            allowInsecure: pending.allowInsecure,
-            clientID: pending.clientID,
-            topic: pending.topic,
-            qos: pending.qos,
-            report: probe.report,
-            hasClientPKCS12: pending.clientPKCS12 != nil,
-            hasClientPKCS12Password: pending.clientPKCS12Password != nil,
-            clientPKCS12Password: nil,
-            username: pending.username,
-            hasPassword: pending.password != nil,
-            passwordDescriptor: StoredCredentialDescriptor.capturing(
-                pending.password,
-                appearance: .password,
-                addedOnDay: pending.firstSeen
-            ),
-            pkcs12PasswordDescriptor: StoredCredentialDescriptor.capturing(
-                pending.clientPKCS12Password,
-                appearance: .pkcs12Password,
-                addedOnDay: pending.firstSeen
-            ),
-            leafSPKISha256: probe.identity?.leafSPKISha256,
-            issuerSPKISha256: probe.identity?.issuerSPKISha256,
-            firstSeen: pending.firstSeen,
-            importedLocalIdentifier: pending.importedLocalIdentifier
-        )
-        let root = try applicationSupportRoot()
-        let pkcs12URL = root.appendingPathComponent("mqtt-client.p12")
-        if let clientPKCS12 = pending.clientPKCS12 {
-            try clientPKCS12.write(to: pkcs12URL, options: .atomic)
-        } else {
-            try? FileManager.default.removeItem(at: pkcs12URL)
-        }
-        let passwordStore = KeychainSecretStore(
-            service: IdentifierRoot.qualified("mqtt")
-        )
-        let passwordHandle = SecretHandle(rawValue: "mqtt_password")
-        if let password = pending.password {
-            try await passwordStore.store(Array(password.utf8), handle: passwordHandle)
-        } else {
-            try? await passwordStore.delete(passwordHandle)
-        }
-        let pkcs12PasswordHandle = SecretHandle(rawValue: "mqtt_pkcs12_password")
-        if let pkcs12Password = pending.clientPKCS12Password {
-            try await passwordStore.store(Array(pkcs12Password.utf8), handle: pkcs12PasswordHandle)
-        } else {
-            try? await passwordStore.delete(pkcs12PasswordHandle)
-        }
-        try JSONEncoder().encode(record).write(
-            to: root.appendingPathComponent("mqtt-destination.json"),
-            options: .atomic
-        )
-        if let snapshotURL = StatusSnapshotLocation.url(destinationID: "mqtt") {
-            try DestinationSnapshotFile.recordSecurityEvents(
-                events.count,
-                destinationID: "mqtt",
-                destinationLabel: pending.host,
-                writtenAtEpoch: Date().timeIntervalSince1970,
-                at: snapshotURL
-            )
-        }
-        try await emitTrustNotices(events, destination: pending.host)
-        try await requestScopeAuthorizationIfConfigured("mqtt")
-        if pending.allowInsecure {
-            let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-            try await store.transact { tx in
-                try tx.appendLedger(
-                    EgressEntry(
-                        destination: pending.host,
-                        sampleCount: 0,
-                        outcomeKind: "security:insecure_mqtt_enabled",
-                        detail: "explicit_user_opt_in",
-                        wallTimeEpoch: Date().timeIntervalSince1970
-                    )
-                )
-            }
-        }
-        return DestinationConfirmationCard(
-            host: pending.host,
-            identity: probe.identity,
-            preview: probe.preview,
-            insecureWithoutTLS: pending.allowInsecure && probe.identity == nil
-        ).lines
-            + probe.report.steps.map { "\($0.name.rawValue): \($0.outcome.rawValue)" }
+        try await AppDestinationSetup.service.confirmMQTT()
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func cancelPendingMQTTDestination() {
-        Task { await PendingDestination.shared.setMQTT(nil) }
+        Task { await AppDestinationSetup.service.cancelMQTT() }
     }
 
     // #42: forwarder; remove when the product UI calls the service.
@@ -1056,135 +675,17 @@ enum HarnessExport {
     }
 
     // #42: forwarder; remove when the product UI calls the service.
-    private static func mqttPKCS12Password(
-        from saved: MQTTVerificationRecord,
-        root: URL
-    ) async throws -> String? {
-        try await AppDestinations.records.mqttPKCS12Password(from: saved, root: root)
-    }
-
     private static func verifiedCompanionDestination(
         session: PairingSession,
         root: URL,
         onTestProgress: DestinationTestProgress? = nil
     ) async throws -> (VerifiedDestination, TraceparentEmission) {
-        let psk = try CompanionPSK.preSharedKey(from: session.secret)
-        let discovered = try await CompanionDiscovery().find(
-            pairedName: session.serviceName,
-            for: .seconds(8)
-        )
-        let options = NWByteStream.Options(
-            requireTLS13: true,
-            failFastOnWaiting: true,
-            preSharedKey: psk
-        )
-        let deliveryPipe = ByteStreamCompanionPipe(
-            stream: NWByteStream(service: discovered, options: options)
-        )
-        let emission = TraceparentEmission(enabled: storedCompanionTraceparent())
-        let verificationURL = companionTestReportURL(root: root)
-        if let data = try? Data(contentsOf: verificationURL),
-           let saved = try? JSONDecoder().decode(CompanionVerificationRecord.self, from: data),
-           saved.serviceName == session.serviceName,
-           saved.macInstallationID == session.macInstallationID,
-           saved.report.allowsEnablement
-        {
-            let verified = try CompanionDestinationEnable.resume(
-                deliveryPipe: deliveryPipe,
-                installationID: session.localInstallationID,
-                testReport: saved.report,
-                traceparent: emission,
-                meteredPolicy: .fromAllowsMetered(
-                    allowsMeteredNetwork(destinationID: "companion")
-                ),
-                pathConditions: networkPathConditions()
-            )
-            return (verified, emission)
-        }
-        let testPipe = ByteStreamCompanionPipe(
-            stream: NWByteStream(service: discovered, options: options)
-        )
-        let completed = try await CompanionDestinationEnable.complete(
-            testPipe: testPipe,
-            deliveryPipe: deliveryPipe,
-            installationID: session.localInstallationID,
-            emittedAt: Date().ISO8601Format(),
-            traceparent: emission,
-            meteredPolicy: .fromAllowsMetered(
-                allowsMeteredNetwork(destinationID: "companion")
-            ),
-            pathConditions: networkPathConditions(),
-            onProgress: onTestProgress
-        )
-        let record = CompanionVerificationRecord(
-            serviceName: session.serviceName,
-            macInstallationID: session.macInstallationID,
-            report: completed.report,
-            propagateTraceparent: emission.header(seed: "preview") != nil
-        )
-        try JSONEncoder().encode(record).write(to: verificationURL, options: .atomic)
-        if let snapshotURL = StatusSnapshotLocation.url(destinationID: "companion") {
-            try DestinationSnapshotFile.recordSecurityEvents(
-                completed.events.count,
-                destinationID: "companion",
-                destinationLabel: "Mac companion · \(session.serviceName)",
-                writtenAtEpoch: Date().timeIntervalSince1970,
-                at: snapshotURL
-            )
-        }
-        try await emitTrustNotices(completed.events, destination: session.serviceName)
-        return (completed.destination, emission)
+        try await AppDestinationSetup.verifiedCompanion(session: session, onTestProgress: onTestProgress)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     private static func verifiedMQTTDestination(root: URL) async throws -> VerifiedDestination {
-        let data = try Data(
-            contentsOf: root.appendingPathComponent("mqtt-destination.json")
-        )
-        let saved = try JSONDecoder().decode(MQTTVerificationRecord.self, from: data)
-        let allowedHosts = Set(saved.allowedHosts)
-        let pkcs12URL = root.appendingPathComponent("mqtt-client.p12")
-        let pkcs12 = (saved.hasClientPKCS12 == true) ? try Data(contentsOf: pkcs12URL) : nil
-        let password: String?
-        if saved.hasPassword == true {
-            password = String(
-                decoding: try await KeychainSecretStore(
-                    service: IdentifierRoot.qualified("mqtt")
-                ).load(SecretHandle(rawValue: "mqtt_password")),
-                as: UTF8.self
-            )
-        } else {
-            password = nil
-        }
-        let destination = try MQTTDestination(
-            urlString: saved.urlString,
-            allowedHosts: allowedHosts,
-            allowInsecure: saved.allowInsecure,
-            clientID: saved.clientID,
-            topic: saved.topic,
-            qos: try MQTTDestination.qos(configurationValue: saved.qos ?? 1),
-            username: saved.username,
-            password: password,
-            clientPKCS12: pkcs12,
-            clientPKCS12Password: try await mqttPKCS12Password(from: saved, root: root),
-            exporterID: try installationID()
-        )
-        let pin: PinRecord?
-        if let leaf = saved.leafSPKISha256, let issuer = saved.issuerSPKISha256 {
-            pin = PinRecord(
-                leafSPKISha256: leaf,
-                issuerSPKISha256: issuer,
-                firstSeen: saved.firstSeen ?? "1970-01-01T00:00:00Z",
-                policy: .leaf
-            )
-        } else {
-            pin = nil
-        }
-        var sink = try MQTTSink.overNetwork(destination: destination, pin: pin)
-        sink.meteredPolicy = .fromAllowsMetered(allowsMeteredNetwork(destinationID: "mqtt"))
-        sink.pathConditions = networkPathConditions()
-        var setup = DestinationSetup()
-        try setup.resumeEnabled(testReport: saved.report)
-        return try setup.enable(sink: sink)
+        try await AppDestinationSetup.verifiedMQTT(root: root)
     }
 
     // #42: forwarder; remove when the product UI calls the service.
@@ -1207,104 +708,19 @@ enum HarnessExport {
         )
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     private static func verifiedHTTPSDestination(
         destinationID: String,
         root: URL
     ) async throws -> (VerifiedDestination, TraceparentEmission) {
-        let data = try Data(
-            contentsOf: httpsDestinationRecordURL(
-                root: root,
-                destinationID: destinationID
-            )
-        )
-        let saved = try JSONDecoder().decode(HTTPSVerificationRecord.self, from: data)
-        let allowedHosts = Set(saved.allowedHosts)
-        let bearer: String?
-        if saved.hasBearer {
-            bearer = String(
-                decoding: try await KeychainSecretStore(
-                    service: httpsKeychainService(destinationID)
-                ).load(SecretHandle(rawValue: "bearer")),
-                as: UTF8.self
-            )
-        } else {
-            bearer = nil
-        }
-        let destinationURLString: String
-        if destinationID == "home-assistant" {
-            let webhookID = String(
-                decoding: try await KeychainSecretStore(
-                    service: httpsKeychainService(destinationID)
-                ).load(SecretHandle(rawValue: "webhook-id")),
-                as: UTF8.self
-            )
-            destinationURLString = try HomeAssistantWebhookPreset.endpoint(
-                baseURLString: saved.urlString,
-                webhookID: webhookID
-            ).absoluteString
-        } else {
-            destinationURLString = saved.urlString
-        }
-        let destination = try HTTPSDestination(
-            urlString: destinationURLString,
-            allowedHosts: allowedHosts,
-            allowInsecureHTTP: saved.allowInsecureHTTP,
-            authorizationBearer: bearer
-        )
-        let base = BackgroundTaskHTTPTransport(inner: try SystemHTTPTransport.make(
-            probing: destination.url,
-            allowedHosts: allowedHosts,
-            allowInsecureHTTP: saved.allowInsecureHTTP
-        ))
-        let transport: any HTTPTransport
-        if let leaf = saved.leafSPKISha256, let issuer = saved.issuerSPKISha256 {
-            transport = PinningHTTPTransport(
-                inner: base,
-                pin: PinRecord(
-                    leafSPKISha256: leaf,
-                    issuerSPKISha256: issuer,
-                    firstSeen: saved.firstSeen,
-                    policy: .leaf
-                )
-            )
-        } else {
-            transport = base
-        }
-        let emission = TraceparentEmission(enabled: saved.propagateTraceparent ?? false)
-        var setup = DestinationSetup()
-        try setup.resumeEnabled(testReport: saved.report)
-        let verified = try setup.enable(
-            sink: HTTPSSink(
-                destination: destination,
-                transport: transport,
-                traceparent: emission,
-                meteredPolicy: .fromAllowsMetered(
-                    allowsMeteredNetwork(destinationID: destinationID)
-                ),
-                pathConditions: networkPathConditions()
-            )
-        )
-        return (verified, emission)
+        try await AppDestinationSetup.verifiedHTTPS(destinationID: destinationID, root: root)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func enableLocalFileDestination(
         onProgress: DestinationTestProgress? = nil
     ) async throws -> [String] {
-        try ExportScopeGate.requireConfigured(try await destinationScope("local-file"))
-        let root = try applicationSupportRoot()
-        let folderAccess = try localExportFolder(root: root)
-        defer { withExtendedLifetime(folderAccess) {} }
-        let dest = folderAccess.url
-        try? FileManager.default.removeItem(at: localFileTestReportURL(root: root))
-        let (_, events) = try verifiedLocalFile(
-            root: root,
-            destinationDirectory: dest,
-            onProgress: onProgress
-        )
-        try await emitTrustNotices(events)
-        try await requestScopeAuthorizationIfConfigured("local-file")
-        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
-        return destinationStatusLines()
+        try await AppDestinationSetup.enableLocalFile(onProgress: onProgress)
     }
 
     // #42: forwarder; remove when the product UI calls the service.
@@ -1336,247 +752,46 @@ enum HarnessExport {
         try AppDestinations.repository.setCompanionTraceparent(enabled)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func portableConfigurationExport() async throws -> URL {
-        let root = try applicationSupportRoot()
-        var destinations: [PortableDestinationConfiguration] = []
-        let httpsURL = root.appendingPathComponent("https-destination.json")
-        if let data = try? Data(contentsOf: httpsURL),
-           let record = try? JSONDecoder().decode(
-               HTTPSVerificationRecord.self,
-               from: data
-           ),
-           record.report.allowsEnablement {
-            let scope = try await destinationScope("https")
-            destinations.append(
-                try PortableDestinationConfiguration(
-                    sourceIdentifier:
-                        record.importedLocalIdentifier ?? "https",
-                    displayName:
-                        URL(string: record.urlString)?.host ?? "HTTPS",
-                    kind: .https,
-                    endpoint: record.urlString,
-                    settings: [
-                        "allowInsecureHTTP":
-                            record.allowInsecureHTTP ? "true" : "false",
-                        "method": "POST",
-                    ],
-                    exportScope: try PortableDestinationExportScope(
-                        metrics: scope.metrics.sorted {
-                            $0.rawValue < $1.rawValue
-                        },
-                        startInclusive: scope.startInclusive,
-                        endExclusive: scope.endExclusive
-                    )
-                )
-            )
-        }
-        let homeAssistantURL = root.appendingPathComponent(
-            "home-assistant-destination.json"
-        )
-        if let data = try? Data(contentsOf: homeAssistantURL),
-           let record = try? JSONDecoder().decode(
-               HTTPSVerificationRecord.self,
-               from: data
-           ),
-           record.report.allowsEnablement,
-           let baseURL = URL(string: record.urlString) {
-            let scope = try await destinationScope("home-assistant")
-            destinations.append(
-                try PortableDestinationConfiguration(
-                    sourceIdentifier:
-                        record.importedLocalIdentifier ?? "home-assistant",
-                    displayName: baseURL.host ?? "Home Assistant",
-                    kind: .homeAssistant,
-                    endpoint: baseURL.absoluteString,
-                    settings: [
-                        "allowInsecureHTTP":
-                            record.allowInsecureHTTP ? "true" : "false",
-                        "mode": "webhook",
-                    ],
-                    exportScope: try PortableDestinationExportScope(
-                        metrics: scope.metrics.sorted {
-                            $0.rawValue < $1.rawValue
-                        },
-                        startInclusive: scope.startInclusive,
-                        endExclusive: scope.endExclusive
-                    )
-                )
-            )
-        }
-        let mqttURL = root.appendingPathComponent("mqtt-destination.json")
-        if let data = try? Data(contentsOf: mqttURL),
-           let record = try? JSONDecoder().decode(
-               MQTTVerificationRecord.self,
-               from: data
-           ),
-           record.report.allowsEnablement {
-            let scope = try await destinationScope("mqtt")
-            destinations.append(
-                try PortableDestinationConfiguration(
-                    sourceIdentifier:
-                        record.importedLocalIdentifier ?? "mqtt",
-                    displayName:
-                        URL(string: record.urlString)?.host ?? "MQTT",
-                    kind: .mqtt,
-                    endpoint: record.urlString,
-                    settings: [
-                        "allowInsecure":
-                            record.allowInsecure ? "true" : "false",
-                        "clientID": record.clientID,
-                        "qos": String(record.qos ?? 1),
-                        "topic": record.topic,
-                    ],
-                    exportScope: try PortableDestinationExportScope(
-                        metrics: scope.metrics.sorted {
-                            $0.rawValue < $1.rawValue
-                        },
-                        startInclusive: scope.startInclusive,
-                        endExclusive: scope.endExclusive
-                    )
-                )
-            )
-        }
-        if let data = try? Data(contentsOf: companionTestReportURL(root: root)),
-           let record = try? JSONDecoder().decode(
-               CompanionVerificationRecord.self,
-               from: data
-           ),
-           record.report.allowsEnablement {
-            let scope = try await destinationScope("companion")
-            destinations.append(
-                try PortableDestinationConfiguration(
-                    sourceIdentifier: "companion",
-                    displayName: record.serviceName,
-                    kind: .companion,
-                    endpoint: record.serviceName,
-                    settings: ["serviceName": record.serviceName],
-                    exportScope: try PortableDestinationExportScope(
-                        metrics: scope.metrics.sorted {
-                            $0.rawValue < $1.rawValue
-                        },
-                        startInclusive: scope.startInclusive,
-                        endExclusive: scope.endExclusive
-                    )
-                )
-            )
-        }
-        let output = FileManager.default.temporaryDirectory
-            .appendingPathComponent("open-health-exporter.tributary")
-        try DestinationConfigurationDocument(destinations: destinations)
-            .encoded()
-            .write(to: output, options: [.atomic, .completeFileProtection])
-        return output
+        try await AppDestinationSetup.portableConfigurationExport()
     }
 
     #if !OHE_OBS25_SIZE_BASELINE
+    // #42: forwarder; remove when the product UI calls the service.
     static func storedOTLPURL() -> String {
-        guard let root = try? applicationSupportRoot(),
-              let data = try? Data(contentsOf: root.appendingPathComponent("otlp-destination.json")),
-              let record = try? JSONDecoder().decode(OTLPDestinationRecord.self, from: data)
-        else {
-            return ""
-        }
-        return record.urlString
+        AppDestinationSetup.service.storedOTLPURL()
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func previewOTLP() async throws -> (preview: String, payload: Data) {
-        let root = try applicationSupportRoot()
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        let events = try await store.transact { try $0.loadJournal() }
-        let payload = OTLPPreview.payload(events: events)
-        return (OTLPPreview.text(payload: payload), payload)
+        try await AppDestinationSetup.previewOTLP()
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func enableOTLPCollector(
         urlString: String,
         allowInsecureHTTP: Bool,
         previewPayload: Data
     ) async throws -> [String] {
-        let settings = try OTLPSettingsGate.enabledSettings(
+        try await AppDestinationSetup.enableOTLPCollector(
             urlString: urlString,
             allowInsecureHTTP: allowInsecureHTTP,
-            previewCompleted: !previewPayload.isEmpty
+            previewPayload: previewPayload
         )
-        guard let endpoint = settings.endpoint, let host = endpoint.url.host else {
-            throw OTLPExportError.endpointRequired
-        }
-        let root = try applicationSupportRoot()
-        let record = OTLPDestinationRecord(
-            urlString: endpoint.url.absoluteString,
-            allowedHosts: [host],
-            allowInsecureHTTP: allowInsecureHTTP,
-            previewDigest: ContentSHA256.digest(previewPayload)
-        )
-        try JSONEncoder().encode(record).write(
-            to: root.appendingPathComponent("otlp-destination.json"),
-            options: .atomic
-        )
-        let now = Date().timeIntervalSince1970
-        if let snapshotURL = StatusSnapshotLocation.url(destinationID: "otlp") {
-            try DestinationSnapshotFile.write(
-                DestinationStatusSnapshot(
-                    destinationID: "otlp",
-                    destinationLabel: host,
-                    enabled: true,
-                    state: .noExportsYet,
-                    unacknowledgedSecurityEventCount: allowInsecureHTTP ? 1 : 0,
-                    writtenAtEpoch: now
-                ),
-                to: snapshotURL
-            )
-        }
-        if allowInsecureHTTP {
-            let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-            try await store.transact { tx in
-                try tx.appendLedger(
-                    EgressEntry(
-                        destination: host,
-                        sampleCount: 0,
-                        outcomeKind: "security:insecure_http_enabled",
-                        detail: "explicit_user_opt_in otlp",
-                        wallTimeEpoch: now
-                    )
-                )
-            }
-        }
-        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
-        return destinationStatusLines()
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func disableOTLPCollector() throws {
-        let root = try applicationSupportRoot()
-        try? FileManager.default.removeItem(
-            at: root.appendingPathComponent("otlp-destination.json")
-        )
-        if let snapshotURL = StatusSnapshotLocation.url(destinationID: "otlp") {
-            try? FileManager.default.removeItem(at: snapshotURL)
-        }
-        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+        AppDestinationSetup.service.disableOTLP()
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     private static func otlpMetricsDestination(
         tracesEndpoint: HTTPSDestination,
         allowedHosts: Set<String>
     ) throws -> HTTPSDestination {
-        var components = URLComponents(
-            url: tracesEndpoint.url,
-            resolvingAgainstBaseURL: false
-        )
-        if components?.path.hasSuffix("/v1/traces") == true {
-            components?.path.removeLast("traces".count)
-            components?.path.append("metrics")
-        } else {
-            let path = components?.path ?? ""
-            components?.path = path.hasSuffix("/") ? "\(path)v1/metrics" : "\(path)/v1/metrics"
-        }
-        guard let url = components?.url else {
-            throw OTLPExportError.endpointRequired
-        }
-        return try HTTPSDestination(
-            urlString: url.absoluteString,
-            allowedHosts: allowedHosts,
-            allowInsecureHTTP: tracesEndpoint.allowInsecureHTTP
-        )
+        try AppDestinationSetup.otlpMetricsDestination(tracesEndpoint: tracesEndpoint, allowedHosts: allowedHosts)
     }
 
     static func projectOTLP() async throws -> String {
@@ -1757,84 +972,26 @@ enum HarnessExport {
     // #42: forwarder; remove when the product UI calls the service.
     static func wipeEverything() async throws { try await AppExport.service.wipeEverything() }
 
+    // #42: forwarder; remove when the product UI calls the service.
     private static func verifiedLocalFile(
         root: URL,
         destinationDirectory: URL,
         onProgress: DestinationTestProgress? = nil
     ) throws -> (VerifiedDestination, [TrustEvent]) {
-        let reportURL = localFileTestReportURL(root: root)
-        if let saved = try? Data(contentsOf: reportURL),
-           let report = try? JSONDecoder().decode(DestinationTestReport.self, from: saved),
-           report.allowsEnablement {
-            return (
-                try LocalFileDestinationEnable.resume(
-                    directory: destinationDirectory,
-                    testReport: report
-                ),
-                []
-            )
-        }
-        let completed = try LocalFileDestinationEnable.complete(
-            directory: destinationDirectory,
-            exporterId: try installationID(),
-            emittedAt: Date().ISO8601Format(),
-            onProgress: onProgress
-        )
-        try JSONEncoder().encode(completed.report).write(to: reportURL, options: .atomic)
-        if let snapshotURL = StatusSnapshotLocation.url(destinationID: "local-file") {
-            try DestinationSnapshotFile.recordSecurityEvents(
-                completed.events.count,
-                destinationID: "local-file",
-                destinationLabel: "This \(DeviceNoun.current) → Archive folder",
-                writtenAtEpoch: Date().timeIntervalSince1970,
-                at: snapshotURL
-            )
-        }
-        return (completed.destination, completed.events)
+        try AppDestinationSetup.verifiedLocalFile(destinationDirectory: destinationDirectory, onProgress: onProgress)
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     private static func emitTrustNotices(_ events: [TrustEvent]) async throws {
-        try await emitTrustNotices(events, destination: "local-file")
+        try await AppDestinationSetup.service.emitTrustNotices(events, destination: "local-file")
     }
 
+    // #42: forwarder; remove when the product UI calls the service.
     private static func emitTrustNotices(
         _ events: [TrustEvent],
         destination: String
     ) async throws {
-        guard !events.isEmpty else { return }
-        let notifier = LocalUserNotifier()
-        let deliveries = try await TrustNoticePosting.post(
-            events: events,
-            destination: destination,
-            notifier: notifier
-        )
-        let suppressed = TrustNoticePosting.suppressedCount(deliveries)
-        guard suppressed > 0 else { return }
-        let root = try applicationSupportRoot()
-        let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
-        try await store.transact { tx in
-            try tx.appendLedger(
-                EgressEntry(
-                    destination: destination,
-                    sampleCount: 0,
-                    outcomeKind: "security:notifications_denied",
-                    detail: "trust_notice_suppressed:\(suppressed)",
-                    wallTimeEpoch: Date().timeIntervalSince1970
-                )
-            )
-        }
-        for snapshot in StatusSnapshotLocation.readAll() where snapshot.destinationLabel == destination {
-            if let snapshotURL = StatusSnapshotLocation.url(destinationID: snapshot.destinationID) {
-                try DestinationSnapshotFile.recordSecurityEvents(
-                    suppressed,
-                    destinationID: snapshot.destinationID,
-                    destinationLabel: snapshot.destinationLabel,
-                    writtenAtEpoch: Date().timeIntervalSince1970,
-                    at: snapshotURL
-                )
-            }
-        }
-        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+        try await AppDestinationSetup.service.emitTrustNotices(events, destination: destination)
     }
 
     // #42: forwarder; remove when the product UI calls the service.
@@ -1935,24 +1092,9 @@ enum HarnessExport {
     }
     #endif
 
+    // #42: forwarder; remove when the product UI calls the service.
     static func forgetCompanion() async throws {
-        let root = try applicationSupportRoot()
-        try await vault().forget()
-        try? FileManager.default.removeItem(at: companionTestReportURL(root: root))
-        let event = TrustEvent.trustLost
-        if let snapshotURL = StatusSnapshotLocation.url(destinationID: "companion") {
-            try DestinationSnapshotFile.recordSecurityEvents(
-                1,
-                destinationID: "companion",
-                destinationLabel: "Mac companion",
-                enabled: false,
-                state: .blocked,
-                writtenAtEpoch: Date().timeIntervalSince1970,
-                at: snapshotURL
-            )
-        }
-        try await emitTrustNotices([event], destination: "companion")
-        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+        try await AppDestinationSetup.service.forgetCompanion()
     }
 }
 

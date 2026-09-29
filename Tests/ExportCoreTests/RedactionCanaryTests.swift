@@ -256,19 +256,23 @@ enum LeakMutant: String, CaseIterable {
         encoding: .utf8
     )
 
-    for destinationID in ["local-file", "mqtt", "companion"] {
-        #expect(exportHarness.contains("destinationScope(\"\(destinationID)\")"))
-        #expect(exportHarness.contains(
-            "requestScopeAuthorizationIfConfigured(\"\(destinationID)\")"
-        ))
-    }
-    #expect(exportHarness.contains(#""home-assistant""#))
-    #expect(exportHarness.contains("destinationScope(pending.destinationID)"))
-    #expect(
-        exportHarness.contains(
-            "requestScopeAuthorizationIfConfigured(pending.destinationID)"
-        )
+    // #42: adding a destination moved to DestinationSetupService (confirmation) and
+    // AppDestinationSetup (the local folder); the companion run stays in HarnessExport.
+    let setupService = try String(
+        contentsOf: root.appendingPathComponent("Sources/AppServices/DestinationSetupService.swift"),
+        encoding: .utf8
     )
+    let appSetup = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/Services/AppDestinationSetup.swift"),
+        encoding: .utf8
+    )
+    #expect(exportHarness.contains("destinationScope(\"companion\")"))
+    #expect(exportHarness.contains("requestScopeAuthorizationIfConfigured(\"companion\")"))
+    #expect(setupService.contains(#"try await requestScopeAuthorization("mqtt")"#))
+    #expect(appSetup.contains(#"service.requestScopeAuthorization("local-file")"#))
+    #expect(setupService.contains("try await authorizeScope(try await repository.scope(destinationID))"))
+    #expect(exportHarness.contains(#""home-assistant""#))
+    #expect(setupService.contains("try await requestScopeAuthorization(pending.destinationID)"))
     #expect(exportHarness.contains("destinationScope(destinationID)"))
     // #42: the enabled-destination union moved to DestinationRepository.
     let repository = try String(
@@ -278,14 +282,14 @@ enum LeakMutant: String, CaseIterable {
     #expect(repository.contains("guard isEnabled($1.destinationID)"))
     #expect(exportHarness.contains("window: HealthKitQueryWindow(scope: scope)"))
     #expect(exportHarness.contains("try ExportScopeGate.requireConfigured(scope)"))
-    #expect(exportHarness.contains(
-        "try ExportScopeGate.requireConfigured(\n            try await destinationScope(pending.destinationID)"
+    #expect(setupService.contains(
+        "try ExportScopeGate.requireConfigured(try await repository.scope(pending.destinationID))"
     ))
-    #expect(exportHarness.contains(
-        #"try ExportScopeGate.requireConfigured(try await destinationScope("mqtt"))"#
+    #expect(setupService.contains(
+        #"try ExportScopeGate.requireConfigured(try await repository.scope("mqtt"))"#
     ))
-    #expect(exportHarness.contains(
-        #"try ExportScopeGate.requireConfigured(try await destinationScope("local-file"))"#
+    #expect(appSetup.contains(
+        #"try ExportScopeGate.requireConfigured(try await AppDestinations.repository.scope("local-file"))"#
     ))
     #expect(!exportHarness.contains(
         "for metric in [MetricCatalog.heartRate.id, MetricCatalog.stepCount.id]"

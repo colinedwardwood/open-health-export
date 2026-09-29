@@ -107,9 +107,15 @@ import Watchdog
     #expect(payload.contains(#"notificationPolicyVersionKey = "notification_policy_version""#))
     #expect(payload.contains("notificationPolicyVersionKey: 1"))
 
+    // #42: the setup paths' status writes moved to DestinationSetupService.
     let harness = try String(
         contentsOf: root.appendingPathComponent(
             "Apps/Exporter-iOS/HarnessExport.swift"
+        ),
+        encoding: .utf8
+    ) + String(
+        contentsOf: root.appendingPathComponent(
+            "Sources/AppServices/DestinationSetupService.swift"
         ),
         encoding: .utf8
     )
