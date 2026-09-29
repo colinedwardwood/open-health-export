@@ -6284,9 +6284,14 @@ private func anchorHoldFixture(
     ] {
         #expect(harness.contains("\"\(artifact)\""))
     }
-    #expect(harness.contains("mqtt_pkcs12_password"))
-    #expect(harness.contains("StoredCredentialDescriptor"))
-    #expect(harness.contains("clientPKCS12Password: nil"))
+    // #42: what setup saves moved to DestinationSetupService.
+    let setupService = try String(
+        contentsOf: root.appendingPathComponent("Sources/AppServices/DestinationSetupService.swift"),
+        encoding: .utf8
+    )
+    #expect(setupService.contains("mqtt_pkcs12_password"))
+    #expect(setupService.contains("StoredCredentialDescriptor"))
+    #expect(setupService.contains("clientPKCS12Password: nil"))
     #expect(harness.contains("removePersistentDomain"))
     #expect(harness.contains("try removeIfPresent(directory)"))
 }
@@ -6344,10 +6349,12 @@ private func anchorHoldFixture(
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
-    // #42: the export runs moved to ExportService; its decisions to AppServices.
+    // #42: the export runs moved to ExportService; its decisions to AppServices. The
+    // setup probes and verified sinks moved to AppDestinationSetup.
     let harness = try [
         "Apps/Exporter-iOS/HarnessExport.swift",
         "Apps/Exporter-iOS/Services/ExportService.swift",
+        "Apps/Exporter-iOS/Services/AppDestinationSetup.swift",
     ].map { try String(contentsOf: root.appendingPathComponent($0), encoding: .utf8) }.joined()
     #expect(harness.contains("allowsMeteredNetwork(destinationID:"))
     #expect(harness.contains("NetworkPathMonitorCache.conditions()"))

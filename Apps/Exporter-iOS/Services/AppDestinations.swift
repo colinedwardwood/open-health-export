@@ -13,29 +13,8 @@ import StorageSQLite
 import Watchdog
 import WidgetKit
 
-// MARK: Saved verification records (formats unchanged; moved here from HarnessExport)
-
-struct CompanionVerificationRecord: Codable {
-    var serviceName: String
-    var macInstallationID: String
-    var report: DestinationTestReport
-    var propagateTraceparent: Bool?
-}
-
-struct HTTPSVerificationRecord: Codable {
-    var urlString: String
-    var allowedHosts: [String]
-    var allowInsecureHTTP: Bool
-    var report: DestinationTestReport
-    var leafSPKISha256: String?
-    var issuerSPKISha256: String?
-    var firstSeen: String
-    var hasBearer: Bool
-    var bearerDescriptor: StoredCredentialDescriptor?
-    var webhookDescriptor: StoredCredentialDescriptor?
-    var propagateTraceparent: Bool?
-    var importedLocalIdentifier: String?
-}
+// The saved verification records (HTTPSVerificationRecord, MQTTVerificationRecord,
+// CompanionVerificationRecord) live in AppServices/DestinationSetupService.swift.
 
 enum LocalExportFolderError: LocalizedError {
     case notSelected
