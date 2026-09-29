@@ -14,10 +14,12 @@ struct StatusTabScreen: View {
 
     var body: some View {
         List {
-            Section("Destinations") {
+            Section {
                 ForEach(services.status.destinationStatusLines(), id: \.self) { line in
                     Text(line)
                 }
+            } header: {
+                SectionTitle("Destinations")
             }
             Section {
                 Button(model.exporting ? "Exporting…" : "Export now") {
@@ -70,8 +72,10 @@ struct DestinationErrorScreen: View {
                         .accessibilityIdentifier("shell-error-title")
                     Text(error.cause)
                 }
-                Section("How to fix it") {
+                Section {
                     Text(error.fix)
+                } header: {
+                    SectionTitle("How to fix it")
                 }
             } else {
                 Text("Nothing is wrong with this destination.")
