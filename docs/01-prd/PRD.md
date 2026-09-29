@@ -622,6 +622,7 @@ superseded.
 | D-03 | **Organisation enrolment confirmed.** The app ships under the owner's existing corporate Apple Developer team | Settles the individual-vs-organisation question in #13/#23. Seller and trader details come from that entity |
 | D-06 | **Bundle identifiers use the neutral root `com.cewdesign.exporter`**; the product name stays open pending clearance (#22) | #11, #35. The name lives only in `Brand.xcconfig` |
 | D-08a | **Paid: free download plus a one-time US$14.99 lifetime unlock**, Family Sharing on, no subscription. Source builds stay fully unlocked | Supersedes D-08 (#10). Charging still waits on the counsel opinion (#21), per R-112 |
+| D-08b | **The free tier is manual export; the unlock is automation.** Free: every destination, every data type, "Export now" and the Export Now control. The US$14.99 unlock adds automatic exports (background wakes, Health observers, catch-up on open). Security notices, security updates and fixes are never gated, and a refund or revocation drops back to manual export without deleting any configuration | Owner decision 2026-09-29. Implemented by #68; the Settings and paywall copy say what the unlock adds rather than what it costs |
 | D-15 | **iPhone-only for 1.0**; iPad later | #12, #33 |
 | D-16 | **Mac companion ships in 1.1**, after its pairing protocol is redesigned | #15, #110 |
 | D-17 | **No EU/EEA storefronts at launch.** Add them once the counsel opinion and a Cyber Resilience Act reporting process exist | #19, RK-10 |
