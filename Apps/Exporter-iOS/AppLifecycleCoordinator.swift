@@ -20,10 +20,24 @@ final class AppLifecycleCoordinator {
 
     private var healthObservers: HealthKitObserverCoordinator?
     private(set) var pendingDeepLink: URL?
+    private var deepLinkHandler: ((URL) -> Void)?
 
     private init() {}
 
+    /// #43: the product app's router. A link that arrived before it existed (a
+    /// notification tapped on a cold launch) is handed over straight away.
+    func setDeepLinkHandler(_ handler: @escaping (URL) -> Void) {
+        deepLinkHandler = handler
+        if let url = consumePendingDeepLink() {
+            handler(url)
+        }
+    }
+
     func queueDeepLink(_ url: URL) {
+        if let deepLinkHandler {
+            deepLinkHandler(url)
+            return
+        }
         pendingDeepLink = url
         NotificationCenter.default.post(name: .oheOpenDeepLink, object: url)
     }
