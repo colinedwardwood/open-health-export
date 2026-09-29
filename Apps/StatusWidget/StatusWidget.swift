@@ -87,11 +87,21 @@ struct ExportStatusWidgetView: View {
         .accessibilityIdentifier("widget-locked")
     }
 
+    /// #44: the same tone colour the app uses, on the home screen only. Accented and
+    /// vibrant renderings strip hue, so the glyph and label carry the state there.
+    private func tint(_ state: DestinationDisplayState) -> Color {
+        chrome.stripsHue ? .primary : state.tone.color
+    }
+
     private var small: some View {
         let worst = worstSnapshot
         let state = worst?.state(at: entry.date.timeIntervalSince1970) ?? .notSetUp
         return VStack(alignment: .leading, spacing: 8) {
-            Label(state.label, systemImage: state.glyph)
+            Label {
+                Text(state.label)
+            } icon: {
+                Image(systemName: state.glyph).foregroundStyle(tint(state))
+            }
                 .font(.headline)
                 .modifier(ExportStatusChrome(mode: chrome))
             Spacer()
@@ -130,7 +140,11 @@ struct ExportStatusWidgetView: View {
         VStack(alignment: .leading, spacing: 7) {
             if let worst = worstSnapshot {
                 let state = worst.state(at: entry.date.timeIntervalSince1970)
-                Label(state.label, systemImage: state.glyph)
+                Label {
+                    Text(state.label)
+                } icon: {
+                    Image(systemName: state.glyph).foregroundStyle(tint(state))
+                }
                     .font(.headline)
                     .modifier(ExportStatusChrome(mode: chrome))
             }
@@ -138,6 +152,7 @@ struct ExportStatusWidgetView: View {
                 HStack {
                     let state = snapshot.state(at: entry.date.timeIntervalSince1970)
                     Image(systemName: state.glyph)
+                        .foregroundStyle(tint(state))
                         .accessibilityHidden(true)
                         .modifier(ExportStatusChrome(mode: chrome))
                     Text(snapshot.destinationLabel)
