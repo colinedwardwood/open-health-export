@@ -23,6 +23,15 @@ public enum DestinationExportRole: String, Sendable, Equatable, Codable, CaseIte
     }
 }
 
+/// The four semantic status colours (UX-5): system green, orange, red and secondary,
+/// in their increased-contrast variants so the glyphs pass contrast in light and dark.
+public enum StatusTone: String, Sendable, Equatable, CaseIterable {
+    case ok
+    case attention
+    case blocked
+    case neutral
+}
+
 public enum DestinationDisplayState: String, Sendable, Equatable, Codable, CaseIterable {
     case notSetUp = "not_set_up"
     case noExportsYet = "no_exports_yet"
@@ -78,6 +87,17 @@ public enum DestinationDisplayState: String, Sendable, Equatable, Codable, CaseI
         case .limitedByIOS: "Limited by iOS"
         case .paused: "Paused"
         case .overdue: "Overdue"
+        }
+    }
+
+    /// UX-5 (#44): the colour family the app and the widget both paint this state in.
+    /// Colour only reinforces the glyph and the label; it is never the only signal.
+    public var tone: StatusTone {
+        switch self {
+        case .healthy: .ok
+        case .quiet, .sentUnconfirmed, .partial, .stale, .limitedByIOS, .overdue: .attention
+        case .failing, .blocked: .blocked
+        case .notSetUp, .noExportsYet, .manualOnly, .waiting, .deferred, .paused: .neutral
         }
     }
 

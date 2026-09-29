@@ -6761,3 +6761,16 @@ private struct SilentDiscardSink: DestinationSink {
         DeliveryReceipt(batchID: idempotencyKey, accepted: 0, statusOnly: true)
     }
 }
+
+@Test func ux5ToneFollowsSeverityAndOnlyHealthyIsOK() {
+    for state in DestinationDisplayState.allCases {
+        switch state.tone {
+        case .ok: #expect(state == .healthy)
+        case .blocked: #expect(state.severity == 4)
+        case .attention: #expect(state.severity >= 2)
+        case .neutral: #expect(state.severity <= 1)
+        }
+    }
+    // Every tone is used, so the four colour assets are all needed.
+    #expect(Set(DestinationDisplayState.allCases.map(\.tone)) == Set(StatusTone.allCases))
+}
