@@ -12,14 +12,14 @@
     "releaseGate": "policycheck"
   },
   "firstPartyNetworkEndpoints": [
-    "https://advisories.openhealthexporter.org/advisories/v1.json"
+    "https://advisories.cewdesign.com/advisories/v1.json"
   ],
   "flows": [
     {
       "id": "security-advisory-feed",
       "sourceTargets": ["NetEgress", "WireFormat"],
       "network": true,
-      "destination": "https://advisories.openhealthexporter.org/advisories/v1.json",
+      "destination": "https://advisories.cewdesign.com/advisories/v1.json",
       "destinationControl": "project",
       "trigger": "Off by default. When the user turns it on: at most once per 24 hours on a user-visible foreground launch after the first-run disclosure",
       "data": [

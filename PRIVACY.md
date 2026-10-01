@@ -24,7 +24,7 @@ The authoritative, machine-checked list is
 - Companion discovery uses Bonjour on the local network and transfer is limited to the paired
   companion.
 - The only built-in Internet host is
-  `https://advisories.openhealthexporter.org/advisories/v1.json`. Security-advisory fetching is
+  `https://advisories.cewdesign.com/advisories/v1.json`. Security-advisory fetching is
   off by default. If you turn it on, then at most once per 24 hours, on a user-visible foreground
   launch after the first-run disclosure, the app may send an empty GET carrying only the app's
   coarse major.minor version in `User-Agent`.

@@ -197,7 +197,7 @@ private actor ToggleDestinationSink: DestinationSink {
     #expect(result.presentation.fetched)
     #expect(result.state.lastSeenSeq == 1)
     let ledger = try await store.transact { try $0.loadLedger() }
-    #expect(ledger.map(\.destination) == ["advisory:advisories.openhealthexporter.org"])
+    #expect(ledger.map(\.destination) == ["advisory:advisories.cewdesign.com"])
     #expect(await transport.requests.count == 1)
 
     let skipped = try await AdvisoryClient.fetch(
