@@ -60,6 +60,9 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
       - name: Build the app and its UI tests once
+        # Signed ad hoc ("Sign to Run Locally"), not unsigned: only a signed simulator
+        # build carries the HealthKit entitlement, and without it every Health request
+        # in the UI suite fails (first run, #45).
         run: |
           stamp=()
           while IFS= read -r setting; do stamp+=("$setting"); done < <(./scripts/version-settings.sh)
@@ -69,7 +72,10 @@ jobs:
             -sdk iphonesimulator \
             -configuration Debug \
             -derivedDataPath "$RUNNER_TEMP/ohe-dd" \
-            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM= \
+            PROVISIONING_PROFILE_SPECIFIER= \
             "${stamp[@]}" \
             build-for-testing
       - name: App and widget carry one version, build and source commit
