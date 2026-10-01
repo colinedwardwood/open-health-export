@@ -149,12 +149,17 @@ What follows from the numbers:
 **The icon (owner choice, 2026-10-01):**
 - **Left half:** a heart drawn as three nested strokes, coral, white and bright teal from outside in.
 - **Right half:** three white arrows fanning out from the heart's point, where the right half of the heart would be.
-- **Background:** a deep-teal gradient, `#14897F` to `#0B4F4A`.
-- **Dark variant:** the same mark on `#0B1514`.
-- **Tinted variant:** greyscale on black.
+- **Background:** deep teal `#0F766E`, as a system-derived gradient.
+- **Dark appearance:** the same mark on `#0B1514`.
+- **Tinted and clear appearances:** rendered by the system from the layers.
 
-The white strand gives the heart its luminance edge (rule 3.3.4). The artwork will be licensed separately from the code (#90), and the Icon Composer layers for iOS 26 are still to do (#57).
-- A brief for generating concepts is kept outside the repo, with the launch review notes.
+The white strand gives the heart its luminance edge (rule 3.3.4).
+
+**Source:** `Apps/Icon/AppIcon.icon` is a layered Icon Composer file, shared by the iPhone app and the Mac companion.
+- **Layers:** the arrows are the front group, and the three heart strands are the back group.
+- **Fallbacks:** Xcode generates the flat icons for iOS 18 and the `.icns` for macOS 15 from it.
+- **Editing:** change `Apps/Icon/generate.py` and run it, rather than editing the bundle by hand. Preview the glass rendering by opening the `.icon` in Icon Composer.
+- **Licence:** the artwork will be licensed separately from the code (#90).
 
 ## 7. Voice and tone
 
@@ -184,7 +189,6 @@ The white strand gives the heart its luminance edge (rule 3.3.4). The artwork wi
 |---|---|---|
 | Legal clearance of the name | Owner and counsel | #22 |
 | Confirm the subtitle "Your vitals, on your server" | Owner | — |
-| Designed app icon, with light, dark, tinted and Icon Composer layers | Owner, designer | #57 |
 | Separate licence for the icon and artwork; trademark policy | Owner and counsel | #90 |
 | Register `keepmymetrics.com` / `.app` | Owner | — |
 | Rewrite the store copy in this voice (the current description predates it) | Engineering | #53 |

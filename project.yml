@@ -41,6 +41,8 @@ targets:
           - Info.plist
           - "*.entitlements"
       - path: Apps/AppShared
+      # #57: layered Icon Composer icon, shared with the Mac companion.
+      - path: Apps/Icon/AppIcon.icon
       - path: Apps/Localizable.xcstrings
       - path: NOTICE
         type: file
@@ -126,6 +128,7 @@ targets:
         excludes:
           - Info.plist
           - "*.entitlements"
+      - path: Apps/Icon/AppIcon.icon
       - path: Apps/Localizable.xcstrings
       - path: NOTICE
         type: file
