@@ -726,7 +726,8 @@ public struct ExportRun: Sendable {
         }
         days.formUnion(persistedDays)
         var aggregateSamples = page.samples
-        if let observations {
+        if let observations,
+           MetricCatalog.declaration(for: metric)?.readsByDay == true {
             var byUUID = Dictionary(uniqueKeysWithValues: page.samples.map { ($0.key.uuid, $0) })
             for day in days {
                 for sample in try await observations.samples(metric: metric, day: day) {

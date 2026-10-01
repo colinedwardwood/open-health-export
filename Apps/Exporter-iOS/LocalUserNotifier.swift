@@ -33,6 +33,20 @@ private actor NotificationCooldowns {
 
 /// Platform R-40 notifier. Copy is resolved from `NoticeCopy`, never composed here.
 final class LocalUserNotifier: UserNotifier, Sendable {
+    /// Notices arrive quietly, and the person hasn't been asked for alerts yet.
+    func canOfferAlerts() async -> Bool {
+        let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        return status == .provisional || status == .notDetermined
+    }
+
+    /// The one place full alert permission is requested: from a failure the person is
+    /// looking at, so they can judge what they're agreeing to (UX-35).
+    func requestAlerts() async -> Bool {
+        (try? await UNUserNotificationCenter.current().requestAuthorization(
+            options: [.alert, .sound, .badge]
+        )) ?? false
+    }
+
     func authorizationDenied() async -> Bool {
         await UNUserNotificationCenter.current().notificationSettings()
             .authorizationStatus == .denied
@@ -41,10 +55,13 @@ final class LocalUserNotifier: UserNotifier, Sendable {
     func notify(_ notice: UserNotice) async throws -> NoticeDelivery {
         let copy = NoticeCopy.render(notice)
         let center = UNUserNotificationCenter.current()
-        let options: UNAuthorizationOptions = notice.kind == .exportFailed
-            ? [.alert, .sound, .badge]
-            : [.alert, .sound, .badge, .provisional]
-        let granted = try await center.requestAuthorization(options: options)
+        // UX-35: quiet (provisional) delivery until the person asks for alerts. Asking
+        // here, mid-run, would put Apple's prompt over whatever they are doing, and a
+        // refusal would take provisional delivery away too. The full request is
+        // `requestAlerts()`, offered on the error a failure opens.
+        let granted = try await center.requestAuthorization(
+            options: [.alert, .sound, .badge, .provisional]
+        )
         guard granted else { return .skippedAuthorizationDenied }
         guard await NotificationCooldowns.shared.claim(
             notice,

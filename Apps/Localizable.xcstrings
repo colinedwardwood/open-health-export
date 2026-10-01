@@ -2949,6 +2949,127 @@
           }
         }
       }
+    },
+    "Files on this iPhone": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Files on this iPhone"
+          }
+        }
+      }
+    },
+    "Data goes straight from this iPhone to the destination you set up. We never see it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data goes straight from this iPhone to the destination you set up. We never see it."
+          }
+        }
+      }
+    },
+    "Set up later": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set up later"
+          }
+        }
+      }
+    },
+    "Skip for now": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skip for now"
+          }
+        }
+      }
+    },
+    "Your folder is set up, but Apple Health had nothing from the last seven days for the types you chose.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your folder is set up, but Apple Health had nothing from the last seven days for the types you chose."
+          }
+        }
+      }
+    },
+    "Choose different types": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose different types"
+          }
+        }
+      }
+    },
+    "Done": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        }
+      }
+    },
+    "Later": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Later"
+          }
+        }
+      }
+    },
+    "Finish setup: choose where exports go": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finish setup: choose where exports go"
+          }
+        }
+      }
+    },
+    "Get alerts for failures like this": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get alerts for failures like this"
+          }
+        }
+      }
+    },
+    "Right now these arrive quietly in Notification Centre.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Right now these arrive quietly in Notification Centre."
+          }
+        }
+      }
     }
   }
 }

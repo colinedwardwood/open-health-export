@@ -103,7 +103,12 @@ struct HealthService: Sendable {
 
     /// Asks Health for one destination's types, once its scope is configured.
     func requestReadAccess(for scope: DestinationExportScope) async throws {
-        guard let metrics = HealthAuthorizationPlan.readRequest(for: scope) else { return }
+        guard let metrics = HealthAuthorizationPlan.readRequest(
+            for: scope,
+            disclosureAcknowledged: UserDefaults.standard.bool(
+                forKey: SettingKey.disclosureAcknowledged.rawValue
+            )
+        ) else { return }
         try await HealthKitAuthorization.requestReadAccess(metrics: metrics)
     }
 

@@ -107,6 +107,9 @@ public struct ReconcileSweep: Sendable {
     }
 
     public func runFullHistory(throughDay: String) async throws -> RunOutcome {
+        guard readsByDay else {
+            return try await run(days: [], throughDay: throughDay, reason: "full_reconcile")
+        }
         guard let bounded = observations as? any BoundedDayObservationSource else {
             throw ReconcileSweepError.fullHistoryRangeUnavailable
         }
@@ -127,6 +130,10 @@ public struct ReconcileSweep: Sendable {
     /// O-9: sweep every day this metric still has a census row, so an undatable
     /// deletion can be rebuilt from live observations instead of waiting for a
     /// global full reconcile.
+    private var readsByDay: Bool {
+        MetricCatalog.declaration(for: metric)?.readsByDay ?? false
+    }
+
     public func runCensusDays(reason: String = DeletionUndatable.token) async throws -> RunOutcome {
         let days = try await store.transact { try $0.loadCensusDays(metric: metric) }
         let throughDay = days.max() ?? String(clock.now().ISO8601Format().prefix(10))
@@ -177,7 +184,9 @@ public struct ReconcileSweep: Sendable {
             try await record(outcome: outcome, tally: tally, receipt: nil)
             return outcome
         }
-        if MetricCatalog.isCharacteristic(metric) {
+        // Characteristics have no samples, and other non-quantity types have no day
+        // reader, so there is nothing a day-by-day sweep can rebuild for them.
+        if MetricCatalog.isCharacteristic(metric) || !readsByDay {
             let tally = RunTally(nothingDue: true)
             let outcome = RunOutcome.derive(from: tally)
             try await record(outcome: outcome, tally: tally, receipt: nil)

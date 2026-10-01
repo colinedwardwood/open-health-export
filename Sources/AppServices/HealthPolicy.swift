@@ -80,9 +80,15 @@ public enum HealthAuthorizationPlan {
     }
 
     /// The types to ask Health for on behalf of one destination, in a stable order, or
-    /// nil when its scope is not configured yet (SEC-16: absence is deny).
-    public static func readRequest(for scope: DestinationExportScope) -> [MetricID]? {
-        guard scope.isConfigured else { return nil }
+    /// nil when its scope is not configured yet (SEC-16: absence is deny). Nothing is
+    /// asked before the disclosure is acknowledged (R-63): enabling a destination during
+    /// first run must not put Apple's sheet ahead of it. First run asks on its own
+    /// priming screen instead (#45).
+    public static func readRequest(
+        for scope: DestinationExportScope,
+        disclosureAcknowledged: Bool
+    ) -> [MetricID]? {
+        guard disclosureAcknowledged, scope.isConfigured else { return nil }
         return scope.metrics.sorted { $0.rawValue < $1.rawValue }
     }
 }
