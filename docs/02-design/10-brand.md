@@ -146,9 +146,14 @@ What follows from the numbers:
 - Contain text.
 - Look like Health Auto Export's red heart with an arrow when shown in a greyscale grid.
 
-**Status:**
-- The icon in the repo is a placeholder (converging streams) that exists so the build and upload validation pass.
-- The designed icon is tracked in #57, and the artwork will be licensed separately from the code (#90).
+**The icon (owner choice, 2026-10-01):**
+- **Left half:** a heart drawn as three nested strokes, coral, white and bright teal from outside in.
+- **Right half:** three white arrows fanning out from the heart's point, where the right half of the heart would be.
+- **Background:** a deep-teal gradient, `#14897F` to `#0B4F4A`.
+- **Dark variant:** the same mark on `#0B1514`.
+- **Tinted variant:** greyscale on black.
+
+The white strand gives the heart its luminance edge (rule 3.3.4). The artwork will be licensed separately from the code (#90), and the Icon Composer layers for iOS 26 are still to do (#57).
 - A brief for generating concepts is kept outside the repo, with the launch review notes.
 
 ## 7. Voice and tone
