@@ -651,10 +651,22 @@ private func deviceIdentity(_ device: HKDevice?) -> SampleDevice? {
     }
 }
 
-public enum HealthKitSourceError: Error, Sendable {
+public enum HealthKitSourceError: Error, Sendable, LocalizedError {
     case unavailable
     case unknownMetric(MetricID)
     case queryFailed(String)
+
+    /// UX-7: never "error 0". The metric is named so a report says which type failed.
+    public var errorDescription: String? {
+        switch self {
+        case .unavailable:
+            "Apple Health isn't available on this device."
+        case let .unknownMetric(metric):
+            "This version can't read \(MetricCatalog.declaration(for: metric)?.displayName ?? metric.rawValue) from Apple Health."
+        case let .queryFailed(reason):
+            "Apple Health couldn't answer: \(reason)"
+        }
+    }
 
     static func classifiedQueryError(_ error: Error) -> any Error {
         let nsError = error as NSError

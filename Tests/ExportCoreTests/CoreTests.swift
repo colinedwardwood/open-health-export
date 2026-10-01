@@ -6774,3 +6774,46 @@ private struct SilentDiscardSink: DestinationSink {
     // Every tone is used, so the four colour assets are all needed.
     #expect(Set(DestinationDisplayState.allCases.map(\.tone)) == Set(StatusTone.allCases))
 }
+
+/// #45: the trailing reconcile after every export read day samples for Mindful
+/// minutes, a category type with no day reader, and failed the first export.
+@Test func reconcileSkipsTypesWithNoDayReader() async throws {
+    let metric = MetricCatalog.mindfulSession.id
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-reconcile-category-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let dir = root.appendingPathComponent("archive")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let observations = CountingFixtureDays(byDay: [:])
+    let scope = try DestinationExportScope(
+        destinationID: "archive",
+        metrics: [metric],
+        startInclusive: ExportScopeGate.dayStartUTC("2024-01-01")
+    )
+    let snapshot = root.appendingPathComponent("archive-status.json")
+    try DestinationSnapshotFile.write(
+        DestinationStatusSnapshot(destinationID: "archive", enabled: true, writtenAtEpoch: 1),
+        to: snapshot
+    )
+    let sweep = ReconcileSweep(
+        observations: observations,
+        destination: .testing(LocalFileSink(directory: dir)),
+        store: MemoryStateStore(),
+        metric: metric,
+        scratchDirectory: root.appendingPathComponent("scratch"),
+        destinationName: "archive",
+        envelope: testEnvelope(),
+        snapshotURL: snapshot,
+        destinations: [
+            RunDestination(
+                id: "archive",
+                destination: .testing(LocalFileSink(directory: dir)),
+                scope: scope,
+                snapshotURL: snapshot
+            ),
+        ]
+    )
+    #expect(try await sweep.run(throughDay: "2024-01-07").kind == .successNothingDue)
+    #expect(try await sweep.runFullHistory(throughDay: "2024-01-07").kind == .successNothingDue)
+    #expect(await observations.dayReads == 0)
+}

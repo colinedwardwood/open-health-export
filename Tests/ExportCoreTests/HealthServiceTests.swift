@@ -87,16 +87,27 @@ private final class MemoryObserverFailureStorage: ObserverFailureStorage, @unche
         destinationID: "mqtt",
         metrics: [MetricID(rawValue: "step_count")]
     )
-    #expect(HealthAuthorizationPlan.readRequest(for: unconfigured) == nil)
+    #expect(HealthAuthorizationPlan.readRequest(for: unconfigured, disclosureAcknowledged: true) == nil)
 
     let configured = try DestinationExportScope(
         destinationID: "mqtt",
         metrics: [MetricID(rawValue: "step_count"), MetricID(rawValue: "heart_rate")],
         startInclusive: Date(timeIntervalSince1970: 0)
     )
-    #expect(HealthAuthorizationPlan.readRequest(for: configured) == [
+    #expect(HealthAuthorizationPlan.readRequest(for: configured, disclosureAcknowledged: true) == [
         MetricID(rawValue: "heart_rate"), MetricID(rawValue: "step_count"),
     ])
+}
+
+/// #45: enabling a destination during first run used to open Apple's Health sheet
+/// before the disclosure screen.
+@Test func healthReadAccessIsNeverRequestedBeforeTheDisclosure() throws {
+    let configured = try DestinationExportScope(
+        destinationID: "local-file",
+        metrics: [MetricID(rawValue: "step_count")],
+        startInclusive: Date(timeIntervalSince1970: 0)
+    )
+    #expect(HealthAuthorizationPlan.readRequest(for: configured, disclosureAcknowledged: false) == nil)
 }
 
 @Test func observerFailuresAreRecordedClearedAndSummarised() {

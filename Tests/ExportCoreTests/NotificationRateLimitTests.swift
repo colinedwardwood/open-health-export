@@ -138,8 +138,11 @@ import Watchdog
         ),
         encoding: .utf8
     )
-    #expect(notifier.contains("notice.kind == .exportFailed"))
-    #expect(notifier.contains("[.alert, .sound, .badge, .provisional]"))
+    // Every notice asks only for provisional delivery; the full request lives in
+    // requestAlerts(), which a person triggers from a failure they are looking at.
+    #expect(notifier.contains("options: [.alert, .sound, .badge, .provisional]"))
+    #expect(notifier.components(separatedBy: "options: [.alert, .sound, .badge]\n").count == 2)
+    #expect(notifier.contains("func requestAlerts()"))
 
     let lifecycle = try String(
         contentsOf: root.appendingPathComponent(

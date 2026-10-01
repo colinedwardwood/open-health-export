@@ -16,6 +16,11 @@ final class AppModel {
     var paths: [AppTab: [AppRoute]] = [:]
     private(set) var exporting = false
     private(set) var lastExportMessage: String?
+    /// #45: first run, shown over the app until the disclosure is acknowledged; a
+    /// "Finish setup" row resumes it later.
+    var onboarding: Onboarding?
+    /// Bumped when first run finishes, so screens re-read what it changed.
+    private(set) var setupGeneration = 0
     #if DEBUG
     var showsDeveloper = false
     #endif
@@ -35,6 +40,29 @@ final class AppModel {
         self.services = services
         self.defaults = defaults
         privacyGate.prepare(enabled: privacyGateEnabled)
+        if OnboardingPlan.launchStep(disclosureAcknowledged: disclosureAcknowledged) != nil {
+            onboarding = Onboarding(resuming: false)
+        }
+    }
+
+    struct Onboarding: Identifiable {
+        let id = UUID()
+        let resuming: Bool
+    }
+
+    /// No destination can receive an export yet.
+    var needsSetup: Bool {
+        _ = setupGeneration
+        return !DestinationRepository.healthDestinationIDs.contains { services.destinations.isEnabled($0) }
+    }
+
+    func resumeSetup() {
+        onboarding = Onboarding(resuming: true)
+    }
+
+    func finishOnboarding() {
+        onboarding = nil
+        setupGeneration += 1
     }
 
     var privacyGateEnabled: Bool {

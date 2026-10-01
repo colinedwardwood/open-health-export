@@ -11,6 +11,9 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     init(authenticator: any UserPresenceAuthenticating) {
+        #if DEBUG
+        UITestFixtures.applyLaunchResets()
+        #endif
         _model = State(initialValue: AppModel(authenticator: authenticator))
     }
 
@@ -37,6 +40,11 @@ struct RootView: View {
                 PrivacyLockScreen(gate: model.privacyGate) {
                     Task { await model.unlock() }
                 }
+            }
+        }
+        .fullScreenCover(item: $model.onboarding) { onboarding in
+            OnboardingFlow(resuming: onboarding.resuming) {
+                model.finishOnboarding()
             }
         }
         .task { await model.start() }

@@ -14,6 +14,17 @@ struct StatusTabScreen: View {
 
     var body: some View {
         List {
+            if model.needsSetup, model.disclosureAcknowledged {
+                Section {
+                    Button {
+                        model.resumeSetup()
+                    } label: {
+                        Label("Finish setup: choose where exports go", systemImage: "arrow.right.circle")
+                    }
+                    .accessibilityIdentifier("shell-finish-setup")
+                    .attentionCard(.attention)
+                }
+            }
             Section {
                 ForEach(services.status.destinationStatusLines(), id: \.self) { line in
                     Text(line)
@@ -61,6 +72,7 @@ struct DestinationErrorScreen: View {
     let destinationID: String
     let archetype: UserFacingErrorArchetype?
     @Environment(\.services) private var services
+    @State private var canOfferAlerts = false
 
     var body: some View {
         let error = services.status.userFacingError(destinationID: destinationID, archetype: archetype)
@@ -77,6 +89,16 @@ struct DestinationErrorScreen: View {
                 } header: {
                     SectionTitle("How to fix it")
                 }
+                if canOfferAlerts {
+                    Section {
+                        Button("Get alerts for failures like this") {
+                            Task { canOfferAlerts = !(await LocalUserNotifier().requestAlerts()) }
+                        }
+                        .accessibilityIdentifier("shell-error-request-alerts")
+                    } footer: {
+                        Text("Right now these arrive quietly in Notification Centre.")
+                    }
+                }
             } else {
                 Text("Nothing is wrong with this destination.")
                     .accessibilityIdentifier("shell-error-none")
@@ -84,6 +106,7 @@ struct DestinationErrorScreen: View {
         }
         .navigationTitle(error?.destinationLabel ?? destinationID)
         .navigationBarTitleDisplayMode(.inline)
+        .task { canOfferAlerts = error != nil ? await LocalUserNotifier().canOfferAlerts() : false }
     }
 }
 

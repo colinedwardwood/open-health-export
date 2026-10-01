@@ -453,6 +453,76 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(destinationStatusElement(0).waitForExistence(timeout: uiWait))
     }
 
+    /// #45: a new person reaches a successful first export from launch, with the
+    /// disclosure before Apple's Health sheet, in eight taps or fewer of our own.
+    func testFirstRunReachesAFirstExport() {
+        app.terminate()
+        app.launchEnvironment = [
+            "OHE_RESET_SEEDED_SURFACES": "1",
+            "OHE_RESET_FIRST_RUN": "1",
+            "OHE_SEED_LOCAL_EXPORT_FOLDER": "1",
+        ]
+        app.launchArguments = [
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        let started = Date()
+        app.launch()
+        var taps = 0
+        func tap(_ identifier: String) {
+            let button = app.buttons[identifier]
+            XCTAssertTrue(
+                button.waitForExistence(timeout: uiWait),
+                "\(identifier) missing: \(visibleIdentifiers().joined(separator: ","))"
+            )
+            button.tap()
+            taps += 1
+        }
+        tap("onboarding-start")
+        tap("onboarding-types-continue")
+        tap("onboarding-choose-files")
+        XCTAssertTrue(
+            app.staticTexts["first-run-disclaimer"].waitForExistence(timeout: uiWait),
+            visibleIdentifiers().joined(separator: ",")
+        )
+        XCTAssertFalse(app.buttons["health-priming-continue"].exists)
+        tap("disclosure-continue")
+        tap("health-priming-continue")
+        allowHealthSheetIfShown()
+        // The simulator's Health store is usually empty, which is the "nothing came
+        // back" ending; a store with data ends on the summary. Both are a finished
+        // first export, and both offer Done.
+        let summary = app.staticTexts["onboarding-export-summary"]
+        let empty = app.staticTexts["onboarding-nothing-came-back"]
+        let deadline = Date().addingTimeInterval(90)
+        while !summary.exists, !empty.exists, Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        }
+        XCTAssertTrue(summary.exists || empty.exists, visibleIdentifiers().joined(separator: ","))
+        if empty.exists {
+            XCTAssertTrue(app.buttons["onboarding-check-again"].exists)
+            XCTAssertTrue(app.buttons["onboarding-choose-types"].exists)
+        }
+        tap("onboarding-done")
+        XCTAssertTrue(app.buttons["shell-export-now"].waitForExistence(timeout: uiWait))
+        XCTAssertLessThanOrEqual(taps, 8)
+        XCTAssertLessThanOrEqual(Date().timeIntervalSince(started), 90)
+    }
+
+    /// Apple's sheet appears only for types whose permission is still undecided, so a
+    /// simulator that already answered goes straight on.
+    private func allowHealthSheetIfShown() {
+        let turnOnAll = app.descendants(matching: .any)["Turn On All"]
+        guard turnOnAll.waitForExistence(timeout: 10) else { return }
+        turnOnAll.tap()
+        let allow = app.navigationBars.buttons["Allow"].exists
+            ? app.navigationBars.buttons["Allow"]
+            : app.buttons["Allow"]
+        if allow.waitForExistence(timeout: uiWait) {
+            allow.tap()
+        }
+    }
+
     /// #43: the product app routes a cold-launch link through AppModel, with no
     /// harness in the way.
     func testProductShellColdLaunchLinkOpensTheDestinationError() {
