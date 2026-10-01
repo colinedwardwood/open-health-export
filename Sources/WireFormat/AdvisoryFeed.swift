@@ -71,9 +71,9 @@ public enum AdvisoryError: Error, Equatable {
 /// introduce a key. The private halves are held offline by the owner, never in this
 /// repository or in the app, and signing lives in `Tools/advisory-sign`.
 public enum AdvisoryPinnedKeys {
-    public static let host = "advisories.openhealthexporter.org"
+    public static let host = "advisories.cewdesign.com"
     public static let path = "/advisories/v1.json"
-    public static let urlString = "https://advisories.openhealthexporter.org/advisories/v1.json"
+    public static let urlString = "https://advisories.cewdesign.com/advisories/v1.json"
     public static let activeID = "active"
     public static let successorID = "successor"
 
