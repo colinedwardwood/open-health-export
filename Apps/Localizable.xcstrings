@@ -3081,6 +3081,237 @@
           }
         }
       }
+    },
+    "Add destination": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add destination"
+          }
+        }
+      }
+    },
+    "Exports are written as JSON Lines files. A folder in iCloud Drive syncs your health data to iCloud.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exports are written as JSON Lines files. A folder in iCloud Drive syncs your health data to iCloud."
+          }
+        }
+      }
+    },
+    "Files": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Files"
+          }
+        }
+      }
+    },
+    "Save": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save"
+          }
+        }
+      }
+    },
+    "Test again": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test again"
+          }
+        }
+      }
+    },
+    "Automatic exports": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic exports"
+          }
+        }
+      }
+    },
+    "When this is off, this destination only receives data when you tap Export now.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When this is off, this destination only receives data when you tap Export now."
+          }
+        }
+      }
+    },
+    "Remove destination": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove destination"
+          }
+        }
+      }
+    },
+    "Remove this destination?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove this destination?"
+          }
+        }
+      }
+    },
+    "No destinations yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No destinations yet"
+          }
+        }
+      }
+    },
+    "Remove": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove"
+          }
+        }
+      }
+    },
+    "Files already exported stay in the folder. Nothing more is written there.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Files already exported stay in the folder. Nothing more is written there."
+          }
+        }
+      }
+    },
+    "Add a folder in Files to start. You can add servers later.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a folder in Files to start. You can add servers later."
+          }
+        }
+      }
+    },
+    "Not encrypted, by your choice.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not encrypted, by your choice."
+          }
+        }
+      }
+    },
+    "Check the certificate": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check the certificate"
+          }
+        }
+      }
+    },
+    "It matches": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It matches"
+          }
+        }
+      }
+    },
+    "Share or copy the example": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share or copy the example"
+          }
+        }
+      }
+    },
+    "Paste this into a new automation in Home Assistant (Edit in YAML), then use the same webhook ID here.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste this into a new automation in Home Assistant (Edit in YAML), then use the same webhook ID here."
+          }
+        }
+      }
+    },
+    "Your own server": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your own server"
+          }
+        }
+      }
+    },
+    "Test": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test"
+          }
+        }
+      }
+    },
+    "Continue only if this fingerprint exactly matches the one your server shows. If you didn't set up a self-signed certificate yourself, cancel.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue only if this fingerprint exactly matches the one your server shows. If you didn't set up a self-signed certificate yourself, cancel."
+          }
+        }
+      }
     }
   }
 }
