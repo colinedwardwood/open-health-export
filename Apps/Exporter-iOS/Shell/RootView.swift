@@ -21,7 +21,7 @@ struct RootView: View {
         ZStack {
             TabView(selection: $model.selectedTab) {
                 Tab("Status", systemImage: "checkmark.circle", value: AppTab.status) {
-                    stack(.status) { StatusTabScreen() }
+                    stack(.status) { StatusScreen() }
                 }
                 Tab("Data", systemImage: "chart.bar", value: AppTab.data) {
                     stack(.data) { PlaceholderScreen(title: "Data") }

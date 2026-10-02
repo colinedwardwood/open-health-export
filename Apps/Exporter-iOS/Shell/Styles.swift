@@ -19,7 +19,9 @@ struct SectionTitle: View {
     var body: some View {
         Text(text)
             .font(.headline)
-            .foregroundStyle(.primary)
+            // The concrete colour: inside a List header, `.primary` is relative to the
+            // header's own grey style and fails contrast (#46).
+            .foregroundStyle(Color.primary)
             .textCase(nil)
             .accessibilityAddTraits(.isHeader)
     }
@@ -43,7 +45,7 @@ extension View {
     /// Secondary line under a title: timestamps, counts, where data went.
     func metadata() -> some View {
         font(.subheadline)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.secondaryText)
             .monospacedDigit()
     }
 

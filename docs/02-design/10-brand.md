@@ -48,10 +48,11 @@ The app uses the iOS system palette for everything except one accent. Status col
 | **Status: ok** | `#248A3D` | `#30D158` | "Up to date" glyphs |
 | **Status: attention** | `#C93400` | `#FF9F0A` | Overdue, stale, partial, unconfirmed |
 | **Status: blocked** | `#D70015` | `#FF453A` | Failing, or waiting for the person |
-| **Status: neutral** | system `.secondary` | system `.secondary` | Not set up, paused, waiting on iOS |
+| **Status: neutral** | `#6C6C70` | `#A1A1A6` | Not set up, paused, waiting on iOS |
+| **Secondary text** | `#6C6C70` | `#A1A1A6` | Detail lines, metadata, footnotes. Use this instead of the system `.secondary`, which blends to about 3.4:1 on white and fails the contrast audit for small text |
 | **Brand coral** | `#FF6B5E` | `#FF6B5E` | Icon and marketing only (see 3.3) |
 
-Everything else (backgrounds, text, separators, grouped cards) uses iOS semantic colours: `.background`, `.secondarySystemGroupedBackground`, `.primary`, `.secondary` and `.separator`. We don't hard-code a hex value for them.
+Everything else (backgrounds, primary text, separators, grouped cards) uses iOS semantic colours: `.background`, `.secondarySystemGroupedBackground`, `Color.primary` and `.separator`. We don't hard-code a hex value for them. Secondary text is the exception above (`Color.secondaryText`).
 
 The light status values are Apple's increased-contrast variants; the dark values are the standard dark-mode system colours.
 

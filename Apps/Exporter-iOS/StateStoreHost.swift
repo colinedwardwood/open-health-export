@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import AppServices
 import Foundation
 import StorageSQLite
 
@@ -41,3 +42,6 @@ enum StateStoreHost {
         }
     }
 }
+
+/// #46: a database failure reads as "this app's records", never as a raw error domain.
+extension StorageError: @retroactive StorageFailure {}

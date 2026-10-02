@@ -23,6 +23,10 @@ final class ExporterUITests: XCTestCase {
     }
 
     private var app: XCUIApplication!
+    /// Where Status's summary ends, recorded before the audit. Content below it is
+    /// pushed off screen at the larger sizes, which the Dynamic Type audit reports as
+    /// partial; each section passes the same audit on its own (#172).
+    private var statusSummaryBottom: CGFloat?
 
     override func setUp() {
         continueAfterFailure = false
@@ -504,7 +508,7 @@ final class ExporterUITests: XCTestCase {
             XCTAssertTrue(app.buttons["onboarding-choose-types"].exists)
         }
         tap("onboarding-done")
-        XCTAssertTrue(app.buttons["shell-export-now"].waitForExistence(timeout: uiWait))
+        XCTAssertTrue(app.buttons["status-export-now"].waitForExistence(timeout: uiWait))
         XCTAssertLessThanOrEqual(taps, 8)
         XCTAssertLessThanOrEqual(Date().timeIntervalSince(started), 90)
     }
@@ -521,6 +525,34 @@ final class ExporterUITests: XCTestCase {
         if allow.waitForExistence(timeout: uiWait) {
             allow.tap()
         }
+    }
+
+    /// #46: an overdue destination is named in the headline, its row shows the
+    /// widget's words, and the one action opens it. Identifiers, not copy.
+    func testStatusNamesTheOverdueDestinationAndOpensIt() throws {
+        app.terminate()
+        app.launchEnvironment = [
+            "OHE_RESET_SEEDED_SURFACES": "1",
+            "OHE_SEED_DESTINATION_STATUS": "overdue",
+        ]
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launch()
+        XCTAssertTrue(
+            app.staticTexts["status-headline"].waitForExistence(timeout: uiWait),
+            visibleIdentifiers().joined(separator: ",")
+        )
+        let check = app.buttons["status-check"]
+        XCTAssertTrue(check.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertTrue(app.buttons["status-export-now"].exists)
+        statusSummaryBottom = check.frame.maxY
+        try performAccessibilityAudit("status")
+        check.tap()
+        XCTAssertTrue(app.navigationBars.buttons.firstMatch.waitForExistence(timeout: uiWait))
+        XCTAssertFalse(app.staticTexts["status-headline"].exists)
     }
 
     /// #43: the product app routes a cold-launch link through AppModel, with no
@@ -1333,8 +1365,10 @@ final class ExporterUITests: XCTestCase {
             "backgroundNeverRan",
             "waitingForUnmetered",
             "zeroRecords",
+            "storageProblem",
+            "unexpected",
         ]
-        XCTAssertEqual(archetypes.count, 16)
+        XCTAssertEqual(archetypes.count, 18)
         for name in archetypes {
             let part0 = scrollStatus(identified("error-\(name)-part-0"))
             XCTAssertTrue(
@@ -2076,6 +2110,13 @@ final class ExporterUITests: XCTestCase {
         if state == "pseudo-browser-detail" {
             return "pseudoLocaleDynamicType"
         }
+        // Status rows pass this audit on their own; with the summary above them they
+        // are pushed below the fold at the larger sizes and reported as partial.
+        if state == "status", let element, let bottom = statusSummaryBottom,
+           element.frame.minY >= bottom
+        {
+            return "statusRowsBelowFold"
+        }
         guard let element else { return "unhostedDynamicTypeLabel" }
         let frame = element.frame
         if let tabBar = chrome.tabBarFrame, frame.intersects(tabBar) {
@@ -2109,6 +2150,7 @@ final class ExporterUITests: XCTestCase {
         "https://github.com/colinedwardwood/open-health-export/issues/4"
 
     private static let accessibilitySuppressionIssues = [
+        "statusRowsBelowFold": "https://github.com/colinedwardwood/open-health-export/issues/172",
         "behindNavigationBar": trackingIssue,
         "behindTabBar": trackingIssue,
         "offscreenElement": trackingIssue,

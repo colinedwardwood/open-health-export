@@ -111,6 +111,27 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck setting keys live in SettingsStore: ok")
+        // #46: product screens show the five-part error (UserFacingFailure), never an
+        // error's own description, which is a raw domain and code more often than not.
+        // The harness and the views it still owns are replaced by #47 and #56.
+        var rawErrorText: [String] = []
+        for folder in ["Shell", "Status", "Onboarding"] {
+            let directory = apps.appendingPathComponent("Exporter-iOS/\(folder)")
+            guard let files = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: nil)
+            else { continue }
+            for case let file as URL in files where file.pathExtension == "swift" {
+                let text = try String(contentsOf: file, encoding: .utf8)
+                if text.contains("localizedDescription") { rawErrorText.append(file.path) }
+            }
+        }
+        if !rawErrorText.isEmpty {
+            FileHandle.standardError.write(
+                Data(("UX-6: product screens must map errors with UserFacingFailure, not localizedDescription:\n"
+                    + rawErrorText.joined(separator: "\n") + "\n").utf8)
+            )
+            exit(1)
+        }
+        print("policycheck product screens never show raw error text: ok")
         if !pasteboardBypasses.isEmpty {
             FileHandle.standardError.write(
                 Data(

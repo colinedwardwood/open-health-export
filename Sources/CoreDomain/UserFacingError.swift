@@ -76,6 +76,10 @@ public enum UserFacingErrorArchetype: String, Sendable, Equatable, CaseIterable 
     case backgroundNeverRan
     case waitingForUnmetered
     case zeroRecords
+    /// #46: the app's own database failed. A problem on the phone, not the destination.
+    case storageProblem
+    /// #46: anything without a specific explanation. Never a raw error domain on screen.
+    case unexpected
 }
 
 extension UserFacingErrorArchetype {
@@ -283,6 +287,20 @@ public struct UserFacingErrorObject: Sendable, Equatable {
                 "None of the selected types returned data. That can mean there is no new data, or that access to those types is off in Health — this app has no way to tell which.",
                 "Check Health → Sharing → Apps for this app, then review coverage.",
                 [.reviewCoverage, .testAgain]
+            )
+        case .storageProblem:
+            return (
+                "Couldn't update this app's export records",
+                "The database this app keeps on \(DeviceNoun.thisDevice) couldn't be opened or written. Nothing is wrong at \(label).",
+                "Try again. If it keeps happening, restart \(DeviceNoun.thisDevice), then copy the diagnostics into a report.",
+                [.exportNow]
+            )
+        case .unexpected:
+            return (
+                "The export to \(label) stopped",
+                "Something failed that this app has no specific explanation for.",
+                "Try again. If it happens again, copy the diagnostics into a report so it can be fixed.",
+                [.exportNow]
             )
         }
     }
