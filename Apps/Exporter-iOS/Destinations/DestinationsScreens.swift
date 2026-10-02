@@ -95,7 +95,7 @@ struct AddDestinationFlow: View {
                         .accessibilityIdentifier("add-\(kind.rawValue)")
                     }
                 } footer: {
-                    Text("Data goes straight from \(DeviceNoun.thisDevice) to the destination you set up. KeepMyMetrics never sees it.")
+                    SectionFooter("Data goes straight from \(DeviceNoun.thisDevice) to the destination you set up. KeepMyMetrics never sees it.")
                 }
             }
             .navigationTitle("Add destination")
@@ -141,7 +141,7 @@ struct FilesSetupScreen: View {
                 .disabled(setup.testing)
                 .accessibilityIdentifier("files-choose-folder")
             } footer: {
-                Text("Exports are written as JSON Lines files. A folder in iCloud Drive syncs your health data to iCloud.")
+                SectionFooter("Exports are written as JSON Lines files. A folder in iCloud Drive syncs your health data to iCloud.")
             }
             if setup.folderName != nil {
                 TestChecklistSection(checklist: setup.checklist, error: setup.error) {
@@ -278,7 +278,7 @@ struct DestinationDetailScreen: View {
                         model.refreshStatus()
                     }
             } footer: {
-                Text("When this is off, this destination only receives data when you tap Export now.")
+                SectionFooter("When this is off, this destination only receives data when you tap Export now.")
             }
             if destinationID == "local-file" {
                 Section {

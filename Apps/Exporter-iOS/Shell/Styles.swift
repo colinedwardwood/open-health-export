@@ -27,6 +27,20 @@ struct SectionTitle: View {
     }
 }
 
+/// A list section footer. List footers default to the system grey, which fails the
+/// contrast audit for small text; this uses the accessible secondary colour (#68).
+struct SectionFooter: View {
+    let text: LocalizedStringKey
+
+    init(_ text: LocalizedStringKey) {
+        self.text = text
+    }
+
+    var body: some View {
+        Text(text).foregroundStyle(Color.secondaryText)
+    }
+}
+
 /// A destination state as glyph plus words. The glyph carries the tone; the words
 /// are what VoiceOver reads.
 struct StatusBadge: View {
