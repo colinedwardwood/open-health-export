@@ -3224,6 +3224,94 @@
           }
         }
       }
+    },
+    "Not encrypted, by your choice.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not encrypted, by your choice."
+          }
+        }
+      }
+    },
+    "Check the certificate": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check the certificate"
+          }
+        }
+      }
+    },
+    "It matches": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It matches"
+          }
+        }
+      }
+    },
+    "Share or copy the example": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share or copy the example"
+          }
+        }
+      }
+    },
+    "Paste this into a new automation in Home Assistant (Edit in YAML), then use the same webhook ID here.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste this into a new automation in Home Assistant (Edit in YAML), then use the same webhook ID here."
+          }
+        }
+      }
+    },
+    "Your own server": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your own server"
+          }
+        }
+      }
+    },
+    "Test": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test"
+          }
+        }
+      }
+    },
+    "Continue only if this fingerprint exactly matches the one your server shows. If you didn't set up a self-signed certificate yourself, cancel.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue only if this fingerprint exactly matches the one your server shows. If you didn't set up a self-signed certificate yourself, cancel."
+          }
+        }
+      }
     }
   }
 }
