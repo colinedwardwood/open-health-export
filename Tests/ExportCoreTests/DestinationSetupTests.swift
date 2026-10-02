@@ -3,6 +3,7 @@
 
 import AppServices
 import DestinationTrust
+import MetricCatalog
 import Testing
 
 @Test func checklistMarksEarlierStepsPassedAsTheTestMovesOn() {
@@ -33,7 +34,7 @@ import Testing
 }
 
 @Test func filesAndHTTPSDestinationsAreAddableAndTheMacStaysHidden() {
-    #expect(DestinationKind.addable == [.files, .https, .homeAssistantWebhook])
+    #expect(DestinationKind.addable == [.files, .mqtt, .https, .homeAssistantWebhook])
     #expect(DestinationKind.homeAssistantWebhook.caveat?.contains("doesn't create sensors") == true)
     #expect(DestinationKind.https.caveat == nil)
     #expect(!DestinationKind.allCases.map(\.destinationID).contains("companion"))
@@ -62,4 +63,26 @@ import Testing
     #expect(yaml.contains("PASTE-THE-SAME-WEBHOOK-ID-HERE"))
     #expect(yaml.contains("local_only: true"))
     #expect(!yaml.contains("\t"))
+}
+
+@Test func mqttChecklistFollowsEncryptionAndQoS() {
+    #expect(DestinationTestChecklist.mqtt(encrypted: false, checksCertificate: false, confirmsDelivery: true)
+        .steps.map(\.step) == [.connect, .publishCanary, .receiveEcho])
+    #expect(DestinationTestChecklist.mqtt(encrypted: true, checksCertificate: true, confirmsDelivery: false)
+        .steps.map(\.step) == [.tlsHandshake, .confirmCertificate, .connect, .publishCanary])
+}
+
+@Test func brokerAddressesUseMQTTSchemes() {
+    #expect(NetworkAddressCheck.checkBroker("mqtts://ha.local:8883", allowsUnencrypted: false).isUsable)
+    #expect(!NetworkAddressCheck.checkBroker("mqtt://ha.local:1883", allowsUnencrypted: false).isUsable)
+    #expect(NetworkAddressCheck.checkBroker("mqtt://ha.local:1883", allowsUnencrypted: true).isUsable)
+    #expect(!NetworkAddressCheck.checkBroker("https://ha.local", allowsUnencrypted: true).isUsable)
+}
+
+@Test func discoveryPreviewListsQuantityTypesByName() {
+    let names = HomeAssistantDiscoveryPreview.entityNames(for: MetricCatalog.coreDaily)
+    #expect(names.contains("Step count"))
+    #expect(names.contains("Heart rate"))
+    #expect(!names.contains("Sleep"))
+    #expect(!names.contains("Workouts"))
 }

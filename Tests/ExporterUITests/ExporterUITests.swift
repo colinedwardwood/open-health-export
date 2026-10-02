@@ -568,6 +568,56 @@ final class ExporterUITests: XCTestCase {
         XCTAssertLessThanOrEqual(taps, 6)
     }
 
+    /// #49: the MQTT path lists the Home Assistant entities discovery will create,
+    /// shows QoS once, and a broker that refuses the connection fails at Connect. A
+    /// real broker is exercised by the container contracts and by
+    /// OHE_UI_MQTT_BROKER when a local Mosquitto is available.
+    func testMQTTShowsTheEntitiesItWillCreateAndNamesTheFailedStep() throws {
+        app.terminate()
+        app.launchEnvironment = ["OHE_RESET_SEEDED_SURFACES": "1"]
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launch()
+        app.tabBars.buttons["Destinations"].tap()
+        let add = app.buttons["destinations-add"]
+        XCTAssertTrue(add.waitForExistence(timeout: uiWait))
+        add.tap()
+        let mqtt = app.buttons["add-mqtt"]
+        XCTAssertTrue(mqtt.waitForExistence(timeout: uiWait))
+        mqtt.tap()
+        let broker = ProcessInfo.processInfo.environment["OHE_UI_MQTT_BROKER"]
+        type(broker ?? "mqtt://127.0.0.1:1", into: app.textFields["network-address"])
+        dismissKeyboard()
+        let plain = app.switches["network-plain-http"]
+        XCTAssertTrue(plain.waitForExistence(timeout: uiWait))
+        if plain.value as? String != "1" { plain.switches.firstMatch.tap() }
+        XCTAssertEqual(app.segmentedControls.count, 1, "QoS should appear once")
+        let test = app.buttons["network-test"]
+        XCTAssertTrue(test.waitForEnabled(timeout: uiWait))
+        test.tap()
+        if broker != nil {
+            let card = identified("network-confirm-card")
+            for _ in 0 ..< 8 where !card.exists { app.swipeUp() }
+            XCTAssertTrue(card.waitForExistence(timeout: 60), visibleIdentifiers().joined(separator: ","))
+            let save = app.buttons["network-save"]
+            XCTAssertTrue(save.waitForEnabled(timeout: uiWait))
+            save.tap()
+            XCTAssertTrue(app.buttons["destinations-row-mqtt"].waitForExistence(timeout: uiWait))
+            return
+        }
+        let step = identified("test-step-connect")
+        for _ in 0 ..< 8 where !step.exists { app.swipeUp() }
+        XCTAssertTrue(step.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        expectation(for: NSPredicate(format: "value == %@", "Failed"), evaluatedWith: step)
+        waitForExpectations(timeout: 60)
+        let error = identified("test-error")
+        for _ in 0 ..< 4 where !error.exists { app.swipeUp() }
+        XCTAssertTrue(error.waitForExistence(timeout: uiWait))
+    }
+
     /// #48: the webhook's caveat and example automation come before configuration,
     /// the address is said back, and a server that can't be found fails at its step.
     func testHomeAssistantWebhookWarnsFirstAndNamesTheFailedStep() throws {

@@ -3,6 +3,7 @@
 
 import DestinationTrust
 import Foundation
+import MetricCatalog
 
 /// A kind of destination someone can add (#47). Only the kinds whose setup screens
 /// exist are offered; the Mac companion stays hidden until 1.1 (#15).
@@ -33,7 +34,7 @@ public enum DestinationKind: String, Sendable, Hashable, CaseIterable, Identifia
         case .files: "A folder in Files on this phone or in iCloud Drive."
         case .https: "An HTTPS address you control, and a token if it needs one."
         case .homeAssistantWebhook: "Your Home Assistant address and a webhook automation."
-        case .mqtt: "Your broker's address, and a username if it needs one."
+        case .mqtt: "Your MQTT broker, such as the Mosquitto add-on, and its login."
         }
     }
 
@@ -48,8 +49,8 @@ public enum DestinationKind: String, Sendable, Hashable, CaseIterable, Identifia
         }
     }
 
-    /// The kinds with a setup flow today. #49 adds MQTT.
-    public static let addable: [DestinationKind] = [.files, .https, .homeAssistantWebhook]
+    /// The kinds with a setup flow, recommended first for Home Assistant users.
+    public static let addable: [DestinationKind] = [.files, .mqtt, .https, .homeAssistantWebhook]
 }
 
 /// The named steps of a destination test, each with its own state, so the screen can
@@ -79,6 +80,17 @@ public struct DestinationTestChecklist: Sendable, Equatable {
     public static let localFile = DestinationTestChecklist(
         steps: [.openFolder, .writeCanary, .readBack, .confirmBytes]
     )
+
+    /// The MQTT test. A certificate is only checked when one was confirmed by
+    /// fingerprint; QoS 0 has no acknowledgement to wait for.
+    public static func mqtt(encrypted: Bool, checksCertificate: Bool, confirmsDelivery: Bool) -> DestinationTestChecklist {
+        var steps: [DestinationTestStep] = []
+        if encrypted { steps.append(.tlsHandshake) }
+        if encrypted && checksCertificate { steps.append(.confirmCertificate) }
+        steps += [.connect, .publishCanary]
+        if confirmsDelivery { steps.append(.receiveEcho) }
+        return DestinationTestChecklist(steps: steps)
+    }
 
     /// The HTTPS test. Plain HTTP (an explicit opt-in) has no certificate to check.
     public static func https(encrypted: Bool) -> DestinationTestChecklist {
@@ -152,26 +164,36 @@ public struct NetworkAddressCheck: Sendable, Equatable {
     public var message: String
     public var isUsable: Bool
 
-    public static func check(_ raw: String, allowsPlainHTTP: Bool) -> NetworkAddressCheck {
+    /// The same check for an MQTT broker: `mqtts://` is encrypted, `mqtt://` is not.
+    public static func checkBroker(_ raw: String, allowsUnencrypted: Bool) -> NetworkAddressCheck {
+        check(raw, allowsPlainHTTP: allowsUnencrypted, secure: "mqtts", plain: "mqtt")
+    }
+
+    public static func check(
+        _ raw: String,
+        allowsPlainHTTP: Bool,
+        secure: String = "https",
+        plain: String = "http"
+    ) -> NetworkAddressCheck {
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else {
-            return NetworkAddressCheck(host: nil, encrypted: false, message: "Enter the address, starting with https://.", isUsable: false)
+            return NetworkAddressCheck(host: nil, encrypted: false, message: "Enter the address, starting with \(secure)://.", isUsable: false)
         }
         guard let url = URL(string: text), let scheme = url.scheme?.lowercased(), let host = url.host, !host.isEmpty else {
-            return NetworkAddressCheck(host: nil, encrypted: false, message: "That isn't a full address. It should look like https://example.com/path.", isUsable: false)
+            return NetworkAddressCheck(host: nil, encrypted: false, message: "That isn't a full address. It should start with \(secure)://.", isUsable: false)
         }
         if url.user != nil || url.password != nil {
             return NetworkAddressCheck(host: host, encrypted: false, message: "Remove the name and password from the address. Use the token field instead.", isUsable: false)
         }
         switch scheme {
-        case "https":
+        case secure:
             return NetworkAddressCheck(host: host, encrypted: true, message: "Will send to \(host), encrypted.", isUsable: true)
-        case "http" where allowsPlainHTTP:
+        case plain where allowsPlainHTTP:
             return NetworkAddressCheck(host: host, encrypted: false, message: "Will send to \(host) without encryption. Anyone on the network path can read it.", isUsable: true)
-        case "http":
-            return NetworkAddressCheck(host: host, encrypted: false, message: "This address isn't encrypted. Use https://, or turn on plain HTTP below if this server is on your own network.", isUsable: false)
+        case plain:
+            return NetworkAddressCheck(host: host, encrypted: false, message: "This address isn't encrypted. Use \(secure)://, or allow unencrypted below if this server is on your own network.", isUsable: false)
         default:
-            return NetworkAddressCheck(host: host, encrypted: false, message: "Only https:// addresses are supported.", isUsable: false)
+            return NetworkAddressCheck(host: host, encrypted: false, message: "Only \(secure):// and \(plain):// addresses are supported.", isUsable: false)
         }
     }
 }
@@ -195,4 +217,12 @@ public enum HomeAssistantWebhookExample {
           title: KeepMyMetrics
           message: An export arrived.
     """
+}
+
+/// #49: the Home Assistant entities MQTT discovery creates, so the person knows what
+/// to look for before they save. Discovery publishes quantity types only.
+public enum HomeAssistantDiscoveryPreview {
+    public static func entityNames(for metrics: [MetricDeclaration]) -> [String] {
+        metrics.filter(\.readsByDay).map(\.displayName)
+    }
 }
