@@ -604,3 +604,21 @@ enum AppDestinationSetup {
     }
     #endif
 }
+
+extension AppDestinationSetup {
+    /// #47: removes the Files destination. The exported files stay where they are;
+    /// only the app's link to the folder, its test result and its status go.
+    static func removeLocalFile() throws {
+        service.forgetLocalFileTest()
+        let root = try HarnessExport.applicationSupportRoot()
+        let bookmark = DestinationSidecar.localFolderBookmark.url(in: root)
+        if FileManager.default.fileExists(atPath: bookmark.path) {
+            try FileManager.default.removeItem(at: bookmark)
+        }
+        if let snapshot = StatusSnapshotLocation.url(destinationID: "local-file"),
+           FileManager.default.fileExists(atPath: snapshot.path) {
+            try FileManager.default.removeItem(at: snapshot)
+        }
+        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
+    }
+}
