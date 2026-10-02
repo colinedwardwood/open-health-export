@@ -5,58 +5,8 @@ import AppServices
 import CoreDomain
 import SwiftUI
 
-// Interim screens for the shell (#43). Each is replaced by its own issue: Status by
-// #46, Destinations by #47, Data by #50, History by #51 and Settings by #52.
-
-struct StatusTabScreen: View {
-    @Environment(AppModel.self) private var model
-    @Environment(\.services) private var services
-
-    var body: some View {
-        List {
-            if model.needsSetup, model.disclosureAcknowledged {
-                Section {
-                    Button {
-                        model.resumeSetup()
-                    } label: {
-                        Label("Finish setup: choose where exports go", systemImage: "arrow.right.circle")
-                    }
-                    .accessibilityIdentifier("shell-finish-setup")
-                    .attentionCard(.attention)
-                }
-            }
-            Section {
-                ForEach(services.status.destinationStatusLines(), id: \.self) { line in
-                    Text(line)
-                }
-            } header: {
-                SectionTitle("Destinations")
-            }
-            Section {
-                Button(model.exporting ? "Exporting…" : "Export now") {
-                    Task { await model.exportNow() }
-                }
-                .disabled(model.exporting || !model.disclosureAcknowledged)
-                .accessibilityIdentifier("shell-export-now")
-                if let message = model.lastExportMessage {
-                    Text(message)
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("shell-export-result")
-                }
-            }
-        }
-        .navigationTitle("Status")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                NavigationLink(value: AppRoute.settings) {
-                    Image(systemName: "gearshape")
-                }
-                .accessibilityLabel("Settings")
-                .accessibilityIdentifier("shell-settings")
-            }
-        }
-    }
-}
+// Interim screens for the shell (#43). Each is replaced by its own issue:
+// Destinations by #47, Data by #50, History by #51 and Settings by #52.
 
 struct PlaceholderScreen: View {
     let title: String

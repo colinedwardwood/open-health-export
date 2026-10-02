@@ -70,6 +70,11 @@ public struct StatusService: Sendable {
 
     // MARK: Status screen
 
+    /// Every destination's snapshot, for the Status rows (#46).
+    public func destinationSnapshots() -> [DestinationStatusSnapshot] {
+        snapshots.readAll()
+    }
+
     public func destinationStatusLines() -> [String] {
         let all = snapshots.readAll()
         guard !all.isEmpty else { return [DestinationStatusLine.emptyCopy] }

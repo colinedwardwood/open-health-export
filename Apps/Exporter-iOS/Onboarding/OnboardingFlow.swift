@@ -54,7 +54,7 @@ private struct StepLayout<Content: View, Actions: View>: View {
                 if let message {
                     Text(message)
                         .font(.body)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 content
@@ -101,7 +101,7 @@ private struct WorkStatus: View {
                 ProgressView()
                 Text(label)
             }
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.secondaryText)
             .accessibilityElement(children: .combine)
         case let .failed(message):
             Label {
@@ -128,7 +128,7 @@ private struct Point: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title).font(.headline)
-                Text(detail).foregroundStyle(.secondary)
+                Text(detail).foregroundStyle(.secondaryText)
             }
             .fixedSize(horizontal: false, vertical: true)
         }
@@ -192,7 +192,7 @@ private struct TypesStep: View {
         } actions: {
             Text("\(model.selected.count) of \(model.types.count) types")
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.secondaryText)
                 .monospacedDigit()
             PrimaryButton(
                 title: "Continue",
@@ -234,7 +234,7 @@ private struct DestinationStep: View {
                             Text(model.folderName.map { "Folder: \($0)" }
                                 ?? "Choose a folder. Recommended for your first export.")
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.secondaryText)
                         }
                         Spacer()
                         Image(systemName: "chevron.right")
@@ -253,7 +253,7 @@ private struct DestinationStep: View {
                     systemImage: "lock.shield"
                 )
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.secondaryText)
             }
         } actions: {
             Button("Set up later") { model.setUpLater() }
@@ -292,7 +292,7 @@ private struct HowItWorksStep: View {
                 )
                 Text("This is not a medical device. It does not diagnose or treat anything.")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.secondaryText)
                     .accessibilityIdentifier("first-run-disclaimer")
             }
         } actions: {
@@ -313,7 +313,7 @@ private struct HealthAccessStep: View {
                     .accessibilityIdentifier("health-priming-types")
                 Text(HealthAuthorizationPriming.sheetFollows)
                 Text(HealthAuthorizationPriming.invisibility)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.secondaryText)
                 WorkStatus(work: model.work)
             }
             .fixedSize(horizontal: false, vertical: true)
@@ -350,13 +350,13 @@ private struct FirstExportStep: View {
                     }
                     if let folder = model.folderName {
                         Text("Open the \(folder) folder in Files to see it.")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.secondaryText)
                     }
                 } else if model.nothingCameBack {
                     Text("Your folder is set up, but Apple Health had nothing from the last seven days for the types you chose.")
                         .accessibilityIdentifier("onboarding-nothing-came-back")
                     Text("Types you turned off on Apple's screen stay empty. To change that, open the Health app, tap your profile, then Apps, then \(ProductName.display).")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.secondaryText)
                 } else if model.isWorking {
                     ProgressView(value: model.exportProgress) {
                         Text("Exporting…")

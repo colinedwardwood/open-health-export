@@ -6,7 +6,7 @@ import EnginePorts
 import Testing
 
 @Test func everyUserFacingErrorArchetypeHasFivePartsAndOwnedFixes() {
-    #expect(UserFacingErrorArchetype.allCases.count == 16)
+    #expect(UserFacingErrorArchetype.allCases.count == 18)
     for archetype in UserFacingErrorArchetype.allCases {
         let error = UserFacingErrorObject.make(
             archetype: archetype,

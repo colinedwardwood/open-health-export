@@ -104,6 +104,9 @@ final class OnboardingModel {
             )
             try await services.destinations.applyScope(scope, previousMetrics: [])
             _ = try await AppDestinationSetup.enableLocalFile(onProgress: nil)
+            // The person set this destination up just now; it is not a change for them
+            // to review, so Status doesn't open with "its identity changed".
+            try? services.status.acknowledgeDestinationChanges()
             destinationReady = true
             advance()
         } catch {
@@ -163,8 +166,9 @@ final class OnboardingModel {
             exportSummary = nothingCameBack ? nil : summary
             work = .idle
         } catch {
-            _ = await HarnessExport.notifyRunFailure(trigger: .manual)
-            work = .failed("The export didn't finish: \(error.localizedDescription)")
+            let label = await HarnessExport.notifyRunFailure(trigger: .manual)
+            let object = UserFacingFailure.object(for: error, destinationLabel: label ?? folderName ?? "your folder")
+            work = .failed("\(object.title). \(object.fix)")
         }
     }
 

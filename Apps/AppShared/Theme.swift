@@ -13,9 +13,19 @@ extension StatusTone {
         case .ok: Color("StatusOK")
         case .attention: Color("StatusAttention")
         case .blocked: Color("StatusBlocked")
-        case .neutral: .secondary
+        case .neutral: .secondaryText
         }
     }
+}
+
+extension Color {
+    /// Secondary text that passes 4.5:1. The system `.secondary` blends to about
+    /// 3.4:1 on white, which fails the contrast audit for small text (#46).
+    static let secondaryText = Color("TextSecondary")
+}
+
+extension ShapeStyle where Self == Color {
+    static var secondaryText: Color { Color.secondaryText }
 }
 
 extension DestinationDisplayState {

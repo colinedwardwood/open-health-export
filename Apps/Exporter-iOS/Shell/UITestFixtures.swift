@@ -24,6 +24,11 @@ enum UITestFixtures {
         if environment["OHE_RESET_SEEDED_SURFACES"] == "1" {
             try? HarnessExport.resetSeededSurfacesForUITests()
         }
+        // `OHE_SEED_DESTINATION_STATUS=<scenario>`: destination snapshots for Status,
+        // the same fixtures the harness cases use.
+        if let scenario = environment["OHE_SEED_DESTINATION_STATUS"] {
+            try? HarnessExport.seedDestinationStatusForUITests(scenario: scenario)
+        }
         if environment["OHE_RESET_FIRST_RUN"] == "1" {
             UserDefaults.standard.removeObject(forKey: SettingKey.disclosureAcknowledged.rawValue)
         }

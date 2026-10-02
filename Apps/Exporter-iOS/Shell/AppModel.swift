@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import AppServices
+import CoreDomain
 import EnginePorts
 import Foundation
 import Observation
@@ -15,7 +16,13 @@ final class AppModel {
     var selectedTab: AppTab = .status
     var paths: [AppTab: [AppRoute]] = [:]
     private(set) var exporting = false
+    /// Determinate progress while exporting, 0...1.
+    private(set) var exportProgress: Double = 0
+    /// The last Export now: a one-line result, or the five-part error (#46).
     private(set) var lastExportMessage: String?
+    private(set) var lastExportError: UserFacingErrorObject?
+    /// Bumped whenever destination state may have changed, so Status re-reads it.
+    private(set) var statusGeneration = 0
     /// #45: first run, shown over the app until the disclosure is acknowledged; a
     /// "Finish setup" row resumes it later.
     var onboarding: Onboarding?
@@ -63,6 +70,7 @@ final class AppModel {
     func finishOnboarding() {
         onboarding = nil
         setupGeneration += 1
+        refreshStatus()
     }
 
     var privacyGateEnabled: Bool {
@@ -123,6 +131,7 @@ final class AppModel {
 
     func sceneBecameActive() async {
         AppLifecycleCoordinator.shared.recordWake(.appForeground)
+        refreshStatus()
         await privacyGate.authenticateIfNeeded(enabled: privacyGateEnabled)
         try? await services.status.recordNotificationSuppressionIfNeeded(
             forcedDenied: AppStatus.seededNotificationsDenied
@@ -145,15 +154,28 @@ final class AppModel {
     func exportNow(trigger: RunTrigger = .manual) async {
         guard disclosureAcknowledged, !exporting else { return }
         exporting = true
-        defer { exporting = false }
+        exportProgress = 0
+        lastExportError = nil
+        defer {
+            exporting = false
+            refreshStatus()
+        }
         do {
-            // #46 replaces this with the Status screen's own export presentation.
-            let lines = try await HarnessExport.runOnePageEachMetric(trigger: trigger)
+            let lines = try await HarnessExport.runOnePageEachMetric(trigger: trigger) { current, total in
+                await MainActor.run {
+                    self.exportProgress = total > 0 ? Double(current) / Double(total) : 0
+                }
+            }
             lastExportMessage = lines.first ?? "Export finished."
         } catch {
             let label = await HarnessExport.notifyRunFailure(trigger: trigger)
-            lastExportMessage = "\(label ?? "Export") failed: \(error.localizedDescription)"
+            lastExportMessage = nil
+            lastExportError = UserFacingFailure.object(for: error, destinationLabel: label ?? "your destination")
         }
+    }
+
+    func refreshStatus() {
+        statusGeneration += 1
     }
 
     private func refreshAdvisory() async {

@@ -3070,6 +3070,17 @@
           }
         }
       }
+    },
+    "Choose where exports go": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose where exports go"
+          }
+        }
+      }
     }
   }
 }
