@@ -3411,6 +3411,61 @@
           }
         }
       }
+    },
+    "Automatic exports are on": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic exports are on"
+          }
+        }
+      }
+    },
+    "Unlock automatic exports": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlock automatic exports"
+          }
+        }
+      }
+    },
+    "Restore purchase": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore purchase"
+          }
+        }
+      }
+    },
+    "One payment, no subscription. Family Sharing is included. Security notices and updates are never part of the unlock.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One payment, no subscription. Family Sharing is included. Security notices and updates are never part of the unlock."
+          }
+        }
+      }
+    },
+    "Exports run when you tap Export now. Unlock automatic exports in Settings.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exports run when you tap Export now. Unlock automatic exports in Settings."
+          }
+        }
+      }
     }
   }
 }
