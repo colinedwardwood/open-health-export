@@ -154,6 +154,13 @@ private struct ExportNowControl: View {
             .controlSize(.large)
             .disabled(model.exporting)
             .accessibilityIdentifier("status-export-now")
+            if !PurchaseStore.shared.state.isUnlocked {
+                NavigationLink(value: AppRoute.settings) {
+                    Text("Exports run when you tap Export now. Unlock automatic exports in Settings.")
+                        .metadata()
+                }
+                .accessibilityIdentifier("status-unlock-note")
+            }
             if let error = model.lastExportError {
                 ErrorCard(error: error)
             } else if let message = model.lastExportMessage, !model.exporting {
