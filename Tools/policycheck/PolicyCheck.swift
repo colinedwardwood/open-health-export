@@ -115,7 +115,7 @@ struct PolicyCheck {
         // error's own description, which is a raw domain and code more often than not.
         // The harness and the views it still owns are replaced by #47 and #56.
         var rawErrorText: [String] = []
-        for folder in ["Shell", "Status", "Onboarding", "Destinations"] {
+        for folder in ["Shell", "Status", "Onboarding", "Destinations", "Purchase"] {
             let directory = apps.appendingPathComponent("Exporter-iOS/\(folder)")
             guard let files = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: nil)
             else { continue }
@@ -1905,8 +1905,10 @@ struct PolicyCheck {
     }
 
     static func checkSponsorGating(root: URL) throws {
+        // D-08b (#68): the paid unlock is not sponsorship. StoreKit is allowed, but only
+        // in the purchase adapter, so the gate can't spread; it may only gate automatic
+        // exports (AutomationGate, tested). Sponsor and donation gating stay forbidden.
         let forbidden = [
-            "storekit",
             "sponsor",
             "donat",
             "patron",
@@ -1952,6 +1954,18 @@ struct PolicyCheck {
                 hits.append("\(relative): \(token)")
             }
         }
+        let purchaseFolder = root.appendingPathComponent("Apps/Exporter-iOS/Purchase").path + "/"
+        for scanRoot in roots {
+            guard let files = FileManager.default.enumerator(at: scanRoot, includingPropertiesForKeys: nil)
+            else { continue }
+            for case let file as URL in files where file.pathExtension == "swift" {
+                guard !file.path.hasPrefix(purchaseFolder),
+                      let text = try? String(contentsOf: file, encoding: .utf8),
+                      text.contains("import StoreKit")
+                else { continue }
+                hits.append("\(file.path.replacingOccurrences(of: root.path + "/", with: "")): StoreKit outside Apps/Exporter-iOS/Purchase")
+            }
+        }
         if !hits.isEmpty {
             FileHandle.standardError.write(
                 Data(
@@ -1964,7 +1978,7 @@ struct PolicyCheck {
             )
             exit(1)
         }
-        print("policycheck no sponsor-gated feature or StoreKit reference: ok")
+        print("policycheck no sponsor gating; StoreKit only in the purchase adapter: ok")
     }
 
     static func checkHealthKitSymbolsStayInAdapter(sources: URL) throws {

@@ -60,7 +60,7 @@ struct NetworkSetupScreen: View {
             } header: {
                 SectionTitle("Server")
             } footer: {
-                Text(secretFooter)
+                SectionFooter(secretFooter)
             }
             if setup.kind == .mqtt {
                 Section {
@@ -87,7 +87,7 @@ struct NetworkSetupScreen: View {
                 } header: {
                     SectionTitle("Delivery")
                 } footer: {
-                    Text("Confirmed waits for the broker to acknowledge each export, so nothing is marked sent until it arrived.")
+                    SectionFooter("Confirmed waits for the broker to acknowledge each export, so nothing is marked sent until it arrived.")
                 }
                 Section {
                     ForEach(HomeAssistantDiscoveryPreview.entityNames(for: MetricCatalog.coreDaily), id: \.self) { name in
@@ -96,7 +96,7 @@ struct NetworkSetupScreen: View {
                 } header: {
                     SectionTitle("What you'll see in Home Assistant")
                 } footer: {
-                    Text("Home Assistant finds these sensors by itself through MQTT discovery, under one device. Each updates when an export arrives.")
+                    SectionFooter("Home Assistant finds these sensors by itself through MQTT discovery, under one device. Each updates when an export arrives.")
                 }
                 .accessibilityIdentifier("network-discovery-preview")
             }
@@ -112,7 +112,7 @@ struct NetworkSetupScreen: View {
                 } header: {
                     SectionTitle("Example automation")
                 } footer: {
-                    Text("Paste this into a new automation in Home Assistant (Edit in YAML), then use the same webhook ID here.")
+                    SectionFooter("Paste this into a new automation in Home Assistant (Edit in YAML), then use the same webhook ID here.")
                 }
             }
             if setup.stage != .form || setup.error != nil || setup.checklist.steps.contains(where: { $0.state != .pending }) {

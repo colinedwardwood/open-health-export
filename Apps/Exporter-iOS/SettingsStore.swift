@@ -13,6 +13,8 @@ enum SettingKey: String, CaseIterable {
     case advisoryLastVerifiedEpoch = "ohe.advisoryLastVerifiedEpoch"
     case appPrivacyGateEnabled = "ohe.appPrivacyGateEnabled"
     case backfillMode = "ohe.backfillMode"
+    /// #68: the last unlock state StoreKit reported, for background wakes and offline.
+    case unlockLastKnown = "ohe.unlock.lastKnown"
     case backgroundSubmitFailure = "ohe.backgroundSubmitFailure"
     case browserDemoMode = "ohe.browserDemoMode"
     case browserOnlyWithData = "ohe.browserOnlyWithData"

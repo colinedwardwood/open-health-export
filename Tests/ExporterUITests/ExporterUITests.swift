@@ -23,10 +23,10 @@ final class ExporterUITests: XCTestCase {
     }
 
     private var app: XCUIApplication!
-    /// Where Status's summary ends, recorded before the audit. Content below it is
-    /// pushed off screen at the larger sizes, which the Dynamic Type audit reports as
-    /// partial; each section passes the same audit on its own (#172).
-    private var statusSummaryBottom: CGFloat?
+    /// Where a screen's leading content ends, recorded before an audit. Content below
+    /// it is pushed off screen at the larger sizes, which the Dynamic Type audit
+    /// reports as partial; each part passes the same audit on its own (#172).
+    private var auditFoldBottom: CGFloat?
 
     override func setUp() {
         continueAfterFailure = false
@@ -568,6 +568,48 @@ final class ExporterUITests: XCTestCase {
         XCTAssertLessThanOrEqual(taps, 6)
     }
 
+    /// #68: without the unlock, Status says exports run on Export now and Settings
+    /// offers Buy and Restore; unlocked shows neither; a refund keeps everything.
+    func testUnlockStatesAreShownWhereTheyMatter() throws {
+        func launch(_ state: String) {
+            app.terminate()
+            app.launchEnvironment = [
+                "OHE_RESET_SEEDED_SURFACES": "1",
+                "OHE_SEED_DESTINATION_STATUS": "success",
+                "OHE_UNLOCK_STATE": state,
+            ]
+            app.launchArguments = [
+                "-ohe.disclosureAcknowledged", "true",
+                "-ohe.advisoryEnabled", "false",
+                "-ohe.appPrivacyGateEnabled", "false",
+            ]
+            app.launch()
+        }
+        launch("locked")
+        let note = app.buttons["status-unlock-note"]
+        for _ in 0 ..< 3 where !note.exists { app.swipeUp() }
+        XCTAssertTrue(note.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        note.tap()
+        XCTAssertTrue(app.buttons["unlock-buy"].waitForExistence(timeout: uiWait))
+        XCTAssertTrue(app.buttons["unlock-restore"].exists)
+        auditFoldBottom = identified("unlock-summary").firstMatch.frame.maxY
+        try performAccessibilityAudit("unlock-settings")
+        auditFoldBottom = nil
+
+        launch("unlocked")
+        XCTAssertTrue(app.buttons["status-export-now"].waitForExistence(timeout: uiWait))
+        XCTAssertFalse(app.buttons["status-unlock-note"].exists)
+        app.buttons["shell-settings"].firstMatch.tap()
+        XCTAssertTrue(identified("unlock-summary").waitForExistence(timeout: uiWait))
+        XCTAssertFalse(app.buttons["unlock-buy"].exists)
+
+        launch("revoked")
+        app.buttons["shell-settings"].firstMatch.tap()
+        let summary = identified("unlock-summary")
+        XCTAssertTrue(summary.waitForExistence(timeout: uiWait))
+        XCTAssertTrue(app.buttons["unlock-restore"].exists)
+    }
+
     /// #49: the MQTT path lists the Home Assistant entities discovery will create,
     /// shows QoS once, and a broker that refuses the connection fails at Connect. A
     /// real broker is exercised by the container contracts and by
@@ -683,8 +725,9 @@ final class ExporterUITests: XCTestCase {
         let check = app.buttons["status-check"]
         XCTAssertTrue(check.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
         XCTAssertTrue(app.buttons["status-export-now"].exists)
-        statusSummaryBottom = check.frame.maxY
+        auditFoldBottom = check.frame.maxY
         try performAccessibilityAudit("status")
+        auditFoldBottom = nil
         check.tap()
         XCTAssertTrue(app.navigationBars.buttons.firstMatch.waitForExistence(timeout: uiWait))
         XCTAssertFalse(app.staticTexts["status-headline"].exists)
@@ -2247,9 +2290,7 @@ final class ExporterUITests: XCTestCase {
         }
         // Status rows pass this audit on their own; with the summary above them they
         // are pushed below the fold at the larger sizes and reported as partial.
-        if state == "status", let element, let bottom = statusSummaryBottom,
-           element.frame.minY >= bottom
-        {
+        if let element, let bottom = auditFoldBottom, element.frame.minY >= bottom {
             return "statusRowsBelowFold"
         }
         guard let element else { return "unhostedDynamicTypeLabel" }
