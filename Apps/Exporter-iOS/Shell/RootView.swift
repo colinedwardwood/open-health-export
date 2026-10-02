@@ -27,7 +27,7 @@ struct RootView: View {
                     stack(.data) { PlaceholderScreen(title: "Data") }
                 }
                 Tab("Destinations", systemImage: "arrow.right.to.line", value: AppTab.destinations) {
-                    stack(.destinations) { PlaceholderScreen(title: "Destinations") }
+                    stack(.destinations) { DestinationsScreen() }
                 }
                 Tab("History", systemImage: "clock", value: AppTab.history) {
                     stack(.history) { PlaceholderScreen(title: "History") }
@@ -83,7 +83,7 @@ private struct RouteScreen: View {
     var body: some View {
         switch route {
         case let .destination(id):
-            DestinationErrorScreen(destinationID: id, archetype: nil)
+            DestinationDetailScreen(destinationID: id)
         case let .destinationError(id, archetype):
             DestinationErrorScreen(destinationID: id, archetype: archetype)
         case .settings:

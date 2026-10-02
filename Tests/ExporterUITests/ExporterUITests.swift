@@ -527,6 +527,47 @@ final class ExporterUITests: XCTestCase {
         }
     }
 
+    /// #47: a Files destination is added from a clean state in six taps or fewer, each
+    /// test step shows its state, and Save waits for the test to pass.
+    func testFilesDestinationIsAddedAfterItsTestPasses() throws {
+        app.terminate()
+        app.launchEnvironment = [
+            "OHE_RESET_SEEDED_SURFACES": "1",
+            "OHE_SEED_LOCAL_EXPORT_FOLDER": "1",
+        ]
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launch()
+        var taps = 0
+        func tap(_ element: XCUIElement) {
+            XCTAssertTrue(element.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+            element.tap()
+            taps += 1
+        }
+        tap(app.tabBars.buttons["Destinations"])
+        tap(app.buttons["destinations-add"])
+        tap(app.buttons["add-files"])
+        let save = app.buttons["files-save"]
+        XCTAssertTrue(save.waitForExistence(timeout: uiWait))
+        XCTAssertFalse(save.isEnabled)
+        tap(app.buttons["files-choose-folder"])
+        let lastStep = identified("test-step-confirmBytes")
+        XCTAssertTrue(lastStep.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertTrue(
+            NSPredicate(format: "isEnabled == true").evaluate(with: save)
+                || save.waitForEnabled(timeout: 30),
+            "Save never enabled: \(lastStep.value ?? "")"
+        )
+        XCTAssertEqual(lastStep.value as? String, "Passed")
+        try performAccessibilityAudit("files-setup")
+        tap(save)
+        XCTAssertTrue(app.buttons["destinations-row-local-file"].waitForExistence(timeout: uiWait))
+        XCTAssertLessThanOrEqual(taps, 6)
+    }
+
     /// #46: an overdue destination is named in the headline, its row shows the
     /// widget's words, and the one action opens it. Identifiers, not copy.
     func testStatusNamesTheOverdueDestinationAndOpensIt() throws {
@@ -2737,5 +2778,17 @@ private struct AccessibilityChromeSnapshot {
         let tabBar = app.tabBars.firstMatch
         tabBarFrame = tabBar.exists ? tabBar.frame : nil
         window = app.windows.firstMatch.frame
+    }
+}
+
+private extension XCUIElement {
+    /// Polls until the element is enabled; XCUIElement has no built-in wait for it.
+    func waitForEnabled(timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if exists, isEnabled { return true }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        }
+        return exists && isEnabled
     }
 }
