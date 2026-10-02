@@ -46,7 +46,7 @@ struct DestinationErrorScreen: View {
                         }
                         .accessibilityIdentifier("shell-error-request-alerts")
                     } footer: {
-                        Text("Right now these arrive quietly in Notification Centre.")
+                        SectionFooter("Right now these arrive quietly in Notification Centre.")
                     }
                 }
             } else {
@@ -65,6 +65,7 @@ struct SettingsScreen: View {
 
     var body: some View {
         List {
+            UnlockSection()
             Section {
                 Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
             }

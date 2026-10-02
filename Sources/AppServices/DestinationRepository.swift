@@ -125,6 +125,9 @@ public struct DestinationRepository: Sendable {
     private let scopes: any DestinationScopeStorage
     private let folder: any LocalExportFolderStorage
     private let now: @Sendable () -> Date
+    /// D-08b (#68): whether runs that start on their own are unlocked. Defaults to
+    /// unlocked, which is what a source build and every test that isn't about it want.
+    private let unlockState: @Sendable () -> UnlockState
 
     public init(
         records: any DestinationRecordStorage,
@@ -132,7 +135,8 @@ public struct DestinationRepository: Sendable {
         snapshots: any DestinationSnapshotStorage,
         scopes: any DestinationScopeStorage,
         folder: any LocalExportFolderStorage,
-        now: @escaping @Sendable () -> Date
+        now: @escaping @Sendable () -> Date,
+        unlockState: @escaping @Sendable () -> UnlockState = { .sourceBuild }
     ) {
         self.records = records
         self.preferences = preferences
@@ -140,6 +144,7 @@ public struct DestinationRepository: Sendable {
         self.scopes = scopes
         self.folder = folder
         self.now = now
+        self.unlockState = unlockState
     }
 
     // MARK: Pure rules
@@ -275,8 +280,11 @@ public struct DestinationRepository: Sendable {
         }
     }
 
+    /// The destination's own role, and the unlock for runs that start on their own:
+    /// without it, only Export now and the Control Centre button send anything.
     public func allowsExport(_ destinationID: String, trigger: RunTrigger) -> Bool {
         exportRole(destinationID).allows(trigger)
+            && AutomationGate.allows(trigger, state: unlockState())
     }
 
     /// Whether this trigger would send anything: some destination is enabled and its
