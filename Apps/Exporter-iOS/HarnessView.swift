@@ -388,6 +388,12 @@ struct HarnessView: View {
             #endif
             Task {
                 #if DEBUG
+                // Run history accumulates across UI cases in one simulator. Cases that
+                // render the whole diagnostic bundle start from a wiped install, or the
+                // bundle grows to thousands of lines and the case can't reach its end.
+                if ProcessInfo.processInfo.environment["OHE_WIPE_ON_LAUNCH"] == "1" {
+                    try? await HarnessExport.wipeEverything()
+                }
                 if ProcessInfo.processInfo.environment["OHE_RESET_SEEDED_SURFACES"] == "1",
                    seedHold == nil
                 {
