@@ -4,6 +4,7 @@
 import AppServices
 import CoreDomain
 import DestinationTrust
+import MetricCatalog
 import NetEgress
 import SwiftUI
 import Watchdog
@@ -43,16 +44,61 @@ struct NetworkSetupScreen: View {
                         .metadata()
                         .accessibilityIdentifier("network-address-check")
                 }
+                if setup.kind == .mqtt {
+                    TextField("Username (optional)", text: $setup.username)
+                        .textContentType(.username)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .accessibilityIdentifier("network-username")
+                }
                 SecureField(secretPrompt, text: $setup.secret)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .accessibilityIdentifier("network-secret")
-                Toggle("Allow plain HTTP (unsafe)", isOn: $setup.allowsPlainHTTP)
+                Toggle(setup.kind == .mqtt ? "Allow unencrypted (unsafe)" : "Allow plain HTTP (unsafe)", isOn: $setup.allowsPlainHTTP)
                     .accessibilityIdentifier("network-plain-http")
             } header: {
                 SectionTitle("Server")
             } footer: {
                 Text(secretFooter)
+            }
+            if setup.kind == .mqtt {
+                Section {
+                    Picker("Delivery", selection: $setup.qos) {
+                        Text("Confirmed (QoS 1)").tag(UInt8(1))
+                        Text("Best effort (QoS 0)").tag(UInt8(0))
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("network-qos")
+                    DisclosureGroup("Advanced") {
+                        LabeledContent("Client ID") {
+                            TextField("Client ID", text: $setup.clientID)
+                                .multilineTextAlignment(.trailing)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                        }
+                        LabeledContent("Topic") {
+                            TextField("Topic", text: $setup.topic)
+                                .multilineTextAlignment(.trailing)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                        }
+                    }
+                } header: {
+                    SectionTitle("Delivery")
+                } footer: {
+                    Text("Confirmed waits for the broker to acknowledge each export, so nothing is marked sent until it arrived.")
+                }
+                Section {
+                    ForEach(HomeAssistantDiscoveryPreview.entityNames(for: MetricCatalog.coreDaily), id: \.self) { name in
+                        Text(name)
+                    }
+                } header: {
+                    SectionTitle("What you'll see in Home Assistant")
+                } footer: {
+                    Text("Home Assistant finds these sensors by itself through MQTT discovery, under one device. Each updates when an export arrives.")
+                }
+                .accessibilityIdentifier("network-discovery-preview")
             }
             if setup.kind == .homeAssistantWebhook {
                 Section {
@@ -78,7 +124,7 @@ struct NetworkSetupScreen: View {
                 ConfirmServerSection(card: card, phrase: $setup.publicPhrase)
             }
         }
-        .navigationTitle(setup.kind == .homeAssistantWebhook ? "Home Assistant webhook" : "Your own server")
+        .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
@@ -109,18 +155,36 @@ struct NetworkSetupScreen: View {
         }
     }
 
+    private var title: LocalizedStringKey {
+        switch setup.kind {
+        case .mqtt: "Home Assistant sensors"
+        case .homeAssistantWebhook: "Home Assistant webhook"
+        default: "Your own server"
+        }
+    }
+
     private var addressPrompt: LocalizedStringKey {
-        setup.kind == .homeAssistantWebhook ? "https://homeassistant.local:8123" : "https://example.com/ingest"
+        switch setup.kind {
+        case .mqtt: "mqtts://homeassistant.local:8883"
+        case .homeAssistantWebhook: "https://homeassistant.local:8123"
+        default: "https://example.com/ingest"
+        }
     }
 
     private var secretPrompt: LocalizedStringKey {
-        setup.kind == .homeAssistantWebhook ? "Webhook ID" : "Token (optional)"
+        switch setup.kind {
+        case .mqtt: "Password (optional)"
+        case .homeAssistantWebhook: "Webhook ID"
+        default: "Token (optional)"
+        }
     }
 
     private var secretFooter: LocalizedStringKey {
-        setup.kind == .homeAssistantWebhook
-            ? "The webhook ID works like a password. It's kept in the keychain and never shown again."
-            : "Sent as a bearer token. It's kept in the keychain and never shown again."
+        switch setup.kind {
+        case .mqtt: "Use the login you created for the Mosquitto add-on. The password is kept in the keychain and never shown again."
+        case .homeAssistantWebhook: "The webhook ID works like a password. It's kept in the keychain and never shown again."
+        default: "Sent as a bearer token. It's kept in the keychain and never shown again."
+        }
     }
 }
 

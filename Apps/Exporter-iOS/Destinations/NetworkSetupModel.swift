@@ -27,8 +27,14 @@ final class NetworkSetupModel {
 
     let kind: DestinationKind
     var address = ""
+    /// The token (HTTPS), webhook ID (Home Assistant) or password (MQTT).
     var secret = ""
     var allowsPlainHTTP = false
+    // MQTT (#49). QoS 1 waits for the broker to acknowledge each export.
+    var username = ""
+    var qos: UInt8 = 1
+    var clientID = "ohe-iphone"
+    var topic = "ohe/health"
     var publicPhrase = ""
     private(set) var stage: Stage = .form
     private(set) var checklist = DestinationTestChecklist.https(encrypted: true)
@@ -42,7 +48,15 @@ final class NetworkSetupModel {
     }
 
     var addressCheck: NetworkAddressCheck {
-        NetworkAddressCheck.check(address, allowsPlainHTTP: allowsPlainHTTP)
+        kind == .mqtt
+            ? NetworkAddressCheck.checkBroker(address, allowsUnencrypted: allowsPlainHTTP)
+            : NetworkAddressCheck.check(address, allowsPlainHTTP: allowsPlainHTTP)
+    }
+
+    private func freshChecklist(checksCertificate: Bool) -> DestinationTestChecklist {
+        kind == .mqtt
+            ? .mqtt(encrypted: addressCheck.encrypted, checksCertificate: checksCertificate, confirmsDelivery: qos > 0)
+            : .https(encrypted: addressCheck.encrypted)
     }
 
     /// Home Assistant needs its webhook ID; an HTTPS token is optional.
@@ -57,10 +71,11 @@ final class NetworkSetupModel {
             || publicPhrase.trimmingCharacters(in: .whitespaces) == ConfirmationCopy.publicAddressPhrase
     }
 
-    func test(confirmedFingerprint: String? = nil) async {
+    func test(confirmed: TLSIdentity? = nil) async {
+        let confirmedFingerprint = confirmed?.leafSPKISha256
         error = nil
-        checklist = .https(encrypted: addressCheck.encrypted)
-        checklist.start(.resolveHost)
+        checklist = freshChecklist(checksCertificate: confirmed != nil)
+        if let first = checklist.steps.first?.step { checklist.start(first) }
         stage = .testing
         let progress: DestinationTestProgress = { _, _, step in
             Task { @MainActor in self.checklist.start(step) }
@@ -70,6 +85,21 @@ final class NetworkSetupModel {
         do {
             let card: DestinationConfirmationCard
             switch kind {
+            case .mqtt:
+                card = try await AppDestinationSetup.prepareMQTT(
+                    urlString: address,
+                    allowInsecure: allowsPlainHTTP,
+                    clientID: clientID.trimmingCharacters(in: .whitespaces),
+                    topic: topic.trimmingCharacters(in: .whitespaces),
+                    clientPKCS12: nil,
+                    clientPKCS12Password: nil,
+                    username: username.isEmpty ? nil : username,
+                    password: secret.isEmpty ? nil : secret,
+                    qos: qos,
+                    importedLocalIdentifier: nil,
+                    confirmedIdentity: confirmed,
+                    onProgress: progress
+                )
             case .homeAssistantWebhook:
                 card = try await AppDestinationSetup.prepareHomeAssistantWebhook(
                     baseURLString: address,
@@ -105,7 +135,7 @@ final class NetworkSetupModel {
             if case let SetupError.testFailed(step) = error {
                 checklist.finish(failedAt: step)
             } else {
-                checklist.finish(failedAt: running ?? .resolveHost)
+                checklist.finish(failedAt: running ?? checklist.steps.first?.step)
             }
             self.error = UserFacingFailure.object(for: error, destinationLabel: addressCheck.host ?? "the server")
             stage = .form
@@ -113,12 +143,16 @@ final class NetworkSetupModel {
     }
 
     func trustCertificate(_ identity: TLSIdentity) async {
-        await test(confirmedFingerprint: identity.leafSPKISha256)
+        await test(confirmed: identity)
     }
 
     func cancel() async {
         if case .confirmServer = stage {
-            await AppDestinationSetup.service.cancelHTTPS()
+            if kind == .mqtt {
+                await AppDestinationSetup.service.cancelMQTT()
+            } else {
+                await AppDestinationSetup.service.cancelHTTPS()
+            }
         }
         checklist.reset()
         stage = .form
@@ -138,7 +172,11 @@ final class NetworkSetupModel {
                 )
                 try await services.destinations.applyScope(scope, previousMetrics: [])
             }
-            _ = try await AppDestinationSetup.service.confirmHTTPS()
+            if kind == .mqtt {
+                _ = try await AppDestinationSetup.service.confirmMQTT()
+            } else {
+                _ = try await AppDestinationSetup.service.confirmHTTPS()
+            }
             try? services.status.acknowledgeDestinationChanges()
             secret = ""
             AppLifecycleCoordinator.shared.stopObservers()
