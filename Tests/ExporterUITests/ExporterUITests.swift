@@ -568,6 +568,50 @@ final class ExporterUITests: XCTestCase {
         XCTAssertLessThanOrEqual(taps, 6)
     }
 
+    /// #48: the webhook's caveat and example automation come before configuration,
+    /// the address is said back, and a server that can't be found fails at its step.
+    func testHomeAssistantWebhookWarnsFirstAndNamesTheFailedStep() throws {
+        app.terminate()
+        app.launchEnvironment = ["OHE_RESET_SEEDED_SURFACES": "1"]
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launch()
+        app.tabBars.buttons["Destinations"].tap()
+        let add = app.buttons["destinations-add"]
+        XCTAssertTrue(add.waitForExistence(timeout: uiWait))
+        add.tap()
+        let webhook = app.buttons["add-homeAssistantWebhook"]
+        XCTAssertTrue(webhook.waitForExistence(timeout: uiWait))
+        webhook.tap()
+        XCTAssertTrue(identified("network-caveat").waitForExistence(timeout: uiWait))
+        XCTAssertTrue(identified("network-example-yaml").exists)
+        let test = app.buttons["network-test"]
+        XCTAssertFalse(test.isEnabled)
+        let address = app.textFields["network-address"]
+        type("https://ohe-ui-test.invalid", into: address)
+        XCTAssertTrue(identified("network-address-check").waitForExistence(timeout: uiWait))
+        let secret = app.secureTextFields["network-secret"]
+        secret.tap()
+        secret.typeText("ui-test-webhook")
+        dismissKeyboard()
+        XCTAssertTrue(test.waitForEnabled(timeout: uiWait))
+        test.tap()
+        // The test steps sit below the example automation.
+        let step = identified("test-step-resolveHost")
+        for _ in 0 ..< 6 where !step.exists {
+            app.swipeUp()
+        }
+        XCTAssertTrue(step.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        let failed = NSPredicate(format: "value == %@", "Failed")
+        expectation(for: failed, evaluatedWith: step)
+        waitForExpectations(timeout: 60)
+        XCTAssertTrue(identified("test-error").exists)
+        XCTAssertTrue(app.buttons["test-again"].exists)
+    }
+
     /// #46: an overdue destination is named in the headline, its row shows the
     /// widget's words, and the one action opens it. Identifiers, not copy.
     func testStatusNamesTheOverdueDestinationAndOpensIt() throws {

@@ -84,7 +84,8 @@ struct AddDestinationFlow: View {
                         NavigationLink {
                             switch kind {
                             case .files: FilesSetupScreen { dismiss() }
-                            default: EmptyView()
+                            case .https, .homeAssistantWebhook: NetworkSetupScreen(kind: kind) { dismiss() }
+                            case .mqtt: EmptyView()
                             }
                         } label: {
                             VStack(alignment: .leading, spacing: 3) {
@@ -111,9 +112,9 @@ struct AddDestinationFlow: View {
     static func title(_ kind: DestinationKind) -> LocalizedStringKey {
         switch kind {
         case .files: "Files on \(DeviceNoun.thisDevice)"
-        case .homeAssistant: "Home Assistant"
-        case .mqtt: "MQTT broker"
-        case .https: "Your own server"
+        case .https: "Your own server (HTTPS)"
+        case .homeAssistantWebhook: "Home Assistant webhook (advanced)"
+        case .mqtt: "Home Assistant sensors (MQTT)"
         }
     }
 }
