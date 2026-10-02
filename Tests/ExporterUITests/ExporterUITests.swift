@@ -527,6 +527,141 @@ final class ExporterUITests: XCTestCase {
         }
     }
 
+    /// #47: a Files destination is added from a clean state in six taps or fewer, each
+    /// test step shows its state, and Save waits for the test to pass.
+    func testFilesDestinationIsAddedAfterItsTestPasses() throws {
+        app.terminate()
+        app.launchEnvironment = [
+            "OHE_RESET_SEEDED_SURFACES": "1",
+            "OHE_SEED_LOCAL_EXPORT_FOLDER": "1",
+        ]
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launch()
+        var taps = 0
+        func tap(_ element: XCUIElement) {
+            XCTAssertTrue(element.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+            element.tap()
+            taps += 1
+        }
+        tap(app.tabBars.buttons["Destinations"])
+        tap(app.buttons["destinations-add"])
+        tap(app.buttons["add-files"])
+        let save = app.buttons["files-save"]
+        XCTAssertTrue(save.waitForExistence(timeout: uiWait))
+        XCTAssertFalse(save.isEnabled)
+        tap(app.buttons["files-choose-folder"])
+        let lastStep = identified("test-step-confirmBytes")
+        XCTAssertTrue(lastStep.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertTrue(
+            NSPredicate(format: "isEnabled == true").evaluate(with: save)
+                || save.waitForEnabled(timeout: 30),
+            "Save never enabled: \(lastStep.value ?? "")"
+        )
+        XCTAssertEqual(lastStep.value as? String, "Passed")
+        try performAccessibilityAudit("files-setup")
+        tap(save)
+        XCTAssertTrue(app.buttons["destinations-row-local-file"].waitForExistence(timeout: uiWait))
+        XCTAssertLessThanOrEqual(taps, 6)
+    }
+
+    /// #49: the MQTT path lists the Home Assistant entities discovery will create,
+    /// shows QoS once, and a broker that refuses the connection fails at Connect. A
+    /// real broker is exercised by the container contracts and by
+    /// OHE_UI_MQTT_BROKER when a local Mosquitto is available.
+    func testMQTTShowsTheEntitiesItWillCreateAndNamesTheFailedStep() throws {
+        app.terminate()
+        app.launchEnvironment = ["OHE_RESET_SEEDED_SURFACES": "1"]
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launch()
+        app.tabBars.buttons["Destinations"].tap()
+        let add = app.buttons["destinations-add"]
+        XCTAssertTrue(add.waitForExistence(timeout: uiWait))
+        add.tap()
+        let mqtt = app.buttons["add-mqtt"]
+        XCTAssertTrue(mqtt.waitForExistence(timeout: uiWait))
+        mqtt.tap()
+        let broker = ProcessInfo.processInfo.environment["OHE_UI_MQTT_BROKER"]
+        type(broker ?? "mqtt://127.0.0.1:1", into: app.textFields["network-address"])
+        dismissKeyboard()
+        let plain = app.switches["network-plain-http"]
+        XCTAssertTrue(plain.waitForExistence(timeout: uiWait))
+        if plain.value as? String != "1" { plain.switches.firstMatch.tap() }
+        XCTAssertEqual(app.segmentedControls.count, 1, "QoS should appear once")
+        let test = app.buttons["network-test"]
+        XCTAssertTrue(test.waitForEnabled(timeout: uiWait))
+        test.tap()
+        if broker != nil {
+            let card = identified("network-confirm-card")
+            for _ in 0 ..< 8 where !card.exists { app.swipeUp() }
+            XCTAssertTrue(card.waitForExistence(timeout: 60), visibleIdentifiers().joined(separator: ","))
+            let save = app.buttons["network-save"]
+            XCTAssertTrue(save.waitForEnabled(timeout: uiWait))
+            save.tap()
+            XCTAssertTrue(app.buttons["destinations-row-mqtt"].waitForExistence(timeout: uiWait))
+            return
+        }
+        let step = identified("test-step-connect")
+        for _ in 0 ..< 8 where !step.exists { app.swipeUp() }
+        XCTAssertTrue(step.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        expectation(for: NSPredicate(format: "value == %@", "Failed"), evaluatedWith: step)
+        waitForExpectations(timeout: 60)
+        let error = identified("test-error")
+        for _ in 0 ..< 4 where !error.exists { app.swipeUp() }
+        XCTAssertTrue(error.waitForExistence(timeout: uiWait))
+    }
+
+    /// #48: the webhook's caveat and example automation come before configuration,
+    /// the address is said back, and a server that can't be found fails at its step.
+    func testHomeAssistantWebhookWarnsFirstAndNamesTheFailedStep() throws {
+        app.terminate()
+        app.launchEnvironment = ["OHE_RESET_SEEDED_SURFACES": "1"]
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launch()
+        app.tabBars.buttons["Destinations"].tap()
+        let add = app.buttons["destinations-add"]
+        XCTAssertTrue(add.waitForExistence(timeout: uiWait))
+        add.tap()
+        let webhook = app.buttons["add-homeAssistantWebhook"]
+        XCTAssertTrue(webhook.waitForExistence(timeout: uiWait))
+        webhook.tap()
+        XCTAssertTrue(identified("network-caveat").waitForExistence(timeout: uiWait))
+        XCTAssertTrue(identified("network-example-yaml").exists)
+        let test = app.buttons["network-test"]
+        XCTAssertFalse(test.isEnabled)
+        let address = app.textFields["network-address"]
+        type("https://ohe-ui-test.invalid", into: address)
+        XCTAssertTrue(identified("network-address-check").waitForExistence(timeout: uiWait))
+        let secret = app.secureTextFields["network-secret"]
+        secret.tap()
+        secret.typeText("ui-test-webhook")
+        dismissKeyboard()
+        XCTAssertTrue(test.waitForEnabled(timeout: uiWait))
+        test.tap()
+        // The test steps sit below the example automation.
+        let step = identified("test-step-resolveHost")
+        for _ in 0 ..< 6 where !step.exists {
+            app.swipeUp()
+        }
+        XCTAssertTrue(step.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        let failed = NSPredicate(format: "value == %@", "Failed")
+        expectation(for: failed, evaluatedWith: step)
+        waitForExpectations(timeout: 60)
+        XCTAssertTrue(identified("test-error").exists)
+        XCTAssertTrue(app.buttons["test-again"].exists)
+    }
+
     /// #46: an overdue destination is named in the headline, its row shows the
     /// widget's words, and the one action opens it. Identifiers, not copy.
     func testStatusNamesTheOverdueDestinationAndOpensIt() throws {
@@ -2737,5 +2872,17 @@ private struct AccessibilityChromeSnapshot {
         let tabBar = app.tabBars.firstMatch
         tabBarFrame = tabBar.exists ? tabBar.frame : nil
         window = app.windows.firstMatch.frame
+    }
+}
+
+private extension XCUIElement {
+    /// Polls until the element is enabled; XCUIElement has no built-in wait for it.
+    func waitForEnabled(timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if exists, isEnabled { return true }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        }
+        return exists && isEnabled
     }
 }
