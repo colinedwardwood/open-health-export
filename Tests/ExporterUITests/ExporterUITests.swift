@@ -628,6 +628,9 @@ final class ExporterUITests: XCTestCase {
     }
 
     func testDiagnosticShareExistsOnlyPastTheBundlesLastLine() {
+        app.terminate()
+        app.launchEnvironment["OHE_WIPE_ON_LAUNCH"] = "1"
+        app.launch()
         enterControls()
         let build = scrollSettings(app.buttons["diagnostic-build"])
         XCTAssertFalse(app.buttons["diagnostic-share"].exists)
@@ -728,6 +731,7 @@ final class ExporterUITests: XCTestCase {
         ]
         // Cleared rather than overridden, so the app's own write is what dismisses it.
         app.launchEnvironment["OHE_SEED_SHARE_ACK"] = "clear"
+        app.launchEnvironment["OHE_WIPE_ON_LAUNCH"] = "1"
         app.launch()
         enterControls()
         scrollSettings(app.buttons["diagnostic-build"]).tap()
@@ -764,6 +768,8 @@ final class ExporterUITests: XCTestCase {
         // nag, and people learn to tap through it.
         app.terminate()
         app.launchEnvironment["OHE_SEED_SHARE_ACK"] = "keep"
+        // A wipe here would erase the acknowledgement this relaunch is checking.
+        app.launchEnvironment["OHE_WIPE_ON_LAUNCH"] = nil
         app.launch()
         enterControls()
         scrollSettings(app.buttons["diagnostic-build"]).tap()
