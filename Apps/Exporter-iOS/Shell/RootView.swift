@@ -24,13 +24,13 @@ struct RootView: View {
                     stack(.status) { StatusScreen() }
                 }
                 Tab("Data", systemImage: "chart.bar", value: AppTab.data) {
-                    stack(.data) { PlaceholderScreen(title: "Data") }
+                    stack(.data) { DataScreen() }
                 }
                 Tab("Destinations", systemImage: "arrow.right.to.line", value: AppTab.destinations) {
                     stack(.destinations) { DestinationsScreen() }
                 }
                 Tab("History", systemImage: "clock", value: AppTab.history) {
-                    stack(.history) { PlaceholderScreen(title: "History") }
+                    stack(.history) { HistoryScreen() }
                 }
             }
             .tabViewStyle(.sidebarAdaptable)

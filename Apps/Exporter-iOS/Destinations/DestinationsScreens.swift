@@ -84,7 +84,7 @@ struct AddDestinationFlow: View {
                         NavigationLink {
                             switch kind {
                             case .files: FilesSetupScreen { dismiss() }
-                            default: EmptyView()
+                            case .https, .homeAssistantWebhook, .mqtt: NetworkSetupScreen(kind: kind) { dismiss() }
                             }
                         } label: {
                             VStack(alignment: .leading, spacing: 3) {
@@ -95,7 +95,7 @@ struct AddDestinationFlow: View {
                         .accessibilityIdentifier("add-\(kind.rawValue)")
                     }
                 } footer: {
-                    Text("Data goes straight from \(DeviceNoun.thisDevice) to the destination you set up. KeepMyMetrics never sees it.")
+                    SectionFooter("Data goes straight from \(DeviceNoun.thisDevice) to the destination you set up. KeepMyMetrics never sees it.")
                 }
             }
             .navigationTitle("Add destination")
@@ -111,9 +111,9 @@ struct AddDestinationFlow: View {
     static func title(_ kind: DestinationKind) -> LocalizedStringKey {
         switch kind {
         case .files: "Files on \(DeviceNoun.thisDevice)"
-        case .homeAssistant: "Home Assistant"
-        case .mqtt: "MQTT broker"
-        case .https: "Your own server"
+        case .https: "Your own server (HTTPS)"
+        case .homeAssistantWebhook: "Home Assistant webhook (advanced)"
+        case .mqtt: "Home Assistant sensors (MQTT, recommended)"
         }
     }
 }
@@ -141,7 +141,7 @@ struct FilesSetupScreen: View {
                 .disabled(setup.testing)
                 .accessibilityIdentifier("files-choose-folder")
             } footer: {
-                Text("Exports are written as JSON Lines files. A folder in iCloud Drive syncs your health data to iCloud.")
+                SectionFooter("Exports are written as JSON Lines files. A folder in iCloud Drive syncs your health data to iCloud.")
             }
             if setup.folderName != nil {
                 TestChecklistSection(checklist: setup.checklist, error: setup.error) {
@@ -278,7 +278,7 @@ struct DestinationDetailScreen: View {
                         model.refreshStatus()
                     }
             } footer: {
-                Text("When this is off, this destination only receives data when you tap Export now.")
+                SectionFooter("When this is off, this destination only receives data when you tap Export now.")
             }
             if destinationID == "local-file" {
                 Section {

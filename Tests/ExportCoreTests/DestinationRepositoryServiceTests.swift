@@ -106,7 +106,7 @@ private struct MemoryFolder: LocalExportFolderStorage {
 
 private let fixedNow = Date(timeIntervalSince1970: 1_800_000_000)
 
-private func makeRepository() -> (DestinationRepository, MemoryDestinationState) {
+private func makeRepository(unlock: UnlockState = .sourceBuild) -> (DestinationRepository, MemoryDestinationState) {
     let state = MemoryDestinationState()
     let repository = DestinationRepository(
         records: MemoryRecords(state: state),
@@ -114,9 +114,27 @@ private func makeRepository() -> (DestinationRepository, MemoryDestinationState)
         snapshots: MemorySnapshots(state: state),
         scopes: MemoryScopes(state: state),
         folder: MemoryFolder(state: state),
-        now: { fixedNow }
+        now: { fixedNow },
+        unlockState: { unlock }
     )
     return (repository, state)
+}
+
+/// D-08b (#68): without the unlock an enabled destination still exports when the
+/// person asks, and never on its own.
+@Test func destinationRepositoryGatesOnlyAutomaticRunsOnTheUnlock() {
+    for unlock in [UnlockState.locked, .revoked] {
+        let (repository, state) = makeRepository(unlock: unlock)
+        state.with { $0.verifications["mqtt"] = DestinationVerificationSummary(allowsEnablement: true) }
+        #expect(repository.allowsExport("mqtt", trigger: .manual))
+        #expect(repository.hasAutomaticExport(trigger: .widgetControl))
+        #expect(!repository.hasAutomaticExport(trigger: .observerQuery))
+        #expect(!repository.hasAutomaticExport(trigger: .bgAppRefresh))
+        #expect(!repository.allowsExport("mqtt", trigger: .shortcut))
+    }
+    let (unlocked, state) = makeRepository(unlock: .unlocked)
+    state.with { $0.verifications["mqtt"] = DestinationVerificationSummary(allowsEnablement: true) }
+    #expect(unlocked.hasAutomaticExport(trigger: .observerQuery))
 }
 
 private let heartRate = MetricCatalog.heartRate.id

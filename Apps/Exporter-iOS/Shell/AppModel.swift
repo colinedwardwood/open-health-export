@@ -67,6 +67,16 @@ final class AppModel {
         onboarding = Onboarding(resuming: true)
     }
 
+    /// After Delete everything: the app is as new, so first run starts again (#52).
+    func didDeleteEverything() {
+        paths = [:]
+        selectedTab = .status
+        lastExportMessage = nil
+        lastExportError = nil
+        onboarding = Onboarding(resuming: false)
+        refreshStatus()
+    }
+
     func finishOnboarding() {
         onboarding = nil
         setupGeneration += 1
@@ -114,6 +124,8 @@ final class AppModel {
         AppLifecycleCoordinator.shared.setDeepLinkHandler { [weak self] url in
             self?.route(url)
         }
+        // #68: purchases made elsewhere, Family Sharing and refunds update the unlock.
+        PurchaseStore.shared.start()
         #if DEBUG
         UITestFixtures.applyOpenURL(to: self)
         #endif

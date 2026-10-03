@@ -1488,3 +1488,17 @@ in place; of these, **item 14 carries the most weight for the least evidence** �
 on a developer's report of an Apple Developer Support answer, and it determines whether R-105b
 is satisfiable for the Mac target. It should be verified directly in App Store Connect during
 the first month of the entity's enrolment, alongside the notarisation dry run.
+
+## App Store builds and the unlock (#68)
+
+The one-time unlock (D-08a, D-08b) is compiled in only for App Store archives. Archive with:
+
+```sh
+xcodebuild archive -scheme ExporteriOS OHE_STORE_CONDITION=OHE_STORE_BUILD …
+```
+
+Every other build, including Debug, CI and builds from source, leaves `OHE_STORE_CONDITION` empty and is always unlocked. The product is the non-consumable `com.cewdesign.exporter.unlock` (Family Sharing on). `Apps/Exporter-iOS/Purchase/KeepMyMetrics.storekit` is attached to the scheme's Run action, so buying, restoring and refunding can be tried in Xcode (Debug → StoreKit → Manage Transactions) without App Store Connect.
+
+Before the first priced release:
+- Create the in-app purchase in App Store Connect with the same product ID, after the Paid Apps Agreement is active (#23).
+- Charging still waits on counsel's opinion (#21, R-112).

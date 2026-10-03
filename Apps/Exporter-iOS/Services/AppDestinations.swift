@@ -278,6 +278,8 @@ enum AppDestinations {
         snapshots: WidgetDestinationSnapshots(),
         scopes: StateStoreDestinationScopes(root: root),
         folder: folder,
-        now: { Date() }
+        now: { Date() },
+        // #68: automatic runs need the unlock; manual export never does.
+        unlockState: { PurchaseStore.cachedState() }
     )
 }
