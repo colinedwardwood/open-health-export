@@ -115,7 +115,7 @@ struct PolicyCheck {
         // error's own description, which is a raw domain and code more often than not.
         // The harness and the views it still owns are replaced by #47 and #56.
         var rawErrorText: [String] = []
-        for folder in ["Shell", "Status", "Onboarding", "Destinations", "Purchase", "Data", "History"] {
+        for folder in ["Shell", "Status", "Onboarding", "Destinations", "Purchase", "Data", "History", "Settings"] {
             let directory = apps.appendingPathComponent("Exporter-iOS/\(folder)")
             guard let files = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: nil)
             else { continue }
