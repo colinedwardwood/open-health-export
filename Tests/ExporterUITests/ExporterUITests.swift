@@ -707,6 +707,59 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(app.buttons["test-again"].exists)
     }
 
+    /// #52: the privacy policy is one tap from Settings, About links this build's
+    /// source, and Delete everything confirms and then starts first run again.
+    func testSettingsLinksTheLegalPagesAndDeleteEverythingStartsOver() throws {
+        app.terminate()
+        app.launchEnvironment = [
+            "OHE_RESET_SEEDED_SURFACES": "1",
+            "OHE_SEED_DESTINATION_STATUS": "success",
+        ]
+        app.launchArguments = [
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launchEnvironment["OHE_RESET_FIRST_RUN"] = "1"
+        app.launch()
+        // Through first run quickly with Set up later, so Delete everything has
+        // something to reset.
+        for id in ["onboarding-start", "onboarding-types-continue", "onboarding-setup-later", "disclosure-continue"] {
+            let button = app.buttons[id]
+            XCTAssertTrue(button.waitForExistence(timeout: uiWait), "\(id): \(visibleIdentifiers().joined(separator: ","))")
+            button.tap()
+        }
+        let healthContinue = app.buttons["health-priming-continue"]
+        if healthContinue.waitForExistence(timeout: uiWait) {
+            healthContinue.tap()
+            allowHealthSheetIfShown()
+        }
+        let settings = app.buttons["shell-settings"].firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        settings.tap()
+        let privacy = app.buttons["settings-privacy-policy"].exists
+            ? app.buttons["settings-privacy-policy"] : app.links["settings-privacy-policy"]
+        XCTAssertTrue(privacy.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        let about = app.buttons["settings-about"]
+        for _ in 0 ..< 4 where !about.exists { app.swipeUp() }
+        about.tap()
+        let source = identified("about-source").firstMatch
+        XCTAssertTrue(source.waitForExistence(timeout: uiWait))
+        // Text below the first line is pushed off screen at the larger sizes (#172).
+        auditFoldBottom = identified("about-copyright").firstMatch.frame.maxY
+        try performAccessibilityAudit("about")
+        auditFoldBottom = nil
+        app.navigationBars.buttons.firstMatch.tap()
+
+        let delete = app.buttons["settings-delete-everything"]
+        for _ in 0 ..< 4 where !delete.isHittable { app.swipeUp() }
+        delete.tap()
+        let confirm = app.buttons["settings-delete-confirm"].firstMatch.exists
+            ? app.buttons["settings-delete-confirm"].firstMatch : app.buttons["Delete everything"].firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        confirm.tap()
+        XCTAssertTrue(app.buttons["onboarding-start"].waitForExistence(timeout: uiWait))
+    }
+
     /// #51: History opens on problems; with none, it says how many runs delivered,
     /// and All shows each run with its detail in words.
     func testHistoryShowsProblemsFirstAndRunDetail() throws {
