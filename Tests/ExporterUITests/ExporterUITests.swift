@@ -554,6 +554,9 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(save.waitForExistence(timeout: uiWait))
         XCTAssertFalse(save.isEnabled)
         tap(app.buttons["files-choose-folder"])
+        // Enabling asks Apple Health for the new destination's types; on a fresh
+        // simulator (CI) the sheet appears and must be answered.
+        allowHealthSheetIfShown()
         let lastStep = identified("test-step-confirmBytes")
         XCTAssertTrue(lastStep.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
         XCTAssertTrue(
