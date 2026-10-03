@@ -707,6 +707,52 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(app.buttons["test-again"].exists)
     }
 
+    /// #51: History opens on problems; with none, it says how many runs delivered,
+    /// and All shows each run with its detail in words.
+    func testHistoryShowsProblemsFirstAndRunDetail() throws {
+        app.terminate()
+        app.launchEnvironment = [
+            "OHE_RESET_SEEDED_SURFACES": "1",
+            "OHE_SEED_LOCAL_EXPORT_FOLDER": "1",
+        ]
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launch()
+        app.tabBars.buttons["Destinations"].tap()
+        app.buttons["destinations-add"].tap()
+        let files = app.buttons["add-files"]
+        XCTAssertTrue(files.waitForExistence(timeout: uiWait))
+        files.tap()
+        app.buttons["files-choose-folder"].tap()
+        allowHealthSheetIfShown()
+        let save = app.buttons["files-save"]
+        XCTAssertTrue(save.waitForEnabled(timeout: 30))
+        save.tap()
+        app.tabBars.buttons["Status"].tap()
+        let export = app.buttons["status-export-now"]
+        XCTAssertTrue(export.waitForExistence(timeout: uiWait))
+        export.tap()
+        XCTAssertTrue(export.waitForEnabled(timeout: 90))
+
+        app.tabBars.buttons["History"].tap()
+        let empty = identified("history-empty")
+        XCTAssertTrue(empty.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertTrue(empty.label.contains("runs delivered") || empty.label.contains("run delivered"), empty.label)
+        app.segmentedControls.buttons["All"].tap()
+        let row = app.buttons["history-row"].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: uiWait))
+        row.tap()
+        let result = identified("run-result").firstMatch
+        XCTAssertTrue(result.waitForExistence(timeout: uiWait))
+        // Detail rows below the result are pushed off screen at the larger sizes (#172).
+        auditFoldBottom = result.frame.maxY
+        try performAccessibilityAudit("run-detail")
+        auditFoldBottom = nil
+    }
+
     /// #50: a sensitive type is turned on only after its own confirmation, and
     /// changing a destination's types offers Save until it is saved.
     func testDataAsksBeforeASensitiveTypeAndSaves() throws {

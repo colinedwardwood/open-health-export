@@ -3499,6 +3499,83 @@
           }
         }
       }
+    },
+    "Run": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run"
+          }
+        }
+      }
+    },
+    "Show": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show"
+          }
+        }
+      }
+    },
+    "Problems": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Problems"
+          }
+        }
+      }
+    },
+    "All": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All"
+          }
+        }
+      }
+    },
+    "Show all runs": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show all runs"
+          }
+        }
+      }
+    },
+    " · ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " · "
+          }
+        }
+      }
+    },
+    "All destinations": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All destinations"
+          }
+        }
+      }
     }
   }
 }
