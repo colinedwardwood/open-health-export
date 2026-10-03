@@ -1,1 +1,1 @@
-This is not a medical device. It does not diagnose or treat anything. Exports go only to destinations you enable.
+Your Health data, delivered to Home Assistant, MQTT, your own server or Files. No account. This is not a medical device. It does not diagnose or treat anything.

@@ -1,3 +1,8 @@
-First source-available 0.1.0 build. This is not a medical device. It does not diagnose or treat anything.
+First release.
 
-Local folder, HTTPS, MQTT, and Mac companion destinations. Overdue in-app banner. Acknowledgements from NOTICE. Freshness class A–D still pending soak evidence.
+• Send Health data to Home Assistant (MQTT sensors or a webhook), an MQTT broker, your own HTTPS server, or a folder in Files.
+• Status, Destinations, Data and History, in plain words.
+• Every destination is tested before it's saved, and you see each step as it runs.
+• Export now is free with every destination. A one-time purchase adds automatic exports.
+
+This is not a medical device. It does not diagnose or treat anything.

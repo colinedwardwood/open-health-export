@@ -1,3 +1,7 @@
-This is not a medical device. It does not diagnose or treat anything. Do not attach real HealthKit values to feedback.
+Set up a destination in first run, tap Export now, then check Status and History.
 
-Enable a local-file destination, export one page, and check last success and last failure. Confirm the locked-device disclosure before Health permission. If you are a maintainer, the overdue banner can be seeded in the UI tests.
+If you use Home Assistant, add the MQTT destination with the Mosquitto add-on and look for the sensors it creates. Tell us anything that reads wrong or surprises you.
+
+Please don't attach real health values to feedback.
+
+This is not a medical device. It does not diagnose or treat anything.
