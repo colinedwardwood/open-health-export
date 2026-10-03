@@ -37,3 +37,16 @@ import Testing
     #expect(!DestinationKind.allCases.map(\.destinationID).contains("companion"))
     #expect(DestinationKind.files.destinationID == "local-file")
 }
+
+/// #47: on CI the last progress report arrived after the test passed and put the
+/// last step back to running, so Save never enabled.
+@Test func aLateProgressReportCannotReopenAFinishedTest() {
+    var list = DestinationTestChecklist.localFile
+    list.start(.readBack)
+    list.finish(failedAt: nil)
+    list.start(.confirmBytes)
+    #expect(list.passed)
+    list.reset()
+    list.start(.openFolder)
+    #expect(list.running)
+}
