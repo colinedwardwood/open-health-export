@@ -56,6 +56,9 @@ public struct DestinationTestChecklist: Sendable, Equatable {
     }
 
     public private(set) var steps: [Step]
+    /// Set once the test has an outcome. Progress reports arrive asynchronously and
+    /// one can land after the outcome; it must not reopen a finished test (#47).
+    public private(set) var isFinished = false
 
     public init(steps: [DestinationTestStep]) {
         self.steps = steps.map { Step(step: $0, title: Self.title($0), state: .pending) }
@@ -72,13 +75,14 @@ public struct DestinationTestChecklist: Sendable, Equatable {
 
     /// The test reports the step it is starting; everything before it has passed.
     public mutating func start(_ step: DestinationTestStep) {
-        guard let index = steps.firstIndex(where: { $0.step == step }) else { return }
+        guard !isFinished, let index = steps.firstIndex(where: { $0.step == step }) else { return }
         for i in steps.indices {
             steps[i].state = i < index ? .passed : (i == index ? .running : .pending)
         }
     }
 
     public mutating func finish(failedAt step: DestinationTestStep?) {
+        isFinished = true
         guard let step else {
             for i in steps.indices { steps[i].state = .passed }
             return
@@ -92,6 +96,7 @@ public struct DestinationTestChecklist: Sendable, Equatable {
     }
 
     public mutating func reset() {
+        isFinished = false
         for i in steps.indices { steps[i].state = .pending }
     }
 
