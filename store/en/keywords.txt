@@ -1,1 +1,1 @@
-health,export,apple,mqtt,https,local
+home assistant,mqtt,mosquitto,export,health data,json,backup,sync,self-hosted,webhook,watch,steps

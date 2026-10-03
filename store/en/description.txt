@@ -1,9 +1,21 @@
-KeepMyMetrics sends the Apple Health types you choose to destinations you enable: a local folder, HTTPS, MQTT, or a Mac companion. It shows last success, last failure with a reason code, and an overdue banner when export has been quiet too long.
+Send your Apple Health data to places you own, automatically.
+
+KeepMyMetrics reads the Health types you choose and delivers them to destinations you set up:
+• Home Assistant, as sensors through MQTT discovery, or through a webhook
+• An MQTT broker, such as the Mosquitto add-on
+• Your own server, over HTTPS
+• A folder in Files, on your iPhone or in iCloud Drive
+
+No account, and no cloud of ours. Data goes straight from your iPhone to your destination, and we never see it. There are no analytics.
+
+It catches late data. Readings your Apple Watch syncs hours later are still picked up and sent.
+
+It tells you when something's wrong. Status shows every destination in plain words, and if one stops answering you'll know which one and what to do. History keeps 90 days of runs: what was sent, where, and how long it took.
+
+It's honest about iOS. iOS decides when background exports run, and Health data stays locked while your iPhone is locked, so exports catch up after you unlock. Export now, or the Control Centre button, runs one whenever you choose.
+
+Try it free: Export now works with every destination and every data type. A one-time purchase adds automatic exports. No subscription, and Family Sharing is included.
+
+Open source under the GNU AGPL. The source for every version is public, and you can build it yourself.
 
 This is not a medical device. It does not diagnose or treat anything.
-
-Background delivery is best-effort. Freshness target N is per class A–D and is pending device soak evidence; the overdue alarm floor is 6 hours and is not a delivery promise. Deletion tombstones are best-effort because HealthKit provides no deletion callback.
-
-iOS can hide this app. The binary has no stealth mode, alternate icons, or second name. If it disappears, check Settings → Apps → Hidden Apps, Screen Time, Battery, and App Store purchase history.
-
-Build from source is documented in the README. Licence: AGPL-3.0 with an additional permission for App Store distribution.
