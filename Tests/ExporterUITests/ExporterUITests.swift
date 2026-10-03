@@ -23,10 +23,10 @@ final class ExporterUITests: XCTestCase {
     }
 
     private var app: XCUIApplication!
-    /// Where Status's summary ends, recorded before the audit. Content below it is
-    /// pushed off screen at the larger sizes, which the Dynamic Type audit reports as
-    /// partial; each section passes the same audit on its own (#172).
-    private var statusSummaryBottom: CGFloat?
+    /// Where a screen's leading content ends, recorded before an audit. Content below
+    /// it is pushed off screen at the larger sizes, which the Dynamic Type audit
+    /// reports as partial; each part passes the same audit on its own (#172).
+    private var auditFoldBottom: CGFloat?
 
     override func setUp() {
         continueAfterFailure = false
@@ -571,6 +571,238 @@ final class ExporterUITests: XCTestCase {
         XCTAssertLessThanOrEqual(taps, 6)
     }
 
+    /// #68: without the unlock, Status says exports run on Export now and Settings
+    /// offers Buy and Restore; unlocked shows neither; a refund keeps everything.
+    func testUnlockStatesAreShownWhereTheyMatter() throws {
+        func launch(_ state: String) {
+            app.terminate()
+            app.launchEnvironment = [
+                "OHE_RESET_SEEDED_SURFACES": "1",
+                "OHE_SEED_DESTINATION_STATUS": "success",
+                "OHE_UNLOCK_STATE": state,
+            ]
+            app.launchArguments = [
+                "-ohe.disclosureAcknowledged", "true",
+                "-ohe.advisoryEnabled", "false",
+                "-ohe.appPrivacyGateEnabled", "false",
+            ]
+            app.launch()
+        }
+        launch("locked")
+        let note = app.buttons["status-unlock-note"]
+        for _ in 0 ..< 3 where !note.exists { app.swipeUp() }
+        XCTAssertTrue(note.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        note.tap()
+        XCTAssertTrue(app.buttons["unlock-buy"].waitForExistence(timeout: uiWait))
+        XCTAssertTrue(app.buttons["unlock-restore"].exists)
+        auditFoldBottom = identified("unlock-summary").firstMatch.frame.maxY
+        try performAccessibilityAudit("unlock-settings")
+        auditFoldBottom = nil
+
+        launch("unlocked")
+        XCTAssertTrue(app.buttons["status-export-now"].waitForExistence(timeout: uiWait))
+        XCTAssertFalse(app.buttons["status-unlock-note"].exists)
+        app.buttons["shell-settings"].firstMatch.tap()
+        XCTAssertTrue(identified("unlock-summary").waitForExistence(timeout: uiWait))
+        XCTAssertFalse(app.buttons["unlock-buy"].exists)
+
+        launch("revoked")
+        app.buttons["shell-settings"].firstMatch.tap()
+        let summary = identified("unlock-summary")
+        XCTAssertTrue(summary.waitForExistence(timeout: uiWait))
+        XCTAssertTrue(app.buttons["unlock-restore"].exists)
+    }
+
+    /// #49: the MQTT path lists the Home Assistant entities discovery will create,
+    /// shows QoS once, and a broker that refuses the connection fails at Connect. A
+    /// real broker is exercised by the container contracts and by
+    /// OHE_UI_MQTT_BROKER when a local Mosquitto is available.
+    func testMQTTShowsTheEntitiesItWillCreateAndNamesTheFailedStep() throws {
+        app.terminate()
+        app.launchEnvironment = ["OHE_RESET_SEEDED_SURFACES": "1"]
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launch()
+        app.tabBars.buttons["Destinations"].tap()
+        let add = app.buttons["destinations-add"]
+        XCTAssertTrue(add.waitForExistence(timeout: uiWait))
+        add.tap()
+        let mqtt = app.buttons["add-mqtt"]
+        XCTAssertTrue(mqtt.waitForExistence(timeout: uiWait))
+        mqtt.tap()
+        let broker = ProcessInfo.processInfo.environment["OHE_UI_MQTT_BROKER"]
+        type(broker ?? "mqtt://127.0.0.1:1", into: app.textFields["network-address"])
+        dismissKeyboard()
+        let plain = app.switches["network-plain-http"]
+        XCTAssertTrue(plain.waitForExistence(timeout: uiWait))
+        if plain.value as? String != "1" { plain.switches.firstMatch.tap() }
+        XCTAssertEqual(app.segmentedControls.count, 1, "QoS should appear once")
+        let test = app.buttons["network-test"]
+        XCTAssertTrue(test.waitForEnabled(timeout: uiWait))
+        test.tap()
+        if broker != nil {
+            let card = identified("network-confirm-card")
+            for _ in 0 ..< 8 where !card.exists { app.swipeUp() }
+            XCTAssertTrue(card.waitForExistence(timeout: 60), visibleIdentifiers().joined(separator: ","))
+            let save = app.buttons["network-save"]
+            XCTAssertTrue(save.waitForEnabled(timeout: uiWait))
+            save.tap()
+            XCTAssertTrue(app.buttons["destinations-row-mqtt"].waitForExistence(timeout: uiWait))
+            return
+        }
+        let step = identified("test-step-connect")
+        for _ in 0 ..< 8 where !step.exists { app.swipeUp() }
+        XCTAssertTrue(step.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        expectation(for: NSPredicate(format: "value == %@", "Failed"), evaluatedWith: step)
+        waitForExpectations(timeout: 60)
+        let error = identified("test-error")
+        for _ in 0 ..< 4 where !error.exists { app.swipeUp() }
+        XCTAssertTrue(error.waitForExistence(timeout: uiWait))
+    }
+
+    /// #48: the webhook's caveat and example automation come before configuration,
+    /// the address is said back, and a server that can't be found fails at its step.
+    func testHomeAssistantWebhookWarnsFirstAndNamesTheFailedStep() throws {
+        app.terminate()
+        app.launchEnvironment = ["OHE_RESET_SEEDED_SURFACES": "1"]
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launch()
+        app.tabBars.buttons["Destinations"].tap()
+        let add = app.buttons["destinations-add"]
+        XCTAssertTrue(add.waitForExistence(timeout: uiWait))
+        add.tap()
+        let webhook = app.buttons["add-homeAssistantWebhook"]
+        XCTAssertTrue(webhook.waitForExistence(timeout: uiWait))
+        webhook.tap()
+        XCTAssertTrue(identified("network-caveat").waitForExistence(timeout: uiWait))
+        XCTAssertTrue(identified("network-example-yaml").exists)
+        let test = app.buttons["network-test"]
+        XCTAssertFalse(test.isEnabled)
+        let address = app.textFields["network-address"]
+        type("https://ohe-ui-test.invalid", into: address)
+        XCTAssertTrue(identified("network-address-check").waitForExistence(timeout: uiWait))
+        let secret = app.secureTextFields["network-secret"]
+        secret.tap()
+        secret.typeText("ui-test-webhook")
+        dismissKeyboard()
+        XCTAssertTrue(test.waitForEnabled(timeout: uiWait))
+        test.tap()
+        // The test steps sit below the example automation.
+        let step = identified("test-step-resolveHost")
+        for _ in 0 ..< 6 where !step.exists {
+            app.swipeUp()
+        }
+        XCTAssertTrue(step.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        let failed = NSPredicate(format: "value == %@", "Failed")
+        expectation(for: failed, evaluatedWith: step)
+        waitForExpectations(timeout: 60)
+        XCTAssertTrue(identified("test-error").exists)
+        XCTAssertTrue(app.buttons["test-again"].exists)
+    }
+
+    /// #51: History opens on problems; with none, it says how many runs delivered,
+    /// and All shows each run with its detail in words.
+    func testHistoryShowsProblemsFirstAndRunDetail() throws {
+        app.terminate()
+        app.launchEnvironment = [
+            "OHE_RESET_SEEDED_SURFACES": "1",
+            "OHE_SEED_LOCAL_EXPORT_FOLDER": "1",
+        ]
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launch()
+        app.tabBars.buttons["Destinations"].tap()
+        app.buttons["destinations-add"].tap()
+        let files = app.buttons["add-files"]
+        XCTAssertTrue(files.waitForExistence(timeout: uiWait))
+        files.tap()
+        app.buttons["files-choose-folder"].tap()
+        allowHealthSheetIfShown()
+        let save = app.buttons["files-save"]
+        XCTAssertTrue(save.waitForEnabled(timeout: 30))
+        save.tap()
+        app.tabBars.buttons["Status"].tap()
+        let export = app.buttons["status-export-now"]
+        XCTAssertTrue(export.waitForExistence(timeout: uiWait))
+        export.tap()
+        XCTAssertTrue(export.waitForEnabled(timeout: 90))
+
+        app.tabBars.buttons["History"].tap()
+        let empty = identified("history-empty")
+        XCTAssertTrue(empty.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertTrue(empty.label.contains("runs delivered") || empty.label.contains("run delivered"), empty.label)
+        app.segmentedControls.buttons["All"].tap()
+        let row = app.buttons["history-row"].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: uiWait))
+        row.tap()
+        let result = identified("run-result").firstMatch
+        XCTAssertTrue(result.waitForExistence(timeout: uiWait))
+        // Detail rows below the result are pushed off screen at the larger sizes (#172).
+        auditFoldBottom = result.frame.maxY
+        try performAccessibilityAudit("run-detail")
+        auditFoldBottom = nil
+    }
+
+    /// #50: a sensitive type is turned on only after its own confirmation, and
+    /// changing a destination's types offers Save until it is saved.
+    func testDataAsksBeforeASensitiveTypeAndSaves() throws {
+        app.terminate()
+        app.launchEnvironment = [
+            "OHE_RESET_SEEDED_SURFACES": "1",
+            "OHE_SEED_LOCAL_EXPORT_FOLDER": "1",
+        ]
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launch()
+        app.tabBars.buttons["Destinations"].tap()
+        app.buttons["destinations-add"].tap()
+        let files = app.buttons["add-files"]
+        XCTAssertTrue(files.waitForExistence(timeout: uiWait))
+        files.tap()
+        app.buttons["files-choose-folder"].tap()
+        allowHealthSheetIfShown()
+        let save = app.buttons["files-save"]
+        XCTAssertTrue(save.waitForEnabled(timeout: 30))
+        save.tap()
+
+        app.tabBars.buttons["Data"].tap()
+        XCTAssertTrue(app.buttons["data-core-daily"].waitForExistence(timeout: uiWait))
+        XCTAssertFalse(app.buttons["data-save"].exists)
+        let search = app.searchFields.firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: uiWait))
+        search.tap()
+        search.typeText("glucose\n")
+        let glucose = identified("data-type-bloodGlucose")
+        XCTAssertTrue(glucose.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        if glucose.switches.firstMatch.exists { glucose.switches.firstMatch.tap() } else { glucose.tap() }
+        let confirm = app.alerts.buttons["Export it"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: uiWait))
+        confirm.tap()
+        XCTAssertEqual(glucose.value as? String, "1")
+        // An active search hides the navigation bar and its Save; close it first.
+        let cancelSearch = app.navigationBars.buttons["Cancel"].firstMatch
+        if cancelSearch.exists { cancelSearch.tap() } else if app.buttons["Cancel"].exists { app.buttons["Cancel"].firstMatch.tap() }
+        let dataSave = app.buttons["data-save"]
+        for _ in 0 ..< 3 where !dataSave.exists { app.swipeDown() }
+        XCTAssertTrue(dataSave.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        dataSave.tap()
+        allowHealthSheetIfShown()
+        XCTAssertTrue(dataSave.waitForNonExistence(timeout: uiWait), "Save stayed after saving")
+    }
+
     /// #46: an overdue destination is named in the headline, its row shows the
     /// widget's words, and the one action opens it. Identifiers, not copy.
     func testStatusNamesTheOverdueDestinationAndOpensIt() throws {
@@ -592,8 +824,9 @@ final class ExporterUITests: XCTestCase {
         let check = app.buttons["status-check"]
         XCTAssertTrue(check.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
         XCTAssertTrue(app.buttons["status-export-now"].exists)
-        statusSummaryBottom = check.frame.maxY
+        auditFoldBottom = check.frame.maxY
         try performAccessibilityAudit("status")
+        auditFoldBottom = nil
         check.tap()
         XCTAssertTrue(app.navigationBars.buttons.firstMatch.waitForExistence(timeout: uiWait))
         XCTAssertFalse(app.staticTexts["status-headline"].exists)
@@ -2156,9 +2389,7 @@ final class ExporterUITests: XCTestCase {
         }
         // Status rows pass this audit on their own; with the summary above them they
         // are pushed below the fold at the larger sizes and reported as partial.
-        if state == "status", let element, let bottom = statusSummaryBottom,
-           element.frame.minY >= bottom
-        {
+        if let element, let bottom = auditFoldBottom, element.frame.minY >= bottom {
             return "statusRowsBelowFold"
         }
         guard let element else { return "unhostedDynamicTypeLabel" }

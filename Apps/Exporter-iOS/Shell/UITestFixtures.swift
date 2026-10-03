@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import AppServices
 import Foundation
 
 #if DEBUG
@@ -38,6 +39,12 @@ enum UITestFixtures {
     /// the Files picker, which UI tests can't drive.
     static var seedsLocalExportFolder: Bool {
         environment["OHE_SEED_LOCAL_EXPORT_FOLDER"] == "1"
+    }
+
+    /// `OHE_UNLOCK_STATE=locked|unlocked|revoked|sourceBuild` forces the unlock state
+    /// (#68), so UI tests cover each without a StoreKit sandbox.
+    nonisolated static var unlockState: UnlockState? {
+        ProcessInfo.processInfo.environment["OHE_UNLOCK_STATE"].flatMap(UnlockState.init(rawValue:))
     }
 
     /// `OHE_OPEN_URL` is delivered through the same router a tapped notification uses.

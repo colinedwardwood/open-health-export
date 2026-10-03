@@ -3,6 +3,7 @@
 
 import AppServices
 import CoreDomain
+import DestinationTrust
 import EnginePorts
 import Foundation
 import NetEgress
@@ -120,6 +121,9 @@ private struct SomethingElse: Error {}
         UserFacingFailure.object(for: DestinationSendError.destinationUnreachable, destinationLabel: "HA").archetype
             == .hostUnresolvable
     )
+    #expect(UserFacingFailure.object(for: SetupError.testFailed(at: .resolveHost), destinationLabel: "HA").archetype == .hostUnresolvable)
+    #expect(UserFacingFailure.object(for: SetupError.testFailed(at: .authenticate), destinationLabel: "HA").archetype == .http401)
+    #expect(UserFacingFailure.object(for: SetupError.testFailed(at: .tlsHandshake), destinationLabel: "HA").archetype == .tlsTrustFailure)
     for archetype in [UserFacingErrorArchetype.storageProblem, .unexpected] {
         let object = UserFacingErrorObject.make(archetype: archetype, destinationLabel: "Files")
         #expect(!object.title.isEmpty && !object.cause.isEmpty && !object.fix.isEmpty)

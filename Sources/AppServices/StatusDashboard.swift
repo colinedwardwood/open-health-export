@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import CoreDomain
+import DestinationTrust
 import EnginePorts
 import Foundation
 import NetEgress
@@ -39,6 +40,9 @@ public enum UserFacingFailure {
                 break
             }
         }
+        if case let SetupError.testFailed(step) = error {
+            return .make(archetype: archetype(failedAt: step), destinationLabel: destinationLabel)
+        }
         if let send = error as? DestinationSendError,
            let archetype = UserFacingErrorArchetype.fromErrorClass(send.errorClass) {
             return .make(archetype: archetype, destinationLabel: destinationLabel)
@@ -47,6 +51,17 @@ public enum UserFacingFailure {
             return .make(archetype: .storageProblem, destinationLabel: destinationLabel)
         }
         return .make(archetype: .unexpected, destinationLabel: destinationLabel)
+    }
+
+    /// A destination test that stopped at a step says what that step means (#48).
+    static func archetype(failedAt step: DestinationTestStep) -> UserFacingErrorArchetype {
+        switch step {
+        case .resolveHost, .connect: .hostUnresolvable
+        case .tlsHandshake, .confirmCertificate: .tlsTrustFailure
+        case .authenticate: .http401
+        case .sendCanary, .readResponse, .publishCanary, .receiveEcho, .subscribe: .timeout
+        case .openFolder, .writeCanary, .readBack, .confirmBytes: .unexpected
+        }
     }
 }
 

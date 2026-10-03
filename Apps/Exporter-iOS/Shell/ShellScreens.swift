@@ -5,17 +5,8 @@ import AppServices
 import CoreDomain
 import SwiftUI
 
-// Interim screens for the shell (#43). Each is replaced by its own issue:
-// Destinations by #47, Data by #50, History by #51 and Settings by #52.
-
-struct PlaceholderScreen: View {
-    let title: String
-
-    var body: some View {
-        ContentUnavailableView(title, systemImage: "hammer", description: Text("Not built yet."))
-            .navigationTitle(title)
-    }
-}
+// Interim screens for the shell (#43): the error screen and Settings, which #52
+// replaces.
 
 /// The five-part error for one destination, as a notification opens it.
 struct DestinationErrorScreen: View {
@@ -46,7 +37,7 @@ struct DestinationErrorScreen: View {
                         }
                         .accessibilityIdentifier("shell-error-request-alerts")
                     } footer: {
-                        Text("Right now these arrive quietly in Notification Centre.")
+                        SectionFooter("Right now these arrive quietly in Notification Centre.")
                     }
                 }
             } else {
@@ -65,6 +56,7 @@ struct SettingsScreen: View {
 
     var body: some View {
         List {
+            UnlockSection()
             Section {
                 Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
             }
