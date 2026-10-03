@@ -707,6 +707,56 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(app.buttons["test-again"].exists)
     }
 
+    /// #50: a sensitive type is turned on only after its own confirmation, and
+    /// changing a destination's types offers Save until it is saved.
+    func testDataAsksBeforeASensitiveTypeAndSaves() throws {
+        app.terminate()
+        app.launchEnvironment = [
+            "OHE_RESET_SEEDED_SURFACES": "1",
+            "OHE_SEED_LOCAL_EXPORT_FOLDER": "1",
+        ]
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launch()
+        app.tabBars.buttons["Destinations"].tap()
+        app.buttons["destinations-add"].tap()
+        let files = app.buttons["add-files"]
+        XCTAssertTrue(files.waitForExistence(timeout: uiWait))
+        files.tap()
+        app.buttons["files-choose-folder"].tap()
+        allowHealthSheetIfShown()
+        let save = app.buttons["files-save"]
+        XCTAssertTrue(save.waitForEnabled(timeout: 30))
+        save.tap()
+
+        app.tabBars.buttons["Data"].tap()
+        XCTAssertTrue(app.buttons["data-core-daily"].waitForExistence(timeout: uiWait))
+        XCTAssertFalse(app.buttons["data-save"].exists)
+        let search = app.searchFields.firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: uiWait))
+        search.tap()
+        search.typeText("glucose\n")
+        let glucose = identified("data-type-bloodGlucose")
+        XCTAssertTrue(glucose.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        if glucose.switches.firstMatch.exists { glucose.switches.firstMatch.tap() } else { glucose.tap() }
+        let confirm = app.alerts.buttons["Export it"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: uiWait))
+        confirm.tap()
+        XCTAssertEqual(glucose.value as? String, "1")
+        // An active search hides the navigation bar and its Save; close it first.
+        let cancelSearch = app.navigationBars.buttons["Cancel"].firstMatch
+        if cancelSearch.exists { cancelSearch.tap() } else if app.buttons["Cancel"].exists { app.buttons["Cancel"].firstMatch.tap() }
+        let dataSave = app.buttons["data-save"]
+        for _ in 0 ..< 3 where !dataSave.exists { app.swipeDown() }
+        XCTAssertTrue(dataSave.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        dataSave.tap()
+        allowHealthSheetIfShown()
+        XCTAssertTrue(dataSave.waitForNonExistence(timeout: uiWait), "Save stayed after saving")
+    }
+
     /// #46: an overdue destination is named in the headline, its row shows the
     /// widget's words, and the one action opens it. Identifiers, not copy.
     func testStatusNamesTheOverdueDestinationAndOpensIt() throws {

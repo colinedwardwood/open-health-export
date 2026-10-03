@@ -24,7 +24,7 @@ struct RootView: View {
                     stack(.status) { StatusScreen() }
                 }
                 Tab("Data", systemImage: "chart.bar", value: AppTab.data) {
-                    stack(.data) { PlaceholderScreen(title: "Data") }
+                    stack(.data) { DataScreen() }
                 }
                 Tab("Destinations", systemImage: "arrow.right.to.line", value: AppTab.destinations) {
                     stack(.destinations) { DestinationsScreen() }
