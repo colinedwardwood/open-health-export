@@ -30,7 +30,7 @@ struct RootView: View {
                     stack(.destinations) { DestinationsScreen() }
                 }
                 Tab("History", systemImage: "clock", value: AppTab.history) {
-                    stack(.history) { PlaceholderScreen(title: "History") }
+                    stack(.history) { HistoryScreen() }
                 }
             }
             .tabViewStyle(.sidebarAdaptable)
