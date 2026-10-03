@@ -12,7 +12,7 @@ Where this guide and the code disagree, the code is being fixed; tell us. The fi
 |---|---|---|
 | Product and App Store name | **KeepMyMetrics** (one word, capital K, M, M) | `Brand.xcconfig` `PRODUCT_NAME`, `STORE_NAME`; `store/en/name.txt` |
 | Home-screen label and in-app name | **Keep Metrics** (12 characters, so it never truncates) | `Brand.xcconfig` `DISPLAY_NAME` |
-| App Store subtitle | **Your vitals, on your server** (proposed; awaiting owner confirmation) | `store/en/subtitle.txt` |
+| App Store subtitle | **Your vitals, on your server** (confirmed 2026-10-03) | `store/en/subtitle.txt` |
 | Bundle identifier root | `com.cewdesign.exporter` (never shown to people) | `Brand.xcconfig` |
 
 Rules:
@@ -189,7 +189,6 @@ The white strand gives the heart its luminance edge (rule 3.3.4).
 | Item | Owner | Tracking |
 |---|---|---|
 | Legal clearance of the name | Owner and counsel | #22 |
-| Confirm the subtitle "Your vitals, on your server" | Owner | — |
 | Separate licence for the icon and artwork; trademark policy | Owner and counsel | #90 |
 | Register `keepmymetrics.com` / `.app` | Owner | — |
 | Rewrite the store copy in this voice (the current description predates it) | Engineering | #53 |
