@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: FSL-1.1-ALv2
 
 import AppServices
 import Foundation
@@ -24,7 +24,7 @@ import Testing
 }
 
 @Test func aboutCarriesTheLegalNotices() {
-    #expect(About.licence.contains("Affero"))
+    #expect(About.licence.contains("FSL-1.1-ALv2"))
     #expect(About.warranty.contains("no warranty"))
     #expect(About.medical.contains("not a medical device"))
 }

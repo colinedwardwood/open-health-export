@@ -2169,17 +2169,6 @@
         }
       }
     },
-    "Source offer: this receiver is AGPL-3.0. If you run it for someone else, you must offer them the source.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Source offer: this receiver is AGPL-3.0. If you run it for someone else, you must offer them the source."
-          }
-        }
-      }
-    },
     "Stale": {
       "extractionState": "manual",
       "localizations": {
@@ -3683,6 +3672,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Apple's Personal Safety guide"
+          }
+        }
+      }
+    },
+    "The source for this app is public under FSL-1.1-ALv2 at github.com/colinedwardwood/open-health-export.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The source for this app is public under FSL-1.1-ALv2 at github.com/colinedwardwood/open-health-export."
           }
         }
       }

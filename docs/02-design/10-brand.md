@@ -34,6 +34,8 @@ Rules:
 
 **Who it is for:** self-hosters, Home Assistant users, quantified-self people and developers. They are technical, allergic to hype, and pay for tools that are quiet and dependable.
 
+**Licence in copy:** the source is public under FSL-1.1-ALv2 (ADR-0005). Say "source-available" or "the source is public"; never "open source" or "free software".
+
 **Business model:** a free download with manual export to every destination. A one-time US$14.99 unlock adds automatic exports (D-08a, D-08b). There is no subscription, and security notices and updates are never locked.
 
 ## 3. Colour

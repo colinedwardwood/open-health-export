@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: FSL-1.1-ALv2
 #
 # #38: runs the package test suites on an iOS simulator, so code behind
 # `#if os(iOS)` is compiled and exercised. `swift test` only ever sees macOS and

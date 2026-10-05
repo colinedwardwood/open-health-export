@@ -1,3 +1,5 @@
+> **Superseded by [ADR-0005](0005-relicense-to-fsl-1.1-alv2.md) on 2026-10-05.** The project is now FSL-1.1-ALv2.
+
 # ADR-0001 — AGPL-3.0 with a GPLv3 §7 app-store additional permission
 
 - **Status:** Accepted

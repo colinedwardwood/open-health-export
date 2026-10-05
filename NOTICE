@@ -1,7 +1,7 @@
 KeepMyMetrics
 Copyright (c) 2026 Colin Edward Wood and contributors
 
-Licensed under AGPL-3.0-or-later with the additional permission in COPYING.
+Licensed under FSL-1.1-ALv2 (see LICENSE). Each version becomes Apache-2.0 two years after release.
 
 This binary contains no third-party Swift packages.
 

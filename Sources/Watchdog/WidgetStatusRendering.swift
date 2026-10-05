@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: FSL-1.1-ALv2
 
 /// WidgetKit `widgetRenderingMode` mapped into ExportCore so Linux tests can lock
 /// UX-41: status stays glyph+label when accented/vibrant chrome strips hue.

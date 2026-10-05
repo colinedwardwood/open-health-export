@@ -8,9 +8,9 @@ This project is for one person moving **their own** Apple Health data to
 destinations they control — with a documented wire format, a visible run outcome,
 and an overdue signal when delivery has been quiet too long.
 
-It remains open source so you can read the code that touches health data, check
+The source is public so you can read the code that touches health data, check
 the published contracts, and build the app yourself. Transparency, auditability,
-and the ability to inspect behaviour are product advantages. Open source does not
+and the ability to inspect behaviour are product advantages. Public source does not
 by itself make software secure; the security posture is the combination of those
 inspectable controls, default-off egress, and the limits described below.
 
@@ -164,10 +164,13 @@ status. The explicit stop condition is
 
 ## Licence and source
 
-AGPL-3.0 with an additional permission under §7 for App Store distribution. See
-[`LICENSE`](LICENSE) and [`COPYING`](COPYING). Documentation under `docs/` is
-CC BY 4.0 unless a file says otherwise. The wire spec and its fixtures under
-`spec/` are CC0-1.0. Third-party and system-library attribution is generated into
+Source-available under the [Functional Source License, Version 1.1, ALv2 Future
+License](LICENSE) (FSL-1.1-ALv2): you may read, build, modify and use it for any
+purpose except a competing commercial product, and each version becomes Apache-2.0
+two years after it is released (ADR-0005). Versions published before 2026-10-05 were
+AGPL-3.0 and stay so. The reference receiver (`receiver/`, `Tools/receiver/`) is
+Apache-2.0. Documentation under `docs/` is CC BY 4.0 unless a file says otherwise.
+The wire spec and its fixtures under `spec/` are CC0-1.0. Third-party and system-library attribution is generated into
 [`NOTICE`](NOTICE) and shown in the in-app Acknowledgements screen.
 
 You can read the exact source of any released version, verify that every artifact
