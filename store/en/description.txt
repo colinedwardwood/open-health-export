@@ -16,6 +16,6 @@ It's honest about iOS. iOS decides when background exports run, and Health data 
 
 Try it free: Export now works with every destination and every data type. A one-time purchase adds automatic exports. No subscription, and Family Sharing is included.
 
-Open source under the GNU AGPL. The source for every version is public, and you can build it yourself.
+The source for every version is public, and you can build it yourself.
 
 This is not a medical device. It does not diagnose or treat anything.
