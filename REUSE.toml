@@ -5,7 +5,7 @@ SPDX-PackageDownloadLocation = "https://github.com/colinedwardwood/open-health-e
 
 # OSS-15 / REUSE 3.3. Source files carry their own SPDX headers; these annotations
 # cover the files that cannot hold a comment — JSON, NDJSON fixtures, plists, string
-# catalogues — and restate the split already written down in COPYING. `precedence =
+# catalogues — and restate the split recorded in ADR-0005. `precedence =
 # "aggregate"` means a file's own header always wins over the glob.
 #
 # The catch-all comes first so a newly added data file inherits the outbound licence
@@ -16,7 +16,7 @@ SPDX-PackageDownloadLocation = "https://github.com/colinedwardwood/open-health-e
 path = "**"
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Colin Edward Wood and contributors"
-SPDX-License-Identifier = "AGPL-3.0-or-later"
+SPDX-License-Identifier = "FSL-1.1-ALv2"
 
 [[annotations]]
 path = "docs/**"
@@ -31,3 +31,11 @@ path = "spec/**"
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Colin Edward Wood and contributors"
 SPDX-License-Identifier = "CC0-1.0"
+
+# ADR-0005: the reference receiver is Apache-2.0, so third parties can build tools that
+# read KeepMyMetrics exports without the FSL non-compete.
+[[annotations]]
+path = ["receiver/**", "Tools/receiver/**"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Colin Edward Wood and contributors"
+SPDX-License-Identifier = "Apache-2.0"

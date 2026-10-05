@@ -37,6 +37,6 @@ File mode (conformance state only):
 swift run receiver -- spec/v1.0.0/fixtures/receiver-sequence.ndjson
 ```
 
-The dashboard JSON is CC0-1.0. Receiver code is AGPL-3.0-or-later like the rest
-of the tree. Grafana community-catalogue upload is not done here; it needs an
+The dashboard JSON is CC0-1.0. Receiver code is Apache-2.0, so anyone can build on
+it to read KeepMyMetrics exports. Grafana community-catalogue upload is not done here; it needs an
 org Grafana Cloud account.

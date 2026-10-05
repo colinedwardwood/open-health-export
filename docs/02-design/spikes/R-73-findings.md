@@ -1,6 +1,6 @@
 <!--
 SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
-SPDX-License-Identifier: AGPL-3.0-or-later
+SPDX-License-Identifier: FSL-1.1-ALv2
 -->
 
 # R-73 launch-latency findings

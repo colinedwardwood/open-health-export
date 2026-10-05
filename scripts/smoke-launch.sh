@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: FSL-1.1-ALv2
 #
 # #37: launches a built app the way a new install does: a fresh simulator, no launch
 # arguments, no environment, no UI-test hooks, one attempt. It fails if the app is

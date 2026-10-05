@@ -5,7 +5,7 @@ work. The owner may choose to review a narrowly scoped external patch, but
 submitting one does not create an expectation of review, support, or a project
 role.
 
-Inbound licence equals outbound: AGPL-3.0 plus the additional permission in `COPYING`.
+Inbound licence equals outbound: FSL-1.1-ALv2 (`LICENSE`), or Apache-2.0 for the reference receiver.
 
 ## Developer Certificate of Origin
 
@@ -47,8 +47,8 @@ By making a contribution to this project, I certify that:
     this project or the open source license(s) involved.
 ```
 
-Signing off also grants the **Additional permission under GNU AGPL version 3 section 7**
-reproduced verbatim in `COPYING`.
+Signing off licenses the contribution under the licence of the files it changes:
+FSL-1.1-ALv2 (`LICENSE`) for the app and libraries, Apache-2.0 for the reference receiver.
 
 Copy-paste:
 

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: FSL-1.1-ALv2
 
 import CoreDomain
 /// UX-03 / UX-04: the HealthKit pre-alert screen. One in-content button, titled

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: FSL-1.1-ALv2
 
 import Foundation
 import MetricCatalog
@@ -1731,9 +1731,9 @@ struct PolicyCheck {
         }
 
         let grant = try String(contentsOf: root.appendingPathComponent("LICENSE"), encoding: .utf8)
-        let copy = root.appendingPathComponent("LICENSES/AGPL-3.0-or-later.txt")
+        let copy = root.appendingPathComponent("LICENSES/FSL-1.1-ALv2.txt")
         if (try? String(contentsOf: copy, encoding: .utf8)) != grant {
-            problems.append("LICENSES/AGPL-3.0-or-later.txt is not byte-identical to LICENSE")
+            problems.append("LICENSES/FSL-1.1-ALv2.txt is not byte-identical to LICENSE")
         }
 
         // Every identifier the manifest names needs its verbatim text on disk, or the
@@ -1894,7 +1894,7 @@ struct PolicyCheck {
         KeepMyMetrics
         Copyright (c) 2026 Colin Edward Wood and contributors
 
-        Licensed under AGPL-3.0-or-later with the additional permission in COPYING.
+        Licensed under FSL-1.1-ALv2 (see LICENSE). Each version becomes Apache-2.0 two years after release.
 
         This binary contains no third-party Swift packages.
 

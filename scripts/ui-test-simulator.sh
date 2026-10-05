@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: FSL-1.1-ALv2
 # Prints the UDID of the simulator the XCUITest suite runs on, for one device family.
 #
 # Picking whichever device the runner happens to list first makes the accessibility

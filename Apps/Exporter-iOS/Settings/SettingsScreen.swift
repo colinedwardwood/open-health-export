@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: FSL-1.1-ALv2
 
 import AppServices
 import CoreDomain
@@ -129,7 +129,7 @@ struct SettingsScreen: View {
     }
 }
 
-/// #52: who made this, under what licence, and where its source is (AGPL §5(d), §6).
+/// #52: who made this, under what licence, and where its source is (ADR-0005).
 struct AboutScreen: View {
     var body: some View {
         let identity = BuildIdentity.current
@@ -156,7 +156,7 @@ struct AboutScreen: View {
                 ForEach(About.links) { link in
                     Link(link.title, destination: link.url)
                 }
-                NavigationLink("Open-source notices") { NoticesScreen() }
+                NavigationLink("Acknowledgements") { NoticesScreen() }
             }
         }
         .navigationTitle("About")
@@ -176,7 +176,7 @@ struct NoticesScreen: View {
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .navigationTitle("Open-source notices")
+        .navigationTitle("Acknowledgements")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
     }

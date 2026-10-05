@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: FSL-1.1-ALv2
 
 import CompanionReceive
 import CompanionWire
@@ -101,7 +101,7 @@ struct CompanionView: View {
                 }
             }
             .disabled(listening || folder == nil)
-            Text("Source offer: this receiver is AGPL-3.0. If you run it for someone else, you must offer them the source.")
+            Text("The source for this app is public under FSL-1.1-ALv2 at github.com/colinedwardwood/open-health-export.")
                 .font(.footnote)
             Text("Acknowledgements")
                 .font(.headline)

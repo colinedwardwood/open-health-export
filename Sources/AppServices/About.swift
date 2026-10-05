@@ -1,17 +1,17 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: FSL-1.1-ALv2
 
 import CoreDomain
 import Foundation
 
-/// #52: what About must show. AGPL §5(d) Appropriate Legal Notices and the source
-/// offer, the privacy policy App Review looks for (5.1.1(i)), terms and support.
+/// #52: what About must show. The licence and where the source is (ADR-0005), the
+/// privacy policy App Review looks for (5.1.1(i)), terms and support.
 public enum About {
     public static let repository = "https://github.com/colinedwardwood/open-health-export"
 
     public static let copyright = "© 2026 Colin Edward Wood and contributors"
     public static let licence =
-        "Free software under the GNU Affero General Public License, version 3 or later, with an additional permission for App Store distribution."
+        "Source-available under the Functional Source License 1.1 (FSL-1.1-ALv2). Each version becomes Apache-2.0 two years after release."
     public static let warranty =
         "It comes with no warranty, to the extent permitted by law. See the licence for details."
     public static let medical = "This is not a medical device. It does not diagnose or treat anything."
@@ -29,11 +29,11 @@ public enum About {
         Link(title: "Terms of use", url: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!),
         Link(title: "Support", url: URL(string: "\(repository)/blob/main/SUPPORT.md")!),
         Link(title: "Report a security problem", url: URL(string: "\(repository)/blob/main/SECURITY.md")!),
-        Link(title: "Licence", url: URL(string: "\(repository)/blob/main/COPYING")!),
+        Link(title: "Licence", url: URL(string: "\(repository)/blob/main/LICENSE")!),
     ]
 
     /// The source this build was made from: the commit when known, otherwise the
-    /// repository (AGPL §6).
+    /// repository.
     public static func sourceLink(commit: String) -> URL {
         BuildIdentity.sourceLink(commit: commit).flatMap(URL.init(string:)) ?? URL(string: repository)!
     }

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: FSL-1.1-ALv2
 
 /// UX-27: a user-facing error is a five-part object, not a localizedDescription.
 public enum UserFacingFixAction: String, Sendable, Equatable, CaseIterable {

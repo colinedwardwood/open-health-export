@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: FSL-1.1-ALv2
 """Generates AppIcon.icon, the layered Icon Composer source for the iPhone app and
 the Mac companion (#57). The design: a heart drawn as three nested strokes whose
 right half becomes three arrows fanning out to destinations, on deep teal.

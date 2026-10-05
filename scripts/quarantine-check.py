@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: FSL-1.1-ALv2
 """QA-32: every skipped test must cite a quarantine issue and an expiry date."""
 
 from __future__ import annotations

@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 
 FROM swift:6.3.3-jammy AS build
 RUN apt-get update \

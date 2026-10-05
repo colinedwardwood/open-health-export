@@ -1,14 +1,15 @@
 # Project continuity
 
-KeepMyMetrics is an owner-directed commercial open-source project. It is
+KeepMyMetrics is an owner-directed commercial, source-available project. It is
 not recruiting maintainers. This document describes what remains possible if
 the owner is unavailable; it does not imply that a deputy or credential escrow
 exists.
 
 ## What anyone can continue
 
-- Fork the AGPL-3.0-or-later source, run the documented clean build, and publish
-  source releases under a different signing identity.
+- Read and build the FSL-1.1-ALv2 source for any permitted purpose; each version
+  becomes Apache-2.0 two years after release, after which anyone may continue it.
+  Versions before 2026-10-05 remain AGPL-3.0.
 - Build and test the Linux core, iOS app, widget, Mac companion, wire fixtures,
   reference receiver, and container contracts from the repository.
 - Validate advisory documents with the public verification material committed
