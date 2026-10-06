@@ -3466,6 +3466,39 @@
           }
         }
       }
+    },
+    "Export it": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export it"
+          }
+        }
+      }
+    },
+    "Add a destination first. Then choose which types it receives here.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a destination first. Then choose which types it receives here."
+          }
+        }
+      }
+    },
+    "Save changes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save changes"
+          }
+        }
+      }
     }
   }
 }
