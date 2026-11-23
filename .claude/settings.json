@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff)",
+      "Bash(git diff --stat)",
+      "Bash(git diff --name-only)",
+      "Bash(swift test)",
+      "Bash(swift test --filter:*)",
+      "Bash(swift build --target:*)",
+      "Bash(swift run policycheck)",
+      "Bash(python3 qa/validate-nfr-mapping.py)"
+    ],
+    "deny": [
+      "Read(/build/**)",
+      "Read(/.build/**)",
+      "Read(/.build-net/**)",
+      "Read(/OpenHealthExporter.xcodeproj/**)"
+    ]
+  }
+}
