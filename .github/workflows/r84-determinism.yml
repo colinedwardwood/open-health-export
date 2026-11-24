@@ -23,7 +23,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             setup_swift: true
           - os: ubuntu-24.04-arm
             setup_swift: true
