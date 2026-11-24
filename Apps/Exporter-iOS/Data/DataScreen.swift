@@ -26,6 +26,8 @@ struct DataScreen: View {
         return DestinationRepository.healthDestinationIDs.filter { services.destinations.isEnabled($0) }
     }
 
+    private func current(_ ids: [String]) -> String { destinationID ?? ids[0] }
+
     private var changed: Bool { selected != baseline || start != baselineStart }
 
     var body: some View {
@@ -50,18 +52,16 @@ struct DataScreen: View {
         return List {
             if changed {
                 Section {
-                    VStack {
-                        Button {
-                            Task { await save(destinationID ?? ids[0]) }
-                        } label: {
-                            Text("Save changes").frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                        .disabled(saving || selected.isEmpty)
-                        .accessibilityIdentifier("data-save")
+                    Button {
+                        Task { await save(current(ids)) }
+                    } label: {
+                        Text("Save changes").frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
                     .padding(.vertical, 4)
+                    .disabled(saving || selected.isEmpty)
+                    .accessibilityIdentifier("data-save")
                 } footer: {
                     SectionFooter(selected.isEmpty ? "Choose at least one type." : "Nothing changes until you save.")
                 }
@@ -69,7 +69,7 @@ struct DataScreen: View {
             Section {
                 if ids.count > 1 {
                     Picker("Destination", selection: Binding(
-                        get: { destinationID ?? ids[0] },
+                        get: { current(ids) },
                         set: { destinationID = $0 }
                     )) {
                         ForEach(ids, id: \.self) { Text(DestinationRepository.label($0)).tag($0) }
@@ -115,7 +115,7 @@ struct DataScreen: View {
             Button("Export it") { toggle(row, on: true) }
             Button("Cancel", role: .cancel) {}
         } message: { _ in
-            Text("This is sensitive health data. It will be sent to \(DestinationRepository.label(destinationID ?? ids[0])) along with your other types.")
+            Text("This is sensitive health data. It will be sent to \(DestinationRepository.label(current(ids))) along with your other types.")
         }
     }
 
@@ -147,7 +147,7 @@ struct DataScreen: View {
             baselineStart = start
             model.refreshStatus()
         } catch {
-            // The scope is unchanged; the toolbar keeps offering Save.
+            // The scope is unchanged; Save stays on offer.
         }
     }
 }

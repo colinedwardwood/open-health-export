@@ -64,7 +64,6 @@ public enum DataSelection {
         case "min": "minutes"
         case "s": "seconds"
         case "ms": "milliseconds"
-        case "count": "count"
         default: wireUnit
         }
     }
