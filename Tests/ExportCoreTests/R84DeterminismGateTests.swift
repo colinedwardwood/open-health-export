@@ -67,7 +67,7 @@ private enum R84DeterminismFixture {
     let workflow = try R84DeterminismFixture.text(".github/workflows/r84-determinism.yml")
     #expect(script.contains("OHE_DETERMINISM_RUNS"))
     #expect(script.contains("does not claim Darwin x86_64"))
-    #expect(workflow.contains("ubuntu-latest"))
+    #expect(workflow.contains("ubuntu-24.04"))
     #expect(workflow.contains("ubuntu-24.04-arm"))
     #expect(workflow.contains("macos-26"))
     #expect(workflow.contains("actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683"))

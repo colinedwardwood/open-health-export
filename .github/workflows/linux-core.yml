@@ -15,7 +15,7 @@ jobs:
   # OSS-15. Kept separate from export-core so a licence-header slip reports as a
   # licence failure rather than hiding inside a 90-minute test job.
   licence-headers:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -27,7 +27,7 @@ jobs:
         run: reuse lint
 
   export-core:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2

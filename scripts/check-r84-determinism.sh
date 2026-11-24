@@ -9,7 +9,7 @@
 # the committed file, and schema-checks the stream with pipelinecheck.
 # Host tzdata pins are the existing policycheck gate (A-8 / criterion c).
 #
-# Hosted GitHub Actions currently supplies Linux x86_64 (ubuntu-latest),
+# Hosted GitHub Actions currently supplies Linux x86_64 (ubuntu-24.04),
 # Linux arm64 (ubuntu-24.04-arm), and macOS arm64 (macos-26). This script
 # reports `uname -s` / `uname -m` and does not claim Darwin x86_64: GitHub
 # no longer hosts Intel macOS runners.
@@ -68,7 +68,7 @@ ohe_workflow_is_fork_safe() {
   fi
   grep -F 'permissions:' "$workflow" >/dev/null
   grep -F 'contents: read' "$workflow" >/dev/null
-  grep -F 'ubuntu-latest' "$workflow" >/dev/null
+  grep -F 'ubuntu-24.04' "$workflow" >/dev/null
   grep -F 'ubuntu-24.04-arm' "$workflow" >/dev/null
   grep -F 'macos-26' "$workflow" >/dev/null
   grep -F 'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683' "$workflow" >/dev/null
