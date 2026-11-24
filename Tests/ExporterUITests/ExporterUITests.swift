@@ -2133,6 +2133,10 @@ final class ExporterUITests: XCTestCase {
         _ arguments: [String],
         _ configuration: String
     ) throws {
+        // The per-case reset leaves run history alone, so a shard that has already
+        // exported would audit dozens of rows here. Start from an empty history, as a
+        // fresh simulator does.
+        app.launchEnvironment["OHE_WIPE_ON_LAUNCH"] = "1"
         launchLocalized(arguments)
         enterDestinations()
         XCTAssertTrue(scrollDestinations(app.staticTexts["destination-title"]).exists)
