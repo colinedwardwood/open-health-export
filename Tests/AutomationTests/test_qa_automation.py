@@ -212,7 +212,7 @@ class ReleaseTests(unittest.TestCase):
 
     def test_every_determinism_matrix_leg_must_succeed(self):
         required = [
-            "utc-fixed-offset (ubuntu-latest, true)",
+            "utc-fixed-offset (ubuntu-24.04, true)",
             "utc-fixed-offset (ubuntu-24.04-arm, true)",
             "utc-fixed-offset (macos-26, false)",
         ]

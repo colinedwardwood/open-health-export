@@ -60,7 +60,7 @@
     "tier-two-exportrun (2)",
     "tier-two-exportrun (3)",
     "tier-two-exportrun (4)",
-    "utc-fixed-offset (ubuntu-latest, true)",
+    "utc-fixed-offset (ubuntu-24.04, true)",
     "utc-fixed-offset (ubuntu-24.04-arm, true)",
     "utc-fixed-offset (macos-26, false)",
     "full-state-matrix (iPhone, 0)",
