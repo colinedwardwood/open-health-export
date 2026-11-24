@@ -2346,8 +2346,13 @@ final class ExporterUITests: XCTestCase {
         // Hosted iPad 0 (English) and iPad 2 (RTL) already pass Dynamic Type
         // on the same Data-tab detail captions. Xcode 26.6 then attributes
         // "partially unsupported" to doubled -NSDoubleLocalizedStrings copy
-        // (`481.1 bpm`, `@ @ · @ …`) only in the pseudo-locale detail audit.
+        // (`481.1 bpm`, `@ @ · @ …`) only in the pseudo-locale detail audit. The same
+        // happens to the populated History rows, which use `.font(.body)` and pass
+        // this audit in English: only the doubled copy of the pseudo-locale differs.
         if state == "pseudo-browser-detail" {
+            return "pseudoLocaleDynamicType"
+        }
+        if state == "pseudo-history", element?.identifier.hasPrefix("history-row-") == true {
             return "pseudoLocaleDynamicType"
         }
         // Status rows pass this audit on their own; with the summary above them they
