@@ -31,6 +31,9 @@ NEVER run `scripts/mutation-check.py` locally: it rewrites source files.
 - No real health data anywhere; no new runtime dependency without an ADR + Linux build check.
 - User-visible changes get a fragment in `changes/unreleased/` (CONTRIBUTING; not CI-enforced). 445 exist: `ls` only, copy one's style.
 
+## Workflow
+- Run the `simplify` skill on every PR's diff before opening it, and again after substantive review changes. Apply its fixes in the PR. It covers quality only; run `/code-review` separately for bugs.
+
 ## Docs (47 files; don't grep the whole `docs/` tree)
 - No docs index; the map is the table in `README.md`. Start: `docs/01-prd/PRD.md`, `docs/02-design/00-system-design.md`,
   `docs/02-design/03-wire-format-spec.md`, `docs/03-implementation/final-scope-audit.md`.
