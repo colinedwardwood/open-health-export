@@ -2140,6 +2140,10 @@ final class ExporterUITests: XCTestCase {
         selectRootTab(3)
         XCTAssertTrue(scrollHistory(app.buttons["history-load"]).exists)
         app.buttons["history-load"].tap()
+        // The load is asynchronous. Auditing before it finishes asks the audit to walk a
+        // busy app, which hosted runners answer with `-56` "Audit failed to complete in
+        // time" in under 20s. The first row is the signal that the list is on screen.
+        XCTAssertTrue(app.staticTexts["history-row-0"].waitForExistence(timeout: uiWait))
         try performAccessibilityAudit("\(configuration)-history")
     }
 
