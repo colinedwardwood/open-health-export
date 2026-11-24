@@ -2142,8 +2142,13 @@ final class ExporterUITests: XCTestCase {
         app.buttons["history-load"].tap()
         // The load is asynchronous. Auditing before it finishes asks the audit to walk a
         // busy app, which hosted runners answer with `-56` "Audit failed to complete in
-        // time" in under 20s. The first row is the signal that the list is on screen.
-        XCTAssertTrue(app.staticTexts["history-row-0"].waitForExistence(timeout: uiWait))
+        // time" in under 20s. A row is the signal that the list is on screen. An empty
+        // history numbers its rows `history-row-0`; a populated one, which a shard that
+        // has already exported will have, numbers them `history-row-<event>-<line>`.
+        let row = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'history-row-'"))
+            .firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: uiWait))
         try performAccessibilityAudit("\(configuration)-history")
     }
 
