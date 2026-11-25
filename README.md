@@ -135,8 +135,8 @@ developer-operated Health-data service. Authoritative egress:
 
 The sole built-in network host is the security advisory feed
 `https://advisories.cewdesign.com/advisories/v1.json`. Fetching is off by
-default. If you turn it on, it runs only on a user-visible foreground launch after
-the first-run disclosure, never during export. The GET carries marketing major.minor in `User-Agent` and nothing else
+default. If you turn on "Check for security notices" in Settings, it runs only on a
+user-visible foreground launch, never during export. The GET carries marketing major.minor in `User-Agent` and nothing else
 identifying. Block it at your resolver if you do not want the fetch. Plain HTTP
 on the LAN is allowed only through `NSAllowsLocalNetworking`. Any
 `NSAllowsArbitraryLoads` key in an app Info.plist fails `policycheck`.

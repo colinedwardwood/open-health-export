@@ -1,5 +1,8 @@
 # Privacy policy
 
+No account. No analytics. No third-party Swift packages. Health data goes only to
+destinations you add.
+
 KeepMyMetrics is designed without accounts, advertising, analytics, crash reporting,
 or a developer-operated Health-data service.
 
@@ -22,12 +25,19 @@ The authoritative, machine-checked list is
   only by opaque local destination IDs. That is user-directed operational telemetry, not
   telemetry received by this project, and it contains no Health values.
 - Companion discovery uses Bonjour on the local network and transfer is limited to the paired
-  companion.
+  companion, authenticated with a pre-shared key from the pairing code. (The Mac companion is
+  not part of the 1.0 iPhone release.)
 - The only built-in Internet host is
   `https://advisories.cewdesign.com/advisories/v1.json`. Security-advisory fetching is
-  off by default. If you turn it on, then at most once per 24 hours, on a user-visible foreground
-  launch after the first-run disclosure, the app may send an empty GET carrying only the app's
-  coarse major.minor version in `User-Agent`.
+  off by default. If you turn on "Check for security notices" in Settings, then at most once per
+  24 hours, on a user-visible foreground launch, the app may send an empty GET carrying only the
+  app's coarse major.minor version in `User-Agent`. The request uses its own ephemeral URL session
+  (no cookies or cache are kept). The returned feed is shown only if its Ed25519 signature verifies
+  against one of two public keys compiled into the app. The schedule has no random delay.
+
+This optional fetch is the one case where the app contacts a host the project operates, so
+this policy does not say the app never contacts the developer. With the setting off, the app
+makes no connection to any project-operated host.
 
 The advisory server and intervening networks necessarily see ordinary connection metadata,
 including the source IP address and time. The request sends no Health data, account identifier,

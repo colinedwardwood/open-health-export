@@ -3,6 +3,16 @@
 Support is best-effort from the owner. Purchasing the app does not include a
 support SLA.
 
+**Targets, not guarantees.** First response to a support request: 3 business days. Suspected
+data loss, wrong data or a launch crash: triaged within 1 business day. Security reports:
+acknowledged within 5 business days (see `SECURITY.md`). These are goals for one person, not
+commitments, and a missed target is not a breach of anything. TODO-owner: confirm these figures
+before publishing them on the store support page.
+
+**Before you write,** check [`docs/support/known-issues.md`](docs/support/known-issues.md). If
+the app crashed, [`docs/support/sharing-crash-logs.md`](docs/support/sharing-crash-logs.md) says
+how to share a log without sharing Health data.
+
 **Use GitHub Issues for bugs** in the app, exporter, or wire format. Do not paste real
 HealthKit values, tokens, hostnames of private servers, or crash logs that contain them.
 

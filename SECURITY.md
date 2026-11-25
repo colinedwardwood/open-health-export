@@ -5,8 +5,9 @@ GitHub's private vulnerability reporting:
 <https://github.com/colinedwardwood/open-health-export/security/advisories/new>.
 
 There is currently one maintainer and no deputy. **Target** for an initial
-acknowledgement of a private report is 14 days. That is a target, not a staffed SLA;
-this file does not promise we will hit it.
+acknowledgement of a private report is 5 business days, and we aim never to exceed 14 days.
+That is a target, not a staffed SLA; this file does not promise we will hit it. TODO-owner:
+confirm the 5-business-day figure.
 
 Coordinated disclosure: we prefer to ship a fix before a public write-up. If we cannot
 respond, you may disclose after 90 days from the report. Do not include HealthKit

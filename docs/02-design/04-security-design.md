@@ -128,7 +128,7 @@ That single change is why §*Regulatory posture* has to be re-run.
 | ID | Stage 1 | Stage 2 | Why |
 |---|---|---|---|
 | T-08 / T-09 | "Not applicable — no listener" | **Applicable on macOS, Medium** | The companion listens. SEC-02's seven controls now bind (mapped in §*LAN surfaces*) |
-| T-10 (DNS rebinding) | "Medium if shipped" | **Structurally eliminated** | The companion protocol is not HTTP and requires a client certificate before any application byte. A browser cannot produce one |
+| T-10 (DNS rebinding) | "Medium if shipped" | **Structurally eliminated** | The companion protocol is not HTTP and requires a TLS pre-shared-key handshake before any application byte. A browser cannot complete one without the key. *Implementation note: the shipped companion uses TLS-PSK from the pairing code (`CompanionPSK`, `CompanionListener`), not the mutual-TLS client certificates this design described; the SAS and SPKI-pinning text in the companion section below is the original design, not shipped behaviour.* |
 | T-11 (localhost laundering) | Disqualifying | **Still fully avoided on iOS** | This is the part of the "outbound push" framing that genuinely survives |
 | T-24 (coercive insider) | Medium, severe | **Medium, severe — and less mitigable than Stage 1 assumed** | T-49 was not in the Stage 1 model. Our escalation chain runs through surfaces the OS lets a passcode-holder switch off |
 | T-27 (repudiation) | High if unmitigated | **Low** | Hash-chained, SE-sealed ledger with a destruction marker |
@@ -667,14 +667,18 @@ The design below is shaped more by the second concern than the first.
 
 A **static, signed feed at a fixed URL**, fetched by an unconditional `GET`, parsed, verified,
 filtered client-side and displayed. No server-side logic of any kind exists at that origin, and
-the project commits to that in the ADR, the README and the privacy policy.
+the project commits to that in the ADR, the README and the privacy policy. The fetch is
+optional and off by default, and it is still contact with a project-operated host (the server
+sees the IP address), so no surface may claim the app never contacts the developer. The
+request's schedule is at most once per 24 hours with no random delay: `AdvisorySchedule.maxJitter`
+is defined but not applied.
 
 **Signing and verification.** Detached Ed25519 signature over a canonical serialisation of the
 feed. The verification key is **compiled into the binary**, not fetched, not TLS-derived, not
 CA-anchored. Two keys are pinned — an active key and a successor — and rotation happens only by
 shipping an app update. A feed-driven key rotation would be a takeover primitive and must not
-exist. The private key is held offline on a hardware token by a release maintainer; signing is a
-deliberate manual act, which is appropriate for something published a handful of times a year.
+exist. The private keys are held offline by the owner, outside the repository, CI and any server
+(`docs/03-implementation/advisory-signing.md`); signing is a deliberate manual act, which is appropriate for something published a handful of times a year.
 
 TLS is used for transport, but the security of the channel does not depend on it. A hostile CA,
 a hostile CDN or a hostile network cannot forge an advisory; they can only withhold one, which
@@ -849,6 +853,11 @@ Apple, *What's new for enterprise in macOS Sequoia*, <https://support.apple.com/
 Design response: the companion is a normal user-launched app with a menu-bar presence, **not** a
 `launchd` daemon or a short-lived agent — the documented failure mode where the privilege prompt
 never appears affects exactly those shapes.
+
+> **Shipped behaviour differs from the table below.** The companion transport is TLS 1.2 with a
+> 32-byte pre-shared key carried in the pairing code (ADR-0009; `CompanionPSK`). It does not
+> use client certificates, SPKI pinning or a short authentication string. Read the "Mutual
+> TLS" and "pinned" wording in this section as the original design.
 
 **(c) The listener's controls have to be real, so here they are mapped.**
 
