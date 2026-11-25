@@ -392,12 +392,11 @@ import Testing
             "launch lifecycle must register HealthKit observers without telemetry: \(forbidden)"
         )
     }
-    let harness = try String(
-        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift"),
+    let setup = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/Services/AppDestinationSetup.swift"),
         encoding: .utf8
     )
-    #expect(harness.contains("static func projectOTLP() async throws"))
-    #expect(harness.contains("static func enableOTLPCollector("))
+    #expect(setup.contains("static func enableOTLPCollector("))
 }
 
 @Test func otlpDependencyGraphUsesHTTPProtobufWithoutGRPCOrNIO() throws {

@@ -113,7 +113,6 @@ struct PolicyCheck {
         print("policycheck setting keys live in SettingsStore: ok")
         // #46: product screens show the five-part error (UserFacingFailure), never an
         // error's own description, which is a raw domain and code more often than not.
-        // The harness and the views it still owns are replaced by #47 and #56.
         var rawErrorText: [String] = []
         for folder in ["Shell", "Status", "Onboarding", "Destinations", "Purchase", "Data", "History", "Settings"] {
             let directory = apps.appendingPathComponent("Exporter-iOS/\(folder)")
@@ -314,24 +313,24 @@ struct PolicyCheck {
             }
         }
         print("policycheck bundle versions come from build settings: ok")
-        let harnessExport = try String(
-            contentsOf: apps.appendingPathComponent("Exporter-iOS/HarnessExport.swift"),
+        let appFiles = try String(
+            contentsOf: apps.appendingPathComponent("Exporter-iOS/Services/AppFiles.swift"),
             encoding: .utf8
         )
         let sqliteStore = try String(
             contentsOf: sources.appendingPathComponent("StorageSQLite/SQLiteStateStore.swift"),
             encoding: .utf8
         )
-        guard harnessExport.contains(
+        guard appFiles.contains(
             ".protectionKey: FileProtectionType.completeUntilFirstUserAuthentication"
         ),
-            harnessExport.contains("try fm.setAttributes("),
-            harnessExport.contains("FileProtectionType.completeUnlessOpen"),
-            harnessExport.contains("protectedPayloadDirectory(named:"),
+            appFiles.contains("try fm.setAttributes("),
+            appFiles.contains("FileProtectionType.completeUnlessOpen"),
+            appFiles.contains("func protectedPayloadDirectory("),
             sqliteStore.contains(
                 "SQLITE_OPEN_FILEPROTECTION_COMPLETEUNTILFIRSTUSERAUTHENTICATION"
             ),
-            !harnessExport.contains(".protectionKey: FileProtectionType.none")
+            !appFiles.contains(".protectionKey: FileProtectionType.none")
         else {
             FileHandle.standardError.write(
                 Data("SEC-32: managed storage lost its Data Protection floor\n".utf8)
@@ -477,6 +476,7 @@ struct PolicyCheck {
         try checkHealthKitSymbolsStayInAdapter(sources: sources)
         try checkSpecArtifacts(root: root)
         try checkBackupExclusion(root: root)
+        try checkAppSourceShape(root: root)
         try checkHealthAuthorizationScope(root: root)
         try checkHostTZDataPin(root: root)
     }
@@ -1159,7 +1159,6 @@ struct PolicyCheck {
         for relative in [
             "README.md",
             "landing/index.html",
-            "Apps/Exporter-iOS/HarnessView.swift",
             "Apps/Localizable.xcstrings",
             "receiver/README.md",
         ] {
@@ -1833,11 +1832,11 @@ struct PolicyCheck {
             )
             exit(1)
         }
-        let harness = try String(
-            contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
+        let settings = try String(
+            contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/Settings/SettingsScreen.swift"),
             encoding: .utf8
         )
-        if !harness.contains("acknowledgements-body") || !harness.contains("forResource: \"NOTICE\"") {
+        if !settings.contains("NoticesScreen") || !settings.contains("forResource: \"NOTICE\"") {
             FileHandle.standardError.write(
                 Data("in-app Acknowledgements must load NOTICE from the app bundle\n".utf8)
             )
@@ -2002,16 +2001,74 @@ struct PolicyCheck {
         print("policycheck HealthKit types stay in HealthKitSource: ok")
     }
 
+    /// #56: the product UI stays in small files and small views. A 4,000-line view with
+    /// 124 `@State` values is how the harness became impossible to test, localise or
+    /// review, so the limits are enforced where the app's sources live: no Swift file in
+    /// `Apps/Exporter-iOS` over 600 lines, and no `View` struct with more than 15 `@State`
+    /// properties. Split along a seam rather than raising either number.
+    static func checkAppSourceShape(root: URL) throws {
+        let maxLines = 600
+        let maxState = 15
+        let base = root.appendingPathComponent("Apps/Exporter-iOS")
+        guard let files = FileManager.default.enumerator(at: base, includingPropertiesForKeys: nil) else {
+            FileHandle.standardError.write(Data("Apps/Exporter-iOS missing\n".utf8))
+            exit(1)
+        }
+        var hits: [String] = []
+        var checked = 0
+        let viewDeclaration = try NSRegularExpression(
+            pattern: #"^[ \t]*(?:@MainActor\s+)?(?:(?:private|fileprivate|public)\s+)?struct\s+(\w+)\s*:[^{\n]*\bView\b[^{\n]*\{"#,
+            options: [.anchorsMatchLines]
+        )
+        let stateDeclaration = try NSRegularExpression(
+            pattern: #"^[ \t]*@State\b"#,
+            options: [.anchorsMatchLines]
+        )
+        for case let file as URL in files where file.pathExtension == "swift" {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            let relative = String(file.path.dropFirst(root.path.count + 1))
+            checked += 1
+            let lineCount = text.split(separator: "\n", omittingEmptySubsequences: false).count
+                - (text.hasSuffix("\n") ? 1 : 0)
+            if lineCount > maxLines {
+                hits.append("\(relative): \(lineCount) lines (limit \(maxLines))")
+            }
+            let source = text as NSString
+            let whole = NSRange(location: 0, length: source.length)
+            for match in viewDeclaration.matches(in: text, range: whole) {
+                let open = match.range.location + match.range.length - 1
+                guard let body = balancedSwiftBlock(in: source, afterOpenBrace: open) else { continue }
+                let states = stateDeclaration.numberOfMatches(in: text, range: body)
+                if states > maxState {
+                    hits.append(
+                        "\(relative): \(source.substring(with: match.range(at: 1))) has \(states) @State (limit \(maxState))"
+                    )
+                }
+            }
+        }
+        guard checked > 0 else {
+            FileHandle.standardError.write(Data("#56: no app sources found to check\n".utf8))
+            exit(1)
+        }
+        if !hits.isEmpty {
+            FileHandle.standardError.write(
+                Data(("#56 app source shape:\n" + hits.sorted().joined(separator: "\n") + "\n").utf8)
+            )
+            exit(1)
+        }
+        print("policycheck app files <= \(maxLines) lines, views <= \(maxState) @State: ok")
+    }
+
     /// SEC-30: the app's storage root holds the state database, the journal and queued
     /// payloads. Creating it without excluding it from backup is the whole of T-16, and
     /// the omission is invisible in review because the protection class next to it looks
     /// like the mitigation. Asserted where the directory is made, not where it is used.
     static func checkBackupExclusion(root: URL) throws {
-        let file = root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift")
+        let file = root.appendingPathComponent("Apps/Exporter-iOS/Services/AppFiles.swift")
         let text = try String(contentsOf: file, encoding: .utf8)
         guard let body = text.range(of: "applicationSupportRoot() throws -> URL") else {
             FileHandle.standardError.write(
-                Data("HarnessExport.applicationSupportRoot is gone; SEC-30 gate needs rewiring\n".utf8)
+                Data("AppFiles.applicationSupportRoot is gone; SEC-30 gate needs rewiring\n".utf8)
             )
             exit(1)
         }

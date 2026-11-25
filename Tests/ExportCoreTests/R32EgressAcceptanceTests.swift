@@ -79,7 +79,7 @@ private let r32ExcludedOSInitiatedTraffic = [
     )
 }
 
-/// Mirrors the relevant ordering in `HarnessExport.runHTTPSDestination`: load the
+/// Mirrors the relevant ordering in `ExportService.runHTTPSDestination`: load the
 /// saved URL, authorize it against the *current* allowlist, construct the transport,
 /// and only then start `ExportRun`.
 private func runR32HTTPSExportCycle(
