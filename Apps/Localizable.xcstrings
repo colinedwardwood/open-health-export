@@ -3835,6 +3835,18 @@
         }
       }
     },
+    "Earlier health history is waiting to be sent. Open Settings and run a backfill.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Earlier health history is waiting to be sent. Open Settings and run a backfill."
+          }
+        }
+      }
+    },
     "%@ %@": {
       "comment": "Sources copy (LocalizedCopy)",
       "extractionState": "manual",

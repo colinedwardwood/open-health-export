@@ -258,7 +258,18 @@ extension ExportService {
         let checkpointURL = root.appendingPathComponent(
             mode == .raw ? "backfill-raw.json" : "backfill-aggregate.json"
         )
-        let resumed = try? BackfillCheckpoint.read(from: checkpointURL)
+        var resumed = try? BackfillCheckpoint.read(from: checkpointURL)
+        // #61: a saved job that cannot reach history a widened scope now owes would
+        // either never run again or resume without it.
+        if let saved = resumed,
+           ScopeWidening.supersedes(
+               saved,
+               owed: AppDestinations.repository.pendingBackfills(),
+               planned: plannedIDs
+           ) {
+            try FileManager.default.removeItem(at: checkpointURL)
+            resumed = nil
+        }
         let owedIDs = ExportPlan.backfillOwed(
             planned: plannedIDs,
             resumedPlan: resumed?.plan.destinations
@@ -343,6 +354,7 @@ extension ExportService {
                 "Checkpoint: \(checkpointURL.path)",
             ]
         }
+        try AppDestinations.repository.backfillCompleted(for: destinations.map(\.id))
         var lines = [
             "\(mode.rawValue) backfill complete",
             "Destinations: \(destinations.map(\.id).joined(separator: ", "))",

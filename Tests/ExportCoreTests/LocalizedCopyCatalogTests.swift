@@ -56,6 +56,7 @@ private func producedCopy() -> [LocalizedCopy] {
     ]
     copy += (0...2).map(HealthAuthorizationPriming.typeCountCopy)
     copy += About.links.map(\.title)
+    copy += ScopeWidening.statusCopy([ScopeWidening(destinationID: "d", metrics: [], since: Date())]).map { [$0] } ?? []
 
     let classes: [String?] = ErrorClass.allCases.map(\.rawValue) + [nil]
     for kind in RunOutcome.Kind.allCases {
