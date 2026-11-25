@@ -39,7 +39,7 @@ body:
     id: compliance-evidence
     attributes:
       label: Compliance evidence
-      description: Put the reviewer (or the owner's dated self-review, with its cooling-off times) and linked R-109 and R-111 sign-offs on separate lines. Name only reviewers who actually reviewed.
+      description: Put the named reviewers and linked R-109 and R-111 sign-offs on separate lines.
     validations:
       required: true
   - type: textarea
@@ -74,7 +74,7 @@ body:
           required: true
         - label: Privacy manifests, licences, store copy, disclaimers, SBOM, and attestations were reviewed.
           required: true
-        - label: The compliance review recorded in this issue was actually performed, with any outside reviewer named, or the owner's dated self-review and cooling-off times (docs/runbooks/release-rollout.md).
+        - label: Both named compliance reviewers approved the release.
           required: true
         - label: No feature, update, artifact, or beta seat is sponsor-gated; any TestFlight public link was checked manually.
           required: true

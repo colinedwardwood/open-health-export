@@ -22,7 +22,7 @@ User-facing companions: [`../support/known-issues.md`](../support/known-issues.m
 |---|---|
 | Second maintainer verifies | Run the check from a second machine (or a fresh clone and a fresh login) and paste the output with a timestamp |
 | Second maintainer approves | Cooling-off: finish the checklist, stop, and re-read it after at least 12 hours (24 hours for a security release) before pressing the button. Record both times |
-| Two named compliance reviewers | Do not tick a box that names two reviewers. Record the owner's dated self-review and link any outside review actually obtained (TODO-owner: counsel review, #21) |
+| Two named compliance reviewers | The release template requires both. Name only people who actually reviewed. If fewer than two can, that is an owner decision about the gate (TODO-owner; counsel review is #21), not something to tick around |
 | Peer decision to halt | The halt criteria below were fixed in advance; applying them is not a judgment call |
 
 ## Rules for every runbook
