@@ -6,11 +6,14 @@ import CoreDomain
 /// chosen-time run is a Shortcut or Control Centre control — never a promised
 /// 3 a.m. schedule.
 public enum SchedulingHonesty {
-    public static let title = "When export runs"
-    public static var body: String {
-        "iOS decides when background export runs. Health data is withheld while \(DeviceNoun.thisDevice) is locked. A Shortcut or Control Centre control is how you run at a time you choose."
+    public static let title: LocalizedCopy = "When export runs"
+    public static var body: LocalizedCopy {
+        LocalizedCopy(
+            "iOS decides when background export runs. Health data is withheld while %@ is locked. A Shortcut or Control Centre control is how you run at a time you choose.",
+            .text(DeviceNoun.thisDevice)
+        )
     }
-    public static let noSchedulePromise = "Nothing here promises a send at 3 a.m."
-    public static let shortcutsLine =
+    public static let noSchedulePromise: LocalizedCopy = "Nothing here promises a send at 3 a.m."
+    public static let shortcutsLine: LocalizedCopy =
         "Shortcuts can run one page to the local archive after you enable it."
 }

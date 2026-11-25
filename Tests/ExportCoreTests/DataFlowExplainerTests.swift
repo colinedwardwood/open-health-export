@@ -31,20 +31,20 @@ import Testing
             credential: DataFlowHop.noCredential
         ),
     ]
-    #expect(DataFlowExplainer.typeCountCopy(41) == "We read 41 types you chose.")
-    #expect(DataFlowExplainer.typeCountCopy(1) == "We read 1 type you chose.")
-    #expect(DataFlowExplainer.typeCountCopy(0) == "No types selected yet.")
+    #expect(DataFlowExplainer.typeCountCopy(41).english == "We read 41 types you chose.")
+    #expect(DataFlowExplainer.typeCountCopy(1).english == "We read 1 type you chose.")
+    #expect(DataFlowExplainer.typeCountCopy(0).english == "No types selected yet.")
     #expect(
-        hops.map(DataFlowExplainer.hopLine) == [
+        hops.map { DataFlowExplainer.hopLine($0).english } == [
             "Files on this iPhone · Local files · no network",
             "homeassistant.local:8123 · HTTPS · bearer token",
             "nas.example.com:8883 · MQTTS · username + password",
             "collector.example.com · OTLP HTTP · no credential",
         ]
     )
-    let joined = hops.map(DataFlowExplainer.hopLine).joined(separator: " ")
-        + DataFlowExplainer.nowhereElse
-        + DataFlowExplainer.empty
+    let joined = hops.map { DataFlowExplainer.hopLine($0).english }.joined(separator: " ")
+        + DataFlowExplainer.nowhereElse.english
+        + DataFlowExplainer.empty.english
     for secretShaped in ["sk_live", "password=", "Bearer ey"] {
         #expect(!joined.contains(secretShaped))
     }

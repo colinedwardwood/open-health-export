@@ -181,7 +181,7 @@ public struct TransparencyService: Sendable {
             )
         }
         if let mqtt = sources.mqtt {
-            let credential: String
+            let credential: LocalizedCopy
             if mqtt.hasClientCertificate {
                 credential = DataFlowHop.clientCertificate
             } else if mqtt.hasUsernameOrPassword {

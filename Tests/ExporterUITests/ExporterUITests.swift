@@ -482,21 +482,73 @@ final class ExporterUITests: XCTestCase {
     /// #50: a sensitive type is turned on only after its own confirmation, and
     /// changing a destination's types offers Save until it is saved.
     func testDataAsksBeforeASensitiveTypeAndSaves() throws {
-        app.terminate()
-        app.launchEnvironment = [
-            "OHE_RESET_SEEDED_SURFACES": "1",
-            "OHE_SEED_LOCAL_EXPORT_FOLDER": "1",
-        ]
-        app.launchArguments = [
-            "-ohe.disclosureAcknowledged", "true",
-            "-ohe.advisoryEnabled", "false",
-            "-ohe.appPrivacyGateEnabled", "false",
-        ]
-        app.launch()
-        addFilesDestination()
+        launchDataWithArchive()
+        let dataSave = try changeDataSelection()
+        dataSave.tap()
+        allowHealthSheetIfShown()
+        XCTAssertTrue(dataSave.waitForNonExistence(timeout: uiWait), "Save stayed after saving")
+        XCTAssertFalse(identified("data-save-error").exists)
+    }
 
-        app.tabBars.buttons["Data"].tap()
-        XCTAssertTrue(app.buttons["data-core-daily"].waitForExistence(timeout: uiWait))
+    /// A save that fails says so in the five-part error's words, keeps Save on offer
+    /// and shows no raw error text. `OHE_FAIL_DATA_SAVE` makes the save throw.
+    func testDataSaveFailureIsShownAndKeepsSave() throws {
+        launchDataWithArchive(environment: ["OHE_FAIL_DATA_SAVE": "1"])
+        let dataSave = try changeDataSelection()
+        dataSave.tap()
+        let error = identified("data-save-error")
+        XCTAssertTrue(error.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertFalse(error.label.isEmpty)
+        XCTAssertFalse(error.label.contains("InjectedFailure"), error.label)
+        XCTAssertTrue(app.buttons["data-save"].exists, "Save must stay on offer after a failed save")
+    }
+
+    /// The same failure through the doubled pseudo-locale: its copy comes from
+    /// `Sources/`, so it is localised too.
+    func testDataSaveFailureCopyIsPseudoLocalised() throws {
+        launchDataWithArchive(arguments: Self.pseudoLocaleArguments, environment: ["OHE_FAIL_DATA_SAVE": "1"])
+        try changeDataSelection().tap()
+        let error = identified("data-save-error")
+        XCTAssertTrue(error.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertTrue(Self.isDoubled(error.label), "save error: \(error.label)")
+    }
+
+    /// The Data screen's own copy, with a destination and its types listed, in the
+    /// doubled pseudo-locale. Not audited: UIKit list headers are reported as
+    /// partially unsupported Dynamic Type once doubled, which says nothing about the copy.
+    func testDataWithADestinationInPseudoLocale() throws {
+        launchDataWithArchive(arguments: Self.pseudoLocaleArguments)
+        let coreDaily = app.buttons["data-core-daily"]
+        XCTAssertTrue(Self.isDoubled(coreDaily.label), "Core Daily: \(coreDaily.label)")
+    }
+
+    func testSettingsInPseudoLocale() throws {
+        launchProduct(arguments: Self.pseudoLocaleArguments)
+        openSettings()
+        let about = app.buttons["settings-about"]
+        for _ in 0 ..< 4 where !about.exists { app.swipeUp() }
+        XCTAssertTrue(about.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        // Not audited: UIKit list headers are reported as partially unsupported Dynamic
+        // Type once doubled, which says nothing about the copy.
+        XCTAssertTrue(Self.isDoubled(about.label), "About: \(about.label)")
+        let notices = app.switches["settings-security-notices"]
+        for _ in 0 ..< 4 where !notices.exists { app.swipeDown() }
+        XCTAssertTrue(Self.isDoubled(notices.label), "Security notices: \(notices.label)")
+    }
+
+    /// Launches past first run with the seeded archive folder added, then opens Data.
+    private func launchDataWithArchive(arguments: [String] = [], environment: [String: String] = [:]) {
+        launchProduct(
+            arguments: arguments,
+            environment: ["OHE_SEED_LOCAL_EXPORT_FOLDER": "1"].merging(environment) { _, new in new }
+        )
+        addFilesDestination()
+        openTab("data")
+        XCTAssertTrue(app.buttons["data-core-daily"].waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+    }
+
+    /// Turns on a sensitive type through its confirmation and returns the Save button.
+    private func changeDataSelection() throws -> XCUIElement {
         XCTAssertFalse(app.buttons["data-save"].exists)
         let search = app.searchFields.firstMatch
         XCTAssertTrue(search.waitForExistence(timeout: uiWait))
@@ -504,20 +556,25 @@ final class ExporterUITests: XCTestCase {
         search.typeText("glucose\n")
         let glucose = identified("data-type-bloodGlucose")
         XCTAssertTrue(glucose.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        // Saved choices outlive a launch, so an earlier case may have left glucose on.
+        // Turning it off needs no confirmation and is a change all the same.
+        let wasOn = glucose.value as? String == "1"
         if glucose.switches.firstMatch.exists { glucose.switches.firstMatch.tap() } else { glucose.tap() }
-        let confirm = app.alerts.buttons["Export it"]
-        XCTAssertTrue(confirm.waitForExistence(timeout: uiWait))
-        confirm.tap()
-        XCTAssertEqual(glucose.value as? String, "1")
+        if !wasOn {
+            // The label doubles in the pseudo-locale, where the confirm button is the
+            // one that is not Cancel.
+            let confirm = app.alerts.buttons.matching(NSPredicate(format: "NOT label BEGINSWITH 'Cancel'")).firstMatch
+            XCTAssertTrue(confirm.waitForExistence(timeout: uiWait))
+            confirm.tap()
+        }
+        XCTAssertEqual(glucose.value as? String, wasOn ? "0" : "1")
         // An active search hides the navigation bar and its Save; close it first.
-        let cancelSearch = app.navigationBars.buttons["Cancel"].firstMatch
-        if cancelSearch.exists { cancelSearch.tap() } else if app.buttons["Cancel"].exists { app.buttons["Cancel"].firstMatch.tap() }
+        let cancelSearch = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Cancel'")).firstMatch
+        if cancelSearch.exists { cancelSearch.tap() }
         let dataSave = app.buttons["data-save"]
         for _ in 0 ..< 3 where !dataSave.exists { app.swipeDown() }
         XCTAssertTrue(dataSave.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
-        dataSave.tap()
-        allowHealthSheetIfShown()
-        XCTAssertTrue(dataSave.waitForNonExistence(timeout: uiWait), "Save stayed after saving")
+        return dataSave
     }
 
     /// #46: an overdue destination is named in the headline, its row shows the

@@ -8,46 +8,54 @@ public struct DataFlowHop: Sendable, Equatable, Identifiable {
     public var id: String
     public var host: String
     public var transport: String
-    public var credential: String
+    public var credential: LocalizedCopy
 
-    public init(id: String, host: String, transport: String, credential: String) {
+    public init(id: String, host: String, transport: String, credential: LocalizedCopy) {
         self.id = id
         self.host = host
         self.transport = transport
         self.credential = credential
     }
 
-    public static let noNetwork = "no network"
-    public static let bearerToken = "bearer token"
-    public static let usernamePassword = "username + password"
-    public static let clientCertificate = "client certificate"
-    public static let pairing = "pairing"
-    public static let webhookSecret = "webhook secret"
-    public static let noCredential = "no credential"
+    public static let noNetwork: LocalizedCopy = "no network"
+    public static let bearerToken: LocalizedCopy = "bearer token"
+    public static let usernamePassword: LocalizedCopy = "username + password"
+    public static let clientCertificate: LocalizedCopy = "client certificate"
+    public static let pairing: LocalizedCopy = "pairing"
+    public static let webhookSecret: LocalizedCopy = "webhook secret"
+    public static let noCredential: LocalizedCopy = "no credential"
 }
 
 public enum DataFlowExplainer {
-    public static var title: String { "Where \(DeviceNoun.thisDevice) sends health data" }
-    public static var source: String { "Apple Health on \(DeviceNoun.thisDevice)" }
-    public static let transform =
+    public static var title: LocalizedCopy {
+        LocalizedCopy("Where %@ sends health data", .text(DeviceNoun.thisDevice))
+    }
+    public static var source: LocalizedCopy {
+        LocalizedCopy("Apple Health on %@", .text(DeviceNoun.thisDevice))
+    }
+    public static let transform: LocalizedCopy =
         "This app transforms to JSON. Nothing stays after a successful send."
-    public static let nowhereElse =
+    public static let nowhereElse: LocalizedCopy =
         "Nowhere else. No account. No analytics. No crash reporting."
-    public static var empty: String {
-        "No destinations yet. Health stays on \(DeviceNoun.thisDevice) until you add one."
+    public static var empty: LocalizedCopy {
+        LocalizedCopy(
+            "No destinations yet. Health stays on %@ until you add one.",
+            .text(DeviceNoun.thisDevice)
+        )
     }
 
-    public static func typeCountCopy(_ count: Int) -> String {
+    public static func typeCountCopy(_ count: Int) -> LocalizedCopy {
         if count <= 0 {
             return "No types selected yet."
         }
-        if count == 1 {
-            return "We read 1 type you chose."
-        }
-        return "We read \(count) types you chose."
+        return LocalizedCopy(
+            "We read %lld types you chose.",
+            .number(count),
+            singular: "We read 1 type you chose."
+        )
     }
 
-    public static func hopLine(_ hop: DataFlowHop) -> String {
-        "\(hop.host) · \(hop.transport) · \(hop.credential)"
+    public static func hopLine(_ hop: DataFlowHop) -> LocalizedCopy {
+        LocalizedCopy("%@ · %@ · %@", .text(hop.host), .text(hop.transport), .copy(hop.credential))
     }
 }

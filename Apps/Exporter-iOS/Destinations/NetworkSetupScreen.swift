@@ -25,7 +25,7 @@ struct NetworkSetupScreen: View {
             if let caveat = setup.kind.caveat {
                 Section {
                     Label {
-                        Text(caveat)
+                        Text(copy: caveat)
                     } icon: {
                         DestinationDisplayState.stale.toneGlyph
                     }
@@ -40,7 +40,7 @@ struct NetworkSetupScreen: View {
                     .autocorrectionDisabled()
                     .accessibilityIdentifier("network-address")
                 if !setup.address.isEmpty {
-                    Text(setup.addressCheck.message)
+                    Text(copy: setup.addressCheck.message)
                         .metadata()
                         .accessibilityIdentifier("network-address-check")
                 }

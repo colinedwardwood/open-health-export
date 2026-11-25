@@ -43,6 +43,14 @@ enum UITestFixtures {
         environment["OHE_SEED_LOCAL_EXPORT_FOLDER"] == "1"
     }
 
+    /// `OHE_FAIL_DATA_SAVE=1`: saving the Data screen's types fails, so UI tests reach
+    /// its error without a broken database.
+    static var failsDataSave: Bool {
+        environment["OHE_FAIL_DATA_SAVE"] == "1"
+    }
+
+    struct InjectedFailure: Error {}
+
     /// `OHE_SEED_ICLOUD_FOLDER=1`: the folder button offers a folder whose path is under
     /// `Mobile Documents`, as iCloud Drive's is, so UI tests reach the iCloud warning
     /// without the Files picker. It lives in the app container, which needs no scope.

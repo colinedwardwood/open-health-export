@@ -174,8 +174,9 @@ private struct ExportNowControl: View {
 }
 
 /// The five-part error, compact: what happened, why, and what to do.
-private struct ErrorCard: View {
+struct ErrorCard: View {
     let error: UserFacingErrorObject
+    var identifier = "status-export-error"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -189,6 +190,6 @@ private struct ErrorCard: View {
         }
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("status-export-error")
+        .accessibilityIdentifier(identifier)
     }
 }
