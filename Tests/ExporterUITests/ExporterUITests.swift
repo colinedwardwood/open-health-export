@@ -571,6 +571,48 @@ final class ExporterUITests: XCTestCase {
         XCTAssertLessThanOrEqual(taps, 6)
     }
 
+    /// #59: a folder in iCloud Drive shows a warning and is not used, tested or saved
+    /// until the person acknowledges it.
+    func testICloudFolderWarnsAndNeedsAcknowledgement() throws {
+        app.terminate()
+        app.launchEnvironment = [
+            "OHE_RESET_SEEDED_SURFACES": "1",
+            "OHE_WIPE_ON_LAUNCH": "1",
+            "OHE_SEED_ICLOUD_FOLDER": "1",
+        ]
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launch()
+        func tap(_ element: XCUIElement) {
+            XCTAssertTrue(element.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+            element.tap()
+        }
+        tap(app.tabBars.buttons["Destinations"])
+        tap(app.buttons["destinations-add"])
+        tap(app.buttons["add-files"])
+        tap(app.buttons["files-choose-folder"])
+        XCTAssertTrue(identified("icloud-warning").waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        // Nothing was tested or saved while the warning is open.
+        XCTAssertFalse(app.buttons["files-save"].isEnabled)
+        XCTAssertFalse(identified("test-step-openFolder").exists)
+        // The two choices sit under the warning, so the larger Dynamic Type sizes push
+        // them below the fold and the audit reports them as partial, as it does for
+        // the Status rows under their summary (statusRowsBelowFold).
+        auditFoldBottom = identified("icloud-warning").firstMatch.frame.maxY
+        try performAccessibilityAudit("files-icloud-warning")
+        auditFoldBottom = nil
+        tap(app.buttons["icloud-choose-another"])
+        XCTAssertFalse(identified("icloud-warning").exists)
+        tap(app.buttons["files-choose-folder"])
+        tap(app.buttons["icloud-acknowledge"])
+        allowHealthSheetIfShown()
+        XCTAssertTrue(identified("test-step-confirmBytes").waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertFalse(identified("icloud-warning").exists)
+    }
+
     /// #68: without the unlock, Status says exports run on Export now and Settings
     /// offers Buy and Restore; unlocked shows neither; a refund keeps everything.
     func testUnlockStatesAreShownWhereTheyMatter() throws {

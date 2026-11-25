@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: FSL-1.1-ALv2
 
 import AppServices
+import CompanionReceive
 import Foundation
 
 #if DEBUG
@@ -30,6 +31,9 @@ enum UITestFixtures {
         if let scenario = environment["OHE_SEED_DESTINATION_STATUS"] {
             try? HarnessExport.seedDestinationStatusForUITests(scenario: scenario)
         }
+        if seedsICloudFolder {
+            ICloudFolderAcknowledgement.app.clear()
+        }
         if environment["OHE_RESET_FIRST_RUN"] == "1" {
             UserDefaults.standard.removeObject(forKey: SettingKey.disclosureAcknowledged.rawValue)
         }
@@ -39,6 +43,27 @@ enum UITestFixtures {
     /// the Files picker, which UI tests can't drive.
     static var seedsLocalExportFolder: Bool {
         environment["OHE_SEED_LOCAL_EXPORT_FOLDER"] == "1"
+    }
+
+    /// `OHE_SEED_ICLOUD_FOLDER=1`: the folder button offers a folder whose path is under
+    /// `Mobile Documents`, as iCloud Drive's is, so UI tests reach the iCloud warning
+    /// without the Files picker. It lives in the app container, which needs no scope.
+    static var seedsICloudFolder: Bool {
+        environment["OHE_SEED_ICLOUD_FOLDER"] == "1"
+    }
+
+    static func iCloudFixtureFolder() throws -> URL {
+        let folder = try HarnessExport.applicationSupportRoot()
+            .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/ohe-icloud-fixture", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder
+    }
+
+    /// Saves a fixture folder the way the picker would, without a security scope.
+    static func chooseFixtureFolder(_ url: URL) throws -> String {
+        try AppDestinations.folder.saveUnscopedFolder(url)
+        AppDestinations.records.remove(.localFileTestReport)
+        return url.lastPathComponent
     }
 
     /// `OHE_UNLOCK_STATE=locked|unlocked|revoked|sourceBuild` forces the unlock state

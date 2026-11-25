@@ -106,16 +106,52 @@ public struct CompanionArchive: Sendable {
 
 public enum FolderRisk {
     /// True when writing here would put PHI in iCloud Drive / Desktop-Documents sync.
-    public static func iCloudSyncWarning(for url: URL) -> String? {
-        let values = try? url.resourceValues(forKeys: [.isUbiquitousItemKey, .ubiquitousItemContainerDisplayNameKey])
-        if values?.isUbiquitousItem == true {
-            return "This folder is in iCloud. Health archives written here leave this Mac."
-        }
-        let path = url.path
-        if path.contains("/Library/Mobile Documents/") || path.contains("/Mobile Documents/") {
-            return "This folder is in iCloud. Health archives written here leave this Mac."
-        }
-        return nil
+    /// `device` is the noun the warning uses for where the data stays ("this Mac").
+    public static func iCloudSyncWarning(for url: URL, device: String = "this Mac") -> String? {
+        isInICloud(url)
+            ? "This folder is in iCloud. Health archives written here leave \(device)."
+            : nil
+    }
+
+    /// The Mobile Documents path (iCloud Drive's container on macOS and iOS) is checked
+    /// first because it needs no I/O; the ubiquity flag covers folders elsewhere.
+    public static func isInICloud(_ url: URL) -> Bool {
+        if url.path.contains("/Mobile Documents/") { return true }
+        let values = try? url.resourceValues(forKeys: [.isUbiquitousItemKey])
+        return values?.isUbiquitousItem == true
+    }
+}
+
+/// The folder the person has said they accept being in iCloud, so the warning is asked
+/// once per folder and a different folder asks again (App Review 5.1.3(ii)).
+public struct ICloudFolderAcknowledgement {
+    private let defaults: UserDefaults
+    private let key: String
+
+    public init(defaults: UserDefaults = .standard, key: String = "ohe.iCloudFolderAcknowledged") {
+        self.defaults = defaults
+        self.key = key
+    }
+
+    public func isAcknowledged(_ url: URL) -> Bool {
+        defaults.string(forKey: key) == Self.identity(url)
+    }
+
+    public func acknowledge(_ url: URL) {
+        defaults.set(Self.identity(url), forKey: key)
+    }
+
+    public func clear() {
+        defaults.removeObject(forKey: key)
+    }
+
+    /// True when this folder is in iCloud and has not been acknowledged.
+    public func needsAcknowledgement(_ url: URL) -> Bool {
+        FolderRisk.isInICloud(url) && !isAcknowledged(url)
+    }
+
+    private static func identity(_ url: URL) -> String {
+        url.resolvingSymlinksInPath().standardizedFileURL.path
     }
 }
 

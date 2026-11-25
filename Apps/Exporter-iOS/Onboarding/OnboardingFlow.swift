@@ -217,6 +217,10 @@ private struct DestinationStep: View {
             VStack(alignment: .leading, spacing: 16) {
                 Button {
                     #if DEBUG
+                    if UITestFixtures.seedsICloudFolder {
+                        Task { await model.useICloudFixtureFolder() }
+                        return
+                    }
                     if UITestFixtures.seedsLocalExportFolder {
                         Task { await model.useSeededFolder() }
                         return
@@ -247,6 +251,13 @@ private struct DestinationStep: View {
                 .buttonStyle(.plain)
                 .disabled(model.isWorking)
                 .accessibilityIdentifier("onboarding-choose-files")
+                if let warning = model.iCloudWarning {
+                    ICloudFolderWarning(
+                        warning: warning,
+                        acknowledge: { Task { await model.acknowledgeICloudFolder() } },
+                        decline: model.declineICloudFolder
+                    )
+                }
                 WorkStatus(work: model.work)
                 Label(
                     "Data goes straight from \(DeviceNoun.thisDevice) to the destination you set up. We never see it.",

@@ -129,6 +129,10 @@ struct FilesSetupScreen: View {
             Section {
                 Button {
                     #if DEBUG
+                    if UITestFixtures.seedsICloudFolder {
+                        Task { await setup.useICloudFixtureFolder() }
+                        return
+                    }
                     if UITestFixtures.seedsLocalExportFolder {
                         Task { await setup.useSeededFolder() }
                         return
@@ -142,6 +146,15 @@ struct FilesSetupScreen: View {
                 .accessibilityIdentifier("files-choose-folder")
             } footer: {
                 SectionFooter("Exports are written as JSON Lines files. A folder in iCloud Drive syncs your health data to iCloud.")
+            }
+            if let warning = setup.iCloudWarning {
+                Section {
+                    ICloudFolderWarning(
+                        warning: warning,
+                        acknowledge: { Task { await setup.acknowledgeICloudFolder() } },
+                        decline: setup.declineICloudFolder
+                    )
+                }
             }
             if setup.folderName != nil {
                 TestChecklistSection(checklist: setup.checklist, error: setup.error) {
@@ -160,6 +173,35 @@ struct FilesSetupScreen: View {
         .fileImporter(isPresented: $picking, allowedContentTypes: [.folder]) { result in
             guard case let .success(url) = result else { return }
             Task { await setup.useFolder(url) }
+        }
+    }
+}
+
+/// The iCloud Drive warning for a picked folder: the folder is used only once the
+/// person acknowledges it (#59), and the default choice keeps the data on the device.
+struct ICloudFolderWarning: View {
+    let warning: String
+    let acknowledge: () -> Void
+    let decline: () -> Void
+
+    var body: some View {
+        Group {
+            HStack(alignment: .top, spacing: 12) {
+                DestinationDisplayState.stale.toneGlyph.accessibilityHidden(true)
+                Text(warning)
+                    .font(.body)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("icloud-warning")
+            Button(action: decline) {
+                Text("Choose another folder").font(.body)
+            }
+            .accessibilityIdentifier("icloud-choose-another")
+            Button(action: acknowledge) {
+                Text("Use iCloud folder anyway").font(.body)
+            }
+            .accessibilityIdentifier("icloud-acknowledge")
         }
     }
 }

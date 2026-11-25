@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: FSL-1.1-ALv2
 
 import AppServices
+import CompanionReceive
 import CoreDomain
 import DestinationTrust
 import Foundation
@@ -16,6 +17,11 @@ final class FilesSetupModel {
     private(set) var folderName: String?
     private(set) var checklist = DestinationTestChecklist.localFile
     private(set) var error: UserFacingErrorObject?
+    /// A picked folder in iCloud Drive, held until the person acknowledges that exports
+    /// there leave this device (#59). Nothing is saved or written meanwhile.
+    private(set) var pendingICloudFolder: URL?
+    /// The warning for `pendingICloudFolder`, computed once when it is picked.
+    private(set) var iCloudWarning: String?
 
     @ObservationIgnored private let services: AppEnvironment
 
@@ -27,9 +33,25 @@ final class FilesSetupModel {
     var canSave: Bool { checklist.passed }
     var testing: Bool { checklist.running }
 
+
     func useFolder(_ url: URL) async {
+        guard !ICloudFolderAcknowledgement.app.needsAcknowledgement(url) else {
+            pendingICloudFolder = url
+            iCloudWarning = FolderRisk.iCloudSyncWarning(for: url, device: DeviceNoun.thisDevice)
+            return
+        }
+        pendingICloudFolder = nil
+        iCloudWarning = nil
         do {
+            #if DEBUG
+            if UITestFixtures.seedsICloudFolder {
+                folderName = try UITestFixtures.chooseFixtureFolder(url)
+            } else {
+                folderName = try services.destinations.chooseLocalExportFolder(url)
+            }
+            #else
             folderName = try services.destinations.chooseLocalExportFolder(url)
+            #endif
         } catch {
             self.error = UserFacingFailure.object(for: error, destinationLabel: "the folder")
             return
@@ -37,8 +59,24 @@ final class FilesSetupModel {
         await runTest()
     }
 
+    func acknowledgeICloudFolder() async {
+        guard let url = pendingICloudFolder else { return }
+        ICloudFolderAcknowledgement.app.acknowledge(url)
+        await useFolder(url)
+    }
+
+    func declineICloudFolder() {
+        pendingICloudFolder = nil
+        iCloudWarning = nil
+    }
+
     #if DEBUG
     /// UI tests can't drive the Files folder picker; they get a seeded folder.
+    func useICloudFixtureFolder() async {
+        guard let url = try? UITestFixtures.iCloudFixtureFolder() else { return }
+        await useFolder(url)
+    }
+
     func useSeededFolder() async {
         folderName = try? HarnessExport.seedLocalExportFolderForUITests()
         await runTest()

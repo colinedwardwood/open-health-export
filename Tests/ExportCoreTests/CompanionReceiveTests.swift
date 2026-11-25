@@ -68,6 +68,29 @@ import WireFormat
     #expect(archive.iCloudWarning() != nil)
 }
 
+@Test func iCloudWarningNamesTheDeviceAndRecognisesIOSContainerPaths() {
+    let ios = URL(fileURLWithPath: "/private/var/mobile/Library/Mobile Documents/com~apple~CloudDocs/Archive")
+    #expect(FolderRisk.isInICloud(ios))
+    #expect(FolderRisk.iCloudSyncWarning(for: ios, device: "this iPhone")?.contains("leave this iPhone") == true)
+    #expect(!FolderRisk.isInICloud(URL(fileURLWithPath: "/private/var/mobile/Containers/Shared/AppGroup/Archive")))
+    #expect(!FolderRisk.isInICloud(URL(fileURLWithPath: "/private/var/mobile/Mobile Documents-notes")))
+}
+
+@Test func iCloudAcknowledgementIsPerFolder() throws {
+    let suite = "ohe-icloud-ack-\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let ack = ICloudFolderAcknowledgement(defaults: defaults)
+    let first = URL(fileURLWithPath: "/var/mobile/Library/Mobile Documents/com~apple~CloudDocs/One")
+    let second = URL(fileURLWithPath: "/var/mobile/Library/Mobile Documents/com~apple~CloudDocs/Two")
+    let local = FileManager.default.temporaryDirectory
+    #expect(ack.needsAcknowledgement(first))
+    ack.acknowledge(first)
+    #expect(!ack.needsAcknowledgement(first))
+    #expect(ack.needsAcknowledgement(second))
+    #expect(!ack.needsAcknowledgement(local))
+}
+
 @Test func companionInboundPersistsAcrossRestart() async throws {
     let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ohe-inbound-\(UUID().uuidString)")
     let archive = CompanionArchive(directory: dir)
