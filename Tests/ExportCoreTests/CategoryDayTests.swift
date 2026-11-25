@@ -240,6 +240,7 @@ private func sweep(
 @Test func homeAssistantDiscoveryDeclaresASensorForMindfulMinutesNotSleep() throws {
     let data = try HADiscovery.encodeDeviceConfig(
         exporterId: "device-1234",
+        productName: "KeepMyMetrics",
         metrics: [mindful, sleep]
     )
     let root = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
