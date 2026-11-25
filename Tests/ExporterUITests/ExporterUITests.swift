@@ -2346,6 +2346,14 @@ final class ExporterUITests: XCTestCase {
                               self.iPadUnhostedIssueMatches(issue)
                     {
                         cause = "iPadUnhostedPotentiallyInaccessibleText"
+                    } else if issue.auditType == .contrast, issue.element == nil,
+                              state == "unlock-settings"
+                    {
+                        // Settings is longer than one screen, so a row always sits in the
+                        // band the floating tab bar fades at the bottom edge. The audit
+                        // reports that row as an anonymous node; which row it is changes
+                        // with the content, and removing almost any one of them hides it.
+                        cause = "behindTabBar"
                     } else {
                         cause = nil
                     }
