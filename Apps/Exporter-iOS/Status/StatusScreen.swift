@@ -162,7 +162,7 @@ private struct ExportNowControl: View {
                 .accessibilityIdentifier("status-unlock-note")
             }
             if let error = model.lastExportError {
-                ErrorCard(error: error)
+                ErrorCard(error: error, identifier: "status-export-error")
             } else if let message = model.lastExportMessage, !model.exporting {
                 Text(message)
                     .metadata()
@@ -176,7 +176,7 @@ private struct ExportNowControl: View {
 /// The five-part error, compact: what happened, why, and what to do.
 struct ErrorCard: View {
     let error: UserFacingErrorObject
-    var identifier = "status-export-error"
+    let identifier: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
