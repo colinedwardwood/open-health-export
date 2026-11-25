@@ -170,7 +170,7 @@ private struct TypeToggle: View {
     let set: @MainActor (Bool) -> Void
 
     var body: some View {
-        Toggle(isOn: Binding(get: { row.selected }, set: set)) {
+        Toggle(isOn: Binding(get: { row.selected }, set: { set($0) })) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.name)
                 if let unit = row.unit {
