@@ -78,7 +78,7 @@ final class FilesSetupModel {
     }
 
     func useSeededFolder() async {
-        folderName = try? HarnessExport.seedLocalExportFolderForUITests()
+        folderName = try? UITestFixtures.seedLocalExportFolder()
         await runTest()
     }
     #endif

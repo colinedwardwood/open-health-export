@@ -14,6 +14,7 @@ import Watchdog
 struct DestinationsScreen: View {
     @Environment(AppModel.self) private var model
     @Environment(\.services) private var services
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var adding = false
 
     var body: some View {
@@ -25,11 +26,12 @@ struct DestinationsScreen: View {
         )
         return List {
             if rows.isEmpty {
-                ContentUnavailableView {
-                    Label("No destinations yet", systemImage: "arrow.right.to.line")
-                } description: {
-                    Text("Add a folder in Files to start. You can add servers later.")
-                }
+                EmptyState(
+                    symbol: "arrow.right.to.line",
+                    title: "No destinations yet",
+                    message: "Add a folder in Files to start. You can add servers later."
+                )
+                .accessibilityIdentifier("destinations-empty")
             } else {
                 Section {
                     ForEach(rows) { row in
@@ -53,7 +55,13 @@ struct DestinationsScreen: View {
                 Button {
                     adding = true
                 } label: {
-                    Label("Add destination", systemImage: "plus")
+                    // Text only at accessibility sizes: an icon-and-title Label clips
+                    // there, as it does inside a prominent button on Status (#46).
+                    if dynamicTypeSize.isAccessibilitySize {
+                        Text("Add destination")
+                    } else {
+                        Label("Add destination", systemImage: "plus")
+                    }
                 }
                 .accessibilityIdentifier("destinations-add")
             }

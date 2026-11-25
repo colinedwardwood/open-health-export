@@ -142,13 +142,13 @@ struct HealthService: Sendable {
 
 enum AppHealth {
     static let service = HealthService(
-        root: { try HarnessExport.applicationSupportRoot() },
+        root: { try AppFiles.applicationSupportRoot() },
         store: { root in
             try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         },
-        selectedMetrics: { try await HarnessExport.selectedMetrics() },
+        selectedMetrics: { try await AppDestinations.repository.selectedMetrics() },
         owedDestinations: {
-            HarnessExport.healthDestinationIDs.filter { HarnessExport.isDestinationEnabled($0) }
+            DestinationRepository.healthDestinationIDs.filter { AppDestinations.repository.isEnabled($0) }
         },
         failureLog: ObserverFailureLog(storage: PreferencesObserverFailureStorage())
     )

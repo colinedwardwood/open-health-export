@@ -160,14 +160,14 @@ struct ExportOnePageIntent: AppIntent {
     func perform() async throws -> some IntentResult & ReturnsValue<ShortcutExportKind> {
         if let reason = ShortcutExportAuthorization.denyReason(
             disclosureAcknowledged: UserDefaults.standard.bool(forKey: SettingKey.disclosureAcknowledged.rawValue),
-            destinationEnabled: HarnessExport.hasAutomaticExport(trigger: .shortcut)
+            destinationEnabled: AppDestinations.repository.hasAutomaticExport(trigger: .shortcut)
         ) {
             if reason.contains("disclosure") {
                 throw ShortcutExportError.disclosureRequired
             }
             throw ShortcutExportError.destinationDisabled
         }
-        let lines = try await HarnessExport.runOnePageEachMetric(trigger: .shortcut)
+        let lines = try await AppExport.service.runOnePageEachMetric(trigger: .shortcut)
         return .result(
             value: ShortcutExportKind.summarizing(ShortcutExportKind.kinds(fromExportLines: lines))
         )
@@ -190,7 +190,7 @@ struct ExportTypeWindowIntent: AppIntent {
     func perform() async throws -> some IntentResult & ReturnsValue<ShortcutExportKind> {
         if let reason = ShortcutExportAuthorization.denyReason(
             disclosureAcknowledged: UserDefaults.standard.bool(forKey: SettingKey.disclosureAcknowledged.rawValue),
-            destinationEnabled: HarnessExport.hasAutomaticExport(trigger: .shortcut)
+            destinationEnabled: AppDestinations.repository.hasAutomaticExport(trigger: .shortcut)
         ) {
             if reason.contains("disclosure") {
                 throw ShortcutExportError.disclosureRequired
@@ -198,7 +198,7 @@ struct ExportTypeWindowIntent: AppIntent {
             throw ShortcutExportError.destinationDisabled
         }
         UserDefaults.standard.set(max(1, windowHours), forKey: SettingKey.exportWindowHours.rawValue)
-        let lines = try await HarnessExport.runOnePageEachMetric(
+        let lines = try await AppExport.service.runOnePageEachMetric(
             metrics: [MetricID(rawValue: metricIdentifier)],
             trigger: .shortcut
         )

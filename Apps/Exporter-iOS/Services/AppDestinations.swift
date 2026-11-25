@@ -287,7 +287,7 @@ struct BookmarkedExportFolder: LocalExportFolderStorage {
 }
 
 enum AppDestinations {
-    private static let root: @Sendable () throws -> URL = { try HarnessExport.applicationSupportRoot() }
+    private static let root: @Sendable () throws -> URL = { try AppFiles.applicationSupportRoot() }
 
     static let records = DestinationRecordFiles(root: root)
     static let folder = BookmarkedExportFolder(root: root)

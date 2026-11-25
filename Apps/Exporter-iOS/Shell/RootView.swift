@@ -35,6 +35,9 @@ struct RootView: View {
             }
             .tabViewStyle(.sidebarAdaptable)
             .environment(model)
+            // The lock covers the screen, and VoiceOver and automation still read what
+            // is under it unless it is hidden from them too (SEC-29).
+            .accessibilityHidden(model.isLocked)
 
             if model.isLocked {
                 PrivacyLockScreen(gate: model.privacyGate) {
@@ -56,11 +59,6 @@ struct RootView: View {
                 model.sceneLeftForeground()
             }
         }
-        #if DEBUG
-        .fullScreenCover(isPresented: $model.showsDeveloper) {
-            DeveloperScreen()
-        }
-        #endif
     }
 
     private func stack(_ tab: AppTab, @ViewBuilder root: () -> some View) -> some View {

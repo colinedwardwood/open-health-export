@@ -36,7 +36,7 @@ final class SampleDataModel {
         phase = .running
         let date = Date()
         do {
-            _ = try await HarnessExport.runDemoDataset(at: date)
+            _ = try await AppExport.service.runDemoDataset(at: date)
             let source = DemoSampleSource(now: date)
             var rows: [Row] = []
             for declaration in MetricCatalog.selectable where declaration.kind == "sample.quantity" {

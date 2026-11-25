@@ -7,8 +7,8 @@ import CorrectnessEngine
 import SwiftUI
 import UIKit
 
-/// #52: Settings. Expert surfaces (OTLP, traceparent) stay in the debug Developer
-/// screen and never reach a release build.
+/// #52: Settings. Engineering controls are not reachable from here or anywhere else in
+/// the app (#56).
 struct SettingsScreen: View {
     @Environment(AppModel.self) private var model
     @Environment(\.services) private var services
@@ -102,13 +102,6 @@ struct SettingsScreen: View {
                 NavigationLink("About KeepMyMetrics") { AboutScreen() }
                     .accessibilityIdentifier("settings-about")
             }
-
-            #if DEBUG
-            Section {
-                Button("Developer") { model.showsDeveloper = true }
-                    .accessibilityIdentifier("shell-developer")
-            }
-            #endif
         }
         .navigationTitle("Settings")
         .sheet(isPresented: $showsSample) { SampleDataScreen() }
@@ -164,6 +157,7 @@ struct AboutScreen: View {
                     Link(link.title, destination: link.url)
                 }
                 NavigationLink("Acknowledgements") { NoticesScreen() }
+                    .accessibilityIdentifier("about-acknowledgements")
             }
         }
         .navigationTitle("About")
@@ -179,6 +173,7 @@ struct NoticesScreen: View {
         ScrollView {
             Text(Self.notice)
                 .font(.footnote.monospaced())
+                .accessibilityIdentifier("acknowledgements-body")
                 .textSelection(.enabled)
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)
