@@ -26,6 +26,7 @@ absent. `No` rows point at a numbered manual step below.
 | `OHE_SEED_LOCAL_EXPORT_FOLDER` | The Files picker, which XCUITest cannot drive | No: manual step M2 |
 | `OHE_SEED_ICLOUD_FOLDER` | A folder under iCloud Drive chosen in the picker | No: manual step M2 |
 | `OHE_FAIL_DATA_SAVE` | A real storage failure when saving Data types | Yes: `testDataAsksBeforeASensitiveTypeAndSaves` saves with the hook off |
+| `OHE_SEED_BACKGROUND_REFRESH` | The Background App Refresh setting, which the simulator cannot change from a test | No: manual step M11 |
 | `OHE_UNLOCK_STATE` | StoreKit purchase state | No: manual step M3 |
 | `OHE_OPEN_URL` | A notification or widget tap delivering the URL | No: manual step M4 |
 | `OHE_TEST_USER_PRESENCE` | Face ID, Touch ID and passcode prompts | No: manual step M5 |
@@ -63,3 +64,4 @@ Run on a physical iPhone with a Release build before each release, recording
 - M8. Export on cellular with Low Data Mode on; confirm the metered-network rules apply.
 - M9. On an iPad, confirm the "only exporter" notice. A device with no Health store is not available for manual testing; the check is covered by unit tests only.
 - M10. With a network available, launch a Release build with advisories at their defaults and confirm the advisory request is the only one sent.
+- M11. Turn Background App Refresh off for the app in iOS Settings and confirm Status says so; turn it back on and confirm the row goes away.
