@@ -617,7 +617,7 @@ final class ExporterUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(
             app.otherElements["status-notice-background-refresh"].waitForExistence(timeout: uiWait)
-                || app.staticTexts["Background App Refresh is off"].waitForExistence(timeout: uiWait),
+                || app.staticTexts["Background App Refresh is not available"].waitForExistence(timeout: uiWait),
             visibleIdentifiers().joined(separator: ",")
         )
     }

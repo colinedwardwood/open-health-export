@@ -41,9 +41,8 @@ private func recorder(
 @Test func launchFailureIsJournalledWithAnErrorClassAndRemembered() async {
     let store = MemoryStateStore()
     let memory = MemoryIssues()
-    let recorded = await recorder(store, memory: memory)
+    await recorder(store, memory: memory)
         .record(.observerStart, error: Boom(), trigger: .launch)
-    #expect(recorded == .internalFault)
     let event = store.transaction.journal.last
     #expect(event?.outcomeKind == "launch_failure")
     #expect(event?.errorClass == ErrorClass.internalFault.rawValue)
@@ -56,9 +55,7 @@ private func recorder(
 }
 
 @Test func aLockedKeychainIsADeferralClassifiedAsADeviceLock() async {
-    #expect(LaunchFailureRecorder.isDeferral(SecretStoreError.locked))
-    #expect(!LaunchFailureRecorder.isDeferral(SecretStoreError.notFound))
-    #expect(!LaunchFailureRecorder.isDeferral(Boom()))
+    #expect(LaunchFailureRecorder.errorClass(for: SecretStoreError.notFound) == .internalFault)
     #expect(LaunchFailureRecorder.errorClass(for: SecretStoreError.locked) == .deviceLocked)
     #expect(LaunchFailureRecorder.errorClass(for: DestinationSendError.lowPowerMode) == .lowPowerMode)
     let store = MemoryStateStore()
@@ -76,6 +73,33 @@ private func recorder(
     recorder.resolve(.observerStart)
     recorder.resolve(.observerStart)
     #expect(recorder.issues().map(\.stage) == [.wakeLedger])
+}
+
+@Test func runRecordsAThrowAndClearsOnSuccess() async {
+    let recorder = recorder()
+    let failed: Int? = await recorder.run(.observerStart, trigger: .launch) { throw Boom() }
+    #expect(failed == nil)
+    #expect(recorder.issues().map(\.stage) == [.observerStart])
+    let worked = await recorder.run(.observerStart, trigger: .launch) { 7 }
+    #expect(worked == 7)
+    #expect(recorder.issues().isEmpty)
+    // Nothing outstanding: resolving again does not touch storage.
+    recorder.resolve(.wakeLedger)
+    #expect(recorder.issues().isEmpty)
+}
+
+@Test func concurrentFailuresAcrossStagesAreAllRemembered() async {
+    let memory = MemoryIssues()
+    let recorder = recorder(memory: memory)
+    await withTaskGroup(of: Void.self) { group in
+        for stage in LaunchStage.allCases {
+            group.addTask { await recorder.record(stage, error: Boom(), trigger: .launch) }
+            group.addTask { recorder.resolve(.wakeLedger) }
+        }
+    }
+    let expected = Set(LaunchStage.allCases).subtracting([.wakeLedger])
+    #expect(Set(recorder.issues().map(\.stage)).isSuperset(of: expected))
+    #expect(Set(memory.issues().map(\.stage)) == Set(recorder.issues().map(\.stage)))
 }
 
 @Test func anUnopenableJournalStillRemembersTheFailure() async {
@@ -114,7 +138,7 @@ private func recorder(
         backgroundRefresh: .denied, lowPowerMode: false, submitFailure: nil, issues: []
     )
     #expect(denied.map(\.id) == ["background-refresh"])
-    #expect(denied[0].title.english == "Background App Refresh is off")
+    #expect(denied[0].title.english == "Background App Refresh is not available")
     let restricted = StatusNotices.notices(
         backgroundRefresh: .restricted, lowPowerMode: true, submitFailure: "refresh (code 1)", issues: []
     )

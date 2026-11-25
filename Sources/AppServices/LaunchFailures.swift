@@ -52,11 +52,15 @@ public protocol LaunchIssueMemory: Sendable {
 
 /// #62: records a failed launch or background step in the run journal with an error
 /// class, and remembers it so Status can show it. Recording never throws: a failure
-/// to record a failure must not take the wake down with it.
-public struct LaunchFailureRecorder: Sendable {
+/// to record a failure must not take the wake down with it. Observer wakes, the wake
+/// handler and the foreground path call in concurrently, so the remembered list is
+/// guarded by a lock and cached after the first read.
+public final class LaunchFailureRecorder: @unchecked Sendable {
     private let store: @Sendable () throws -> any StateStore
     private let memory: any LaunchIssueMemory
     private let now: @Sendable () -> Date
+    private let lock = NSLock()
+    private var cached: [LaunchIssue]?
 
     public init(
         store: @escaping @Sendable () throws -> any StateStore,
@@ -80,17 +84,26 @@ public struct LaunchFailureRecorder: Sendable {
         return .internalFault
     }
 
-    /// True when the failure only needs a retry once the device is unlocked.
-    public static func isDeferral(_ error: Error) -> Bool {
-        errorClass(for: error) == .deviceLocked
+    /// Runs one launch or background step. Success clears the stage's earlier failure;
+    /// a throw is recorded and returns nil.
+    @discardableResult
+    public func run<T>(
+        _ stage: LaunchStage,
+        trigger: RunTrigger,
+        isolation: isolated (any Actor)? = #isolation,
+        _ body: () async throws -> T
+    ) async -> T? {
+        do {
+            let value = try await body()
+            resolve(stage)
+            return value
+        } catch {
+            await record(stage, error: error, trigger: trigger)
+            return nil
+        }
     }
 
-    @discardableResult
-    public func record(
-        _ stage: LaunchStage,
-        error: Error,
-        trigger: RunTrigger
-    ) async -> ErrorClass {
+    public func record(_ stage: LaunchStage, error: Error, trigger: RunTrigger) async {
         let errorClass = Self.errorClass(for: error)
         let epoch = now().timeIntervalSince1970
         if let store = try? store() {
@@ -107,21 +120,38 @@ public struct LaunchFailureRecorder: Sendable {
                 )
             }
         }
-        var current = memory.issues().filter { $0.stage != stage }
-        current.append(LaunchIssue(stage: stage, errorClass: errorClass.rawValue, atEpoch: epoch))
-        memory.save(current)
-        return errorClass
+        update { issues in
+            issues.removeAll { $0.stage == stage }
+            issues.append(LaunchIssue(stage: stage, errorClass: errorClass.rawValue, atEpoch: epoch))
+        }
     }
 
-    /// The step worked this time; its earlier failure is no longer news.
+    /// The step worked this time; its earlier failure is no longer news. Costs nothing
+    /// when nothing is outstanding, which is almost always.
     public func resolve(_ stage: LaunchStage) {
-        let current = memory.issues()
-        guard current.contains(where: { $0.stage == stage }) else { return }
-        memory.save(current.filter { $0.stage != stage })
+        update { $0.removeAll { $0.stage == stage } }
     }
 
     public func issues() -> [LaunchIssue] {
-        memory.issues()
+        lock.withLock { load() }
+    }
+
+    private func update(_ change: (inout [LaunchIssue]) -> Void) {
+        lock.withLock {
+            var issues = load()
+            let before = issues
+            change(&issues)
+            guard issues != before else { return }
+            cached = issues
+            memory.save(issues)
+        }
+    }
+
+    private func load() -> [LaunchIssue] {
+        if let cached { return cached }
+        let loaded = memory.issues()
+        cached = loaded
+        return loaded
     }
 }
 
@@ -149,21 +179,11 @@ public enum StatusNotices {
         issues: [LaunchIssue]
     ) -> [StatusNotice] {
         var notices: [StatusNotice] = []
-        switch backgroundRefresh {
-        case .available:
-            break
-        case .denied:
+        if backgroundRefresh != .available {
             notices.append(StatusNotice(
                 id: "background-refresh",
-                title: "Background App Refresh is off",
-                detail: "Exports only run when you open the app. Turn it on in Settings, under General, Background App Refresh.",
-                tone: .attention
-            ))
-        case .restricted:
-            notices.append(StatusNotice(
-                id: "background-refresh",
-                title: "Background App Refresh is restricted",
-                detail: "A setting or profile on this device stops the app refreshing in the background. Exports only run when you open the app.",
+                title: "Background App Refresh is not available",
+                detail: "It is off or restricted on this device, so exports only run when you open the app. To turn it on, open Settings, then General, then Background App Refresh.",
                 tone: .attention
             ))
         }

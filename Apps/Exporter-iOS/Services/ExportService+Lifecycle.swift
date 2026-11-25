@@ -66,20 +66,14 @@ extension ExportService {
     /// #63: the seven-day clock runs at launch, on foreground and on every background
     /// wake. A failure is recorded (#62) instead of discarded.
     func expireQueuesRecordingFailure(trigger: RunTrigger) async {
-        do {
-            _ = try await expireQueuesAndNotify()
-            AppStatus.launchFailures.resolve(.queueExpiry)
-        } catch {
-            await AppStatus.launchFailures.record(.queueExpiry, error: error, trigger: trigger)
+        await AppStatus.launchFailures.run(.queueExpiry, trigger: trigger) {
+            try await expireQueuesAndNotify()
         }
     }
 
     func recoverInterruptedExportsRecordingFailure(trigger: RunTrigger) async {
-        do {
-            _ = try await recoverInterruptedExports()
-            AppStatus.launchFailures.resolve(.interruptedRecovery)
-        } catch {
-            await AppStatus.launchFailures.record(.interruptedRecovery, error: error, trigger: trigger)
+        await AppStatus.launchFailures.run(.interruptedRecovery, trigger: trigger) {
+            try await recoverInterruptedExports()
         }
     }
 

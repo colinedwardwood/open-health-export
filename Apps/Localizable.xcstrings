@@ -14,38 +14,14 @@
         }
       }
     },
-    "A setting or profile on this device stops the app refreshing in the background. Exports only run when you open the app.": {
+    "Background App Refresh is not available": {
       "comment": "Sources copy (LocalizedCopy)",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "A setting or profile on this device stops the app refreshing in the background. Exports only run when you open the app."
-          }
-        }
-      }
-    },
-    "Background App Refresh is off": {
-      "comment": "Sources copy (LocalizedCopy)",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Background App Refresh is off"
-          }
-        }
-      }
-    },
-    "Background App Refresh is restricted": {
-      "comment": "Sources copy (LocalizedCopy)",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Background App Refresh is restricted"
+            "value": "Background App Refresh is not available"
           }
         }
       }
@@ -132,18 +108,6 @@
         }
       }
     },
-    "Exports only run when you open the app. Turn it on in Settings, under General, Background App Refresh.": {
-      "comment": "Sources copy (LocalizedCopy)",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Exports only run when you open the app. Turn it on in Settings, under General, Background App Refresh."
-          }
-        }
-      }
-    },
     "iOS pauses background exports while Low Power Mode is on. They resume when it turns off.": {
       "comment": "Sources copy (LocalizedCopy)",
       "extractionState": "manual",
@@ -164,6 +128,18 @@
           "stringUnit": {
             "state": "translated",
             "value": "iOS refused to schedule them: %@. Exports still run when the app opens."
+          }
+        }
+      }
+    },
+    "It is off or restricted on this device, so exports only run when you open the app. To turn it on, open Settings, then General, then Background App Refresh.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It is off or restricted on this device, so exports only run when you open the app. To turn it on, open Settings, then General, then Background App Refresh."
           }
         }
       }

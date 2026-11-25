@@ -45,7 +45,7 @@ struct StatusScreen: View {
         )
         // #62/#63: what stops or delays background exports, shown even when every
         // destination looks fine.
-        let notices = AppStatus.statusNotices()
+        let notices = model.statusNotices
         return List {
             Section {
                 SummaryHeader(summary: summary)

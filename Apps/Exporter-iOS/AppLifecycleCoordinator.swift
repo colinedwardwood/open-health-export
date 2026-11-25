@@ -50,13 +50,12 @@ final class AppLifecycleCoordinator {
 
     /// #62: a wake that cannot be logged is journalled and shown on Status, never dropped.
     func recordWake(_ trigger: RunTrigger) {
-        do {
-            try AppHealth.service.wakeLedger().append(
-                WakeRecord(trigger: trigger, atEpoch: Date().timeIntervalSince1970)
-            )
-            AppStatus.launchFailures.resolve(.wakeLedger)
-        } catch {
-            Task { await AppStatus.launchFailures.record(.wakeLedger, error: error, trigger: trigger) }
+        Task {
+            await AppStatus.launchFailures.run(.wakeLedger, trigger: trigger) {
+                try AppHealth.service.wakeLedger().append(
+                    WakeRecord(trigger: trigger, atEpoch: Date().timeIntervalSince1970)
+                )
+            }
         }
     }
 
@@ -69,14 +68,10 @@ final class AppLifecycleCoordinator {
                 forKey: SettingKey.disclosureAcknowledged.rawValue
             )
         ) else { return }
-        let revoked: Bool
-        do {
-            revoked = try await AppHealth.service.observeAuthorizationChanges()
-            AppStatus.launchFailures.resolve(.authorizationObservation)
-        } catch {
-            await AppStatus.launchFailures.record(.authorizationObservation, error: error, trigger: trigger)
-            return
-        }
+        guard let revoked = await AppStatus.launchFailures.run(
+            .authorizationObservation, trigger: trigger,
+            { try await AppHealth.service.observeAuthorizationChanges() }
+        ) else { return }
         switch HealthObserverPolicy.action(
             revoked: revoked,
             automaticExport: AppDestinations.repository.hasAutomaticExport(trigger: .observerQuery),
@@ -87,15 +82,12 @@ final class AppLifecycleCoordinator {
         case .keep:
             return
         case .start:
-            do {
-                healthObservers = try await AppHealth.service.startObservers {
+            guard let started = await AppStatus.launchFailures.run(.observerStart, trigger: trigger, {
+                try await AppHealth.service.startObservers {
                     await ObserverExportGate.shared.enqueue($0)
                 }
-                AppStatus.launchFailures.resolve(.observerStart)
-            } catch {
-                await AppStatus.launchFailures.record(.observerStart, error: error, trigger: trigger)
-                return
-            }
+            }) else { return }
+            healthObservers = started
             BackgroundTaskCoordinator.submit()
         }
     }
@@ -288,7 +280,7 @@ enum BackgroundTaskCoordinator {
             } catch {
                 // A keychain sealed before first unlock is a deferral, not a failure:
                 // retry on the next wake instead of telling iOS this one failed.
-                if LaunchFailureRecorder.isDeferral(error) {
+                if LaunchFailureRecorder.errorClass(for: error) == .deviceLocked {
                     await AppStatus.launchFailures.record(.observerExport, error: error, trigger: trigger)
                     task.setTaskCompleted(success: true)
                 } else {
