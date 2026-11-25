@@ -45,7 +45,22 @@ public enum ReconcilePlanner {
         indexed: [EmittedIndexRow],
         observed: [SampleRecord]
     ) -> ReconcileDayPlan {
-        let observedUUIDs = observed.map(\.key.uuid)
+        planDay(
+            metric: metric,
+            day: day,
+            stored: stored,
+            indexed: indexed,
+            observedUUIDs: observed.map(\.key.uuid)
+        )
+    }
+
+    public static func planDay(
+        metric: MetricID,
+        day: String,
+        stored: CensusRow?,
+        indexed: [EmittedIndexRow],
+        observedUUIDs: [String]
+    ) -> ReconcileDayPlan {
         let observedFold = ReconcileCompare.fold(uuids: observedUUIDs)
         let storedRow = stored ?? CensusRow(
             metric: metric,

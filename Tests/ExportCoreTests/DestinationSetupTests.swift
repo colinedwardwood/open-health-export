@@ -11,7 +11,7 @@ import Testing
     #expect(list.steps.map(\.state) == [.pending, .pending, .pending, .pending])
     list.start(.writeCanary)
     #expect(list.steps.map(\.state) == [.passed, .running, .pending, .pending])
-    #expect(list.announcement == "Write a test file…")
+    #expect(list.announcement?.english == "Write a test file…")
     list.finish(failedAt: nil)
     #expect(list.passed)
     #expect(list.announcement == "Test passed.")
@@ -23,7 +23,7 @@ import Testing
     list.finish(failedAt: .readBack)
     #expect(list.steps.map(\.state) == [.passed, .passed, .failed, .pending])
     #expect(!list.passed && list.failed)
-    #expect(list.announcement == "Read it back failed.")
+    #expect(list.announcement?.english == "Read it back failed.")
     list.reset()
     #expect(!list.failed)
 }
@@ -35,7 +35,7 @@ import Testing
 
 @Test func filesAndHTTPSDestinationsAreAddableAndTheMacStaysHidden() {
     #expect(DestinationKind.addable == [.files, .mqtt, .https, .homeAssistantWebhook])
-    #expect(DestinationKind.homeAssistantWebhook.caveat?.contains("doesn't create sensors") == true)
+    #expect(DestinationKind.homeAssistantWebhook.caveat?.english.contains("doesn't create sensors") == true)
     #expect(DestinationKind.https.caveat == nil)
     #expect(!DestinationKind.allCases.map(\.destinationID).contains("companion"))
     #expect(DestinationKind.files.destinationID == "local-file")

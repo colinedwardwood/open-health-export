@@ -5454,6 +5454,546 @@
           }
         }
       }
+    },
+    "When export runs": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When export runs"
+          }
+        }
+      }
+    },
+    "iOS decides when background export runs. Health data is withheld while %@ is locked. A Shortcut or Control Centre control is how you run at a time you choose.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iOS decides when background export runs. Health data is withheld while %@ is locked. A Shortcut or Control Centre control is how you run at a time you choose."
+          }
+        }
+      }
+    },
+    "Nothing here promises a send at 3 a.m.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing here promises a send at 3 a.m."
+          }
+        }
+      }
+    },
+    "Where %@ sends health data": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Where %@ sends health data"
+          }
+        }
+      }
+    },
+    "Apple Health on %@": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Health on %@"
+          }
+        }
+      }
+    },
+    "This app transforms to JSON. Nothing stays after a successful send.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This app transforms to JSON. Nothing stays after a successful send."
+          }
+        }
+      }
+    },
+    "Nowhere else. No account. No analytics. No crash reporting.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nowhere else. No account. No analytics. No crash reporting."
+          }
+        }
+      }
+    },
+    "No destinations yet. Health stays on %@ until you add one.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No destinations yet. Health stays on %@ until you add one."
+          }
+        }
+      }
+    },
+    "No types selected yet.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No types selected yet."
+          }
+        }
+      }
+    },
+    "%@ · %@ · %@": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · %@ · %@"
+          }
+        }
+      }
+    },
+    "no network": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "no network"
+          }
+        }
+      }
+    },
+    "bearer token": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "bearer token"
+          }
+        }
+      }
+    },
+    "username + password": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "username + password"
+          }
+        }
+      }
+    },
+    "client certificate": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "client certificate"
+          }
+        }
+      }
+    },
+    "pairing": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pairing"
+          }
+        }
+      }
+    },
+    "webhook secret": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "webhook secret"
+          }
+        }
+      }
+    },
+    "no credential": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "no credential"
+          }
+        }
+      }
+    },
+    "A folder in Files on this phone or in iCloud Drive.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A folder in Files on this phone or in iCloud Drive."
+          }
+        }
+      }
+    },
+    "An HTTPS address you control, and a token if it needs one.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An HTTPS address you control, and a token if it needs one."
+          }
+        }
+      }
+    },
+    "Your Home Assistant address and a webhook automation.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your Home Assistant address and a webhook automation."
+          }
+        }
+      }
+    },
+    "Your MQTT broker, such as the Mosquitto add-on, and its login.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your MQTT broker, such as the Mosquitto add-on, and its login."
+          }
+        }
+      }
+    },
+    "This sends your data to a Home Assistant automation. It doesn't create sensors by itself: you need an automation that does something with each delivery.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This sends your data to a Home Assistant automation. It doesn't create sensors by itself: you need an automation that does something with each delivery."
+          }
+        }
+      }
+    },
+    "Open the folder": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the folder"
+          }
+        }
+      }
+    },
+    "Write a test file": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Write a test file"
+          }
+        }
+      }
+    },
+    "Read it back": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read it back"
+          }
+        }
+      }
+    },
+    "Check it matches": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check it matches"
+          }
+        }
+      }
+    },
+    "Find the server": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find the server"
+          }
+        }
+      }
+    },
+    "Start a secure connection": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start a secure connection"
+          }
+        }
+      }
+    },
+    "Sign in": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in"
+          }
+        }
+      }
+    },
+    "Send a test record": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send a test record"
+          }
+        }
+      }
+    },
+    "Confirm it arrived": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm it arrived"
+          }
+        }
+      }
+    },
+    "Connect": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect"
+          }
+        }
+      }
+    },
+    "Listen for the reply": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listen for the reply"
+          }
+        }
+      }
+    },
+    "Test passed.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test passed."
+          }
+        }
+      }
+    },
+    "%@ failed.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ failed."
+          }
+        }
+      }
+    },
+    "%@…": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@…"
+          }
+        }
+      }
+    },
+    "Enter the address, starting with %@://.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter the address, starting with %@://."
+          }
+        }
+      }
+    },
+    "That isn't a full address. It should start with %@://.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That isn't a full address. It should start with %@://."
+          }
+        }
+      }
+    },
+    "Remove the name and password from the address. Use the token field instead.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove the name and password from the address. Use the token field instead."
+          }
+        }
+      }
+    },
+    "Will send to %@, encrypted.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Will send to %@, encrypted."
+          }
+        }
+      }
+    },
+    "Will send to %@ without encryption. Anyone on the network path can read it.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Will send to %@ without encryption. Anyone on the network path can read it."
+          }
+        }
+      }
+    },
+    "This address isn't encrypted. Use %@://, or allow unencrypted below if this server is on your own network.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This address isn't encrypted. Use %@://, or allow unencrypted below if this server is on your own network."
+          }
+        }
+      }
+    },
+    "Only %@:// and %@:// addresses are supported.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only %@:// and %@:// addresses are supported."
+          }
+        }
+      }
+    },
+    "We read %lld types you chose.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "We read 1 type you chose."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "We read %lld types you chose."
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

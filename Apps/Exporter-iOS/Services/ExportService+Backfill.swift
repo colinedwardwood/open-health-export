@@ -36,6 +36,12 @@ private actor CountingBackfillObservations: DayObservationSource {
         return samples
     }
 
+    func categories(metric: MetricID, day: String) async throws -> [CategoryRecord] {
+        let categories = try await base.categories(metric: metric, day: day)
+        samplesRead += categories.count
+        return categories
+    }
+
     func count() -> Int {
         samplesRead
     }

@@ -243,13 +243,14 @@ private func browserSample(
 }
 
 @Test func ux20SchedulingCopyNamesIOSTimingLockAndChosenTimeControls() {
-    #expect(SchedulingHonesty.body.contains("iOS decides when background export runs"))
-    #expect(SchedulingHonesty.body.contains("locked"))
-    #expect(SchedulingHonesty.body.contains("Shortcut"))
-    #expect(SchedulingHonesty.body.contains("Control Centre"))
-    #expect(SchedulingHonesty.noSchedulePromise.contains("3 a.m."))
-    #expect(!SchedulingHonesty.body.lowercased().contains("will definitely"))
-    #expect(!SchedulingHonesty.body.lowercased().contains("every hour"))
+    let body = SchedulingHonesty.body.english
+    #expect(body.contains("iOS decides when background export runs"))
+    #expect(body.contains("locked"))
+    #expect(body.contains("Shortcut"))
+    #expect(body.contains("Control Centre"))
+    #expect(SchedulingHonesty.noSchedulePromise.english.contains("3 a.m."))
+    #expect(!body.lowercased().contains("will definitely"))
+    #expect(!body.lowercased().contains("every hour"))
 }
 
 @Test func iPadOnlyExporterNoticeIsPermanentAndNamesThePlatformLimit() throws {

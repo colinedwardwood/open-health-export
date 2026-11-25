@@ -726,11 +726,23 @@ public struct ExportRun: Sendable {
         }
         days.formUnion(persistedDays)
         var aggregateSamples = page.samples
+            + CategoryDayFold.durationSamples(page.categories, metric: metric)
         if let observations,
-           MetricCatalog.declaration(for: metric)?.readsByDay == true {
-            var byUUID = Dictionary(uniqueKeysWithValues: page.samples.map { ($0.key.uuid, $0) })
+           let declaration = MetricCatalog.declaration(for: metric),
+           declaration.hasDailyTotal {
+            let isCategory = declaration.isCategory
+            var byUUID = Dictionary(
+                aggregateSamples.map { ($0.key.uuid, $0) },
+                uniquingKeysWith: { _, latest in latest }
+            )
             for day in days {
-                for sample in try await observations.samples(metric: metric, day: day) {
+                let observed = isCategory
+                    ? CategoryDayFold.durationSamples(
+                        try await observations.categories(metric: metric, day: day),
+                        metric: metric
+                    )
+                    : try await observations.samples(metric: metric, day: day)
+                for sample in observed {
                     byUUID[sample.key.uuid] = sample
                 }
             }

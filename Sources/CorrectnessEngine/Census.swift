@@ -96,7 +96,7 @@ enum Census {
                     digest: String(digestXor, radix: 16)
                 )
             )
-            if MetricCatalog.declaration(for: page.metric)?.kind == "sample.quantity" {
+            if MetricCatalog.declaration(for: page.metric)?.hasDailyTotal == true {
                 try tx.markDirty(metric: page.metric, day: day)
             }
         }
@@ -124,7 +124,7 @@ enum Census {
                     digest: folded.digest
                 )
             )
-            if MetricCatalog.declaration(for: page.metric)?.kind == "sample.quantity" {
+            if MetricCatalog.declaration(for: page.metric)?.hasDailyTotal == true {
                 try tx.markDirty(metric: page.metric, day: day)
             }
         }

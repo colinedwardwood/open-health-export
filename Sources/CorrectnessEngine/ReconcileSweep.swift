@@ -217,19 +217,28 @@ public struct ReconcileSweep: Sendable {
             return outcome
         }
 
+        let isCategory = MetricCatalog.declaration(for: metric)?.isCategory == true
         var samples: [SampleRecord] = []
+        var categories: [CategoryRecord] = []
         var observedSamples: [SampleRecord] = []
+        var observedCategories: [CategoryRecord] = []
         var tombstones: [TombstoneRecord] = []
         for day in permittedDays {
-            let observed = try await observations.samples(metric: metric, day: day)
+            let observed = isCategory
+                ? []
+                : try await observations.samples(metric: metric, day: day)
+            let observedDay = isCategory
+                ? try await observations.categories(metric: metric, day: day)
+                : []
             observedSamples.append(contentsOf: observed)
+            observedCategories.append(contentsOf: observedDay)
             let plan = try await store.transact { tx in
                 ReconcilePlanner.planDay(
                     metric: metric,
                     day: day,
                     stored: try tx.loadCensus(metric: metric, day: day),
                     indexed: try tx.loadEmittedIndex(metric: metric, day: day),
-                    observed: observed
+                    observedUUIDs: observed.map(\.key.uuid) + observedDay.map(\.key.uuid)
                 )
             }
             for repair in plan.repairs {
@@ -237,6 +246,7 @@ public struct ReconcileSweep: Sendable {
                 case .reemitDay:
                     if includeRaw {
                         samples.append(contentsOf: observed)
+                        categories.append(contentsOf: observedDay)
                     }
                 case .emitAbsenceTombstones(let tombs):
                     tombstones.append(contentsOf: tombs)
@@ -246,6 +256,7 @@ public struct ReconcileSweep: Sendable {
 
         let page = SamplePage(
             samples: samples,
+            categories: categories,
             tombstones: tombstones,
             metric: metric,
             anchorBlob: Data(
@@ -255,6 +266,7 @@ public struct ReconcileSweep: Sendable {
         )
         let censusPage = SamplePage(
             samples: observedSamples,
+            categories: observedCategories,
             tombstones: tombstones,
             metric: metric,
             anchorBlob: page.anchorBlob,
@@ -291,6 +303,7 @@ public struct ReconcileSweep: Sendable {
         let batchID = NativeWire.mintBatchID(at: clock.now())
         let payload = try NativeWire.encode(
             samples: page.samples,
+            categories: page.categories,
             tombstones: page.tombstones,
             aggregates: aggregates.map(\.record),
             metric: metric,
@@ -299,7 +312,7 @@ public struct ReconcileSweep: Sendable {
         )
         let payloadURL = scratchDirectory.appendingPathComponent("\(batchID.rawValue).ndjson")
         try FileWriteKit.writeAtomically(payload, to: payloadURL)
-        let recordCount = page.samples.count + page.tombstones.count + aggregates.count
+        let recordCount = page.encodedRecordCount + aggregates.count
         let (queued, pinnedBytes) = try await store.transact { tx -> (Int, Int) in
             let batches = try tx.pendingBatches()
             return (
@@ -609,6 +622,7 @@ public struct ReconcileSweep: Sendable {
     ) async throws -> [AggregateDayPlan] {
         var days = forcedDays
         days.formUnion(page.samples.map { String($0.start.prefix(10)) })
+        days.formUnion(page.categories.map { String($0.start.prefix(10)) })
         let tombDays = try await store.transact { tx -> Set<String> in
             var found: Set<String> = []
             for tomb in page.tombstones {
@@ -622,7 +636,8 @@ public struct ReconcileSweep: Sendable {
         return try await AggregateResolver.plans(
             metric: metric,
             days: days,
-            samples: page.samples,
+            samples: page.samples
+                + CategoryDayFold.durationSamples(page.categories, metric: metric),
             statistics: statistics,
             store: store,
             context: temporal,

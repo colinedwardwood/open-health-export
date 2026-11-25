@@ -1135,9 +1135,9 @@ and they group under a single device. One `components` entry per enabled
 
 ```json
 {
-  "dev": { "identifiers": ["ohe_6b1c2d3e"], "name": "iPhone Health Export",
-           "manufacturer": "open-health-exporter", "model": "iPhone", "sw_version": "1.0.0" },
-  "o":   { "name": "open-health-exporter", "sw_version": "1.0.0",
+  "dev": { "identifiers": ["ohe_6b1c2d3e"], "name": "KeepMyMetrics",
+           "manufacturer": "KeepMyMetrics", "model": "iPhone", "sw_version": "1.0.0" },
+  "o":   { "name": "KeepMyMetrics", "sw_version": "1.0.0",
            "support_url": "https://…" },
   "cmps": {
     "step_count_sum_p1d": {

@@ -97,7 +97,7 @@ struct AddDestinationFlow: View {
                         } label: {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(Self.title(kind)).font(.headline)
-                                Text(kind.requirement).metadata()
+                                Text(copy: kind.requirement).metadata()
                             }
                         }
                         .accessibilityIdentifier("add-\(kind.rawValue)")
@@ -227,7 +227,7 @@ struct TestChecklistSection: View {
                     symbol(step.state)
                         .frame(width: 24)
                         .accessibilityHidden(true)
-                    Text(step.title)
+                    Text(copy: step.title)
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityValue(Self.spoken(step.state))
@@ -250,7 +250,7 @@ struct TestChecklistSection: View {
         }
         .onChange(of: checklist.announcement) { _, announcement in
             if let announcement {
-                AccessibilityNotification.Announcement(announcement).post()
+                AccessibilityNotification.Announcement(announcement.resolved).post()
             }
         }
     }

@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: FSL-1.1-ALv2
 
+import CoreDomain
 import DestinationTrust
 import Foundation
 import MetricCatalog
@@ -21,15 +22,19 @@ public enum DestinationKind: String, Sendable, Hashable, CaseIterable, Identifia
     /// The destination id the engine and the status snapshots use.
     public var destinationID: String {
         switch self {
-        case .files: "local-file"
-        case .https: "https"
-        case .homeAssistantWebhook: "home-assistant"
-        case .mqtt: "mqtt"
+        case .files:
+            "local-file"
+        case .https:
+            "https"
+        case .homeAssistantWebhook:
+            "home-assistant"
+        case .mqtt:
+            "mqtt"
         }
     }
 
     /// What the person needs before they start, in one line.
-    public var requirement: String {
+    public var requirement: LocalizedCopy {
         switch self {
         case .files: "A folder in Files on this phone or in iCloud Drive."
         case .https: "An HTTPS address you control, and a token if it needs one."
@@ -40,7 +45,7 @@ public enum DestinationKind: String, Sendable, Hashable, CaseIterable, Identifia
 
     /// Said before any configuration, so nobody sets up something that won't do what
     /// they expect (#48).
-    public var caveat: String? {
+    public var caveat: LocalizedCopy? {
         switch self {
         case .homeAssistantWebhook:
             "This sends your data to a Home Assistant automation. It doesn't create sensors by itself: you need an automation that does something with each delivery."
@@ -65,7 +70,7 @@ public struct DestinationTestChecklist: Sendable, Equatable {
 
     public struct Step: Sendable, Equatable, Identifiable {
         public var step: DestinationTestStep
-        public var title: String
+        public var title: LocalizedCopy
         public var state: StepState
         public var id: String { step.rawValue }
     }
@@ -136,14 +141,14 @@ public struct DestinationTestChecklist: Sendable, Equatable {
     }
 
     /// What VoiceOver says as the test moves on.
-    public var announcement: String? {
+    public var announcement: LocalizedCopy? {
         if passed { return "Test passed." }
-        if let failed = steps.first(where: { $0.state == .failed }) { return "\(failed.title) failed." }
-        if let running = steps.first(where: { $0.state == .running }) { return "\(running.title)…" }
+        if let failed = steps.first(where: { $0.state == .failed }) { return LocalizedCopy("%@ failed.", .copy(failed.title)) }
+        if let running = steps.first(where: { $0.state == .running }) { return LocalizedCopy("%@…", .copy(running.title)) }
         return nil
     }
 
-    static func title(_ step: DestinationTestStep) -> String {
+    static func title(_ step: DestinationTestStep) -> LocalizedCopy {
         switch step {
         case .openFolder: "Open the folder"
         case .writeCanary: "Write a test file"
@@ -166,7 +171,7 @@ public struct DestinationTestChecklist: Sendable, Equatable {
 public struct NetworkAddressCheck: Sendable, Equatable {
     public var host: String?
     public var encrypted: Bool
-    public var message: String
+    public var message: LocalizedCopy
     public var isUsable: Bool
 
     /// The same check for an MQTT broker: `mqtts://` is encrypted, `mqtt://` is not.
@@ -182,23 +187,23 @@ public struct NetworkAddressCheck: Sendable, Equatable {
     ) -> NetworkAddressCheck {
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else {
-            return NetworkAddressCheck(host: nil, encrypted: false, message: "Enter the address, starting with \(secure)://.", isUsable: false)
+            return NetworkAddressCheck(host: nil, encrypted: false, message: LocalizedCopy("Enter the address, starting with %@://.", .text(secure)), isUsable: false)
         }
         guard let url = URL(string: text), let scheme = url.scheme?.lowercased(), let host = url.host, !host.isEmpty else {
-            return NetworkAddressCheck(host: nil, encrypted: false, message: "That isn't a full address. It should start with \(secure)://.", isUsable: false)
+            return NetworkAddressCheck(host: nil, encrypted: false, message: LocalizedCopy("That isn't a full address. It should start with %@://.", .text(secure)), isUsable: false)
         }
         if url.user != nil || url.password != nil {
-            return NetworkAddressCheck(host: host, encrypted: false, message: "Remove the name and password from the address. Use the token field instead.", isUsable: false)
+            return NetworkAddressCheck(host: host, encrypted: false, message: LocalizedCopy("Remove the name and password from the address. Use the token field instead."), isUsable: false)
         }
         switch scheme {
         case secure:
-            return NetworkAddressCheck(host: host, encrypted: true, message: "Will send to \(host), encrypted.", isUsable: true)
+            return NetworkAddressCheck(host: host, encrypted: true, message: LocalizedCopy("Will send to %@, encrypted.", .text(host)), isUsable: true)
         case plain where allowsPlainHTTP:
-            return NetworkAddressCheck(host: host, encrypted: false, message: "Will send to \(host) without encryption. Anyone on the network path can read it.", isUsable: true)
+            return NetworkAddressCheck(host: host, encrypted: false, message: LocalizedCopy("Will send to %@ without encryption. Anyone on the network path can read it.", .text(host)), isUsable: true)
         case plain:
-            return NetworkAddressCheck(host: host, encrypted: false, message: "This address isn't encrypted. Use \(secure)://, or allow unencrypted below if this server is on your own network.", isUsable: false)
+            return NetworkAddressCheck(host: host, encrypted: false, message: LocalizedCopy("This address isn't encrypted. Use %@://, or allow unencrypted below if this server is on your own network.", .text(secure)), isUsable: false)
         default:
-            return NetworkAddressCheck(host: host, encrypted: false, message: "Only \(secure):// and \(plain):// addresses are supported.", isUsable: false)
+            return NetworkAddressCheck(host: host, encrypted: false, message: LocalizedCopy("Only %@:// and %@:// addresses are supported.", .text(secure), .text(plain)), isUsable: false)
         }
     }
 }
@@ -225,9 +230,9 @@ public enum HomeAssistantWebhookExample {
 }
 
 /// #49: the Home Assistant entities MQTT discovery creates, so the person knows what
-/// to look for before they save. Discovery publishes quantity types only.
+/// to look for before they save. Discovery publishes the types with a daily total.
 public enum HomeAssistantDiscoveryPreview {
     public static func entityNames(for metrics: [MetricDeclaration]) -> [String] {
-        metrics.filter(\.readsByDay).map(\.displayName)
+        metrics.filter(\.hasDailyTotal).map(\.displayName)
     }
 }

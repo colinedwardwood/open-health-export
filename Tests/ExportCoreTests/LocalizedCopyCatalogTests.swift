@@ -4,6 +4,7 @@
 import AppServices
 import CoreDomain
 import CorrectnessEngine
+import DestinationTrust
 import EnginePorts
 import Foundation
 import MetricCatalog
@@ -117,6 +118,39 @@ private func producedCopy() -> [LocalizedCopy] {
         for evidence in evidence {
             let error = UserFacingErrorObject.make(archetype: archetype, destinationLabel: "Archive", evidence: evidence)
             copy += [error.title, error.cause, error.fix]
+        }
+    }
+    copy += [SchedulingHonesty.title, SchedulingHonesty.body, SchedulingHonesty.noSchedulePromise,
+             SchedulingHonesty.shortcutsLine]
+    copy += [DataFlowExplainer.title, DataFlowExplainer.source, DataFlowExplainer.transform,
+             DataFlowExplainer.nowhereElse, DataFlowExplainer.empty]
+    copy += (0...2).map(DataFlowExplainer.typeCountCopy)
+    let credentials = [DataFlowHop.noNetwork, DataFlowHop.bearerToken, DataFlowHop.usernamePassword,
+                       DataFlowHop.clientCertificate, DataFlowHop.pairing, DataFlowHop.webhookSecret,
+                       DataFlowHop.noCredential]
+    copy += credentials.map { DataFlowExplainer.hopLine(DataFlowHop(id: "h", host: "h", transport: "t", credential: $0)) }
+
+    copy += DestinationKind.allCases.map(\.requirement)
+    copy += DestinationKind.allCases.compactMap(\.caveat)
+    let steps: [DestinationTestStep] = [
+        .openFolder, .writeCanary, .readBack, .confirmBytes, .resolveHost, .tlsHandshake, .confirmCertificate,
+        .authenticate, .sendCanary, .publishCanary, .readResponse, .receiveEcho, .connect, .subscribe,
+    ]
+    for step in steps {
+        var checklist = DestinationTestChecklist(steps: [step])
+        copy += checklist.steps.map(\.title)
+        checklist.start(step)
+        copy += checklist.announcement.map { [$0] } ?? []
+        checklist.finish(failedAt: step)
+        copy += checklist.announcement.map { [$0] } ?? []
+        checklist.finish(failedAt: nil)
+    }
+    var passing = DestinationTestChecklist(steps: [.connect])
+    passing.finish(failedAt: nil)
+    copy += passing.announcement.map { [$0] } ?? []
+    for address in ["", "nonsense", "https://u:p@h", "https://h", "http://h", "ftp://h"] {
+        for allowsPlain in [false, true] {
+            copy.append(NetworkAddressCheck.check(address, allowsPlainHTTP: allowsPlain).message)
         }
     }
     return copy.flatMap(flatten)

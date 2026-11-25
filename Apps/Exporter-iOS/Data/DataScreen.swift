@@ -20,6 +20,7 @@ struct DataScreen: View {
     @State private var search = ""
     @State private var confirming: DataTypeRow?
     @State private var saving = false
+    @State private var saveError: UserFacingErrorObject?
 
     private var destinations: [String] {
         _ = model.statusGeneration
@@ -51,6 +52,11 @@ struct DataScreen: View {
     private func list(_ ids: [String]) -> some View {
         let rows = DataSelection.rows(selected: selected, search: search)
         return List {
+            if let saveError {
+                Section {
+                    ErrorCard(error: saveError, identifier: "data-save-error")
+                }
+            }
             if changed {
                 Section {
                     Button {
@@ -127,6 +133,7 @@ struct DataScreen: View {
     private func load(_ id: String?) async {
         guard let id, let scope = try? await services.destinations.scope(id) else { return }
         destinationID = id
+        saveError = nil
         selected = scope.metrics
         baseline = scope.metrics
         start = scope.startInclusive ?? OnboardingPlan.defaultScopeStart(now: Date(), calendar: .current)
@@ -137,8 +144,12 @@ struct DataScreen: View {
     /// re-registers the background observers for the new set.
     private func save(_ id: String) async {
         saving = true
+        saveError = nil
         defer { saving = false }
         do {
+            #if DEBUG
+            if UITestFixtures.failsDataSave { throw UITestFixtures.InjectedFailure() }
+            #endif
             let scope = try DestinationExportScope(destinationID: id, metrics: selected, startInclusive: start)
             try await services.destinations.applyScope(scope, previousMetrics: baseline)
             try? await services.health.requestReadAccess(for: scope)
@@ -148,7 +159,8 @@ struct DataScreen: View {
             baselineStart = start
             model.refreshStatus()
         } catch {
-            // The scope is unchanged; Save stays on offer.
+            // The scope is unchanged; Save stays on offer, and the person is told why.
+            saveError = UserFacingFailure.object(for: error, destinationLabel: DestinationRepository.label(id))
         }
     }
 }

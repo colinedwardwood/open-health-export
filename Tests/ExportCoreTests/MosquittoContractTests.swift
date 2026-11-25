@@ -279,6 +279,7 @@ func mosquittoBrokerKeepsNoRetainedHealthPayload() async throws {
     let discoveryTopic = try HADiscovery.deviceConfigTopic(exporterId: exporterId)
     let discoveryPayload = try HADiscovery.encodeDeviceConfig(
         exporterId: exporterId,
+        productName: "KeepMyMetrics",
         metrics: [MetricCatalog.heartRate.id]
     )
     let session = MQTTSession(

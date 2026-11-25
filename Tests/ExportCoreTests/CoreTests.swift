@@ -1378,16 +1378,15 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     defer { try? FileManager.default.removeItem(at: url) }
     let epoch = Epoch()
     let store = EgressAttemptLog.PersistentStore(url: url, nowEpoch: { epoch.value })
-    EgressAttemptLog.attachPersistent(store)
-    defer { EgressAttemptLog.wipePersistent() }
-
-    EgressAttemptLog.record(kind: .http, host: "ha.example", bytes: 40)
-    epoch.value = 1_100
-    EgressAttemptLog.record(kind: .http, host: "ha.example", bytes: 60)
-    EgressAttemptLog.record(kind: .byteStream, host: "broker.example", bytes: 12)
-    EgressAttemptLog.record(kind: .discovery, host: "_ohe-companion._tcp")
-
-    let rows = EgressAttemptLog.persistentSnapshot()
+    // Task-scoped store: the process-wide one is shared with parallel tests that record egress (#178).
+    let rows = EgressAttemptLog.$scopedPersistent.withValue(store) {
+        EgressAttemptLog.record(kind: .http, host: "ha.example", bytes: 40)
+        epoch.value = 1_100
+        EgressAttemptLog.record(kind: .http, host: "ha.example", bytes: 60)
+        EgressAttemptLog.record(kind: .byteStream, host: "broker.example", bytes: 12)
+        EgressAttemptLog.record(kind: .discovery, host: "_ohe-companion._tcp")
+        return EgressAttemptLog.persistentSnapshot()
+    }
     #expect(rows.map(\.host) == ["_ohe-companion._tcp", "broker.example", "ha.example"])
     let ha = try #require(rows.first { $0.host == "ha.example" })
     #expect(ha.count == 2)
@@ -1450,6 +1449,7 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     #expect(MetricCatalog.bodyMass.sensitivity == .sensitive)
     let json = try HADiscovery.encodeDeviceConfig(
         exporterId: "6b1c2d3e",
+        productName: "KeepMyMetrics",
         metrics: [MetricCatalog.stepCount.id, MetricCatalog.heartRate.id]
     )
     let text = String(decoding: json, as: UTF8.self)
@@ -1493,6 +1493,7 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
 
     let data = try HADiscovery.encodeDeviceConfig(
         exporterId: "device-1234",
+        productName: "KeepMyMetrics",
         metrics: MetricCatalog.all.map(\.id)
     )
     let root = try #require(
@@ -1518,9 +1519,47 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     }
 }
 
+@Test func homeAssistantDiscoveryUsesDisplayNamesAndKeepsIdentityStable() throws {
+    func components(_ productName: String) throws -> ([String: Any], [String: Any]) {
+        let data = try HADiscovery.encodeDeviceConfig(
+            exporterId: "6b1c2d3e",
+            productName: productName,
+            metrics: [MetricCatalog.stepCount.id, MetricCatalog.heartRate.id]
+        )
+        let root = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        return (
+            try #require(root["dev"] as? [String: Any]),
+            try #require(root["cmps"] as? [String: Any])
+        )
+    }
+    let (device, cmps) = try components("KeepMyMetrics")
+    #expect(device["name"] as? String == "KeepMyMetrics")
+    #expect(device["manufacturer"] as? String == "KeepMyMetrics")
+    #expect(device["identifiers"] as? [String] == ["ohe_6b1c2d3e"])
+    let steps = try #require(cmps["step_count_sum_p1d"] as? [String: Any])
+    #expect(steps["name"] as? String == MetricCatalog.stepCount.displayName)
+    #expect(steps["name"] as? String == "Step count")
+
+    // Identity is pinned to the values the previous release published, and does not
+    // depend on the product name or the display name.
+    #expect(steps["unique_id"] as? String == "ohe_6b1c2d3e_step_count_sum_P1D")
+    let heart = try #require(cmps["heart_rate_mean_pt1h"] as? [String: Any])
+    #expect(heart["unique_id"] as? String == "ohe_6b1c2d3e_heart_rate_mean_PT1H")
+    #expect(heart["object_id"] == nil)
+    let (otherDevice, otherCmps) = try components("Something Else")
+    #expect(otherDevice["identifiers"] as? [String] == device["identifiers"] as? [String])
+    #expect(Set(otherCmps.keys) == Set(cmps.keys))
+    for (key, value) in cmps {
+        let other = try #require(otherCmps[key] as? [String: Any])
+        let this = try #require(value as? [String: Any])
+        #expect(other["unique_id"] as? String == this["unique_id"] as? String)
+    }
+}
+
 @Test func homeAssistantDiscoveryOmitsCategoryAndWorkoutFamilies() throws {
     let data = try HADiscovery.encodeDeviceConfig(
         exporterId: "device-1234",
+        productName: "KeepMyMetrics",
         metrics: [
             MetricCatalog.stepCount.id,
             MetricCatalog.sleepAnalysis.id,
@@ -4937,13 +4976,13 @@ private func anchorHoldFixture(
 @Test func copyNamesTheDeviceItIsRunningOn() {
     DeviceNoun.configure(idiomIsPad: false)
     #expect(DeviceNoun.current == "iPhone")
-    #expect(DataFlowExplainer.title == "Where this iPhone sends health data")
+    #expect(DataFlowExplainer.title.english == "Where this iPhone sends health data")
     #expect(DataBrowser.noDataCopy == "No data on this iPhone")
     #expect(HealthAuthorizationPriming.title.english == "Next, iPhone will ask for permission")
     #expect(CredentialDisclosure.copy.contains("only on this iPhone"))
     DeviceNoun.configure(idiomIsPad: true)
     #expect(DeviceNoun.current == "iPad")
-    #expect(DataFlowExplainer.title == "Where this iPad sends health data")
+    #expect(DataFlowExplainer.title.english == "Where this iPad sends health data")
     #expect(DataBrowser.noDataCopy == "No data on this iPad")
     #expect(HealthAuthorizationPriming.title.english == "Next, iPad will ask for permission")
     #expect(CredentialDisclosure.copy.contains("only on this iPad"))
@@ -6799,10 +6838,11 @@ private struct SilentDiscardSink: DestinationSink {
     #expect(Set(DestinationDisplayState.allCases.map(\.tone)) == Set(StatusTone.allCases))
 }
 
-/// #45: the trailing reconcile after every export read day samples for Mindful
-/// minutes, a category type with no day reader, and failed the first export.
+/// #45: the trailing reconcile after every export read day samples for a type with
+/// no day reader and failed the first export. Workouts still have none (#168 added
+/// the category reader).
 @Test func reconcileSkipsTypesWithNoDayReader() async throws {
-    let metric = MetricCatalog.mindfulSession.id
+    let metric = MetricCatalog.workout.id
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-reconcile-category-\(UUID().uuidString)")
     defer { try? FileManager.default.removeItem(at: root) }
