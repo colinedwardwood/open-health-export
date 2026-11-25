@@ -217,7 +217,6 @@ final class ExporterUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment = [
             "OHE_RESET_SEEDED_SURFACES": "1",
-            "OHE_WIPE_ON_LAUNCH": "1",
             "OHE_SEED_ICLOUD_FOLDER": "1",
         ]
         app.launchArguments = [
@@ -418,8 +417,8 @@ final class ExporterUITests: XCTestCase {
         let settings = app.buttons["shell-settings"].firstMatch
         XCTAssertTrue(settings.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
         settings.tap()
-        let privacy = app.buttons["settings-privacy-policy"].exists
-            ? app.buttons["settings-privacy-policy"] : app.links["settings-privacy-policy"]
+        let privacy = identified("settings-privacy-policy").firstMatch
+        for _ in 0 ..< 4 where !privacy.exists { app.swipeUp() }
         XCTAssertTrue(privacy.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
         let about = app.buttons["settings-about"]
         for _ in 0 ..< 4 where !about.exists { app.swipeUp() }
