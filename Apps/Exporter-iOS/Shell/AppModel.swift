@@ -67,6 +67,16 @@ final class AppModel {
         onboarding = Onboarding(resuming: true)
     }
 
+    /// After Delete everything: the app is as new, so first run starts again (#52).
+    func didDeleteEverything() {
+        paths = [:]
+        selectedTab = .status
+        lastExportMessage = nil
+        lastExportError = nil
+        onboarding = Onboarding(resuming: false)
+        refreshStatus()
+    }
+
     func finishOnboarding() {
         onboarding = nil
         setupGeneration += 1

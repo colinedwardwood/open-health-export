@@ -5,8 +5,8 @@ import AppServices
 import CoreDomain
 import SwiftUI
 
-// Interim screens for the shell (#43): the error screen and Settings, which #52
-// replaces.
+// Shell screens (#43): the destination error a notification opens, the privacy
+// lock, and the debug Developer screen.
 
 /// The five-part error for one destination, as a notification opens it.
 struct DestinationErrorScreen: View {
@@ -48,26 +48,6 @@ struct DestinationErrorScreen: View {
         .navigationTitle(error?.destinationLabel ?? destinationID)
         .navigationBarTitleDisplayMode(.inline)
         .task { canOfferAlerts = error != nil ? await LocalUserNotifier().canOfferAlerts() : false }
-    }
-}
-
-struct SettingsScreen: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        List {
-            UnlockSection()
-            Section {
-                Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
-            }
-            #if DEBUG
-            Section {
-                Button("Developer") { model.showsDeveloper = true }
-                    .accessibilityIdentifier("shell-developer")
-            }
-            #endif
-        }
-        .navigationTitle("Settings")
     }
 }
 
