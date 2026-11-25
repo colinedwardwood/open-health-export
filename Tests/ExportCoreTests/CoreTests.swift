@@ -1378,16 +1378,15 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
     defer { try? FileManager.default.removeItem(at: url) }
     let epoch = Epoch()
     let store = EgressAttemptLog.PersistentStore(url: url, nowEpoch: { epoch.value })
-    EgressAttemptLog.attachPersistent(store)
-    defer { EgressAttemptLog.wipePersistent() }
-
-    EgressAttemptLog.record(kind: .http, host: "ha.example", bytes: 40)
-    epoch.value = 1_100
-    EgressAttemptLog.record(kind: .http, host: "ha.example", bytes: 60)
-    EgressAttemptLog.record(kind: .byteStream, host: "broker.example", bytes: 12)
-    EgressAttemptLog.record(kind: .discovery, host: "_ohe-companion._tcp")
-
-    let rows = EgressAttemptLog.persistentSnapshot()
+    // Task-scoped store: the process-wide one is shared with parallel tests that record egress (#178).
+    let rows = EgressAttemptLog.$scopedPersistent.withValue(store) {
+        EgressAttemptLog.record(kind: .http, host: "ha.example", bytes: 40)
+        epoch.value = 1_100
+        EgressAttemptLog.record(kind: .http, host: "ha.example", bytes: 60)
+        EgressAttemptLog.record(kind: .byteStream, host: "broker.example", bytes: 12)
+        EgressAttemptLog.record(kind: .discovery, host: "_ohe-companion._tcp")
+        return EgressAttemptLog.persistentSnapshot()
+    }
     #expect(rows.map(\.host) == ["_ohe-companion._tcp", "broker.example", "ha.example"])
     let ha = try #require(rows.first { $0.host == "ha.example" })
     #expect(ha.count == 2)

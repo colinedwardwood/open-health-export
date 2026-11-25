@@ -134,6 +134,9 @@ public enum EgressAttemptLog {
 
     @TaskLocal public static var recorder: Recorder?
 
+    /// Task-scoped durable store that takes precedence over the process-wide one, so tests do not share it.
+    @TaskLocal public static var scopedPersistent: PersistentStore?
+
     private final class PersistentBox: @unchecked Sendable {
         let lock = NSLock()
         var store: PersistentStore?
@@ -147,11 +150,15 @@ public enum EgressAttemptLog {
         persistent.lock.unlock()
     }
 
-    public static func persistentSnapshot() -> [NetworkActivityRow] {
+    private static func currentPersistent() -> PersistentStore? {
+        if let scopedPersistent { return scopedPersistent }
         persistent.lock.lock()
-        let store = persistent.store
-        persistent.lock.unlock()
-        return store?.snapshot() ?? []
+        defer { persistent.lock.unlock() }
+        return persistent.store
+    }
+
+    public static func persistentSnapshot() -> [NetworkActivityRow] {
+        currentPersistent()?.snapshot() ?? []
     }
 
     public static func wipePersistent() {
@@ -163,10 +170,7 @@ public enum EgressAttemptLog {
     public static func record(kind: EgressAttempt.Kind, host: String, bytes: Int = 0) {
         let attempt = EgressAttempt(kind: kind, host: host, bytes: bytes)
         recorder?.append(attempt)
-        persistent.lock.lock()
-        let store = persistent.store
-        persistent.lock.unlock()
-        store?.record(kind: kind, host: host, bytes: bytes)
+        currentPersistent()?.record(kind: kind, host: host, bytes: bytes)
     }
 
     /// UX-49 honesty line. The list is corroboration, not an independent capture.
