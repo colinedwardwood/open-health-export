@@ -90,32 +90,41 @@ public struct WipeInventory: Sendable, Equatable {
 }
 
 public enum WipeCopy {
-    public static let title = "Delete everything on this device"
-    public static let confirmTitle = "Confirm: delete credentials and ledger identity"
-    public static let receivedLimit =
+    public static let title: LocalizedCopy = "Delete everything on this device"
+    public static let confirmTitle: LocalizedCopy = "Confirm: delete credentials and ledger identity"
+    public static let receivedLimit: LocalizedCopy =
         "We cannot delete data your destinations already received."
-    public static let healthLimit = "We cannot turn off our own Health access."
-    public static var healthPath: String {
-        "To turn access off: Health → your profile picture → Privacy → Apps → \(ProductName.display)."
+    public static let healthLimit: LocalizedCopy = "We cannot turn off our own Health access."
+    public static var healthPath: LocalizedCopy {
+        LocalizedCopy(
+            "To turn access off: Health → your profile picture → Privacy → Apps → %@.",
+            .text(ProductName.display)
+        )
     }
-    public static let macLimit =
+    public static let macLimit: LocalizedCopy =
         "A Mac companion keeps its own copy. Use Delete everything received there. Deleting here does not reach it."
-    public static let noneReceived = "No destination has received data yet."
+    public static let noneReceived: LocalizedCopy = "No destination has received data yet."
 
-    public static func counts(_ inventory: WipeInventory) -> String {
+    public static func counts(_ inventory: WipeInventory) -> LocalizedCopy {
         let megabytes = Double(inventory.queuedBytes) / 1_048_576
-        let queuedSize = String(format: "%.1f", megabytes)
-        return "Destinations: \(inventory.destinationCount). "
-            + "Stored credentials: \(inventory.credentialCount). "
-            + "Queued payloads: \(inventory.queuedRecords) records, \(queuedSize) MB. "
-            + "Run history: \(inventory.runCount). "
-            + "Egress ledger: \(inventory.ledgerCount)."
+        return LocalizedCopy(
+            "Destinations: %lld. Stored credentials: %lld. Queued payloads: %lld records, %@ MB. Run history: %lld. Egress ledger: %lld.",
+            .number(inventory.destinationCount),
+            .number(inventory.credentialCount),
+            .number(inventory.queuedRecords),
+            .text(String(format: "%.1f", megabytes)),
+            .number(inventory.runCount),
+            .number(inventory.ledgerCount)
+        )
     }
 
-    public static func receivedLine(_ range: WipeReceivedRange) -> String {
+    public static func receivedLine(_ range: WipeReceivedRange) -> LocalizedCopy {
         if range.startDay == range.endDay {
-            return "\(range.destination) received data on \(range.startDay)."
+            return LocalizedCopy("%@ received data on %@.", .text(range.destination), .text(range.startDay))
         }
-        return "\(range.destination) received data from \(range.startDay) to \(range.endDay)."
+        return LocalizedCopy(
+            "%@ received data from %@ to %@.",
+            .text(range.destination), .text(range.startDay), .text(range.endDay)
+        )
     }
 }

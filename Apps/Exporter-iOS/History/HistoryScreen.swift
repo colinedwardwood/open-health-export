@@ -29,7 +29,7 @@ struct HistoryScreen: View {
             }
             if loaded, rows.isEmpty {
                 Section {
-                    Text(HistoryPresentation.emptyCopy(events, filter: filter))
+                    Text(copy: HistoryPresentation.emptyCopy(events, filter: filter))
                         .accessibilityIdentifier("history-empty")
                     if filter == .problems, !events.isEmpty {
                         Button("Show all runs") { filter = .all }
@@ -46,8 +46,8 @@ struct HistoryScreen: View {
                                 .foregroundStyle(row.state.tone.color)
                                 .accessibilityHidden(true)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text([row.destination, row.typeName].compactMap { $0 }.joined(separator: " · "))
-                                Text("\(Date(timeIntervalSince1970: row.epoch).formatted(date: .abbreviated, time: .shortened)) · \(row.result)")
+                                Text(verbatim: [localized(row.destination), row.typeName].compactMap { $0 }.joined(separator: " · "))
+                                Text(verbatim: "\(Date(timeIntervalSince1970: row.epoch).formatted(date: .abbreviated, time: .shortened)) · \(row.result.resolved)")
                                     .metadata()
                             }
                         }
@@ -104,15 +104,15 @@ struct RunDetailScreen: View {
                     Image(systemName: row.state.glyph)
                         .foregroundStyle(row.state.tone.color)
                         .accessibilityHidden(true)
-                    Text(row.result)
+                    Text(copy: row.result)
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("run-result")
             }
             Section {
                 LabeledContent("When", value: Date(timeIntervalSince1970: row.epoch).formatted(date: .long, time: .standard))
-                LabeledContent("Started by", value: row.trigger)
-                LabeledContent("Destination", value: row.destination)
+                LabeledContent("Started by", value: row.trigger.resolved)
+                LabeledContent("Destination", value: localized(row.destination))
                 if let type = row.typeName { LabeledContent("Type", value: type) }
                 LabeledContent("Records", value: event.samplesCommitted.formatted())
                 LabeledContent("Data sent", value: ByteCountFormatter.string(fromByteCount: Int64(facts.byteCount), countStyle: .file))
@@ -134,10 +134,10 @@ struct RunDetailScreen: View {
                let archetype = UserFacingErrorArchetype.fromErrorClass(errorClass) {
                 let error = UserFacingErrorObject.make(archetype: archetype, destinationLabel: row.destination)
                 Section {
-                    Text(error.cause)
-                    Text(error.fix).foregroundStyle(.secondaryText)
+                    Text(copy: error.cause)
+                    Text(copy: error.fix).foregroundStyle(.secondaryText)
                 } header: {
-                    SectionTitle(LocalizedStringKey(error.title))
+                    SectionTitle(copy: error.title)
                 }
             }
         }

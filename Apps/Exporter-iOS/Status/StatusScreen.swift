@@ -80,11 +80,11 @@ private struct SummaryHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(summary.headline)
+            Text(copy: summary.headline)
                 .font(.title2.bold())
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("status-headline")
-            Text(summary.detail)
+            Text(copy: summary.detail)
                 .foregroundStyle(.secondaryText)
                 .accessibilityIdentifier("status-detail")
             switch summary.action {
@@ -117,7 +117,7 @@ private struct DestinationRow: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.label)
-                Text("\(row.stateLabel) · \(row.detail)")
+                Text("\(localized(row.stateLabel)) · \(row.detail.resolved)")
                     .metadata()
             }
         }
@@ -180,12 +180,12 @@ private struct ErrorCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Label {
-                Text(error.title).font(.headline)
+                Text(copy: error.title).font(.headline)
             } icon: {
                 DestinationDisplayState.failing.toneGlyph
             }
-            Text(error.cause)
-            Text(error.fix).foregroundStyle(.secondaryText)
+            Text(copy: error.cause)
+            Text(copy: error.fix).foregroundStyle(.secondaryText)
         }
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityElement(children: .combine)

@@ -37,6 +37,6 @@ import Testing
 }
 
 @Test func aRevokedUnlockKeepsEverythingAndSaysSo() {
-    #expect(UnlockDecision.summary(.revoked).contains("unchanged"))
+    #expect(UnlockDecision.summary(.revoked).english.contains("unchanged"))
     #expect(!UnlockState.revoked.isUnlocked)
 }

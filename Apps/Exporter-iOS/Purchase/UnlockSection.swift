@@ -14,7 +14,7 @@ struct UnlockSection: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(store.state.isUnlocked ? "Automatic exports are on" : "Unlock automatic exports")
                     .font(.headline)
-                Text(UnlockDecision.summary(store.state))
+                Text(copy: UnlockDecision.summary(store.state))
                     .foregroundStyle(.secondaryText)
                     .accessibilityIdentifier("unlock-summary")
             }

@@ -39,15 +39,45 @@ struct OnboardingFlow: View {
 
 /// Title, body and a bottom button area, so every step has the same rhythm.
 private struct StepLayout<Content: View, Actions: View>: View {
-    let title: LocalizedStringKey
+    let title: Text
     let message: LocalizedStringKey?
     @ViewBuilder let content: Content
     @ViewBuilder let actions: Actions
 
+    init(
+        title: LocalizedStringKey,
+        message: LocalizedStringKey?,
+        @ViewBuilder content: () -> Content,
+        @ViewBuilder actions: () -> Actions
+    ) {
+        self.init(titleText: Text(title), message: message, content: content, actions: actions)
+    }
+
+    init(
+        titleCopy: LocalizedCopy,
+        message: LocalizedStringKey?,
+        @ViewBuilder content: () -> Content,
+        @ViewBuilder actions: () -> Actions
+    ) {
+        self.init(titleText: Text(copy: titleCopy), message: message, content: content, actions: actions)
+    }
+
+    private init(
+        titleText: Text,
+        message: LocalizedStringKey?,
+        @ViewBuilder content: () -> Content,
+        @ViewBuilder actions: () -> Actions
+    ) {
+        title = titleText
+        self.message = message
+        self.content = content()
+        self.actions = actions()
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text(title)
+                title
                     .font(.largeTitle.bold())
                     .accessibilityAddTraits(.isHeader)
                     .fixedSize(horizontal: false, vertical: true)
@@ -322,12 +352,12 @@ private struct HealthAccessStep: View {
     let model: OnboardingModel
 
     var body: some View {
-        StepLayout(title: LocalizedStringKey(HealthAuthorizationPriming.title), message: nil) {
+        StepLayout(titleCopy: HealthAuthorizationPriming.title, message: nil) {
             VStack(alignment: .leading, spacing: 16) {
-                Text(HealthAuthorizationPriming.typeCountCopy(model.selected.count))
+                Text(copy: HealthAuthorizationPriming.typeCountCopy(model.selected.count))
                     .accessibilityIdentifier("health-priming-types")
-                Text(HealthAuthorizationPriming.sheetFollows)
-                Text(HealthAuthorizationPriming.invisibility)
+                Text(copy: HealthAuthorizationPriming.sheetFollows)
+                Text(copy: HealthAuthorizationPriming.invisibility)
                     .foregroundStyle(.secondaryText)
                 WorkStatus(work: model.work)
             }

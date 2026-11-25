@@ -20,13 +20,13 @@ struct DestinationErrorScreen: View {
         List {
             if let error {
                 Section {
-                    Text(error.title)
+                    Text(copy: error.title)
                         .font(.headline)
                         .accessibilityIdentifier("shell-error-title")
-                    Text(error.cause)
+                    Text(copy: error.cause)
                 }
                 Section {
-                    Text(error.fix)
+                    Text(copy: error.fix)
                 } header: {
                     SectionTitle("How to fix it")
                 }

@@ -64,20 +64,20 @@ import Testing
     #expect(inventory.ledgerCount == 4)
     #expect(inventory.received.map(\.destination) == ["homeassistant.local", "local-file"])
     #expect(
-        WipeCopy.counts(inventory)
+        WipeCopy.counts(inventory).english
             == "Destinations: 3. Stored credentials: 2. Queued payloads: 6 records, 2.0 MB. Run history: 2. Egress ledger: 4."
     )
     #expect(
-        WipeCopy.receivedLine(inventory.received[0])
+        WipeCopy.receivedLine(inventory.received[0]).english
             == "homeassistant.local received data from 2025-03-12 to 2025-09-02."
     )
     #expect(
-        WipeCopy.receivedLine(inventory.received[1])
+        WipeCopy.receivedLine(inventory.received[1]).english
             == "local-file received data on 2025-04-18."
     )
-    #expect(WipeCopy.receivedLimit.contains("already received"))
-    #expect(WipeCopy.healthLimit.contains("Health access"))
-    #expect(WipeCopy.healthPath.contains("Privacy → Apps"))
+    #expect(WipeCopy.receivedLimit.english.contains("already received"))
+    #expect(WipeCopy.healthLimit.english.contains("Health access"))
+    #expect(WipeCopy.healthPath.english.contains("Privacy → Apps"))
 }
 
 @Test func wipeInventoryEmptyLedgerHasNoReceivedRanges() {
@@ -96,5 +96,5 @@ import Testing
         ]
     )
     #expect(inventory.received.isEmpty)
-    #expect(WipeCopy.noneReceived == "No destination has received data yet.")
+    #expect(WipeCopy.noneReceived.english == "No destination has received data yet.")
 }

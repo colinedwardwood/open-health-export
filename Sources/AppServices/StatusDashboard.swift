@@ -71,7 +71,7 @@ public struct StatusDestinationRow: Sendable, Equatable, Identifiable {
     public var id: String
     public var label: String
     public var state: DestinationDisplayState
-    public var detail: String
+    public var detail: LocalizedCopy
     public var needsAttention: Bool
 
     public var stateLabel: String { state.label }
@@ -88,12 +88,12 @@ public struct StatusSummary: Sendable, Equatable {
         case setUp
     }
 
-    public var headline: String
-    public var detail: String
+    public var headline: LocalizedCopy
+    public var detail: LocalizedCopy
     public var tone: StatusTone
     public var action: Action?
 
-    public init(headline: String, detail: String, tone: StatusTone, action: Action?) {
+    public init(headline: LocalizedCopy, detail: LocalizedCopy, tone: StatusTone, action: Action?) {
         self.headline = headline
         self.detail = detail
         self.tone = tone
@@ -141,21 +141,27 @@ public enum StatusDashboard {
         if let worst = attention.max(by: { $0.state.severity < $1.state.severity }) {
             let healthy = rows.count - attention.count
             let headline = rows.count == 1
-                ? "\(worst.label) needs attention."
-                : "\(healthy) of \(rows.count) destinations are up to date."
+                ? LocalizedCopy("%@ needs attention.", .text(worst.label))
+                : LocalizedCopy(
+                    "%lld of %lld destinations are up to date.", .number(healthy), .number(rows.count)
+                )
             return StatusSummary(
                 headline: headline,
-                detail: "\(worst.label): \(worst.detail)",
+                detail: LocalizedCopy("%@: %@", .text(worst.label), .copy(worst.detail)),
                 tone: worst.tone,
                 action: .check(destinationID: worst.id, label: worst.label)
             )
         }
         if rows.allSatisfy({ $0.state.tone == .ok }) {
-            let when = lastSuccessEpoch.map { "Last export \(relative($0))." } ?? ""
-            let count = rows.count == 1 ? "1 destination" : "\(rows.count) destinations"
+            let sending = LocalizedCopy(
+                "Sending to %lld destinations.", .number(rows.count),
+                singular: "Sending to 1 destination."
+            )
             return StatusSummary(
                 headline: "Everything is up to date.",
-                detail: [when, "Sending to \(count)."].filter { !$0.isEmpty }.joined(separator: " "),
+                detail: lastSuccessEpoch.map {
+                    LocalizedCopy("Last export %@. %@", .text(relative($0)), .copy(sending))
+                } ?? sending,
                 tone: .ok,
                 action: nil
             )
@@ -173,14 +179,14 @@ public enum StatusDashboard {
         _ snapshot: DestinationStatusSnapshot,
         state: DestinationDisplayState,
         relative: (TimeInterval) -> String
-    ) -> String {
-        let last = snapshot.lastSuccessEpoch.map(relative)
+    ) -> LocalizedCopy {
+        let last = snapshot.lastSuccessEpoch.map { LocalizedCopy.Argument.text(relative($0)) }
         let reason = humanReason(snapshot.errorClass)
         switch state {
         case .healthy:
-            return last.map { "Delivered \($0)." } ?? "Delivered."
+            return last.map { LocalizedCopy("Delivered %@.", $0) } ?? "Delivered."
         case .manualOnly:
-            return last.map { "Exports when you tap Export now. Last delivered \($0)." }
+            return last.map { LocalizedCopy("Exports when you tap Export now. Last delivered %@.", $0) }
                 ?? "Exports when you tap Export now."
         case .paused:
             return "Paused. Nothing is sent until you resume it."
@@ -189,14 +195,15 @@ public enum StatusDashboard {
         case .noExportsYet:
             return "Waiting for its first export."
         case .quiet:
-            return last.map { "No new data since \($0)." } ?? "No new data yet."
+            return last.map { LocalizedCopy("No new data since %@.", $0) } ?? "No new data yet."
         case .sentUnconfirmed:
-            return last.map { "Sent \($0), waiting for the destination to confirm." }
+            return last.map { LocalizedCopy("Sent %@, waiting for the destination to confirm.", $0) }
                 ?? "Sent, waiting for the destination to confirm."
         case .partial:
-            return "Some types were delivered and some weren't." + (reason.map { " \($0)" } ?? "")
+            guard let reason else { return "Some types were delivered and some weren't." }
+            return LocalizedCopy("Some types were delivered and some weren't. %@", .copy(reason))
         case .stale, .overdue:
-            return last.map { "Last delivered \($0)." } ?? "Nothing delivered yet."
+            return last.map { LocalizedCopy("Last delivered %@.", $0) } ?? "Nothing delivered yet."
         case .failing, .blocked:
             return reason ?? "The last export didn't reach it."
         case .waiting, .deferred, .limitedByIOS:
@@ -206,9 +213,9 @@ public enum StatusDashboard {
 
     /// The manifest's sentence for a known error class; nothing for an unknown one,
     /// so a raw class name never reaches the screen.
-    static func humanReason(_ raw: String?) -> String? {
+    static func humanReason(_ raw: String?) -> LocalizedCopy? {
         guard let raw, let known = ErrorClass(rawValue: raw), known != .none else { return nil }
         let copy = ErrorClassManifest.record(for: known).userFacingCopy
-        return copy.isEmpty ? nil : copy
+        return copy.isEmpty ? nil : LocalizedCopy(verbatimKey: copy)
     }
 }

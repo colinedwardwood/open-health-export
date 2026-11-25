@@ -286,17 +286,17 @@ private func browserSample(
 
 @Test func ux03HealthPrimingIsASingleContinueWithInvisibleReadGrants() throws {
     #expect(HealthAuthorizationPriming.continueTitle == "Continue")
-    #expect(HealthAuthorizationPriming.typeCountCopy(1).contains("1 type"))
-    #expect(HealthAuthorizationPriming.typeCountCopy(24).contains("24 types"))
-    #expect(HealthAuthorizationPriming.invisibility.contains("does not tell apps"))
-    #expect(HealthAuthorizationPriming.invisibility.contains("no data"))
+    #expect(HealthAuthorizationPriming.typeCountCopy(1).english.contains("1 type"))
+    #expect(HealthAuthorizationPriming.typeCountCopy(24).english.contains("24 types"))
+    #expect(HealthAuthorizationPriming.invisibility.english.contains("does not tell apps"))
+    #expect(HealthAuthorizationPriming.invisibility.english.contains("no data"))
     let joined = [
         HealthAuthorizationPriming.title,
         HealthAuthorizationPriming.sheetFollows,
         HealthAuthorizationPriming.invisibility,
         HealthAuthorizationPriming.continueTitle,
         HealthAuthorizationPriming.typeCountCopy(24),
-    ].joined(separator: " ")
+    ].map(\.english).joined(separator: " ")
     for banned in ["cancel", "skip", "back", "not now", "later"] {
         #expect(!joined.lowercased().contains(banned))
     }

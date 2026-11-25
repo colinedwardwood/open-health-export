@@ -4939,18 +4939,19 @@ private func anchorHoldFixture(
     #expect(DeviceNoun.current == "iPhone")
     #expect(DataFlowExplainer.title == "Where this iPhone sends health data")
     #expect(DataBrowser.noDataCopy == "No data on this iPhone")
-    #expect(HealthAuthorizationPriming.title == "Next, iPhone will ask for permission")
+    #expect(HealthAuthorizationPriming.title.english == "Next, iPhone will ask for permission")
     #expect(CredentialDisclosure.copy.contains("only on this iPhone"))
     DeviceNoun.configure(idiomIsPad: true)
     #expect(DeviceNoun.current == "iPad")
     #expect(DataFlowExplainer.title == "Where this iPad sends health data")
     #expect(DataBrowser.noDataCopy == "No data on this iPad")
-    #expect(HealthAuthorizationPriming.title == "Next, iPad will ask for permission")
+    #expect(HealthAuthorizationPriming.title.english == "Next, iPad will ask for permission")
     #expect(CredentialDisclosure.copy.contains("only on this iPad"))
     #expect(
         UserFacingErrorObject
             .make(archetype: .healthLocked, destinationLabel: "Archive folder")
             .cause
+            .english
             .hasPrefix("The iPad")
     )
     // Back to the default so this test cannot change what any other one reads.
