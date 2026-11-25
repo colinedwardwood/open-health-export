@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: FSL-1.1-ALv2
 
+import AppServices
 import CoreDomain
 import CorrectnessEngine
 import EnginePorts
@@ -20,26 +21,14 @@ import WireFormat
     #expect(marked.contains("\"demo\":true"))
 }
 
-@Test func demoExportGateRequiresTheExactDestinationName() throws {
-    #expect(throws: DemoExportError.confirmationRequired) {
-        try DemoExportGate.confirmSending(to: "local-file", typed: "  ")
-    }
-    #expect(throws: DemoExportError.confirmationMismatch) {
-        try DemoExportGate.confirmSending(to: "local-file", typed: "home-assistant")
-    }
-    try DemoExportGate.confirmSending(to: "local-file", typed: "local-file")
-    try DemoExportGate.confirmSending(to: "local-file", typed: " local-file\n")
-}
-
 @Test func shippedDemoExportCoversEverySelectableAndWireFamily() async throws {
-    try DemoExportGate.confirmSending(to: "local-file", typed: "local-file")
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-demo-\(UUID().uuidString)")
     defer { try? FileManager.default.removeItem(at: root) }
     let dest = root.appendingPathComponent("destination")
     let scratch = root.appendingPathComponent("scratch")
     try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
-    let source = DemoSampleSource(seed: 1, samplesPerMetric: 2)
+    let source = DemoSampleSource(seed: 1, samplesPerMetric: 2, now: Date(timeIntervalSince1970: 1_800_000_000))
     let characteristics = DemoCharacteristicSource()
     var envelope = testEnvelope()
     envelope.demo = true
@@ -325,4 +314,71 @@ private func volumeObject(at index: Int, tier: SyntheticCorpusTier) throws -> [S
     return try #require(
         JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
     )
+}
+
+@Test func demoValuesArePlausibleAndRecent() async throws {
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    let source = DemoSampleSource(seed: 1, samplesPerMetric: 12, now: now)
+    let earliest = now.addingTimeInterval(-30 * 24 * 60 * 60)
+    let formatter = ISO8601DateFormatter()
+    for declaration in MetricCatalog.selectable where declaration.kind == "sample.quantity" {
+        let range = try #require(
+            DemoCorpus.plausibleRanges[declaration.wireId],
+            "no plausible range for \(declaration.wireId)"
+        )
+        let page = try await source.page(metric: declaration.id, afterAnchor: nil)
+        #expect(page.samples.count == 12)
+        for sample in page.samples {
+            #expect(range.contains(sample.value), "\(declaration.wireId) = \(sample.value)")
+            #expect(sample.unit == declaration.canonicalUnit)
+            let start = try #require(formatter.date(from: sample.start))
+            #expect(start >= earliest && start <= now, "\(declaration.wireId) at \(sample.start)")
+            #expect(sample.end == sample.start && sample.observedAt == sample.start)
+        }
+    }
+    // The values people most often spot-check.
+    #expect(DemoCorpus.plausibleRanges["heart_rate"]!.upperBound < 220)
+    #expect(DemoCorpus.plausibleRanges["oxygen_saturation"]!.upperBound <= 100)
+    #expect(DemoCorpus.plausibleRanges["body_temperature"]!.upperBound < 42)
+    #expect(DemoCorpus.plausibleRanges["height"]!.upperBound < 2.5)
+}
+
+@Test func demoRunNeverWritesToTheConfiguredArchive() async throws {
+    let support = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ohe-demo-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: support) }
+    let archive = support.appendingPathComponent("archive")
+    let scratch = support.appendingPathComponent("scratch")
+    let destination = DemoExportLocation.directory(under: support)
+    for directory in [archive, destination] {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+    #expect(!destination.path.hasPrefix(archive.path))
+
+    var envelope = testEnvelope()
+    envelope.demo = true
+    let store = MemoryStateStore()
+    for declaration in MetricCatalog.selectable {
+        let run = ExportRun(
+            source: DemoSampleSource(seed: 1, samplesPerMetric: 2, now: Date(timeIntervalSince1970: 1_800_000_000)),
+            destination: .testing(LocalFileSink(directory: destination)),
+            store: store,
+            metric: declaration.id,
+            scratchDirectory: scratch,
+            destinationName: "local-file",
+            envelope: envelope,
+            characteristics: DemoCharacteristicSource()
+        )
+        #expect(try await run.run().kind == .success)
+    }
+    #expect(try FileManager.default.contentsOfDirectory(atPath: archive.path).isEmpty)
+    let written = try FileManager.default.contentsOfDirectory(atPath: destination.path)
+    #expect(!written.isEmpty)
+    #expect(written.allSatisfy { $0.hasPrefix(NativeWire.demoFilePrefix) })
+    #expect(ExportWipe.applicationSupportArtifacts.contains(DemoExportLocation.directoryName))
+}
+
+@Test func demoBannerNamesTheDataAndNeverAppReview() {
+    #expect(DemoCopy.banner == "Sample data. Not from your Apple Health.")
+    #expect(!DemoCopy.banner.localizedCaseInsensitiveContains("app review"))
 }

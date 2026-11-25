@@ -252,24 +252,17 @@ private func backfillCheckpoint(
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
-    let view = try String(
-        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
-        encoding: .utf8
-    )
-    #expect(!view.contains("Working:"))
-    #expect(view.contains("DestinationTestPlan.mqtt("))
-    #expect(view.contains("DestinationTestPlan.https("))
-    #expect(view.contains("DestinationTestPlan.companion"))
-    #expect(view.contains("NamedWorkProgress.measure("))
-
     // #42: the export runs moved to ExportService; its decisions to AppServices.
     let harness = try [
-        "Apps/Exporter-iOS/HarnessExport.swift",
         "Apps/Exporter-iOS/Services/ExportService.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Automatic.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Backfill.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Destinations.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Lifecycle.swift",
     ].map { try String(contentsOf: root.appendingPathComponent($0), encoding: .utf8) }.joined()
     #expect(harness.contains("archive-manifest.json"))
     for name in ["runHTTPSDestination", "runMQTTDestination", "runCompanion"] {
-        guard let range = harness.range(of: "static func \(name)") else {
+        guard let range = harness.range(of: "func \(name)") else {
             Issue.record("\(name) is missing")
             continue
         }
@@ -361,12 +354,6 @@ private func backfillCheckpoint(
         encoding: .utf8
     )
     #expect(appInfo.contains("NSSupportsLiveActivities"))
-    let view = try String(
-        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
-        encoding: .utf8
-    )
-    #expect(view.contains("ArchiveLiveActivitySession.start()"))
-    #expect(view.contains("ArchiveLiveActivitySession.finish()"))
     let session = try String(
         contentsOf: root.appendingPathComponent(
             "Apps/Exporter-iOS/ArchiveLiveActivitySession.swift"

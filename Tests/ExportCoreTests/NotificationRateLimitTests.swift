@@ -108,12 +108,13 @@ import Watchdog
     #expect(payload.contains("notificationPolicyVersionKey: 1"))
 
     // #42: the setup paths' status writes moved to DestinationSetupService.
-    let harness = try String(
-        contentsOf: root.appendingPathComponent(
-            "Apps/Exporter-iOS/HarnessExport.swift"
-        ),
-        encoding: .utf8
-    ) + String(
+    let harness = try [
+        "Apps/Exporter-iOS/Services/ExportService.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Automatic.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Backfill.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Destinations.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Lifecycle.swift",
+    ].map { try String(contentsOf: root.appendingPathComponent($0), encoding: .utf8) }.joined() + String(
         contentsOf: root.appendingPathComponent(
             "Sources/AppServices/DestinationSetupService.swift"
         ),
@@ -121,7 +122,8 @@ import Watchdog
     )
     for destinationID in ["local-file", "https", "mqtt", "companion"] {
         #expect(
-            harness.contains("destinationID: \"\(destinationID)\""),
+            harness.contains("destinationID: \"\(destinationID)\"")
+                || harness.contains("destinationID: String = \"\(destinationID)\""),
             "\(destinationID) failure path is not wired"
         )
     }

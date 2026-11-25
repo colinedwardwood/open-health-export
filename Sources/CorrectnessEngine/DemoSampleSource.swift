@@ -11,10 +11,13 @@ import WireFormat
 public struct DemoSampleSource: SampleSource, Sendable {
     public var seed: UInt64
     public var samplesPerMetric: Int
+    /// "Now" for the sample dataset: every timestamp falls in the 30 days before it.
+    public var now: Date
 
-    public init(seed: UInt64 = 1, samplesPerMetric: Int = 4) {
+    public init(seed: UInt64 = 1, samplesPerMetric: Int = 4, now: Date) {
         self.seed = seed
         self.samplesPerMetric = samplesPerMetric
+        self.now = now
     }
 
     public func page(metric: MetricID, afterAnchor: Data?) async throws -> SamplePage {
@@ -27,10 +30,11 @@ public struct DemoSampleSource: SampleSource, Sendable {
         let metricIndex = MetricCatalog.selectable.firstIndex { $0.id == metric } ?? 0
         let baseIndex = metricIndex * 1_000
         let base: (Int) -> SampleRecord = { offset in
-            DemoCorpus.sample(
+            DemoCorpus.recentSample(
                 at: baseIndex + offset,
                 seed: seed,
-                declaration: declaration
+                declaration: declaration,
+                now: now
             )
         }
 
@@ -82,11 +86,9 @@ public struct DemoSampleSource: SampleSource, Sendable {
             tombstones: tombstones,
             metric: metric,
             anchorBlob: Data("demo-eof:\(metric.rawValue)".utf8),
-            observedThrough: Self.observedThrough
+            observedThrough: now
         )
     }
-
-    private static let observedThrough = Date(timeIntervalSince1970: 1_767_225_600)
 
     private func emptyPage(metric: MetricID, anchor: Data) -> SamplePage {
         SamplePage(
@@ -94,7 +96,7 @@ public struct DemoSampleSource: SampleSource, Sendable {
             tombstones: [],
             metric: metric,
             anchorBlob: anchor,
-            observedThrough: Self.observedThrough
+            observedThrough: now
         )
     }
 
@@ -365,24 +367,17 @@ public struct DemoCharacteristicSource: CharacteristicSource, Sendable {
     ]
 }
 
-public enum DemoExportError: Error, Equatable, LocalizedError {
-    case confirmationRequired
-    case confirmationMismatch
-
-    public var errorDescription: String? {
-        switch self {
-        case .confirmationRequired:
-            "Type the destination name to send demo data."
-        case .confirmationMismatch:
-            "The typed destination name did not match."
-        }
-    }
+/// What the person is told about sample data, and where it is written.
+public enum DemoCopy {
+    public static let banner = "Sample data. Not from your Apple Health."
 }
 
-public enum DemoExportGate {
-    public static func confirmSending(to destinationName: String, typed: String) throws {
-        let trimmed = typed.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { throw DemoExportError.confirmationRequired }
-        guard trimmed == destinationName else { throw DemoExportError.confirmationMismatch }
+/// Sample exports never touch the person's configured archive: they go to their own
+/// folder under the app's private support directory, which Delete everything clears.
+public enum DemoExportLocation {
+    public static let directoryName = "demo-exports"
+
+    public static func directory(under root: URL) -> URL {
+        root.appendingPathComponent(directoryName, isDirectory: true)
     }
 }

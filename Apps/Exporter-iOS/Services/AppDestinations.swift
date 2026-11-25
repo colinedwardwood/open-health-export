@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: FSL-1.1-ALv2
 
 import AppServices
+import CompanionReceive
 import CoreDomain
 import CorrectnessEngine
 import DestinationTrust
@@ -19,6 +20,7 @@ import WidgetKit
 enum LocalExportFolderError: LocalizedError {
     case notSelected
     case inaccessible
+    case iCloudNotAcknowledged
 
     var errorDescription: String? {
         switch self {
@@ -26,6 +28,8 @@ enum LocalExportFolderError: LocalizedError {
             "Choose an archive folder in Files before enabling local export."
         case .inaccessible:
             "The archive folder is no longer accessible. Choose it again in Files."
+        case .iCloudNotAcknowledged:
+            "The archive folder is in iCloud, so exports there leave this device. Open the destination and confirm, or choose another folder."
         }
     }
 }
@@ -224,6 +228,16 @@ struct BookmarkedExportFolder: LocalExportFolderStorage {
         )
     }
 
+    #if DEBUG
+    /// UI-test fixtures live in the app container, where no security scope can start.
+    func saveUnscopedFolder(_ url: URL) throws {
+        try FileWriteKit.writeAtomically(
+            SecurityScopedBookmark.create(fromAccessibleURL: url),
+            to: DestinationSidecar.localFolderBookmark.url(in: root())
+        )
+    }
+    #endif
+
     func accessibleFolderName() -> String? {
         guard let root = try? root(), let access = try? access(root: root) else { return nil }
         return access.url.lastPathComponent
@@ -236,6 +250,11 @@ struct BookmarkedExportFolder: LocalExportFolderStorage {
             throw LocalExportFolderError.notSelected
         }
         let resolved = try SecurityScopedBookmark.resolve(bookmark)
+        // Every run, test and export reaches the folder here, so an iCloud folder that
+        // was not acknowledged never receives a write.
+        if ICloudFolderAcknowledgement.app.needsAcknowledgement(resolved.url) {
+            throw LocalExportFolderError.iCloudNotAcknowledged
+        }
         let access: SecurityScopedAccess
         #if DEBUG
         // A seeded folder lives inside the app container and therefore has no scope to
@@ -268,7 +287,7 @@ struct BookmarkedExportFolder: LocalExportFolderStorage {
 }
 
 enum AppDestinations {
-    private static let root: @Sendable () throws -> URL = { try HarnessExport.applicationSupportRoot() }
+    private static let root: @Sendable () throws -> URL = { try AppFiles.applicationSupportRoot() }
 
     static let records = DestinationRecordFiles(root: root)
     static let folder = BookmarkedExportFolder(root: root)

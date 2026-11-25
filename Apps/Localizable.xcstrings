@@ -475,17 +475,6 @@
         }
       }
     },
-    "Allow plain HTTP for OTLP (unsafe)": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Allow plain HTTP for OTLP (unsafe)"
-          }
-        }
-      }
-    },
     "Allow plain MQTT (unsafe)": {
       "extractionState": "manual",
       "localizations": {
@@ -849,17 +838,6 @@
         }
       }
     },
-    "Demo export never reads HealthKit. Type the destination name local-file to confirm you are not sending this into a live archive.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Demo export never reads HealthKit. Type the destination name local-file to confirm you are not sending this into a live archive."
-          }
-        }
-      }
-    },
     "Destination": {
       "extractionState": "manual",
       "localizations": {
@@ -904,17 +882,6 @@
         }
       }
     },
-    "Disable OTLP collector": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Disable OTLP collector"
-          }
-        }
-      }
-    },
     "Display units": {
       "extractionState": "manual",
       "localizations": {
@@ -937,17 +904,6 @@
         }
       }
     },
-    "Enable OTLP collector": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Enable OTLP collector"
-          }
-        }
-      }
-    },
     "Enable local archive folder (R-25 test)": {
       "extractionState": "manual",
       "localizations": {
@@ -955,17 +911,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Enable local archive folder (R-25 test)"
-          }
-        }
-      }
-    },
-    "End of OTLP preview": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "End of OTLP preview"
           }
         }
       }
@@ -1366,17 +1311,6 @@
         }
       }
     },
-    "M0 harness": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "M0 harness"
-          }
-        }
-      }
-    },
     "MQTT": {
       "extractionState": "manual",
       "localizations": {
@@ -1586,17 +1520,6 @@
         }
       }
     },
-    "OTLP collector URL": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "OTLP collector URL"
-          }
-        }
-      }
-    },
     "Off by default. Exports wait for Wi-Fi unless you turn this on.": {
       "extractionState": "manual",
       "localizations": {
@@ -1762,17 +1685,6 @@
         }
       }
     },
-    "Preview OTLP payload": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Preview OTLP payload"
-          }
-        }
-      }
-    },
     "Project unprojected runs": {
       "extractionState": "manual",
       "localizations": {
@@ -1916,17 +1828,6 @@
         }
       }
     },
-    "Run R-70 (one anchored page per type)": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Run R-70 (one anchored page per type)"
-          }
-        }
-      }
-    },
     "Samples": {
       "extractionState": "manual",
       "localizations": {
@@ -2044,28 +1945,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Send samples starting"
-          }
-        }
-      }
-    },
-    "Send traceparent header (opt-in)": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Send traceparent header (opt-in)"
-          }
-        }
-      }
-    },
-    "Send traceparent to Mac companion (opt-in)": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Send traceparent to Mac companion (opt-in)"
           }
         }
       }
@@ -2378,17 +2257,6 @@
         }
       }
     },
-    "Type local-file to confirm demo export": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Type local-file to confirm demo export"
-          }
-        }
-      }
-    },
     "Unacknowledged destination change": {
       "extractionState": "manual",
       "localizations": {
@@ -2539,17 +2407,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Opens Apple's Health permission sheet."
-          }
-        }
-      }
-    },
-    "Asks for notification permission and posts one R-40 notice with copy from the registry.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Asks for notification permission and posts one R-40 notice with copy from the registry."
           }
         }
       }
@@ -3683,6 +3540,105 @@
           "stringUnit": {
             "state": "translated",
             "value": "The source for this app is public under FSL-1.1-ALv2 at github.com/colinedwardwood/open-health-export."
+          }
+        }
+      }
+    },
+    "Sample export finished": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sample export finished"
+          }
+        }
+      }
+    },
+    "Sample data": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sample data"
+          }
+        }
+      }
+    },
+    "Exporting sample data…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exporting sample data…"
+          }
+        }
+      }
+    },
+    "The sample export didn't finish. Try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The sample export didn't finish. Try again."
+          }
+        }
+      }
+    },
+    "Try again": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try again"
+          }
+        }
+      }
+    },
+    "Choose another folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose another folder"
+          }
+        }
+      }
+    },
+    "Use iCloud folder anyway": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use iCloud folder anyway"
+          }
+        }
+      }
+    },
+    "Try with sample data": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try with sample data"
+          }
+        }
+      }
+    },
+    "The archive folder is in iCloud, so exports there leave this device. Open the destination and confirm, or choose another folder.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The archive folder is in iCloud, so exports there leave this device. Open the destination and confirm, or choose another folder."
           }
         }
       }

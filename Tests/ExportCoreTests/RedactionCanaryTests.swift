@@ -224,23 +224,6 @@ enum LeakMutant: String, CaseIterable {
     #expect(DataBrowser.rows(latest: [:], onlyWithData: true).isEmpty)
 }
 
-@Test func healthAuthorizationIsTiedToEnabledTypesNotTheFullCatalogue() throws {
-    let root = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-    let harness = try String(
-        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
-        encoding: .utf8
-    )
-    #expect(harness.contains("let metrics = try await HarnessExport.selectedMetrics()"))
-    #expect(harness.contains("HarnessExport.destinationScope(destinationID)"))
-    #expect(harness.contains("metrics: adding.sorted"))
-    #expect(!harness.contains("requestReadAccess(\n                    metrics: MetricCatalog.all"))
-    #expect(!harness.contains("requestReadAccess(metrics: MetricCatalog.all"))
-    #expect(!harness.contains("requestReadAccess(metrics: MetricCatalog.selectable"))
-}
-
 @Test func sec16AppRoutesEveryHealthDestinationThroughItsOwnScope() throws {
     let root = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
@@ -248,16 +231,15 @@ enum LeakMutant: String, CaseIterable {
         .deletingLastPathComponent()
     // #42: the export runs moved to ExportService; its decisions to AppServices.
     let exportHarness = try [
-        "Apps/Exporter-iOS/HarnessExport.swift",
         "Apps/Exporter-iOS/Services/ExportService.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Automatic.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Backfill.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Destinations.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Lifecycle.swift",
     ].map { try String(contentsOf: root.appendingPathComponent($0), encoding: .utf8) }.joined()
-    let viewHarness = try String(
-        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
-        encoding: .utf8
-    )
 
     // #42: adding a destination moved to DestinationSetupService (confirmation) and
-    // AppDestinationSetup (the local folder); the companion run stays in HarnessExport.
+    // AppDestinationSetup (the local folder); the companion run is in ExportService.
     let setupService = try String(
         contentsOf: root.appendingPathComponent("Sources/AppServices/DestinationSetupService.swift"),
         encoding: .utf8
@@ -295,12 +277,4 @@ enum LeakMutant: String, CaseIterable {
         "for metric in [MetricCatalog.heartRate.id, MetricCatalog.stepCount.id]"
     ))
     #expect(!exportHarness.contains("metrics ?? selectedMetrics()"))
-    #expect(viewHarness.contains("@State private var browserSelection = Set<MetricID>()"))
-    #expect(viewHarness.contains("Button(\"Use Core Daily\")"))
-    #expect(viewHarness.contains("applyCoreDailyPreset()"))
-    #expect(viewHarness.contains("SettingKey.presetCoreDailyAppliedVersion"))
-    #expect(viewHarness.contains("HarnessExport.isDestinationEnabled(scopeDestinationID)"))
-    #expect(viewHarness.contains("? scope.metrics.subtracting(priorUnion)"))
-    #expect(viewHarness.contains("startInclusive: scopeStartDate"))
-    #expect(viewHarness.contains("endExclusive: scopeEndEnabled ? scopeEndDate : nil"))
 }

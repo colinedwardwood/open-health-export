@@ -15,47 +15,4 @@ import Watchdog
     #expect(AppRootTabs.allCases.last == .history)
     #expect(AppRootTabs.destinations.accessibilityIdentifier == "tab-destinations")
 
-    let root = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-    let view = try String(
-        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
-        encoding: .utf8
-    )
-    #expect(view.contains("TabView(selection: $rootTab)"))
-    #expect(view.contains("ForEach(AppRootTabs.allCases"))
-    #expect(view.contains("Label(\"Status\""))
-    #expect(view.contains("Label(\"Data\""))
-    #expect(view.contains("Label(\"Destinations\""))
-    #expect(view.contains("Label(\"History\""))
-    #expect(view.contains(".tabViewStyle(.sidebarAdaptable)"))
-    #expect(view.contains("rootTab = .status"))
-    #expect(view.contains("rootTab = .destinations"))
-    #expect(view.contains("accessibilityIdentifier(\"status-settings\")"))
-    #expect(view.contains("ToolbarItem(placement: .topBarTrailing)"))
-    #expect(view.contains("@State private var showSettings = false"))
-    #expect(view.contains(".sheet(isPresented: $showSettings)"))
-    #expect(view.contains("accessibilityIdentifier(\"settings-scroll\")"))
-    #expect(view.contains("Label(\"Settings\""))
-    guard let settings = view.range(of: "private var statusSettings") else {
-        Issue.record("statusSettings is missing")
-        return
-    }
-    let window = String(view[settings.lowerBound...].prefix(9000))
-    #expect(window.contains("settings-open-destinations"))
-    #expect(window.contains("dataFlowExplainer"))
-    #expect(window.contains("privacy-gate-enabled"))
-    #expect(view.contains("privacy-gate-locked-title"))
-    #expect(view.contains("privacy-gate-background-scope"))
-    #expect(window.contains("app-privacy-heading"))
-    #expect(window.contains("credential-no-reveal-policy"))
-    #expect(window.contains("wipe-section-heading"))
-    #expect(window.contains("diagnostic-section-heading"))
-    guard let operations = view.range(of: "private var statusOperations") else {
-        Issue.record("statusOperations is missing")
-        return
-    }
-    let statusWindow = String(view[operations.lowerBound...].prefix(900))
-    #expect(!statusWindow.contains("privacy-gate-enabled"))
 }

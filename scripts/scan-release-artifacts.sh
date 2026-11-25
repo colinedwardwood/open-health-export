@@ -80,6 +80,26 @@ duringAnchorPersist
 OHE_PROCESS_EXIT_SEAM
 EOF
 
+# #56 / UX-3: the engineering harness, its debug copy and its test controls must not
+# ship. These are the strings it showed, read from the whole iOS app bundle rather than
+# the executable alone, because string catalogs compile into resource files.
+cat > "$scratch/harness-strings" <<'EOF'
+M0 harness
+Time to first screen
+R-73 is a background-launch budget
+Run R-70
+Demo export never reads HealthKit
+Type local-file to confirm demo export
+posts one R-40 notice
+Send traceparent header
+Send traceparent to Mac companion
+OTLP collector URL
+Enable OTLP collector
+Preview OTLP payload
+HarnessView
+HarnessExport
+EOF
+
 bundle_executable() {
   local bundle="$1"
   local platform="$2"
@@ -164,6 +184,13 @@ for binary in "${binaries[@]}"; do
     fi
   done < "$scratch/forbidden"
 done
+
+while IFS= read -r harness_string; do
+  if grep -rFa -- "$harness_string" "${ios_apps[0]}" >/dev/null 2>&1; then
+    echo "UX-3: harness string shipped in ${ios_apps[0]}: $harness_string" >&2
+    found=1
+  fi
+done < "$scratch/harness-strings"
 
 if [[ "$found" -ne 0 ]]; then
   exit 1

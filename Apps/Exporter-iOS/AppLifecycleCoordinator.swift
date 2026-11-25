@@ -49,7 +49,7 @@ final class AppLifecycleCoordinator {
     }
 
     func recordWake(_ trigger: RunTrigger) {
-        guard let ledger = try? HarnessExport.wakeLedger() else { return }
+        guard let ledger = try? AppHealth.service.wakeLedger() else { return }
         try? ledger.append(
             WakeRecord(trigger: trigger, atEpoch: Date().timeIntervalSince1970)
         )
@@ -65,7 +65,7 @@ final class AppLifecycleCoordinator {
         let revoked = try await AppHealth.service.observeAuthorizationChanges()
         switch HealthObserverPolicy.action(
             revoked: revoked,
-            automaticExport: HarnessExport.hasAutomaticExport(trigger: .observerQuery),
+            automaticExport: AppDestinations.repository.hasAutomaticExport(trigger: .observerQuery),
             running: healthObservers != nil
         ) {
         case .stop:
@@ -73,8 +73,9 @@ final class AppLifecycleCoordinator {
         case .keep:
             return
         case .start:
-            // The export gate the wakes feed stays with the export code for now.
-            healthObservers = try await HarnessExport.startHealthObservers()
+            healthObservers = try await AppHealth.service.startObservers {
+                await ObserverExportGate.shared.enqueue($0)
+            }
             BackgroundTaskCoordinator.submit()
         }
     }
@@ -95,13 +96,13 @@ final class ExporterAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
         AppLifecycleCoordinator.shared.recordWake(.launch)
-        HarnessExport.attachNetworkActivityLedger()
+        AppStatus.transparency.attachNetworkActivityLedger()
         BackgroundTaskCoordinator.register()
         ContinuedBackfillCoordinator.register()
         BackgroundTaskCoordinator.submit()
         Task {
             try? await AppLifecycleCoordinator.shared.startObserversIfEligible()
-            _ = try? await HarnessExport.recoverInterruptedExports()
+            _ = try? await AppExport.service.recoverInterruptedExports()
         }
         return true
     }
@@ -140,7 +141,7 @@ enum ContinuedBackfillCoordinator {
                     rawValue: UserDefaults.standard.string(forKey: modeKey) ?? ""
                 ) ?? .aggregateOnly
                 let work = Task {
-                    try await HarnessExport.runBackfill(mode: mode)
+                    try await AppExport.service.runBackfill(mode: mode)
                 }
                 continued.progress.totalUnitCount = 1
                 continued.expirationHandler = {
@@ -251,7 +252,7 @@ enum BackgroundTaskCoordinator {
             do {
                 // ADR-R8: reported as a successful wake, because it is one. Telling iOS the
                 // wake failed would make it back off scheduling over a deferral we chose.
-                if HarnessExport.deferWakeIfMigrationPending(trigger: trigger) {
+                if AppExport.service.deferWakeIfMigrationPending(trigger: trigger) {
                     task.setTaskCompleted(success: true)
                     submit()
                     return
@@ -259,12 +260,12 @@ enum BackgroundTaskCoordinator {
                 // #28: observer registration is best-effort on a wake. Failing it must
                 // not skip the export pass the wake exists for.
                 try? await AppLifecycleCoordinator.shared.startObserversIfEligible()
-                if HarnessExport.hasAutomaticExport(trigger: trigger) {
-                    _ = try await HarnessExport.runOnePageEachMetric(trigger: trigger)
+                if AppDestinations.repository.hasAutomaticExport(trigger: trigger) {
+                    _ = try await AppExport.service.runOnePageEachMetric(trigger: trigger)
                 }
                 task.setTaskCompleted(success: true)
             } catch {
-                await HarnessExport.notifyRunFailure(trigger: trigger)
+                await AppStatus.notifyRunFailure(trigger: trigger)
                 task.setTaskCompleted(success: false)
             }
             submit()

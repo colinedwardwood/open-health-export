@@ -41,6 +41,32 @@ struct SectionFooter: View {
     }
 }
 
+/// What a screen says when it has nothing to list yet. Not `ContentUnavailableView`,
+/// which the accessibility audit reports as clipped text (#56).
+struct EmptyState: View {
+    let symbol: String
+    let title: LocalizedStringKey
+    let message: LocalizedStringKey
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: symbol)
+                .font(.largeTitle)
+                .foregroundStyle(.secondaryText)
+                .accessibilityHidden(true)
+            Text(title)
+                .font(.title2.bold())
+            Text(message)
+                .foregroundStyle(.secondaryText)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 /// A destination state as glyph plus words. The glyph carries the tone; the words
 /// are what VoiceOver reads.
 struct StatusBadge: View {
@@ -61,15 +87,5 @@ extension View {
         font(.subheadline)
             .foregroundStyle(.secondaryText)
             .monospacedDigit()
-    }
-
-    /// The inset card for something that needs the person: sits inside the list, so
-    /// it scrolls with the content and can never cover the navigation title.
-    func attentionCard(_ tone: StatusTone) -> some View {
-        padding(.vertical, 4)
-            .listRowBackground(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(tone.color.opacity(0.14))
-            )
     }
 }

@@ -30,11 +30,11 @@ enum AppAdvisory {
         storage: PreferencesAdvisoryStorage(),
         transport: { SystemHTTPTransport.make() },
         store: {
-            let root = try HarnessExport.applicationSupportRoot()
+            let root = try AppFiles.applicationSupportRoot()
             return try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         },
         emptyBody: {
-            let body = try HarnessExport.applicationSupportRoot()
+            let body = try AppFiles.applicationSupportRoot()
                 .appendingPathComponent("advisory-request-body")
             if !FileManager.default.fileExists(atPath: body.path) {
                 try Data().write(to: body, options: .atomic)

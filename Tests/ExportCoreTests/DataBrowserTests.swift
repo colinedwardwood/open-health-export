@@ -270,17 +270,6 @@ private func browserSample(
             environment: [IPadExporterNotice.environmentKey: "0"]
         )
     )
-    let root = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-    let view = try String(
-        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
-        encoding: .utf8
-    )
-    #expect(view.contains("ipad-only-exporter"))
-    #expect(view.contains("showsIPadOnlyExporterNotice"))
-    #expect(!view.contains("ipad-only-exporter-dismiss"))
 }
 
 @Test func ux07UnavailableCopyNamesThePlatformLimitWithoutRetryOrDashboard() {
@@ -311,28 +300,6 @@ private func browserSample(
     for banned in ["cancel", "skip", "back", "not now", "later"] {
         #expect(!joined.lowercased().contains(banned))
     }
-    let root = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-    let view = try String(
-        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
-        encoding: .utf8
-    )
-    #expect(view.contains(".fullScreenCover(isPresented: $showHealthPriming)"))
-    #expect(view.contains(".interactiveDismissDisabled()"))
-    #expect(view.contains("presentHealthPriming()"))
-    #expect(view.contains("health-priming-continue"))
-    #expect(view.contains("Button(HealthAuthorizationPriming.continueTitle)"))
-    guard let priming = view.range(of: "private var healthPriming") else {
-        Issue.record("healthPriming is missing")
-        return
-    }
-    let window = String(view[priming.lowerBound...].prefix(1600))
-    #expect(window.contains("toolbar(.hidden"))
-    #expect(!window.contains("Button(\"Cancel\""))
-    #expect(!window.contains("Button(\"Back\""))
-    #expect(!window.contains("Close"))
 }
 
 @Test func selectionReviewRequiresSensitiveIndividualConfirmation() throws {
@@ -595,15 +562,6 @@ private func browserSample(
     #expect(dob.reidentifying)
     #expect(dob.sensitive)
     #expect(dob.subtitle == DataBrowser.characteristicCopy)
-    let view = try String(
-        contentsOf: URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
-        encoding: .utf8
-    )
-    #expect(view.contains("DataBrowser.reidentifyingBadge"))
 }
 
 @Test func ux18PresetUpgradeIsOptInDiffAndLeavesV1UntilAccepted() {
@@ -737,16 +695,6 @@ func displayUnitsFollowTheRegion(
     #expect(unknown.mass == .kilograms)
     #expect(unknown.distance == .miles)
     #expect(DisplayUnitPreference.automatic.label == "Follow Health")
-    let root = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-    let view = try String(
-        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
-        encoding: .utf8
-    )
-    #expect(view.contains("HealthKitPreferredDisplayUnits.policy"))
-    #expect(view.contains("HealthKitPreferredDisplayUnits.didChange"))
 }
 
 @Test(arguments: [

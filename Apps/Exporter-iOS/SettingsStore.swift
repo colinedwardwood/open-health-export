@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: FSL-1.1-ALv2
 
+import CompanionReceive
 import Foundation
 
 /// Every UserDefaults key the app reads or writes, in one place (#42). The raw values
@@ -24,6 +25,8 @@ enum SettingKey: String, CaseIterable {
     case diagnosticWindowHours = "ohe.diagnosticWindowHours"
     case disclosureAcknowledged = "ohe.disclosureAcknowledged"
     case displayUnitPreference = "ohe.displayUnitPreference"
+    /// #59: the one iCloud Drive folder the person has accepted; cleared by Delete everything.
+    case iCloudFolderAcknowledged = "ohe.iCloudFolderAcknowledged"
     case exportWindowHours = "ohe.exportWindowHours"
     case freshnessIntervalMinutes = "ohe.freshnessIntervalMinutes"
     case lastScheduledFullReconcileEpoch = "ohe.lastScheduledFullReconcileEpoch"
@@ -32,6 +35,16 @@ enum SettingKey: String, CaseIterable {
     case observerRegistrationFailures = "ohe.observerRegistrationFailures"
     case presetCoreDailyAppliedVersion = "ohe.preset.coreDaily.appliedVersion"
     case shareProtectionAcknowledged = "ohe.shareProtectionAcknowledged"
+}
+
+extension ICloudFolderAcknowledgement {
+    static var app: Self {
+        let key = SettingKey.iCloudFolderAcknowledged.rawValue
+        return Self(storage: Storage(
+            read: { UserDefaults.standard.string(forKey: key) },
+            write: { UserDefaults.standard.set($0, forKey: key) }
+        ))
+    }
 }
 
 enum SettingsStore {

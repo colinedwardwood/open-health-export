@@ -5,8 +5,8 @@ import AppServices
 import CoreDomain
 import SwiftUI
 
-// Shell screens (#43): the destination error a notification opens, the privacy
-// lock, and the debug Developer screen.
+// Shell screens (#43): the destination error a notification opens and the privacy
+// lock.
 
 /// The five-part error for one destination, as a notification opens it.
 struct DestinationErrorScreen: View {
@@ -76,27 +76,12 @@ struct PrivacyLockScreen: View {
                 .disabled(gate.state == .authenticating)
                 .accessibilityIdentifier("privacy-gate-unlock")
         }
+        .fixedSize(horizontal: false, vertical: true)
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.background)
         .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
         .accessibilityIdentifier("privacy-gate")
     }
 }
-
-#if DEBUG
-/// The engineering harness, reachable from Settings in debug builds only.
-struct DeveloperScreen: View {
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        HarnessView(authenticator: UserPresenceAuthenticatorFactory.make())
-            .overlay(alignment: .topTrailing) {
-                Button("Close") { dismiss() }
-                    .buttonStyle(.bordered)
-                    .padding(.trailing)
-                    .accessibilityIdentifier("developer-close")
-            }
-    }
-}
-#endif

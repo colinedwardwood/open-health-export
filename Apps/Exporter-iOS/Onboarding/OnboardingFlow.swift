@@ -140,6 +140,7 @@ private struct Point: View {
 
 private struct WelcomeStep: View {
     let model: OnboardingModel
+    @State private var showsSample = false
 
     var body: some View {
         StepLayout(title: "Your health data, delivered where you choose.", message: nil) {
@@ -163,7 +164,10 @@ private struct WelcomeStep: View {
             .padding(.top, 8)
         } actions: {
             PrimaryButton(title: "Get started", identifier: "onboarding-start") { model.advance() }
+            Button("Try with sample data") { showsSample = true }
+                .accessibilityIdentifier("onboarding-sample-data")
         }
+        .sheet(isPresented: $showsSample) { SampleDataScreen() }
     }
 }
 
@@ -217,6 +221,10 @@ private struct DestinationStep: View {
             VStack(alignment: .leading, spacing: 16) {
                 Button {
                     #if DEBUG
+                    if UITestFixtures.seedsICloudFolder {
+                        Task { await model.useICloudFixtureFolder() }
+                        return
+                    }
                     if UITestFixtures.seedsLocalExportFolder {
                         Task { await model.useSeededFolder() }
                         return
@@ -247,6 +255,13 @@ private struct DestinationStep: View {
                 .buttonStyle(.plain)
                 .disabled(model.isWorking)
                 .accessibilityIdentifier("onboarding-choose-files")
+                if let warning = model.iCloudWarning {
+                    ICloudFolderWarning(
+                        warning: warning,
+                        acknowledge: { Task { await model.acknowledgeICloudFolder() } },
+                        decline: model.declineICloudFolder
+                    )
+                }
                 WorkStatus(work: model.work)
                 Label(
                     "Data goes straight from \(DeviceNoun.thisDevice) to the destination you set up. We never see it.",

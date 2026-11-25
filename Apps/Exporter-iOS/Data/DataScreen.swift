@@ -34,11 +34,12 @@ struct DataScreen: View {
         let ids = destinations
         Group {
             if ids.isEmpty {
-                ContentUnavailableView {
-                    Label("No destinations yet", systemImage: "chart.bar")
-                } description: {
-                    Text("Add a destination first. Then choose which types it receives here.")
-                }
+                EmptyState(
+                    symbol: "chart.bar",
+                    title: "No destinations yet",
+                    message: "Add a destination first. Then choose which types it receives here."
+                )
+                .accessibilityIdentifier("data-empty")
             } else {
                 list(ids)
             }

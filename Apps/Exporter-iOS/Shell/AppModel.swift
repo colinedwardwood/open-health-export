@@ -28,9 +28,6 @@ final class AppModel {
     var onboarding: Onboarding?
     /// Bumped when first run finishes, so screens re-read what it changed.
     private(set) var setupGeneration = 0
-    #if DEBUG
-    var showsDeveloper = false
-    #endif
 
     let privacyGate: AppPrivacyGate
 
@@ -105,7 +102,8 @@ final class AppModel {
         selectedTab = target.tab
         paths[target.tab] = target.path
         if target.exportNow {
-            Task { await exportNow() }
+            // Control Centre's button is the only link that asks for this.
+            Task { await exportNow(trigger: .widgetControl) }
         }
     }
 
@@ -173,14 +171,14 @@ final class AppModel {
             refreshStatus()
         }
         do {
-            let lines = try await HarnessExport.runOnePageEachMetric(trigger: trigger) { current, total in
+            let lines = try await AppExport.service.runOnePageEachMetric(trigger: trigger) { current, total in
                 await MainActor.run {
                     self.exportProgress = total > 0 ? Double(current) / Double(total) : 0
                 }
             }
             lastExportMessage = lines.first ?? "Export finished."
         } catch {
-            let label = await HarnessExport.notifyRunFailure(trigger: trigger)
+            let label = await AppStatus.notifyRunFailure(trigger: trigger)
             lastExportMessage = nil
             lastExportError = UserFacingFailure.object(for: error, destinationLabel: label ?? "your destination")
         }

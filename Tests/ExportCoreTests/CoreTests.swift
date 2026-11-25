@@ -1828,12 +1828,16 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
         encoding: .utf8
     )
     #expect(bundle.contains("ExportNowControl()"))
-    let view = try String(
-        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
+    let navigation = try String(
+        contentsOf: root.appendingPathComponent("Sources/AppServices/AppNavigation.swift"),
         encoding: .utf8
     )
-    #expect(view.contains("ExportNowRoute(url: url)"))
-    #expect(view.contains("trigger: .widgetControl"))
+    #expect(navigation.contains("ExportNowRoute(url: url)"))
+    let model = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/Shell/AppModel.swift"),
+        encoding: .utf8
+    )
+    #expect(model.contains("exportNow(trigger: .widgetControl)"))
     let intents = try String(
         contentsOf: root.appendingPathComponent(
             "Apps/Exporter-iOS/LastSuccessfulExportIntent.swift"
@@ -2218,11 +2222,11 @@ func diagnosticBundleDoesNotDependOnTheDegradedSubsystem(
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
-    let harness = try String(
-        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift"),
+    let fixtures = try String(
+        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/Shell/UITestFixtures.swift"),
         encoding: .utf8
     )
-    #expect(harness.contains("DestinationStatusUIFixtures.snapshots"))
+    #expect(fixtures.contains("DestinationStatusUIFixtures.snapshots"))
 }
 
 @Test func ux41DisplayStatesStayDistinguishableByGlyphAndLabelWithoutHue() {
@@ -4954,7 +4958,7 @@ private func anchorHoldFixture(
 }
 
 /// A repair sweep is the same fan-out as an export, and its per-sink rows are
-/// what the harness writes each destination's status from. A sweep that reported
+/// what each destination's status is written from. A sweep that reported
 /// only the destination it was constructed around left the others showing a
 /// result from an earlier run, so a sink it had just repaired could still read as
 /// overdue.
@@ -6260,8 +6264,12 @@ private func anchorHoldFixture(
         .deletingLastPathComponent()
     // #42: the export runs moved to ExportService; its decisions to AppServices.
     let harness = try [
-        "Apps/Exporter-iOS/HarnessExport.swift",
+        "Apps/Exporter-iOS/Services/AppFiles.swift",
         "Apps/Exporter-iOS/Services/ExportService.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Automatic.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Backfill.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Destinations.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Lifecycle.swift",
         "Sources/AppServices/ExportPolicy.swift",
     ].map { try String(contentsOf: root.appendingPathComponent($0), encoding: .utf8) }.joined()
     for service in ["ios.psk", "ios.https", "mqtt"] {
@@ -6304,6 +6312,10 @@ private func anchorHoldFixture(
     // #42: the export runs moved to ExportService; its decisions to AppServices.
     let harness = try [
         "Apps/Exporter-iOS/Services/ExportService.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Automatic.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Backfill.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Destinations.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Lifecycle.swift",
     ].map { try String(contentsOf: root.appendingPathComponent($0), encoding: .utf8) }.joined()
     let calls = harness.components(separatedBy: "try await trailingReconcileAfterDelta(").count - 1
     #expect(calls == 4)
@@ -6324,6 +6336,10 @@ private func anchorHoldFixture(
     // #42: the export runs moved to ExportService; its decisions to AppServices.
     let service = try [
         "Apps/Exporter-iOS/Services/ExportService.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Automatic.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Backfill.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Destinations.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Lifecycle.swift",
     ].map { try String(contentsOf: root.appendingPathComponent($0), encoding: .utf8) }.joined()
     let policy = try String(
         contentsOf: root.appendingPathComponent("Sources/AppServices/ExportPolicy.swift"),
@@ -6352,21 +6368,25 @@ private func anchorHoldFixture(
     // #42: the export runs moved to ExportService; its decisions to AppServices. The
     // setup probes and verified sinks moved to AppDestinationSetup.
     let harness = try [
-        "Apps/Exporter-iOS/HarnessExport.swift",
         "Apps/Exporter-iOS/Services/ExportService.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Automatic.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Backfill.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Destinations.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Lifecycle.swift",
         "Apps/Exporter-iOS/Services/AppDestinationSetup.swift",
     ].map { try String(contentsOf: root.appendingPathComponent($0), encoding: .utf8) }.joined()
-    #expect(harness.contains("allowsMeteredNetwork(destinationID:"))
+    #expect(harness.contains("allowsMeteredNetwork("))
     #expect(harness.contains("NetworkPathMonitorCache.conditions()"))
-    for destinationID in ["mqtt", "companion", "otlp"] {
+    // OTLP's own gate is asserted with the exporter below; nothing in the app drives it now.
+    for destinationID in ["mqtt", "companion"] {
         #expect(
-            harness.contains("allowsMeteredNetwork(destinationID: \"\(destinationID)\")"),
+            harness.contains("allowsMeteredNetwork(\"\(destinationID)\")"),
             "missing metered opt-in for \(destinationID)"
         )
     }
     #expect(
         harness.contains(
-            "allowsMeteredNetwork(destinationID: destinationID)"
+            "allowsMeteredNetwork(destinationID)"
         )
     )
     #expect(
@@ -6399,10 +6419,13 @@ private func anchorHoldFixture(
         contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/AppPrivacyGate.swift"),
         encoding: .utf8
     )
-    let exportHarness = try String(
-        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessExport.swift"),
-        encoding: .utf8
-    )
+    let exportHarness = try [
+        "Apps/Exporter-iOS/Services/ExportService.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Automatic.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Backfill.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Destinations.swift",
+        "Apps/Exporter-iOS/Services/ExportService+Lifecycle.swift",
+    ].map { try String(contentsOf: root.appendingPathComponent($0), encoding: .utf8) }.joined()
     let lifecycle = try String(
         contentsOf: root.appendingPathComponent(
             "Apps/Exporter-iOS/AppLifecycleCoordinator.swift"

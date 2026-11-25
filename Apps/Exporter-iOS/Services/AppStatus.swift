@@ -91,7 +91,7 @@ enum DataFlowSourceFiles {
     }
 
     static func read() -> DataFlowSources? {
-        guard let root = try? HarnessExport.applicationSupportRoot() else { return nil }
+        guard let root = try? AppFiles.applicationSupportRoot() else { return nil }
         func decode<T: Decodable>(_ type: T.Type, _ name: String) -> T? {
             guard let data = try? Data(contentsOf: root.appendingPathComponent(name)) else {
                 return nil
@@ -99,8 +99,8 @@ enum DataFlowSourceFiles {
             return try? JSONDecoder().decode(type, from: data)
         }
         var sources = DataFlowSources()
-        if HarnessExport.isLocalFileEnabled() {
-            sources.localFolder = .some(HarnessExport.localExportFolderName())
+        if AppDestinations.repository.isLocalFileEnabled() {
+            sources.localFolder = .some(AppDestinations.repository.localExportFolderName())
         }
         if let record = decode(WebRecord.self, "https-destination.json"),
            record.report.allowsEnablement
@@ -143,7 +143,7 @@ enum DataFlowSourceFiles {
 
 enum AppStatus {
     private static let stateStore: @Sendable () throws -> any StateStore = {
-        let root = try HarnessExport.applicationSupportRoot()
+        let root = try AppFiles.applicationSupportRoot()
         return try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
     }
 
@@ -155,27 +155,27 @@ enum AppStatus {
         notifier: SystemStatusNotifier(),
         denialMemory: PreferencesNotificationDenialMemory(),
         store: stateStore,
-        wakes: { try HarnessExport.wakeLedger().records() },
+        wakes: { try AppHealth.service.wakeLedger().records() },
         now: { Date() }
     )
 
     static let history = HistoryService(
         store: stateStore,
-        seal: { HarnessExport.ledgerHeadSeal() },
+        seal: { AppFiles.ledgerHeadSeal() },
         sealRecordURL: {
-            try HarnessExport.applicationSupportRoot().appendingPathComponent("ledger-head-seal.json")
+            try AppFiles.applicationSupportRoot().appendingPathComponent("ledger-head-seal.json")
         }
     )
 
     static let transparency = TransparencyService(
         sources: { DataFlowSourceFiles.read() },
-        selectedTypeCount: { (try? await HarnessExport.selectedMetrics())?.count ?? 0 },
+        selectedTypeCount: { (try? await AppDestinations.repository.selectedMetrics())?.count ?? 0 },
         store: stateStore,
         networkActivityURL: {
-            try HarnessExport.applicationSupportRoot().appendingPathComponent("network-activity.json")
+            try AppFiles.applicationSupportRoot().appendingPathComponent("network-activity.json")
         },
         diagnosticJournal: { maxRuns, windowSeconds in
-            let root = try HarnessExport.applicationSupportRoot()
+            let root = try AppFiles.applicationSupportRoot()
             let read = SQLiteDiagnosticReader.read(
                 path: root.appendingPathComponent("state.sqlite").path,
                 maxRuns: maxRuns,
@@ -202,6 +202,21 @@ enum AppStatus {
             deviceModel: UIDevice.current.model,
             localeIdentifier: Locale.current.identifier,
             utcOffsetMinutes: TimeZone.current.secondsFromGMT() / 60
+        )
+    }
+
+    /// A run that threw before any destination could report for itself. One notice
+    /// still goes out, against the destination that has evidence of the failure, or the
+    /// first one this trigger was allowed to use. Returns the label that notice used,
+    /// so on-screen text can say the same thing.
+    @discardableResult
+    static func notifyRunFailure(trigger: RunTrigger) async -> String? {
+        await status.notifyRunFailure(
+            planned: DestinationRepository.healthDestinationIDs.filter {
+                AppDestinations.repository.isEnabled($0)
+                    && AppDestinations.repository.allowsExport($0, trigger: trigger)
+            },
+            label: DestinationRepository.label
         )
     }
 

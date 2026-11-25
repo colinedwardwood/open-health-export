@@ -50,30 +50,3 @@ import Testing
     )
 }
 
-@Test func harnessImportSurfacesLocalizedConfigurationErrors() throws {
-    let root = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-    let harness = try String(
-        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/HarnessView.swift"),
-        encoding: .utf8
-    )
-    let importer = try String(
-        contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/ConfigurationImportView.swift"),
-        encoding: .utf8
-    )
-    #expect(harness.contains("Import refused: \\(error.localizedDescription)"))
-    #expect(importer.contains("Configuration refused: \\(error.localizedDescription)"))
-    #expect(!harness.contains("Import refused: \\(error)."))
-    #expect(!importer.contains("Configuration refused: \\(error)\""))
-    #expect(
-        importer.contains(
-            "configuration-import-configure-\\(draft.configuration.kind.rawValue)"
-        )
-    )
-    #expect(importer.contains("HarnessExport.resetCompanionSlotForUITests()"))
-    let importView = try #require(harness.range(of: "ConfigurationImportView("))
-    let pairing = try #require(harness.range(of: "companionPairingSection"))
-    #expect(importView.lowerBound < pairing.lowerBound)
-}

@@ -21,144 +21,12 @@ import StorageSQLite
 import Watchdog
 import WidgetKit
 
-// MARK: Storage adapters
-
-/// The setup sidecars in Application Support. The MQTT client certificate and the
-/// OTLP record live beside the verification records.
-struct DestinationSetupFileStore: DestinationSetupFiles {
-    let root: @Sendable () throws -> URL
-
-    static let mqttClientCertificate = "mqtt-client.p12"
-    static let otlpRecord = "otlp-destination.json"
-
-    func httpsRecord(_ destinationID: String) -> HTTPSVerificationRecord? {
-        read(HTTPSVerificationRecord.self, DestinationSidecar.httpsRecord(destinationID: destinationID).filename)
-    }
-
-    func writeHTTPSRecord(_ record: HTTPSVerificationRecord, destinationID: String) throws {
-        try write(record, DestinationSidecar.httpsRecord(destinationID: destinationID).filename)
-    }
-
-    func mqttRecord() -> MQTTVerificationRecord? {
-        read(MQTTVerificationRecord.self, DestinationSidecar.mqttRecord.filename)
-    }
-
-    func writeMQTTRecord(_ record: MQTTVerificationRecord) throws {
-        try write(record, DestinationSidecar.mqttRecord.filename)
-    }
-
-    func writeMQTTClientCertificate(_ pkcs12: Data?) throws {
-        let url = try root().appendingPathComponent(Self.mqttClientCertificate)
-        if let pkcs12 {
-            try pkcs12.write(to: url, options: .atomic)
-        } else {
-            try? FileManager.default.removeItem(at: url)
-        }
-    }
-
-    func companionRecord() -> CompanionVerificationRecord? {
-        read(CompanionVerificationRecord.self, DestinationSidecar.companionTestReport.filename)
-    }
-
-    func writeCompanionRecord(_ record: CompanionVerificationRecord) throws {
-        try write(record, DestinationSidecar.companionTestReport.filename)
-    }
-
-    func removeCompanionRecord() {
-        remove(DestinationSidecar.companionTestReport.filename)
-    }
-
-    func localFileTestReport() -> DestinationTestReport? {
-        read(DestinationTestReport.self, DestinationSidecar.localFileTestReport.filename)
-    }
-
-    func writeLocalFileTestReport(_ report: DestinationTestReport) throws {
-        try write(report, DestinationSidecar.localFileTestReport.filename)
-    }
-
-    func removeLocalFileTestReport() {
-        remove(DestinationSidecar.localFileTestReport.filename)
-    }
-
-    func otlpRecord() -> OTLPDestinationRecord? {
-        read(OTLPDestinationRecord.self, Self.otlpRecord)
-    }
-
-    func writeOTLPRecord(_ record: OTLPDestinationRecord) throws {
-        try write(record, Self.otlpRecord)
-    }
-
-    func removeOTLPRecord() {
-        remove(Self.otlpRecord)
-    }
-
-    private func read<T: Decodable>(_ type: T.Type, _ name: String) -> T? {
-        guard let root = try? root(),
-              let data = try? Data(contentsOf: root.appendingPathComponent(name))
-        else { return nil }
-        return try? JSONDecoder().decode(type, from: data)
-    }
-
-    private func write<T: Encodable>(_ value: T, _ name: String) throws {
-        try JSONEncoder().encode(value).write(
-            to: try root().appendingPathComponent(name),
-            options: .atomic
-        )
-    }
-
-    private func remove(_ name: String) {
-        guard let root = try? root() else { return }
-        try? FileManager.default.removeItem(at: root.appendingPathComponent(name))
-    }
-}
-
-/// Status snapshots in the shared container, and the widget that reads them.
-struct SharedContainerSetupSnapshots: SetupStatusSnapshots {
-    func readAll() -> [DestinationStatusSnapshot] {
-        StatusSnapshotLocation.readAll()
-    }
-
-    func recordSecurityEvents(
-        _ count: Int,
-        destinationID: String,
-        destinationLabel: String?,
-        enabled: Bool?,
-        state: DestinationDisplayState?,
-        writtenAtEpoch: TimeInterval
-    ) throws {
-        guard let url = StatusSnapshotLocation.url(destinationID: destinationID) else { return }
-        try DestinationSnapshotFile.recordSecurityEvents(
-            count,
-            destinationID: destinationID,
-            destinationLabel: destinationLabel,
-            enabled: enabled,
-            state: state,
-            writtenAtEpoch: writtenAtEpoch,
-            at: url
-        )
-    }
-
-    func write(_ snapshot: DestinationStatusSnapshot) throws {
-        guard let url = StatusSnapshotLocation.url(destinationID: snapshot.destinationID) else { return }
-        try DestinationSnapshotFile.write(snapshot, to: url)
-    }
-
-    func remove(destinationID: String) {
-        guard let url = StatusSnapshotLocation.url(destinationID: destinationID) else { return }
-        try? FileManager.default.removeItem(at: url)
-    }
-
-    func reloadStatusWidget() {
-        WidgetCenter.shared.reloadTimelines(ofKind: "ExportStatusWidget")
-    }
-}
-
 // MARK: Setup flows
 
 /// Adding and verifying destinations (#42). The probes, Keychain reads and sinks live
 /// here; what is decided and saved lives in `DestinationSetupService`.
 enum AppDestinationSetup {
-    private static let root: @Sendable () throws -> URL = { try HarnessExport.applicationSupportRoot() }
+    private static let root: @Sendable () throws -> URL = { try AppFiles.applicationSupportRoot() }
 
     static let files = DestinationSetupFileStore(root: root)
 
@@ -172,7 +40,7 @@ enum AppDestinationSetup {
             try StateStoreHost.store(path: root().appendingPathComponent("state.sqlite").path)
         },
         authorizeScope: { try await AppHealth.service.requestReadAccess(for: $0) },
-        forgetPairing: { try await HarnessExport.vault().forget() },
+        forgetPairing: { try await AppFiles.vault().forget() },
         now: { Date() }
     )
 
@@ -233,16 +101,16 @@ enum AppDestinationSetup {
             allowInsecureHTTP: allowInsecureHTTP
         )
         let now = Date().ISO8601Format()
-        let probe = try await HarnessExport.withThermalCompression {
+        let probe = try await AppExport.service.withThermalCompression {
             try await HTTPSDestinationEnable.probe(
                 destination: destination,
                 transport: transport,
-                exporterID: try HarnessExport.installationID(),
+                exporterID: try AppFiles.installationID(),
                 emittedAt: now,
                 meteredPolicy: .fromAllowsMetered(
-                    HarnessExport.allowsMeteredNetwork(destinationID: destinationID)
+                    AppDestinations.repository.allowsMeteredNetwork(destinationID)
                 ),
-                pathConditions: HarnessExport.networkPathConditions(),
+                pathConditions: AppExport.service.networkPathConditions(),
                 confirmedLeafSPKISha256: confirmedLeafSPKISha256,
                 onProgress: onProgress
             )
@@ -319,9 +187,9 @@ enum AppDestinationSetup {
                 transport: transport,
                 traceparent: emission,
                 meteredPolicy: .fromAllowsMetered(
-                    HarnessExport.allowsMeteredNetwork(destinationID: destinationID)
+                    AppDestinations.repository.allowsMeteredNetwork(destinationID)
                 ),
-                pathConditions: HarnessExport.networkPathConditions()
+                pathConditions: AppExport.service.networkPathConditions()
             )
         )
         return (verified, emission)
@@ -345,7 +213,7 @@ enum AppDestinationSetup {
     ) async throws -> DestinationConfirmationCard {
         let host = try DestinationSetupService.host(of: urlString)
         let allowedHosts: Set<String> = [host]
-        let exporterID = try HarnessExport.installationID()
+        let exporterID = try AppFiles.installationID()
         let destination = try MQTTDestination(
             urlString: urlString,
             allowedHosts: allowedHosts,
@@ -374,10 +242,10 @@ enum AppDestinationSetup {
         let probe = try await MQTTDestinationEnable.probe(
             destination: destination,
             pipe: sink.pipe,
-            exporterID: try HarnessExport.installationID(),
+            exporterID: try AppFiles.installationID(),
             emittedAt: now,
-            meteredPolicy: .fromAllowsMetered(HarnessExport.allowsMeteredNetwork(destinationID: "mqtt")),
-            pathConditions: HarnessExport.networkPathConditions(),
+            meteredPolicy: .fromAllowsMetered(AppDestinations.repository.allowsMeteredNetwork("mqtt")),
+            pathConditions: AppExport.service.networkPathConditions(),
             confirmedLeafSPKISha256: confirmedIdentity?.leafSPKISha256,
             onProgress: onProgress
         )
@@ -429,11 +297,11 @@ enum AppDestinationSetup {
             password: password,
             clientPKCS12: pkcs12,
             clientPKCS12Password: try await AppDestinations.records.mqttPKCS12Password(from: saved, root: root),
-            exporterID: try HarnessExport.installationID()
+            exporterID: try AppFiles.installationID()
         )
         var sink = try MQTTSink.overNetwork(destination: destination, pin: saved.pin)
-        sink.meteredPolicy = .fromAllowsMetered(HarnessExport.allowsMeteredNetwork(destinationID: "mqtt"))
-        sink.pathConditions = HarnessExport.networkPathConditions()
+        sink.meteredPolicy = .fromAllowsMetered(AppDestinations.repository.allowsMeteredNetwork("mqtt"))
+        sink.pathConditions = AppExport.service.networkPathConditions()
         var setup = DestinationSetup()
         try setup.resumeEnabled(testReport: saved.report)
         return try setup.enable(sink: sink)
@@ -443,7 +311,7 @@ enum AppDestinationSetup {
 
     static func enableLocalFile(onProgress: DestinationTestProgress?) async throws -> [String] {
         try ExportScopeGate.requireConfigured(try await AppDestinations.repository.scope("local-file"))
-        let root = try HarnessExport.applicationSupportRoot()
+        let root = try AppFiles.applicationSupportRoot()
         let folderAccess = try AppDestinations.folder.access(root: root)
         defer { withExtendedLifetime(folderAccess) {} }
         service.forgetLocalFileTest()
@@ -472,7 +340,7 @@ enum AppDestinationSetup {
         }
         let completed = try LocalFileDestinationEnable.complete(
             directory: destinationDirectory,
-            exporterId: try HarnessExport.installationID(),
+            exporterId: try AppFiles.installationID(),
             emittedAt: Date().ISO8601Format(),
             onProgress: onProgress
         )
@@ -505,7 +373,7 @@ enum AppDestinationSetup {
         )
         let emission = TraceparentEmission(enabled: AppDestinations.repository.companionTraceparent())
         let meteredPolicy = MeteredNetworkPolicy.fromAllowsMetered(
-            HarnessExport.allowsMeteredNetwork(destinationID: "companion")
+            AppDestinations.repository.allowsMeteredNetwork("companion")
         )
         if let report = service.resumableCompanionReport(
             serviceName: session.serviceName,
@@ -517,7 +385,7 @@ enum AppDestinationSetup {
                 testReport: report,
                 traceparent: emission,
                 meteredPolicy: meteredPolicy,
-                pathConditions: HarnessExport.networkPathConditions()
+                pathConditions: AppExport.service.networkPathConditions()
             )
             return (verified, emission)
         }
@@ -531,7 +399,7 @@ enum AppDestinationSetup {
             emittedAt: Date().ISO8601Format(),
             traceparent: emission,
             meteredPolicy: meteredPolicy,
-            pathConditions: HarnessExport.networkPathConditions(),
+            pathConditions: AppExport.service.networkPathConditions(),
             onProgress: onTestProgress
         )
         try await service.recordCompanionTest(
@@ -560,7 +428,7 @@ enum AppDestinationSetup {
 
     #if !OHE_OBS25_SIZE_BASELINE
     static func previewOTLP() async throws -> (preview: String, payload: Data) {
-        let root = try HarnessExport.applicationSupportRoot()
+        let root = try AppFiles.applicationSupportRoot()
         let store = try StateStoreHost.store(path: root.appendingPathComponent("state.sqlite").path)
         let events = try await store.transact { try $0.loadJournal() }
         let payload = OTLPPreview.payload(events: events)
@@ -610,7 +478,7 @@ extension AppDestinationSetup {
     /// only the app's link to the folder, its test result and its status go.
     static func removeLocalFile() throws {
         service.forgetLocalFileTest()
-        let root = try HarnessExport.applicationSupportRoot()
+        let root = try AppFiles.applicationSupportRoot()
         let bookmark = DestinationSidecar.localFolderBookmark.url(in: root)
         if FileManager.default.fileExists(atPath: bookmark.path) {
             try FileManager.default.removeItem(at: bookmark)

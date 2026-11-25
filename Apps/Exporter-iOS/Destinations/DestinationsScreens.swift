@@ -14,6 +14,7 @@ import Watchdog
 struct DestinationsScreen: View {
     @Environment(AppModel.self) private var model
     @Environment(\.services) private var services
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var adding = false
 
     var body: some View {
@@ -25,11 +26,12 @@ struct DestinationsScreen: View {
         )
         return List {
             if rows.isEmpty {
-                ContentUnavailableView {
-                    Label("No destinations yet", systemImage: "arrow.right.to.line")
-                } description: {
-                    Text("Add a folder in Files to start. You can add servers later.")
-                }
+                EmptyState(
+                    symbol: "arrow.right.to.line",
+                    title: "No destinations yet",
+                    message: "Add a folder in Files to start. You can add servers later."
+                )
+                .accessibilityIdentifier("destinations-empty")
             } else {
                 Section {
                     ForEach(rows) { row in
@@ -53,7 +55,13 @@ struct DestinationsScreen: View {
                 Button {
                     adding = true
                 } label: {
-                    Label("Add destination", systemImage: "plus")
+                    // Text only at accessibility sizes: an icon-and-title Label clips
+                    // there, as it does inside a prominent button on Status (#46).
+                    if dynamicTypeSize.isAccessibilitySize {
+                        Text("Add destination")
+                    } else {
+                        Label("Add destination", systemImage: "plus")
+                    }
                 }
                 .accessibilityIdentifier("destinations-add")
             }
@@ -129,6 +137,10 @@ struct FilesSetupScreen: View {
             Section {
                 Button {
                     #if DEBUG
+                    if UITestFixtures.seedsICloudFolder {
+                        Task { await setup.useICloudFixtureFolder() }
+                        return
+                    }
                     if UITestFixtures.seedsLocalExportFolder {
                         Task { await setup.useSeededFolder() }
                         return
@@ -142,6 +154,15 @@ struct FilesSetupScreen: View {
                 .accessibilityIdentifier("files-choose-folder")
             } footer: {
                 SectionFooter("Exports are written as JSON Lines files. A folder in iCloud Drive syncs your health data to iCloud.")
+            }
+            if let warning = setup.iCloudWarning {
+                Section {
+                    ICloudFolderWarning(
+                        warning: warning,
+                        acknowledge: { Task { await setup.acknowledgeICloudFolder() } },
+                        decline: setup.declineICloudFolder
+                    )
+                }
             }
             if setup.folderName != nil {
                 TestChecklistSection(checklist: setup.checklist, error: setup.error) {
@@ -160,6 +181,35 @@ struct FilesSetupScreen: View {
         .fileImporter(isPresented: $picking, allowedContentTypes: [.folder]) { result in
             guard case let .success(url) = result else { return }
             Task { await setup.useFolder(url) }
+        }
+    }
+}
+
+/// The iCloud Drive warning for a picked folder: the folder is used only once the
+/// person acknowledges it (#59), and the default choice keeps the data on the device.
+struct ICloudFolderWarning: View {
+    let warning: String
+    let acknowledge: () -> Void
+    let decline: () -> Void
+
+    var body: some View {
+        Group {
+            HStack(alignment: .top, spacing: 12) {
+                DestinationDisplayState.stale.toneGlyph.accessibilityHidden(true)
+                Text(warning)
+                    .font(.body)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("icloud-warning")
+            Button(action: decline) {
+                Text("Choose another folder").font(.body)
+            }
+            .accessibilityIdentifier("icloud-choose-another")
+            Button(action: acknowledge) {
+                Text("Use iCloud folder anyway").font(.body)
+            }
+            .accessibilityIdentifier("icloud-acknowledge")
         }
     }
 }
