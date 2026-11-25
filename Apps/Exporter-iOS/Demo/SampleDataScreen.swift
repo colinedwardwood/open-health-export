@@ -21,6 +21,10 @@ final class SampleDataModel {
         let value: String
         let unit: String?
         let when: Date
+
+        var valueWithUnit: String {
+            [value, unit].compactMap { $0 }.joined(separator: "\u{00A0}")
+        }
     }
 
     enum Phase: Equatable {
@@ -107,7 +111,7 @@ struct SampleDataScreen: View {
                                 HStack {
                                     Text(row.name)
                                     Spacer()
-                                    Text([row.value, row.unit].compactMap { $0 }.joined(separator: " "))
+                                    Text(verbatim: row.valueWithUnit)
                                         .monospacedDigit()
                                 }
                                 Text(row.when, format: .dateTime.day().month().hour().minute())

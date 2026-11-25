@@ -28,7 +28,7 @@ import WireFormat
     let dest = root.appendingPathComponent("destination")
     let scratch = root.appendingPathComponent("scratch")
     try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
-    let source = DemoSampleSource(seed: 1, samplesPerMetric: 2)
+    let source = DemoSampleSource(seed: 1, samplesPerMetric: 2, now: Date(timeIntervalSince1970: 1_800_000_000))
     let characteristics = DemoCharacteristicSource()
     var envelope = testEnvelope()
     envelope.demo = true
@@ -360,7 +360,7 @@ private func volumeObject(at index: Int, tier: SyntheticCorpusTier) throws -> [S
     let store = MemoryStateStore()
     for declaration in MetricCatalog.selectable {
         let run = ExportRun(
-            source: DemoSampleSource(seed: 1, samplesPerMetric: 2),
+            source: DemoSampleSource(seed: 1, samplesPerMetric: 2, now: Date(timeIntervalSince1970: 1_800_000_000)),
             destination: .testing(LocalFileSink(directory: destination)),
             store: store,
             metric: declaration.id,

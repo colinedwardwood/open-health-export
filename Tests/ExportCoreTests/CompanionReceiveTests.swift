@@ -76,11 +76,9 @@ import WireFormat
     #expect(!FolderRisk.isInICloud(URL(fileURLWithPath: "/private/var/mobile/Mobile Documents-notes")))
 }
 
-@Test func iCloudAcknowledgementIsPerFolder() throws {
-    let suite = "ohe-icloud-ack-\(UUID().uuidString)"
-    let defaults = try #require(UserDefaults(suiteName: suite))
-    defer { defaults.removePersistentDomain(forName: suite) }
-    let ack = ICloudFolderAcknowledgement(defaults: defaults)
+@Test func iCloudAcknowledgementIsPerFolder() {
+    nonisolated(unsafe) var stored: String?
+    let ack = ICloudFolderAcknowledgement(storage: .init(read: { stored }, write: { stored = $0 }))
     let first = URL(fileURLWithPath: "/var/mobile/Library/Mobile Documents/com~apple~CloudDocs/One")
     let second = URL(fileURLWithPath: "/var/mobile/Library/Mobile Documents/com~apple~CloudDocs/Two")
     let local = FileManager.default.temporaryDirectory

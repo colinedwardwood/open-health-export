@@ -125,24 +125,34 @@ public enum FolderRisk {
 /// The folder the person has said they accept being in iCloud, so the warning is asked
 /// once per folder and a different folder asks again (App Review 5.1.3(ii)).
 public struct ICloudFolderAcknowledgement {
-    private let defaults: UserDefaults
-    private let key: String
+    /// Where the acknowledged folder is kept. The app supplies its settings store; this
+    /// module stays free of required-reason APIs so every bundle that links it is clean.
+    public struct Storage {
+        public var read: () -> String?
+        public var write: (String?) -> Void
 
-    public init(defaults: UserDefaults = .standard, key: String = "ohe.iCloudFolderAcknowledged") {
-        self.defaults = defaults
-        self.key = key
+        public init(read: @escaping () -> String?, write: @escaping (String?) -> Void) {
+            self.read = read
+            self.write = write
+        }
+    }
+
+    private let storage: Storage
+
+    public init(storage: Storage) {
+        self.storage = storage
     }
 
     public func isAcknowledged(_ url: URL) -> Bool {
-        defaults.string(forKey: key) == Self.identity(url)
+        storage.read() == Self.identity(url)
     }
 
     public func acknowledge(_ url: URL) {
-        defaults.set(Self.identity(url), forKey: key)
+        storage.write(Self.identity(url))
     }
 
     public func clear() {
-        defaults.removeObject(forKey: key)
+        storage.write(nil)
     }
 
     /// True when this folder is in iCloud and has not been acknowledged.

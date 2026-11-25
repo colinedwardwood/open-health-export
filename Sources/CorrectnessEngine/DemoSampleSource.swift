@@ -14,7 +14,7 @@ public struct DemoSampleSource: SampleSource, Sendable {
     /// "Now" for the sample dataset: every timestamp falls in the 30 days before it.
     public var now: Date
 
-    public init(seed: UInt64 = 1, samplesPerMetric: Int = 4, now: Date = Date()) {
+    public init(seed: UInt64 = 1, samplesPerMetric: Int = 4, now: Date) {
         self.seed = seed
         self.samplesPerMetric = samplesPerMetric
         self.now = now

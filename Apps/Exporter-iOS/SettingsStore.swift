@@ -38,7 +38,13 @@ enum SettingKey: String, CaseIterable {
 }
 
 extension ICloudFolderAcknowledgement {
-    static var app: Self { Self(key: SettingKey.iCloudFolderAcknowledged.rawValue) }
+    static var app: Self {
+        let key = SettingKey.iCloudFolderAcknowledged.rawValue
+        return Self(storage: Storage(
+            read: { UserDefaults.standard.string(forKey: key) },
+            write: { UserDefaults.standard.set($0, forKey: key) }
+        ))
+    }
 }
 
 enum SettingsStore {

@@ -3543,6 +3543,105 @@
           }
         }
       }
+    },
+    "Sample export finished": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sample export finished"
+          }
+        }
+      }
+    },
+    "Sample data": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sample data"
+          }
+        }
+      }
+    },
+    "Exporting sample data…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exporting sample data…"
+          }
+        }
+      }
+    },
+    "The sample export didn't finish. Try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The sample export didn't finish. Try again."
+          }
+        }
+      }
+    },
+    "Try again": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try again"
+          }
+        }
+      }
+    },
+    "Choose another folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose another folder"
+          }
+        }
+      }
+    },
+    "Use iCloud folder anyway": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use iCloud folder anyway"
+          }
+        }
+      }
+    },
+    "Try with sample data": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try with sample data"
+          }
+        }
+      }
+    },
+    "The archive folder is in iCloud, so exports there leave this device. Open the destination and confirm, or choose another folder.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The archive folder is in iCloud, so exports there leave this device. Open the destination and confirm, or choose another folder."
+          }
+        }
+      }
     }
   }
 }
