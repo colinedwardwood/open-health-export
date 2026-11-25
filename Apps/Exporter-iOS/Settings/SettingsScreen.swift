@@ -18,6 +18,7 @@ struct SettingsScreen: View {
     @State private var confirmingWipe = false
     @State private var wipeInventory: WipeInventory?
     @State private var message: String?
+    @State private var showsSample = false
 
     var body: some View {
         List {
@@ -79,6 +80,13 @@ struct SettingsScreen: View {
             }
 
             Section {
+                Button("Try with sample data") { showsSample = true }
+                    .accessibilityIdentifier("settings-sample-data")
+            } footer: {
+                SectionFooter("Exports made-up values to a private folder. Nothing is read from Apple Health or written to your archive.")
+            }
+
+            Section {
                 Button(WipeCopy.title, role: .destructive) {
                     Task {
                         wipeInventory = await AppStatus.transparency.wipeInventory()
@@ -103,6 +111,7 @@ struct SettingsScreen: View {
             #endif
         }
         .navigationTitle("Settings")
+        .sheet(isPresented: $showsSample) { SampleDataScreen() }
         .task { canOfferAlerts = await LocalUserNotifier().canOfferAlerts() }
         .confirmationDialog(WipeCopy.confirmTitle, isPresented: $confirmingWipe, titleVisibility: .visible) {
             Button("Delete everything", role: .destructive) {

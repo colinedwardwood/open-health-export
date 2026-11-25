@@ -1078,31 +1078,31 @@ struct ExportService: Sendable {
 
     // MARK: Demo and single-destination runs
 
-    func runDemoDataset(typedDestinationName: String) async throws -> [String] {
-        try DemoExportGate.confirmSending(to: "local-file", typed: typedDestinationName)
+    /// Writes the sample dataset to its own folder under Application Support, never to
+    /// the configured archive (#58). It needs no destination and no typed confirmation.
+    func runDemoDataset(at date: Date = Date()) async throws -> [String] {
         let root = try HarnessExport.applicationSupportRoot()
         let sqliteURL = root.appendingPathComponent("demo-state.sqlite")
-        let folderAccess = try localExportFolder(root: root)
-        defer { withExtendedLifetime(folderAccess) {} }
-        let dest = folderAccess.url
+        let dest = DemoExportLocation.directory(under: root)
+        try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
         let scratch = try HarnessExport.exportProtectedPayloadDirectory(named: "demo-scratch", under: root)
         let store = try StateStoreHost.store(path: sqliteURL.path)
         let (verified, events) = try HarnessExport.exportVerifiedLocalFile(root: root, destinationDirectory: dest)
         try await HarnessExport.exportEmitTrustNotices(events)
         let context = TemporalContext.utcHost
-        let now = Date().ISO8601Format()
+        let stamp = date.ISO8601Format()
         let exporterId = try HarnessExport.installationID()
         var envelope = WireEnvelope(
             exporterId: exporterId,
             seq: 1,
-            emittedAt: now,
-            observedAt: now,
+            emittedAt: stamp,
+            observedAt: stamp,
             demo: true
         )
         envelope.reason = "manual"
-        let source = DemoSampleSource(seed: 1, samplesPerMetric: 4)
+        let source = DemoSampleSource(seed: 1, samplesPerMetric: 4, now: date)
         let characteristics = DemoCharacteristicSource()
-        var lines: [String] = ["DEMO MODE — synthetic data, not HealthKit"]
+        var lines: [String] = [DemoCopy.banner]
         for declaration in MetricCatalog.selectable {
             let run = ExportRun(
                 source: source,
@@ -1121,7 +1121,6 @@ struct ExportService: Sendable {
             let outcome = try await run.run()
             lines.append("\(declaration.id.rawValue): \(outcome.kind.rawValue) (demo)")
         }
-        lines.append("Files: \(dest.path)")
         return lines
     }
 

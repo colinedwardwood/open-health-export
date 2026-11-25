@@ -2590,7 +2590,7 @@ struct HarnessView: View {
             }
             Text(
                 browserDemoMode
-                    ? "Demo values. This is what App Review sees without HealthKit history."
+                    ? DemoCopy.banner
                     : "Health values read on \(DeviceNoun.thisDevice)."
             )
                 .font(browserDemoMode ? .body.weight(.semibold) : .body)
@@ -3144,9 +3144,7 @@ struct HarnessView: View {
         phase = .working
         status = "Exporting demo dataset…"
         do {
-            results = try await HarnessExport.runDemoDataset(
-                typedDestinationName: CredentialFieldHygiene.secret(demoConfirmName).normalized
-            )
+            results = try await HarnessExport.runDemoDataset()
             refreshDestinationSurfaces()
             status = "Demo export finished. Files are DEMO- prefixed."
         } catch {

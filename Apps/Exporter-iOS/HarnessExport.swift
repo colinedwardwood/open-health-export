@@ -268,8 +268,8 @@ enum HarnessExport {
     static func reExportQueueGap(_ gap: GapRecord) async throws -> RunOutcome.Kind { try await AppExport.service.reExportQueueGap(gap) }
 
     // #42: forwarder; remove when the product UI calls the service.
-    static func runDemoDataset(typedDestinationName: String) async throws -> [String] {
-        try await AppExport.service.runDemoDataset(typedDestinationName: typedDestinationName)
+    static func runDemoDataset(at date: Date = Date()) async throws -> [String] {
+        try await AppExport.service.runDemoDataset(at: date)
     }
 
     // #42: forwarder; remove when the product UI calls the service.

@@ -140,6 +140,7 @@ private struct Point: View {
 
 private struct WelcomeStep: View {
     let model: OnboardingModel
+    @State private var showsSample = false
 
     var body: some View {
         StepLayout(title: "Your health data, delivered where you choose.", message: nil) {
@@ -163,7 +164,10 @@ private struct WelcomeStep: View {
             .padding(.top, 8)
         } actions: {
             PrimaryButton(title: "Get started", identifier: "onboarding-start") { model.advance() }
+            Button("Try with sample data") { showsSample = true }
+                .accessibilityIdentifier("onboarding-sample-data")
         }
+        .sheet(isPresented: $showsSample) { SampleDataScreen() }
     }
 }
 

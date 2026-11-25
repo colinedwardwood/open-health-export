@@ -457,6 +457,59 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(destinationStatusElement(0).waitForExistence(timeout: uiWait))
     }
 
+    /// #58: with no Health data and nothing typed, a reviewer reaches a finished export
+    /// and its values in one tap from first run, and the same from Settings.
+    func testSampleDataIsOneTapFromFirstRunAndFromSettings() throws {
+        app.terminate()
+        app.launchEnvironment = [
+            "OHE_RESET_SEEDED_SURFACES": "1",
+            "OHE_RESET_FIRST_RUN": "1",
+        ]
+        app.launchArguments = [
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launch()
+        let trySample = app.buttons["onboarding-sample-data"]
+        XCTAssertTrue(trySample.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        trySample.tap()
+        func assertSampleExport() {
+            XCTAssertTrue(
+                identified("sample-done").firstMatch.waitForExistence(timeout: 60),
+                visibleIdentifiers().joined(separator: ",")
+            )
+            XCTAssertTrue(identified("sample-value-stepCount").firstMatch.exists)
+            XCTAssertTrue(app.staticTexts["Sample data. Not from your Apple Health."].exists)
+            XCTAssertFalse(app.staticTexts.matching(
+                NSPredicate(format: "label CONTAINS[c] 'App Review'")
+            ).firstMatch.exists)
+        }
+        assertSampleExport()
+        // The values list is longer than one screen; at the larger sizes its header is
+        // pushed below the fold and reported as partial (#172), as on About.
+        auditFoldBottom = app.staticTexts["sample-banner"].firstMatch.frame.maxY
+        try performAccessibilityAudit("sample-data")
+        auditFoldBottom = nil
+        app.buttons["sample-close"].tap()
+
+        // Then Settings, on a launch that has finished first run.
+        app.terminate()
+        app.launchEnvironment = ["OHE_RESET_SEEDED_SURFACES": "1"]
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launch()
+        let settings = app.buttons["shell-settings"].firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        settings.tap()
+        let sample = app.buttons["settings-sample-data"]
+        for _ in 0 ..< 6 where !sample.exists { app.swipeUp() }
+        sample.tap()
+        assertSampleExport()
+    }
+
     /// #45: a new person reaches a successful first export from launch, with the
     /// disclosure before Apple's Health sheet, in eight taps or fewer of our own.
     func testFirstRunReachesAFirstExport() {
