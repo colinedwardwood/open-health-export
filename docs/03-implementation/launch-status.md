@@ -1,6 +1,6 @@
 # Launch status
 
-**As of:** 2026-10-05. Tracking issue: #131. Backlog: GitHub Project 6.
+**As of:** 2026-11-25. Tracking issue: #131. Backlog: GitHub Project 6.
 Read this first when picking the work up; it says what's done, what's in flight and
 what's next. Decisions live in the PRD's decision table (§11.0a) and the ADRs.
 
@@ -14,7 +14,7 @@ what's next. Decisions live in the PRD's decision table (§11.0a) and the ADRs.
   (background wakes, observers, catch-up on open, Shortcuts). Family Sharing on.
 - **Scope (D-20) and release gates (D-21):** adopted from PM-1 and PM-2.
 - **Licence (D-22, ADR-0005):** FSL-1.1-ALv2, receiver Apache-2.0, spec CC0, docs
-  CC-BY. Copy says "source-available", never "open source". (Merges with #186.)
+  CC-BY. Copy says "source-available", never "open source". (Merged, #186.)
 - **Platforms:** iPhone only for 1.0; Mac companion in 1.1; no EU storefronts at launch.
 
 ## Built (on main)
@@ -22,7 +22,7 @@ what's next. Decisions live in the PRD's decision table (§11.0a) and the ADRs.
 | Area | Issue | What exists |
 |---|---|---|
 | Services | #42 | `Sources/AppServices` (Linux-tested); app adapters in `Apps/Exporter-iOS/Services` |
-| App shell | #43 | `AppModel`, `AppEnvironment`, four-tab `RootView`, `DeepLinkRouter`; harness is DEBUG-only |
+| App shell | #43 | `AppModel`, `AppEnvironment`, four-tab `RootView`, `DeepLinkRouter`; harness deleted (#56) |
 | Visual system | #44, #57 | `StatusTone`, `Theme.xcassets` (light and dark), `Styles.swift`; layered `Apps/Icon/AppIcon.icon` |
 | First run | #45 | `Apps/Exporter-iOS/Onboarding` |
 | Status | #46 | `Apps/Exporter-iOS/Status`, `StatusDashboard`, `UserFacingFailure` |
@@ -30,27 +30,29 @@ what's next. Decisions live in the PRD's decision table (§11.0a) and the ADRs.
 | Unlock | #68 | `AutomationGate`, `PurchaseStore` (StoreKit 2, `OHE_STORE_BUILD` archives only) |
 | Store listing | #53 | `store/en/` in the brand voice |
 
-## In flight (PRs merging in order)
+## Merged since 2026-10-05
 
-1. #180 Data tab (#50)
-2. #181 History tab (#51)
-3. #182 Settings and About (#52)
-4. #186 Relicense to FSL. Its PRD row (D-22) is inserted at the same place as D-20/D-21 from #185, so expect one small conflict in `docs/01-prd/PRD.md` when it's rebased: keep all three rows.
+Data tab (#50, #180), History (#51, #181), Settings and About (#52, #182), the FSL
+relicense (#186), Swift jobs pinned to `ubuntu-24.04` (#188), and in #191 the harness
+deletion with the 600-line and `@State` lint and the release-artifact string scan
+(#56), demo mode with plausible values and separate output (#58) and the iCloud Drive
+folder warning (#59). Localisation (#54, #192) moved `Sources/` copy to catalog keys
+(ADR-0006); the data-flow explainer and scheduling copy are not migrated yet.
 
-Each needs the full CI run, including the three iOS UI shards. GitHub's macOS
-runners are the bottleneck: run CI for one PR at a time, or jobs queue for hours and
-get cancelled. Text-only PRs (docs, store copy) can merge on the Linux checks, which
-include `policycheck`.
+No product UI remains for OTLP, the anchor-hold banner, diagnostics, backfill or the
+Live Activity trigger; their backend code is still there. Decide whether to build
+screens for them or remove the code.
+
+GitHub's macOS runners are the bottleneck: run CI for one PR at a time, or jobs queue
+for hours and get cancelled (rerun with `gh run rerun <id> --failed`). Text-only PRs
+(docs, store copy) can merge on the Linux checks, which include `policycheck`.
 
 ## Next engineering work, in order
 
-1. **#56** Delete `HarnessView`/`HarnessExport` and re-point the UI suite at the product screens (drop `OHE_ROOT=harness`). Then the remaining #42 forwarders go, and #43's UI_TESTING configuration.
-2. **#54** Localisation plumbing (all copy through the String Catalog).
-3. **#58** Demo mode: plausible values, separate output.
-4. **#59** iCloud Drive warning for the Files destination (a footer exists; the issue wants detection).
-5. Follow-ups: #168 (category daily totals and reconcile), #177 (Home Assistant discovery names), #178 (flaky ledger test), #172 (audit fold suppression), Remove for network destinations, MQTT client certificates.
-6. **#67** Host the signed advisory feed at `advisories.cewdesign.com` (owner picks GitHub Pages or Cloudflare Pages).
-7. **#55** Manual VoiceOver and Voice Control pass (needs a person), and **#73** real-receiver end-to-end tests.
+1. Follow-ups: #168 (category daily totals and reconcile), #177 (Home Assistant discovery names), #178 (flaky ledger test), #172 (audit fold suppression), Remove for network destinations, MQTT client certificates, and the Data screen's `save` swallowing errors silently.
+2. Finish #54: migrate the remaining plain-`String` copy and extend the pseudo-locale tests to every screen.
+3. **#67** Host the signed advisory feed at `advisories.cewdesign.com` (owner picks GitHub Pages or Cloudflare Pages).
+4. **#55** Manual VoiceOver and Voice Control pass (needs a person), and **#73** real-receiver end-to-end tests.
 
 ## Owner actions
 
@@ -66,3 +68,5 @@ include `policycheck`.
 - **CI signs the UI-test build ad hoc** (`CODE_SIGN_IDENTITY=-`) so the HealthKit entitlement is present.
 - **Accessibility audit:** list footers and `.secondary` text fail contrast (use `SectionFooter` and `Color.secondaryText`); an icon `Label` in a prominent button or a list row can clip; text pushed below the fold at large sizes is suppressed only below `auditFoldBottom` (#172).
 - **Copy:** product screens never show `localizedDescription` (policycheck); every new UI literal goes in `Apps/Localizable.xcstrings`; device names come from `DeviceNoun`.
+- **Run history persists between UI cases** on a CI shard, so populated-history layouts only appear there; a case cannot assume an empty History (the `OHE_WIPE_ON_LAUNCH` reset went with the harness).
+- **Pseudo-locale plurals** render as `#@value@ %#@value@`, not doubled text.
