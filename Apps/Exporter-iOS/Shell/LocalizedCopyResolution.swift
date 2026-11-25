@@ -23,7 +23,7 @@ extension LocalizedCopy {
     /// The copy in the language the app is running in. Numbers format with the
     /// current locale and a count picks its plural variant from the catalog.
     var resolved: String {
-        let format = Bundle.main.localizedString(forKey: key, value: key, table: nil)
+        let format = localized(key)
         guard !arguments.isEmpty else { return format }
         return String(format: format, locale: .current, arguments: arguments.map(\.resolved))
     }
@@ -34,11 +34,5 @@ extension LocalizedCopy {
 extension Text {
     init(copy: LocalizedCopy) {
         self.init(verbatim: copy.resolved)
-    }
-}
-
-extension Button where Label == Text {
-    init(copy: LocalizedCopy, action: @escaping () -> Void) {
-        self.init(action: action) { Text(copy: copy) }
     }
 }
