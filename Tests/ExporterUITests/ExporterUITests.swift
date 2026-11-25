@@ -707,6 +707,56 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(app.buttons["test-again"].exists)
     }
 
+    /// #50: a sensitive type is turned on only after its own confirmation, and
+    /// changing a destination's types offers Save until it is saved.
+    func testDataAsksBeforeASensitiveTypeAndSaves() throws {
+        app.terminate()
+        app.launchEnvironment = [
+            "OHE_RESET_SEEDED_SURFACES": "1",
+            "OHE_SEED_LOCAL_EXPORT_FOLDER": "1",
+        ]
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launch()
+        app.tabBars.buttons["Destinations"].tap()
+        app.buttons["destinations-add"].tap()
+        let files = app.buttons["add-files"]
+        XCTAssertTrue(files.waitForExistence(timeout: uiWait))
+        files.tap()
+        app.buttons["files-choose-folder"].tap()
+        allowHealthSheetIfShown()
+        let save = app.buttons["files-save"]
+        XCTAssertTrue(save.waitForEnabled(timeout: 30))
+        save.tap()
+
+        app.tabBars.buttons["Data"].tap()
+        XCTAssertTrue(app.buttons["data-core-daily"].waitForExistence(timeout: uiWait))
+        XCTAssertFalse(app.buttons["data-save"].exists)
+        let search = app.searchFields.firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: uiWait))
+        search.tap()
+        search.typeText("glucose\n")
+        let glucose = identified("data-type-bloodGlucose")
+        XCTAssertTrue(glucose.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        if glucose.switches.firstMatch.exists { glucose.switches.firstMatch.tap() } else { glucose.tap() }
+        let confirm = app.alerts.buttons["Export it"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: uiWait))
+        confirm.tap()
+        XCTAssertEqual(glucose.value as? String, "1")
+        // An active search hides the navigation bar and its Save; close it first.
+        let cancelSearch = app.navigationBars.buttons["Cancel"].firstMatch
+        if cancelSearch.exists { cancelSearch.tap() } else if app.buttons["Cancel"].exists { app.buttons["Cancel"].firstMatch.tap() }
+        let dataSave = app.buttons["data-save"]
+        for _ in 0 ..< 3 where !dataSave.exists { app.swipeDown() }
+        XCTAssertTrue(dataSave.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        dataSave.tap()
+        allowHealthSheetIfShown()
+        XCTAssertTrue(dataSave.waitForNonExistence(timeout: uiWait), "Save stayed after saving")
+    }
+
     /// #46: an overdue destination is named in the headline, its row shows the
     /// widget's words, and the one action opens it. Identifiers, not copy.
     func testStatusNamesTheOverdueDestinationAndOpensIt() throws {
@@ -2083,6 +2133,10 @@ final class ExporterUITests: XCTestCase {
         _ arguments: [String],
         _ configuration: String
     ) throws {
+        // The per-case reset leaves run history alone, so a shard that has already
+        // exported would audit dozens of rows here. Start from an empty history, as a
+        // fresh simulator does.
+        app.launchEnvironment["OHE_WIPE_ON_LAUNCH"] = "1"
         launchLocalized(arguments)
         enterDestinations()
         XCTAssertTrue(scrollDestinations(app.staticTexts["destination-title"]).exists)
@@ -2090,6 +2144,15 @@ final class ExporterUITests: XCTestCase {
         selectRootTab(3)
         XCTAssertTrue(scrollHistory(app.buttons["history-load"]).exists)
         app.buttons["history-load"].tap()
+        // The load is asynchronous. Auditing before it finishes asks the audit to walk a
+        // busy app, which hosted runners answer with `-56` "Audit failed to complete in
+        // time" in under 20s. A row is the signal that the list is on screen. An empty
+        // history numbers its rows `history-row-0`; a populated one, which a shard that
+        // has already exported will have, numbers them `history-row-<event>-<line>`.
+        let row = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'history-row-'"))
+            .firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: uiWait))
         try performAccessibilityAudit("\(configuration)-history")
     }
 
@@ -2287,8 +2350,13 @@ final class ExporterUITests: XCTestCase {
         // Hosted iPad 0 (English) and iPad 2 (RTL) already pass Dynamic Type
         // on the same Data-tab detail captions. Xcode 26.6 then attributes
         // "partially unsupported" to doubled -NSDoubleLocalizedStrings copy
-        // (`481.1 bpm`, `@ @ · @ …`) only in the pseudo-locale detail audit.
+        // (`481.1 bpm`, `@ @ · @ …`) only in the pseudo-locale detail audit. The same
+        // happens to the populated History rows, which use `.font(.body)` and pass
+        // this audit in English: only the doubled copy of the pseudo-locale differs.
         if state == "pseudo-browser-detail" {
+            return "pseudoLocaleDynamicType"
+        }
+        if state == "pseudo-history", element?.identifier.hasPrefix("history-row-") == true {
             return "pseudoLocaleDynamicType"
         }
         // Status rows pass this audit on their own; with the summary above them they
