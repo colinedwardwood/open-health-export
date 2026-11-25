@@ -3,6 +3,7 @@
 
 import AppServices
 import CoreDomain
+import CorrectnessEngine
 import EnginePorts
 import Foundation
 import MetricCatalog
@@ -94,6 +95,16 @@ private func producedCopy() -> [LocalizedCopy] {
     copy.append(StatusDashboard.summary([], lastSuccessEpoch: nil) { _ in "" }.detail)
     copy += DestinationDisplayState.allCases.map { LocalizedCopy(verbatimKey: $0.label) }
     copy.append("All destinations")
+    copy += [WipeCopy.title, WipeCopy.confirmTitle, WipeCopy.receivedLimit, WipeCopy.healthLimit, WipeCopy.healthPath,
+             WipeCopy.macLimit, WipeCopy.noneReceived]
+    let inventory = WipeInventory(destinationCount: 1, credentialCount: 1, queuedRecords: 1, queuedBytes: 1,
+                                  runCount: 1, ledgerCount: 1, received: [])
+    copy.append(WipeCopy.counts(inventory))
+    for range in [WipeReceivedRange(destination: "d", startDay: "a", endDay: "a"),
+                  WipeReceivedRange(destination: "d", startDay: "a", endDay: "b")] {
+        copy.append(WipeCopy.receivedLine(range))
+    }
+    copy += [UnlockState.sourceBuild, .unlocked, .locked, .revoked].map(UnlockDecision.summary)
     copy += UserFacingFixAction.allCases.map { LocalizedCopy(verbatimKey: $0.label) }
 
     let evidence = [

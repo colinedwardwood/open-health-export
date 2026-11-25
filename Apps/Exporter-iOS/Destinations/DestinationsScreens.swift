@@ -42,7 +42,7 @@ struct DestinationsScreen: View {
                                     .accessibilityHidden(true)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(row.label)
-                                    Text(verbatim: "\(localized(row.stateLabel)) · \(row.detail.resolved)").metadata()
+                                    Text("\(localized(row.stateLabel)) · \(row.detail.resolved)").metadata()
                                 }
                             }
                             .accessibilityElement(children: .combine)

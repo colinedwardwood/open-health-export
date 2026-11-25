@@ -87,11 +87,13 @@ struct SettingsScreen: View {
             }
 
             Section {
-                Button(WipeCopy.title, role: .destructive) {
+                Button(role: .destructive) {
                     Task {
                         wipeInventory = await AppStatus.transparency.wipeInventory()
                         confirmingWipe = true
                     }
+                } label: {
+                    Text(copy: WipeCopy.title)
                 }
                 .accessibilityIdentifier("settings-delete-everything")
             }
@@ -106,7 +108,7 @@ struct SettingsScreen: View {
         .navigationTitle("Settings")
         .sheet(isPresented: $showsSample) { SampleDataScreen() }
         .task { canOfferAlerts = await LocalUserNotifier().canOfferAlerts() }
-        .confirmationDialog(WipeCopy.confirmTitle, isPresented: $confirmingWipe, titleVisibility: .visible) {
+        .confirmationDialog(WipeCopy.confirmTitle.resolved, isPresented: $confirmingWipe, titleVisibility: .visible) {
             Button("Delete everything", role: .destructive) {
                 Task {
                     try? await services.export.wipeEverything()
@@ -120,12 +122,13 @@ struct SettingsScreen: View {
     }
 
     private var wipeMessage: String {
-        [
+        let paragraphs: [LocalizedCopy?] = [
             wipeInventory.map(WipeCopy.counts),
             WipeCopy.receivedLimit,
             WipeCopy.healthLimit,
             WipeCopy.healthPath,
-        ].compactMap { $0 }.joined(separator: "\n\n")
+        ]
+        return paragraphs.compactMap { $0?.resolved }.joined(separator: "\n\n")
     }
 }
 

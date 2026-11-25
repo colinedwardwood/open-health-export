@@ -794,7 +794,11 @@ final class ExporterUITests: XCTestCase {
     private func auditLocalizedStatusAndData(_ arguments: [String], _ configuration: String) throws {
         launchStatus(seeding: "success", arguments: arguments)
         XCTAssertTrue(identified("status-headline").waitForExistence(timeout: uiWait))
+        // The summary's copy now goes through the catalog, so the doubled pseudo-locale
+        // makes it taller and pushes the rows below the fold (#172), as at large sizes.
+        auditFoldBottom = identified("status-detail").frame.maxY
         try performAccessibilityAudit("\(configuration)-status")
+        auditFoldBottom = nil
         openTab("data")
         XCTAssertTrue(identified("data-empty").waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
         try performAccessibilityAudit("\(configuration)-data")

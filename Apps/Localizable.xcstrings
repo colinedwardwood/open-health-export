@@ -5310,6 +5310,150 @@
           }
         }
       }
+    },
+    "%@ received data from %@ to %@.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ received data from %@ to %@."
+          }
+        }
+      }
+    },
+    "%@ received data on %@.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ received data on %@."
+          }
+        }
+      }
+    },
+    "A Mac companion keeps its own copy. Use Delete everything received there. Deleting here does not reach it.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A Mac companion keeps its own copy. Use Delete everything received there. Deleting here does not reach it."
+          }
+        }
+      }
+    },
+    "Built from source: automatic exports are included.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Built from source: automatic exports are included."
+          }
+        }
+      }
+    },
+    "Destinations: %lld. Stored credentials: %lld. Queued payloads: %lld records, %@ MB. Run history: %lld. Egress ledger: %lld.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Destinations: %lld. Stored credentials: %lld. Queued payloads: %lld records, %@ MB. Run history: %lld. Egress ledger: %lld."
+          }
+        }
+      }
+    },
+    "Export now works with every destination. The one-time unlock adds automatic exports.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export now works with every destination. The one-time unlock adds automatic exports."
+          }
+        }
+      }
+    },
+    "No destination has received data yet.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No destination has received data yet."
+          }
+        }
+      }
+    },
+    "The unlock was refunded or revoked, so exports run only when you tap Export now. Your destinations and settings are unchanged.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The unlock was refunded or revoked, so exports run only when you tap Export now. Your destinations and settings are unchanged."
+          }
+        }
+      }
+    },
+    "To turn access off: Health → your profile picture → Privacy → Apps → %@.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To turn access off: Health → your profile picture → Privacy → Apps → %@."
+          }
+        }
+      }
+    },
+    "Unlocked. Exports run on their own as iOS allows.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlocked. Exports run on their own as iOS allows."
+          }
+        }
+      }
+    },
+    "We cannot delete data your destinations already received.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We cannot delete data your destinations already received."
+          }
+        }
+      }
+    },
+    "We cannot turn off our own Health access.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We cannot turn off our own Health access."
+          }
+        }
+      }
     }
   }
 }

@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: FSL-1.1-ALv2
 
+import CoreDomain
 import EnginePorts
 import Foundation
 
@@ -59,7 +60,7 @@ public enum UnlockDecision {
     }
 
     /// What Status and Settings say about it.
-    public static func summary(_ state: UnlockState) -> String {
+    public static func summary(_ state: UnlockState) -> LocalizedCopy {
         switch state {
         case .sourceBuild:
             "Built from source: automatic exports are included."
