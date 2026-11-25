@@ -188,7 +188,9 @@ struct CompanionView: View {
             refreshQuietWatch()
             let archive = CompanionArchive(directory: folder)
             let installation = session.localInstallationID
-            Task {
+            // An accept failure ends the listener; the window's status line already says when
+            // advertising stops, so the task's error is deliberately not surfaced here.
+            _ = Task {
                 while true {
                     let stream = try await started.accept()
                     let inbound = try CompanionInbound(
@@ -207,7 +209,7 @@ struct CompanionView: View {
                             }
                         }
                     )
-                    Task {
+                    _ = Task {
                         try await inbound.serve()
                         await MainActor.run { refreshQuietWatch() }
                     }

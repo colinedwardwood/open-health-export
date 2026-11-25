@@ -80,6 +80,29 @@ duringAnchorPersist
 OHE_PROCESS_EXIT_SEAM
 EOF
 
+# #69 / #74: UI-test and debug hooks. Every override is DEBUG-only and listed in
+# qa/test-overrides.md. The names below are the ones known today; the OHE_* pattern
+# in the loop below catches a hook nobody added to this list.
+cat > "$scratch/test-hooks" <<'EOF'
+ForUITests
+UITestFixtures
+TestUserPresenceAuthenticator
+OHE_ACCESSIBILITY_MATRIX
+OHE_FAIL_DATA_SAVE
+OHE_FORCE_METERED_PATH
+OHE_HEALTHKIT_UNAVAILABLE
+OHE_IPAD_ONLY_EXPORTER
+OHE_OPEN_URL
+OHE_RESET_FIRST_RUN
+OHE_RESET_SEEDED_SURFACES
+OHE_SEED_DESTINATION_STATUS
+OHE_SEED_ICLOUD_FOLDER
+OHE_SEED_LOCAL_EXPORT_FOLDER
+OHE_SEED_NOTIFICATION_AUTHORIZATION
+OHE_TEST_USER_PRESENCE
+OHE_UNLOCK_STATE
+EOF
+
 # #56 / UX-3: the engineering harness, its debug copy and its test controls must not
 # ship. These are the strings it showed, read from the whole iOS app bundle rather than
 # the executable alone, because string catalogs compile into resource files.
@@ -145,7 +168,7 @@ if [[ "${#binaries[@]}" -eq 0 ]]; then
   exit 1
 fi
 
-cat "$scratch/fault-seams" "$scratch/canaries" > "$scratch/forbidden"
+cat "$scratch/fault-seams" "$scratch/canaries" "$scratch/test-hooks" > "$scratch/forbidden"
 found=0
 for binary in "${binaries[@]}"; do
   echo "Scanning release binary: $binary"
@@ -183,6 +206,11 @@ for binary in "${binaries[@]}"; do
       found=1
     fi
   done < "$scratch/forbidden"
+  # No environment-variable-style name belongs in a shipped binary at all.
+  if grep -E -- 'OHE_[A-Z][A-Z0-9_]+' "$scratch/strings"; then
+    echo "#69: OHE_* hook name leaked into $binary" >&2
+    found=1
+  fi
 done
 
 while IFS= read -r harness_string; do

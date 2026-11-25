@@ -134,7 +134,7 @@ struct ExportService: Sendable {
     }
 
     func withThermalCompression<T>(
-        _ body: () async throws -> T
+        _ body: nonisolated(nonsending) () async throws -> T
     ) async rethrows -> T {
         try await Gzip.$level.withValue(gzipLevel(), operation: body)
     }

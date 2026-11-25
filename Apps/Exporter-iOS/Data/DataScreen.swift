@@ -167,7 +167,7 @@ struct DataScreen: View {
 
 private struct TypeToggle: View {
     let row: DataTypeRow
-    let set: (Bool) -> Void
+    let set: @MainActor (Bool) -> Void
 
     var body: some View {
         Toggle(isOn: Binding(get: { row.selected }, set: set)) {

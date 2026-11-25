@@ -158,7 +158,11 @@ jobs:
           #
           # A single retry covers the launch timeouts that remain: they come from the
           # simulator, not the app, and a case that genuinely fails still fails twice.
-          # The result bundle keeps the first attempt either way.
+          # The retry must not hide the first attempt (#74): the step after this one
+          # reads the first attempt from the result bundle and fails the job on any
+          # first-attempt failure that qa/flake-quarantine.json does not list.
+          # xcodebuild's own exit code is kept so a case that fails both times still
+          # fails here; the audit step runs either way.
           # shellcheck disable=SC2046
           xcodebuild test-without-building \
             -xctestrun "$RUNNER_TEMP"/products/*.xctestrun \
@@ -168,6 +172,13 @@ jobs:
             -retry-tests-on-failure \
             -resultBundlePath "$RUNNER_TEMP/ohe-ui.xcresult" \
             $(bash scripts/ui-test-shard.sh ${{ matrix.shard }} 3)
+      - name: First-attempt UI failures are reported, not retried away
+        if: always()
+        run: |
+          python3 scripts/ui-first-attempt-failures.py \
+            "$RUNNER_TEMP/ohe-ui.xcresult" \
+            --quarantine qa/flake-quarantine.json \
+            --summary "$GITHUB_STEP_SUMMARY"
       # xcodebuild's summary names the failing case but not the assertion, which
       # leaves a red UI run with nothing to diagnose it from.
       - name: Keep the UI result bundle when a case fails
@@ -243,6 +254,8 @@ jobs:
             SYMROOT="$RUNNER_TEMP/ohe-release-ios" \
             OBJROOT="$RUNNER_TEMP/ohe-release-ios-obj" \
             CODE_SIGNING_ALLOWED=NO \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            GCC_TREAT_WARNINGS_AS_ERRORS=YES \
             build
           xcodebuild \
             -project OpenHealthExporter.xcodeproj \
@@ -252,7 +265,11 @@ jobs:
             SYMROOT="$RUNNER_TEMP/ohe-release-mac" \
             OBJROOT="$RUNNER_TEMP/ohe-release-mac-obj" \
             CODE_SIGNING_ALLOWED=NO \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            GCC_TREAT_WARNINGS_AS_ERRORS=YES \
             build
+      - name: The release scan fails when a hook or seam string is injected
+        run: scripts/test-scan-release-artifacts.sh
       - name: Release apps omit fault seams and health-data canaries
         run: |
           scripts/scan-release-artifacts.sh \
