@@ -12,8 +12,8 @@ import RunJournal
 import SinkCompanion
 import UIKit
 
-/// Where the app keeps its state on disk, and the identity and keys tied to it (#56).
-/// Every service reaches them here (#56).
+/// Where the app keeps its state on disk, and the identity and keys tied to it.
+/// Every service reaches them here.
 enum AppFiles {
     static func installationID() throws -> String {
         let root = try applicationSupportRoot()

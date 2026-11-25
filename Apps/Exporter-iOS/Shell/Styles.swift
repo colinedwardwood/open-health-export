@@ -88,14 +88,4 @@ extension View {
             .foregroundStyle(.secondaryText)
             .monospacedDigit()
     }
-
-    /// The inset card for something that needs the person: sits inside the list, so
-    /// it scrolls with the content and can never cover the navigation title.
-    func attentionCard(_ tone: StatusTone) -> some View {
-        padding(.vertical, 4)
-            .listRowBackground(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(tone.color.opacity(0.14))
-            )
-    }
 }

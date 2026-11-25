@@ -149,11 +149,5 @@ enum UITestFixtures {
         try? FileManager.default.removeItem(at: DestinationSidecar.localFileTestReport.url(in: root))
         return folder.lastPathComponent
     }
-
-    static func resetCompanionSlot() {
-        guard let root = try? AppFiles.applicationSupportRoot() else { return }
-        try? FileManager.default.removeItem(at: root.appendingPathComponent("pairing.json"))
-        try? FileManager.default.removeItem(at: DestinationSidecar.companionTestReport.url(in: root))
-    }
 }
 #endif
