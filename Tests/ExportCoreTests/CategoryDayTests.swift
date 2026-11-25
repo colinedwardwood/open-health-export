@@ -250,3 +250,18 @@ private func sweep(
     #expect(sensor["unit_of_measurement"] as? String == "min")
     #expect(components.count == 1)
 }
+
+@Test func aQuantityOnlyDaySourceHasNoCategoryRecords() async throws {
+    struct QuantityOnly: DayObservationSource {
+        func samples(metric: MetricID, day: String) async throws -> [SampleRecord] { [] }
+    }
+    let records = try await QuantityOnly().categories(metric: MetricCatalog.mindfulSession.id, day: "2026-11-25")
+    #expect(records.isEmpty)
+}
+
+@Test func theCountingFixtureCountsCategoryReadsToo() async throws {
+    let days = CountingFixtureDays()
+    _ = try await days.categories(metric: MetricCatalog.mindfulSession.id, day: "2026-11-25")
+    _ = try await days.samples(metric: MetricCatalog.stepCount.id, day: "2026-11-25")
+    #expect(await days.dayReads == 2)
+}
