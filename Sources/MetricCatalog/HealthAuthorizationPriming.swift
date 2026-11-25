@@ -6,18 +6,24 @@ import CoreDomain
 /// Continue, naming the types about to be requested and that Apple does not
 /// report which types were turned off.
 public enum HealthAuthorizationPriming {
-    public static var title: String { "Next, \(DeviceNoun.current) will ask for permission" }
-    public static let continueTitle = "Continue"
-    public static let sheetFollows =
+    public static var title: LocalizedCopy {
+        LocalizedCopy("Next, %@ will ask for permission", .text(DeviceNoun.current))
+    }
+    public static let continueTitle: LocalizedCopy = "Continue"
+    public static let sheetFollows: LocalizedCopy =
         "Apple's permission sheet is next. Turn on whatever you're comfortable with. You can change it any time in Health."
-    public static var invisibility: String {
-        "One thing worth knowing: \(DeviceNoun.current) does not tell apps what you turned off. If a type is switched off, it looks to us exactly like a type you have no data for."
+    public static var invisibility: LocalizedCopy {
+        LocalizedCopy(
+            "One thing worth knowing: %@ does not tell apps what you turned off. If a type is switched off, it looks to us exactly like a type you have no data for.",
+            .text(DeviceNoun.current)
+        )
     }
 
-    public static func typeCountCopy(_ count: Int) -> String {
-        if count == 1 {
-            return "We're about to ask for read access to 1 type of health data you selected."
-        }
-        return "We're about to ask for read access to \(count) types of health data you selected."
+    public static func typeCountCopy(_ count: Int) -> LocalizedCopy {
+        LocalizedCopy(
+            "We're about to ask for read access to %lld types of health data you selected.",
+            .number(count),
+            singular: "We're about to ask for read access to 1 type of health data you selected."
+        )
     }
 }

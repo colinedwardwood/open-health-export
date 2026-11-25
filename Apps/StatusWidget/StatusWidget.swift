@@ -98,7 +98,7 @@ struct ExportStatusWidgetView: View {
         let state = worst?.state(at: entry.date.timeIntervalSince1970) ?? .notSetUp
         return VStack(alignment: .leading, spacing: 8) {
             Label {
-                Text(state.label)
+                Text(localized(state.label))
             } icon: {
                 Image(systemName: state.glyph).foregroundStyle(tint(state))
             }
@@ -141,7 +141,7 @@ struct ExportStatusWidgetView: View {
             if let worst = worstSnapshot {
                 let state = worst.state(at: entry.date.timeIntervalSince1970)
                 Label {
-                    Text(state.label)
+                    Text(localized(state.label))
                 } icon: {
                     Image(systemName: state.glyph).foregroundStyle(tint(state))
                 }
@@ -161,7 +161,7 @@ struct ExportStatusWidgetView: View {
                     if let success = snapshot.lastSuccessEpoch {
                         Text(Date(timeIntervalSince1970: success), style: .relative)
                     } else {
-                        Text(state.label)
+                        Text(localized(state.label))
                     }
                     if let reason = DestinationStatusLine.compactFailure(snapshot) {
                         Text(reason)
@@ -197,7 +197,7 @@ struct ExportStatusWidgetView: View {
                 .accessibilityHidden(true)
                 .modifier(ExportStatusChrome(mode: chrome))
             VStack(alignment: .leading, spacing: 2) {
-                Text(securityEventCount > 0 ? "Destination changed" : state.label)
+                Text(securityEventCount > 0 ? "Destination changed" : localized(state.label))
                     .font(.headline)
                 if let success = worst?.lastSuccessEpoch {
                     HStack(spacing: 3) {
@@ -226,7 +226,7 @@ struct ExportStatusWidgetView: View {
             Image(systemName: securityEventCount > 0 ? "exclamationmark.shield.fill" : state.glyph)
                 .font(.title2)
                 .modifier(ExportStatusChrome(mode: chrome))
-            Text(securityEventCount > 0 ? "Changed" : state.label)
+            Text(securityEventCount > 0 ? "Changed" : localized(state.label))
                 .font(.caption2)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)

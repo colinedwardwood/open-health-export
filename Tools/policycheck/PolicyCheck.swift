@@ -881,6 +881,46 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck string catalog covers app UI literals: ok")
+
+        // #54: copy owned by Sources/ is a `LocalizedCopy` key. A literal key that is not
+        // in the catalog would reach the screen untranslated and un-pseudo'd. Copy built
+        // from data (the error-class manifest) is covered by the LocalizedCopyCatalog tests.
+        let sourcesRoot = root.appendingPathComponent("Sources")
+        let keyPattern = try! NSRegularExpression(
+            pattern: #"LocalizedCopy\(\s*("(?:\\.|[^"\\])*")|:\s*LocalizedCopy\s*=\s*("(?:\\.|[^"\\])*")|case [^\n]*?: ("(?:\\.|[^"\\])*")$"#,
+            options: [.anchorsMatchLines]
+        )
+        var missingCopy: [String] = []
+        if let files = FileManager.default.enumerator(at: sourcesRoot, includingPropertiesForKeys: nil) {
+            for case let file as URL in files where file.pathExtension == "swift" {
+                let text = try String(contentsOf: file, encoding: .utf8)
+                guard text.contains("LocalizedCopy") else { continue }
+                let relative = file.path.replacingOccurrences(of: root.path + "/", with: "")
+                let ns = text as NSString
+                for match in keyPattern.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
+                    // The `case … : "text"` alternative only counts in files that return copy.
+                    for group in 1...3 where match.range(at: group).location != NSNotFound {
+                        let raw = ns.substring(with: match.range(at: group))
+                        let value = decodeSwiftStringLiteral(String(raw.dropFirst().dropLast()))
+                        if !value.contains("\\(") && strings[value] == nil {
+                            missingCopy.append("\(relative): \(String(reflecting: value))")
+                        }
+                    }
+                }
+            }
+        }
+        if !missingCopy.isEmpty {
+            FileHandle.standardError.write(
+                Data(
+                    (
+                        "#54 LocalizedCopy keys missing from Apps/Localizable.xcstrings:\n"
+                            + missingCopy.sorted().joined(separator: "\n") + "\n"
+                    ).utf8
+                )
+            )
+            exit(1)
+        }
+        print("policycheck string catalog covers Sources copy keys: ok")
     }
 
     static func catalogLocalizationIsTranslated(_ localization: [String: Any]) -> Bool {

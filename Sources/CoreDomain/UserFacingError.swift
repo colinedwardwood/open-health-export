@@ -116,9 +116,9 @@ extension UserFacingErrorArchetype {
 public struct UserFacingErrorObject: Sendable, Equatable {
     public var archetype: UserFacingErrorArchetype
     public var destinationLabel: String
-    public var title: String
-    public var cause: String
-    public var fix: String
+    public var title: LocalizedCopy
+    public var cause: LocalizedCopy
+    public var fix: LocalizedCopy
     public var actions: [UserFacingFixAction]
     public var evidence: UserFacingErrorEvidence
     public var copyDiagnostics: String
@@ -159,9 +159,9 @@ public struct UserFacingErrorObject: Sendable, Equatable {
 
     public var lines: [String] {
         [
-            "① \(title)",
-            "② \(cause)",
-            "③ \(fix)",
+            "① \(title.english)",
+            "② \(cause.english)",
+            "③ \(fix.english)",
             "④ " + actions.map(\.label).joined(separator: " · "),
             "⑤ \(copyDiagnostics)",
         ]
@@ -171,77 +171,89 @@ public struct UserFacingErrorObject: Sendable, Equatable {
         archetype: UserFacingErrorArchetype,
         label: String,
         evidence: UserFacingErrorEvidence
-    ) -> (title: String, cause: String, fix: String, actions: [UserFacingFixAction]) {
+    ) -> (title: LocalizedCopy, cause: LocalizedCopy, fix: LocalizedCopy, actions: [UserFacingFixAction]) {
         switch archetype {
         case .hostUnresolvable:
             return (
-                "Couldn't find \(label)",
+                LocalizedCopy("Couldn't find %@", .text(label)),
                 "That name did not resolve on this network. .local names only work on the same network as the server.",
                 "If you are away, use the external address or a VPN. You can add a second address for when you are away.",
                 [.editDestination, .testAgain]
             )
         case .tlsTrustFailure:
             return (
-                "Couldn't verify \(label)'s certificate",
-                "The server presented a certificate \(DeviceNoun.thisDevice) does not trust. Self-signed and private-CA certificates are not trusted by default.",
+                LocalizedCopy("Couldn't verify %@'s certificate", .text(label)),
+                LocalizedCopy("The server presented a certificate %@ does not trust. Self-signed and private-CA certificates are not trusted by default.", .text(DeviceNoun.thisDevice)),
                 "Import the server's certificate and pin it here, or install a publicly trusted certificate on the server.",
                 [.editDestination, .testAgain]
             )
         case .certificateExpired:
             return (
-                "\(label)'s certificate has expired",
-                "The TLS certificate on the server is past its not-after date, so \(DeviceNoun.thisDevice) refused the connection.",
+                LocalizedCopy("%@'s certificate has expired", .text(label)),
+                LocalizedCopy("The TLS certificate on the server is past its not-after date, so %@ refused the connection.", .text(DeviceNoun.thisDevice)),
                 "Renew the certificate on the server. If you use Caddy or Traefik, check that automatic renewal is still running.",
                 [.testAgain]
             )
         case .http401:
             return (
-                "\(label) rejected the token",
+                LocalizedCopy("%@ rejected the token", .text(label)),
                 "The connection was accepted but the credential was refused. Long-lived tokens are revoked when you change a password or delete the token.",
                 "Create a new access token in the destination's profile security settings, then replace it here.",
                 [.replaceToken, .testAgain]
             )
         case .http403:
             return (
-                "\(label) refused this request",
+                LocalizedCopy("%@ refused this request", .text(label)),
                 "The credential was recognised but is not allowed to write here.",
                 "Check the token's permissions, or the webhook's allowed scope.",
                 [.editDestination, .testAgain]
             )
         case .http404:
             return (
-                "That path does not exist on \(label)",
+                LocalizedCopy("That path does not exist on %@", .text(label)),
                 "The server responded, but nothing is listening at the configured path.",
                 "Check the webhook or topic path on the destination, then update it here.",
                 [.editDestination, .testAgain]
             )
         case .http413:
-            let sent = evidence.bytesSent.map { "\($0) bytes" } ?? "this batch"
+            let sent = evidence.bytesSent.map {
+                LocalizedCopy(
+                    "We sent %lld bytes; the server refused the body as too large.", .number($0),
+                    singular: "We sent 1 byte; the server refused the body as too large."
+                )
+            } ?? "We sent this batch; the server refused the body as too large."
             return (
-                "The export was too large for \(label)",
-                "We sent \(sent); the server refused the body as too large.",
+                LocalizedCopy("The export was too large for %@", .text(label)),
+                sent,
                 "Shorten the export window in this app, or raise the destination's maximum body size.",
                 [.shortenWindow, .testAgain]
             )
         case .http429:
-            let wait = evidence.retryAfterSeconds.map { "\($0) seconds" } ?? "a short interval"
+            let wait = evidence.retryAfterSeconds.map {
+                LocalizedCopy(
+                    "Rate limited. It asked us to wait %lld seconds.", .number($0),
+                    singular: "Rate limited. It asked us to wait 1 second."
+                )
+            } ?? "Rate limited. It asked us to wait a short interval."
             return (
-                "\(label) asked us to slow down",
-                "Rate limited. It asked us to wait \(wait).",
+                LocalizedCopy("%@ asked us to slow down", .text(label)),
+                wait,
                 "We will retry automatically. If this keeps happening, choose a less frequent freshness target.",
                 [.lowerFreshness, .testAgain]
             )
         case .http5xx:
-            let code = evidence.statusCode.map { " (\($0))" } ?? ""
+            let title = evidence.statusCode.map {
+                LocalizedCopy("%@ returned an error (%@)", .text(label), .text(String($0)))
+            } ?? LocalizedCopy("%@ returned an error", .text(label))
             return (
-                "\(label) returned an error\(code)",
+                title,
                 "The server, or the proxy in front of it, is not healthy. Your settings here look correct.",
                 "Check the server. We will keep retrying.",
                 [.testAgain]
             )
         case .timeout:
             return (
-                "\(label) didn't respond in time",
+                LocalizedCopy("%@ didn't respond in time", .text(label)),
                 "The host may be asleep, or the connection may be slow. Your settings here look correct.",
                 "Try again on Wi-Fi. If the server sleeps, wake it or increase its timeout.",
                 [.testAgain]
@@ -263,20 +275,20 @@ public struct UserFacingErrorObject: Sendable, Equatable {
         case .healthLocked:
             return (
                 "Health data was locked",
-                "\(DeviceNoun.theDevice) must be unlocked for any app to read Health data. Access ends shortly after you lock it. This is an Apple restriction.",
+                LocalizedCopy("%@ must be unlocked for any app to read Health data. Access ends shortly after you lock it. This is an Apple restriction.", .text(DeviceNoun.theDevice)),
                 "Nothing to change here. Export will continue after you unlock.",
                 [.testAgain]
             )
         case .backgroundNeverRan:
             return (
-                "No recent background exports to \(label)",
+                LocalizedCopy("No recent background exports to %@", .text(label)),
                 "iOS decides when apps may run in the background and can skip us, especially in Low Power Mode or if Background App Refresh is off.",
                 "Turn on Settings → General → Background App Refresh for this app, or export now for exact timing.",
                 [.exportNow, .openBackgroundSettings]
             )
         case .waitingForUnmetered:
             return (
-                "\(label) is waiting for Wi-Fi",
+                LocalizedCopy("%@ is waiting for Wi-Fi", .text(label)),
                 "This destination skips cellular and other metered networks.",
                 "Join Wi-Fi, or turn on Allow cellular and other metered networks for this destination.",
                 [.editDestination, .exportNow]
@@ -291,13 +303,13 @@ public struct UserFacingErrorObject: Sendable, Equatable {
         case .storageProblem:
             return (
                 "Couldn't update this app's export records",
-                "The database this app keeps on \(DeviceNoun.thisDevice) couldn't be opened or written. Nothing is wrong at \(label).",
-                "Try again. If it keeps happening, restart \(DeviceNoun.thisDevice), then copy the diagnostics into a report.",
+                LocalizedCopy("The database this app keeps on %@ couldn't be opened or written. Nothing is wrong at %@.", .text(DeviceNoun.thisDevice), .text(label)),
+                LocalizedCopy("Try again. If it keeps happening, restart %@, then copy the diagnostics into a report.", .text(DeviceNoun.thisDevice)),
                 [.exportNow]
             )
         case .unexpected:
             return (
-                "The export to \(label) stopped",
+                LocalizedCopy("The export to %@ stopped", .text(label)),
                 "Something failed that this app has no specific explanation for.",
                 "Try again. If it happens again, copy the diagnostics into a report so it can be fixed.",
                 [.exportNow]

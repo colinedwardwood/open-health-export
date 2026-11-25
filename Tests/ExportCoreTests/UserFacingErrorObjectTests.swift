@@ -22,9 +22,9 @@ import Testing
                 buildHash: "a91c8e"
             )
         )
-        #expect(!error.title.isEmpty)
-        #expect(!error.cause.isEmpty)
-        #expect(!error.fix.isEmpty)
+        #expect(!error.title.english.isEmpty)
+        #expect(!error.cause.english.isEmpty)
+        #expect(!error.fix.english.isEmpty)
         #expect((1...2).contains(error.actions.count))
         #expect(error.lines.count == 5)
         #expect(error.lines[0].hasPrefix("①"))
@@ -36,9 +36,9 @@ import Testing
         #expect(error.copyDiagnostics.contains("trace:"))
         #expect(error.copyDiagnostics.contains("build:"))
         #expect(error.copyDiagnostics.contains("commit:"))
-        #expect(!error.title.contains("401") || archetype == .http401)
-        #expect(!error.title.hasPrefix("Error"))
-        let blob = ([error.title, error.cause, error.fix, error.copyDiagnostics] + error.actions.map(\.label))
+        #expect(!error.title.english.contains("401") || archetype == .http401)
+        #expect(!error.title.english.hasPrefix("Error"))
+        let blob = ([error.title.english, error.cause.english, error.fix.english, error.copyDiagnostics] + error.actions.map(\.label))
             .joined(separator: "\n")
         #expect(UserFacingErrorCopy.violations(in: blob).isEmpty)
         #expect(!blob.localizedCaseInsensitiveContains("please try again"))
@@ -122,8 +122,8 @@ import Testing
 
     let timeout = UserFacingErrorObject.make(archetype: .timeout, destinationLabel: "nas")
     let http5xx = UserFacingErrorObject.make(archetype: .http5xx, destinationLabel: "nas")
-    #expect(timeout.cause.contains("Your settings here look correct."))
-    #expect(http5xx.cause.contains("Your settings here look correct."))
+    #expect(timeout.cause.english.contains("Your settings here look correct."))
+    #expect(http5xx.cause.english.contains("Your settings here look correct."))
 }
 
 @Test func errorClassManifestCopyAvoidsUX28Phrases() {
@@ -145,7 +145,7 @@ import Testing
         identity: identity
     )
     #expect(error.destinationLabel == "clinic.example")
-    #expect(!error.title.contains("s3cret"))
+    #expect(!error.title.english.contains("s3cret"))
     #expect(error.copyDiagnostics.contains("commit: c0ffee1234567890"))
     #expect(error.copyDiagnostics.contains("build: b1d0c0deabc123"))
     #expect(error.copyDiagnostics.contains("trace:"))

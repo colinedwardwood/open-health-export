@@ -466,6 +466,7 @@ final class ExporterUITests: XCTestCase {
         let empty = identified("history-empty")
         XCTAssertTrue(empty.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
         XCTAssertTrue(empty.label.contains("runs delivered") || empty.label.contains("run delivered"), empty.label)
+        XCTAssertFalse(empty.label.contains("%"), "an unresolved plural reads as \(empty.label)")
         app.segmentedControls.buttons["All"].tap()
         let row = app.buttons["history-row"].firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: uiWait))
@@ -815,6 +816,62 @@ final class ExporterUITests: XCTestCase {
 
     func testDestinationsAndHistoryInPseudoLocale() throws {
         try auditLocalizedDestinationsAndHistory(Self.pseudoLocaleArguments, "pseudo")
+    }
+
+    /// #54: copy that `Sources/` produces reaches the catalog, so the doubled
+    /// pseudo-locale doubles it too. Before, these screens showed it unchanged.
+    func testStatusCopyFromSourcesIsPseudoLocalised() throws {
+        launchStatus(seeding: "overdue", arguments: Self.pseudoLocaleArguments)
+        let headline = identified("status-headline")
+        XCTAssertTrue(headline.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertTrue(Self.isDoubled(headline.label), "headline: \(headline.label)")
+        let detail = identified("status-detail")
+        XCTAssertTrue(detail.exists)
+        XCTAssertTrue(Self.isDoubled(detail.label), "detail: \(detail.label)")
+    }
+
+    func testDestinationRowCopyFromSourcesIsPseudoLocalised() throws {
+        launchStatus(seeding: "overdue", arguments: Self.pseudoLocaleArguments)
+        openTab("destinations")
+        let row = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'destinations-row-'")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertTrue(Self.isDoubled(row.label), "destination row: \(row.label)")
+    }
+
+    func testHistoryCopyFromSourcesIsPseudoLocalised() throws {
+        launchProduct(arguments: Self.pseudoLocaleArguments, environment: ["OHE_WIPE_ON_LAUNCH": "1"])
+        openTab("history")
+        let empty = identified("history-empty")
+        XCTAssertTrue(empty.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertTrue(Self.isDoubled(empty.label), "history: \(empty.label)")
+    }
+
+    func testSettingsAboutCopyFromSourcesIsPseudoLocalised() throws {
+        launchProduct(arguments: Self.pseudoLocaleArguments)
+        openSettings()
+        let about = app.buttons["settings-about"]
+        for _ in 0 ..< 4 where !about.exists { app.swipeUp() }
+        about.tap()
+        let source = identified("about-source").firstMatch
+        XCTAssertTrue(source.waitForExistence(timeout: uiWait))
+        XCTAssertTrue(Self.isDoubled(source.label), "version line: \(source.label)")
+    }
+
+    /// `-NSDoubleLocalizedStrings` repeats each localised string, and a string with
+    /// substitutions loses its second set (`@ needs attention. Archive needs
+    /// attention.`). Either way a run of the sentence appears twice.
+    private static func isDoubled(_ text: String) -> Bool {
+        let characters = Array(text)
+        let run = 12
+        guard characters.count >= run * 2 else { return false }
+        var seen: [ArraySlice<Character>: Int] = [:]
+        for start in 0...(characters.count - run) {
+            let window = characters[start..<(start + run)]
+            if let first = seen[window], start - first >= run { return true }
+            if seen[window] == nil { seen[window] = start }
+        }
+        return false
     }
 
     func testStatusAndDataInRTL() throws {

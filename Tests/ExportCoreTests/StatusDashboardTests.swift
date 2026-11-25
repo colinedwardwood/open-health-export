@@ -49,9 +49,9 @@ private func looksRaw(_ text: String) -> Bool {
                 relative: ago
             )
             for row in rows {
-                #expect(!looksRaw(row.detail), "\(state) \(errorClass ?? "nil"): \(row.detail)")
+                #expect(!looksRaw(row.detail.english), "\(state) \(errorClass ?? "nil"): \(row.detail.english)")
                 #expect(!looksRaw(row.stateLabel), "\(state): \(row.stateLabel)")
-                #expect(!row.detail.contains(state.rawValue), "\(state): \(row.detail)")
+                #expect(!row.detail.english.contains(state.rawValue), "\(state): \(row.detail.english)")
             }
         }
     }
@@ -76,8 +76,8 @@ private func looksRaw(_ text: String) -> Bool {
         relative: ago
     )
     let summary = StatusDashboard.summary(rows, lastSuccessEpoch: now - 720, relative: ago)
-    #expect(summary.headline == "2 of 3 destinations are up to date.")
-    #expect(summary.detail == "Mosquitto: Last delivered 420 min ago.")
+    #expect(summary.headline.english == "2 of 3 destinations are up to date.")
+    #expect(summary.detail.english == "Mosquitto: Last delivered 420 min ago.")
     #expect(summary.action == .check(destinationID: "mqtt", label: "Mosquitto"))
     #expect(summary.tone == .attention)
 }
@@ -89,8 +89,8 @@ private func looksRaw(_ text: String) -> Bool {
         relative: ago
     )
     let summary = StatusDashboard.summary(rows, lastSuccessEpoch: now - 720, relative: ago)
-    #expect(summary.headline == "Everything is up to date.")
-    #expect(summary.detail == "Last export 12 min ago. Sending to 1 destination.")
+    #expect(summary.headline.english == "Everything is up to date.")
+    #expect(summary.detail.english == "Last export 12 min ago. Sending to 1 destination.")
     #expect(summary.action == nil)
 }
 
@@ -126,7 +126,7 @@ private struct SomethingElse: Error {}
     #expect(UserFacingFailure.object(for: SetupError.testFailed(at: .tlsHandshake), destinationLabel: "HA").archetype == .tlsTrustFailure)
     for archetype in [UserFacingErrorArchetype.storageProblem, .unexpected] {
         let object = UserFacingErrorObject.make(archetype: archetype, destinationLabel: "Files")
-        #expect(!object.title.isEmpty && !object.cause.isEmpty && !object.fix.isEmpty)
+        #expect(!object.title.english.isEmpty && !object.cause.english.isEmpty && !object.fix.english.isEmpty)
         #expect(!object.actions.isEmpty)
     }
 }

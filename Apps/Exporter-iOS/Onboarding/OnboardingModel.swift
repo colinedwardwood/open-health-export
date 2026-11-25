@@ -205,7 +205,7 @@ final class OnboardingModel {
         } catch {
             let label = await AppStatus.notifyRunFailure(trigger: .manual)
             let object = UserFacingFailure.object(for: error, destinationLabel: label ?? folderName ?? "your folder")
-            work = .failed("\(object.title). \(object.fix)")
+            work = .failed("\(object.title.resolved). \(object.fix.resolved)")
         }
     }
 

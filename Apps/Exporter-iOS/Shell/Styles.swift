@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
 // SPDX-License-Identifier: FSL-1.1-ALv2
 
+import CoreDomain
 import SwiftUI
 import Watchdog
 
@@ -10,14 +11,18 @@ import Watchdog
 
 /// A list section title: `.headline`, and a header to VoiceOver's rotor.
 struct SectionTitle: View {
-    let text: LocalizedStringKey
+    let text: Text
 
     init(_ text: LocalizedStringKey) {
-        self.text = text
+        self.text = Text(text)
+    }
+
+    init(copy: LocalizedCopy) {
+        text = Text(copy: copy)
     }
 
     var body: some View {
-        Text(text)
+        text
             .font(.headline)
             // The concrete colour: inside a List header, `.primary` is relative to the
             // header's own grey style and fails contrast (#46).
@@ -74,7 +79,7 @@ struct StatusBadge: View {
 
     var body: some View {
         Label {
-            Text(state.label)
+            Text(localized(state.label))
         } icon: {
             state.toneGlyph
         }

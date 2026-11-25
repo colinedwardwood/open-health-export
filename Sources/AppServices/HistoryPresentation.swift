@@ -14,8 +14,8 @@ public struct HistoryRow: Sendable, Equatable, Identifiable {
     public var destinationID: String?
     public var destination: String
     public var typeName: String?
-    public var trigger: String
-    public var result: String
+    public var trigger: LocalizedCopy
+    public var result: LocalizedCopy
     public var isProblem: Bool
     public var state: DestinationDisplayState
     public var event: RunEvent
@@ -42,16 +42,19 @@ public enum HistoryPresentation {
     }
 
     /// What the filtered list says when it has nothing to show.
-    public static func emptyCopy(_ events: [RunEvent], filter: Filter) -> String {
-        guard !events.isEmpty else { return RunHistoryDetail.emptyStateCopy }
+    public static func emptyCopy(_ events: [RunEvent], filter: Filter) -> LocalizedCopy {
+        guard !events.isEmpty, filter == .problems else {
+            return LocalizedCopy(verbatimKey: RunHistoryDetail.emptyStateCopy)
+        }
         let delivered = events.map(row).filter { !$0.isProblem }.count
-        let runs = delivered == 1 ? "1 run" : "\(delivered.formatted()) runs"
-        return filter == .problems
-            ? "No problems in the last 90 days. \(runs) delivered."
-            : RunHistoryDetail.emptyStateCopy
+        return LocalizedCopy(
+            "No problems in the last 90 days. %lld runs delivered.",
+            .number(delivered),
+            singular: "No problems in the last 90 days. 1 run delivered."
+        )
     }
 
-    public static func trigger(_ trigger: RunTrigger) -> String {
+    public static func trigger(_ trigger: RunTrigger) -> LocalizedCopy {
         switch trigger {
         case .manual: "You tapped Export now"
         case .widgetControl: "Control Centre"
@@ -102,16 +105,29 @@ public enum HistoryPresentation {
         }
     }
 
-    static func result(_ kind: RunOutcome.Kind?, records: Int, errorClass: String?) -> String {
-        let count = records == 1 ? "1 record" : "\(records.formatted()) records"
+    static func result(_ kind: RunOutcome.Kind?, records: Int, errorClass: String?) -> LocalizedCopy {
         let reason = StatusDashboard.humanReason(errorClass)
+        let count = LocalizedCopy.Argument.number(records)
         switch kind {
-        case .success: return "Delivered \(count)."
-        case .successNothingDue: return "Nothing new to send."
-        case .partial: return "Delivered \(count); some weren't." + (reason.map { " \($0)" } ?? "")
-        case .unknownAck: return "Sent \(count); the destination didn't confirm."
-        case .failed, .localNetworkDenied, nil: return reason ?? "Not delivered."
-        default: return reason ?? "Waiting for iOS to allow it."
+        case .success:
+            return LocalizedCopy("Delivered %lld records.", count, singular: "Delivered 1 record.")
+        case .successNothingDue:
+            return "Nothing new to send."
+        case .partial:
+            let delivered = LocalizedCopy(
+                "Delivered %lld records; some weren't.", count,
+                singular: "Delivered 1 record; some weren't."
+            )
+            return reason.map { LocalizedCopy("%@ %@", .copy(delivered), .copy($0)) } ?? delivered
+        case .unknownAck:
+            return LocalizedCopy(
+                "Sent %lld records; the destination didn't confirm.", count,
+                singular: "Sent 1 record; the destination didn't confirm."
+            )
+        case .failed, .localNetworkDenied, nil:
+            return reason ?? "Not delivered."
+        default:
+            return reason ?? "Waiting for iOS to allow it."
         }
     }
 }

@@ -97,7 +97,7 @@ struct SettingsScreen: View {
             }
 
             Section {
-                Link(About.privacyPolicy.title, destination: About.privacyPolicy.url)
+                Link(destination: About.privacyPolicy.url) { Text(copy: About.privacyPolicy.title) }
                     .accessibilityIdentifier("settings-privacy-policy")
                 NavigationLink("About KeepMyMetrics") { AboutScreen() }
                     .accessibilityIdentifier("settings-about")
@@ -138,23 +138,23 @@ struct AboutScreen: View {
         let build = info["CFBundleVersion"] as? String ?? "?"
         List {
             Section {
-                Text(About.copyright)
+                Text(copy: About.copyright)
                     .accessibilityIdentifier("about-copyright")
-                Text(About.licence)
-                Text(About.warranty).foregroundStyle(.secondaryText)
-                Text(About.medical).foregroundStyle(.secondaryText)
+                Text(copy: About.licence)
+                Text(copy: About.warranty).foregroundStyle(.secondaryText)
+                Text(copy: About.medical).foregroundStyle(.secondaryText)
             }
             Section {
                 Link(destination: About.sourceLink(commit: identity.sourceCommit)) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Source code for this version")
-                        Text(About.versionLine(version: version, build: build, commit: identity.sourceCommit))
+                        Text(copy: About.versionLine(version: version, build: build, commit: identity.sourceCommit))
                             .metadata()
                     }
                 }
                 .accessibilityIdentifier("about-source")
                 ForEach(About.links) { link in
-                    Link(link.title, destination: link.url)
+                    Link(destination: link.url) { Text(copy: link.title) }
                 }
                 NavigationLink("Acknowledgements") { NoticesScreen() }
                     .accessibilityIdentifier("about-acknowledgements")

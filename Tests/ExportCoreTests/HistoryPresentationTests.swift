@@ -45,14 +45,14 @@ private func event(
 
 @Test func rowsSayWhatHappenedInWords() {
     let row = HistoryPresentation.row(event("a", .success, at: 10, trigger: .bgAppRefresh, records: 1_204))
-    #expect(row.result == "Delivered 1,204 records.")
+    #expect(row.result.english == "Delivered 1,204 records.")
     #expect(row.trigger == "Background")
     #expect(row.destination == "Archive folder")
     #expect(row.typeName == "Heart rate")
     let failed = HistoryPresentation.row(event("b", .failed, at: 10, errorClass: "somethingNew"))
     #expect(failed.result == "Not delivered.")
     for trigger in RunTrigger.allCases {
-        let words = HistoryPresentation.trigger(trigger)
+        let words = HistoryPresentation.trigger(trigger).english
         #expect(words != trigger.rawValue, "\(trigger)")
         #expect(words.range(of: "[a-z][A-Z]", options: .regularExpression) == nil, "\(trigger): \(words)")
     }
@@ -60,6 +60,6 @@ private func event(
 
 @Test func anEmptyProblemsListSaysHowManyRunsDelivered() {
     let events = [event("a", .success, at: 1), event("b", .success, at: 2)]
-    #expect(HistoryPresentation.emptyCopy(events, filter: .problems) == "No problems in the last 90 days. 2 runs delivered.")
-    #expect(HistoryPresentation.emptyCopy([], filter: .problems) == RunHistoryDetail.emptyStateCopy)
+    #expect(HistoryPresentation.emptyCopy(events, filter: .problems).english == "No problems in the last 90 days. 2 runs delivered.")
+    #expect(HistoryPresentation.emptyCopy([], filter: .problems).english == RunHistoryDetail.emptyStateCopy)
 }

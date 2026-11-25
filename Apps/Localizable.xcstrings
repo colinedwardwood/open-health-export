@@ -3642,6 +3642,1674 @@
           }
         }
       }
+    },
+    "%@ %@": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ %@"
+          }
+        }
+      }
+    },
+    "%@ needs attention.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ needs attention."
+          }
+        }
+      }
+    },
+    "%@: %@": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: %@"
+          }
+        }
+      }
+    },
+    "%lld of %lld destinations are up to date.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld of %lld destinations are up to date."
+          }
+        }
+      }
+    },
+    "App launch": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App launch"
+          }
+        }
+      }
+    },
+    "Apple's permission sheet is next. Turn on whatever you're comfortable with. You can change it any time in Health.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple's permission sheet is next. Turn on whatever you're comfortable with. You can change it any time in Health."
+          }
+        }
+      }
+    },
+    "Background": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background"
+          }
+        }
+      }
+    },
+    "Choose where your health data should go, then export.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose where your health data should go, then export."
+          }
+        }
+      }
+    },
+    "Control Centre": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Control Centre"
+          }
+        }
+      }
+    },
+    "Couldn't find your Mac on this network. Both devices need to be on the same network, the Mac needs to be awake, and the companion needs to be running on it.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't find your Mac on this network. Both devices need to be on the same network, the Mac needs to be awake, and the companion needs to be running on it."
+          }
+        }
+      }
+    },
+    "Delivered %@.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delivered %@."
+          }
+        }
+      }
+    },
+    "Delivered %lld records.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Delivered 1 record."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Delivered %lld records."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Delivered %lld records; some weren't.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Delivered 1 record; some weren't."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Delivered %lld records; some weren't."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Delivered.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delivered."
+          }
+        }
+      }
+    },
+    "Everything is up to date.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Everything is up to date."
+          }
+        }
+      }
+    },
+    "Export stopped because of an internal fault. Check diagnostics for the recorded error class.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export stopped because of an internal fault. Check diagnostics for the recorded error class."
+          }
+        }
+      }
+    },
+    "Exports when you tap Export now.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exports when you tap Export now."
+          }
+        }
+      }
+    },
+    "Exports when you tap Export now. Last delivered %@.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exports when you tap Export now. Last delivered %@."
+          }
+        }
+      }
+    },
+    "Health data is restricted on this device by a policy such as MDM or Guest User. That is different from a Health permission in Settings.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Health data is restricted on this device by a policy such as MDM or Guest User. That is different from a Health permission in Settings."
+          }
+        }
+      }
+    },
+    "It comes with no warranty, to the extent permitted by law. See the licence for details.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It comes with no warranty, to the extent permitted by law. See the licence for details."
+          }
+        }
+      }
+    },
+    "Its identity changed. Review it before more data is sent.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its identity changed. Review it before more data is sent."
+          }
+        }
+      }
+    },
+    "Last delivered %@.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last delivered %@."
+          }
+        }
+      }
+    },
+    "Last export %@. %@": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last export %@. %@"
+          }
+        }
+      }
+    },
+    "Licence": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Licence"
+          }
+        }
+      }
+    },
+    "Local Network access is off for this app, so it cannot find your Mac. That is different from the Mac being asleep or on another network. Allow Local Network in Settings, then test again.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local Network access is off for this app, so it cannot find your Mac. That is different from the Mac being asleep or on another network. Allow Local Network in Settings, then test again."
+          }
+        }
+      }
+    },
+    "Low Power Mode is on, so iOS is holding this export. It will retry when Low Power Mode is off.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Low Power Mode is on, so iOS is holding this export. It will retry when Low Power Mode is off."
+          }
+        }
+      }
+    },
+    "New Health data": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Health data"
+          }
+        }
+      }
+    },
+    "Next, %@ will ask for permission": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next, %@ will ask for permission"
+          }
+        }
+      }
+    },
+    "No destinations yet.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No destinations yet."
+          }
+        }
+      }
+    },
+    "No exports yet. Run one now to check your setup.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No exports yet. Run one now to check your setup."
+          }
+        }
+      }
+    },
+    "No new data since %@.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No new data since %@."
+          }
+        }
+      }
+    },
+    "No new data yet.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No new data yet."
+          }
+        }
+      }
+    },
+    "No problems in the last 90 days. %lld runs delivered.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "No problems in the last 90 days. 1 run delivered."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "No problems in the last 90 days. %lld runs delivered."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Not delivered.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not delivered."
+          }
+        }
+      }
+    },
+    "Not set up yet.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not set up yet."
+          }
+        }
+      }
+    },
+    "Nothing delivered yet.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing delivered yet."
+          }
+        }
+      }
+    },
+    "Nothing needs you right now.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing needs you right now."
+          }
+        }
+      }
+    },
+    "Nothing new to send.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing new to send."
+          }
+        }
+      }
+    },
+    "One thing worth knowing: %@ does not tell apps what you turned off. If a type is switched off, it looks to us exactly like a type you have no data for.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One thing worth knowing: %@ does not tell apps what you turned off. If a type is switched off, it looks to us exactly like a type you have no data for."
+          }
+        }
+      }
+    },
+    "Opening the app": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opening the app"
+          }
+        }
+      }
+    },
+    "Paused. Nothing is sent until you resume it.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused. Nothing is sent until you resume it."
+          }
+        }
+      }
+    },
+    "Privacy policy": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy policy"
+          }
+        }
+      }
+    },
+    "Report a security problem": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Report a security problem"
+          }
+        }
+      }
+    },
+    "Sending to %lld destinations.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Sending to 1 destination."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Sending to %lld destinations."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Sent %@, waiting for the destination to confirm.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent %@, waiting for the destination to confirm."
+          }
+        }
+      }
+    },
+    "Sent %lld records; the destination didn't confirm.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Sent 1 record; the destination didn't confirm."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Sent %lld records; the destination didn't confirm."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Sent, waiting for the destination to confirm.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent, waiting for the destination to confirm."
+          }
+        }
+      }
+    },
+    "Shortcut": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shortcut"
+          }
+        }
+      }
+    },
+    "Some destinations are waiting on iOS or haven't exported yet.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Some destinations are waiting on iOS or haven't exported yet."
+          }
+        }
+      }
+    },
+    "Some types were delivered and some weren't.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Some types were delivered and some weren't."
+          }
+        }
+      }
+    },
+    "Some types were delivered and some weren't. %@": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Some types were delivered and some weren't. %@"
+          }
+        }
+      }
+    },
+    "Source-available under the Functional Source License 1.1 (FSL-1.1-ALv2). Each version becomes Apache-2.0 two years after release.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source-available under the Functional Source License 1.1 (FSL-1.1-ALv2). Each version becomes Apache-2.0 two years after release."
+          }
+        }
+      }
+    },
+    "Support": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Support"
+          }
+        }
+      }
+    },
+    "Terms of use": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terms of use"
+          }
+        }
+      }
+    },
+    "The device is locked, so Health data is temporarily unavailable. Export will retry when it unlocks.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The device is locked, so Health data is temporarily unavailable. Export will retry when it unlocks."
+          }
+        }
+      }
+    },
+    "The last export didn't reach it.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The last export didn't reach it."
+          }
+        }
+      }
+    },
+    "The system cancelled this export. It will try again later.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The system cancelled this export. It will try again later."
+          }
+        }
+      }
+    },
+    "The system stopped this export because the background time budget ran out. It will try again later.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The system stopped this export because the background time budget ran out. It will try again later."
+          }
+        }
+      }
+    },
+    "This destination skips cellular and other metered networks. Export will continue on Wi-Fi, or after you allow metered networks for this destination.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This destination skips cellular and other metered networks. Export will continue on Wi-Fi, or after you allow metered networks for this destination."
+          }
+        }
+      }
+    },
+    "Version %@ (%@) · %@": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version %@ (%@) · %@"
+          }
+        }
+      }
+    },
+    "Waiting for iOS to allow it.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for iOS to allow it."
+          }
+        }
+      }
+    },
+    "Waiting for iOS to allow the next export.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for iOS to allow the next export."
+          }
+        }
+      }
+    },
+    "Waiting for its first export.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for its first export."
+          }
+        }
+      }
+    },
+    "We're about to ask for read access to %lld types of health data you selected.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "We're about to ask for read access to 1 type of health data you selected."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "We're about to ask for read access to %lld types of health data you selected."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "You tapped Export now": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You tapped Export now"
+          }
+        }
+      }
+    },
+    "unknown commit": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "unknown commit"
+          }
+        }
+      }
+    },
+    "© 2026 Colin Edward Wood and contributors": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "© 2026 Colin Edward Wood and contributors"
+          }
+        }
+      }
+    },
+    "%@ asked us to slow down": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ asked us to slow down"
+          }
+        }
+      }
+    },
+    "%@ didn't respond in time": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ didn't respond in time"
+          }
+        }
+      }
+    },
+    "%@ is waiting for Wi-Fi": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is waiting for Wi-Fi"
+          }
+        }
+      }
+    },
+    "%@ must be unlocked for any app to read Health data. Access ends shortly after you lock it. This is an Apple restriction.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ must be unlocked for any app to read Health data. Access ends shortly after you lock it. This is an Apple restriction."
+          }
+        }
+      }
+    },
+    "%@ refused this request": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ refused this request"
+          }
+        }
+      }
+    },
+    "%@ rejected the token": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ rejected the token"
+          }
+        }
+      }
+    },
+    "%@ returned an error": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ returned an error"
+          }
+        }
+      }
+    },
+    "%@ returned an error (%@)": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ returned an error (%@)"
+          }
+        }
+      }
+    },
+    "%@'s certificate has expired": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@'s certificate has expired"
+          }
+        }
+      }
+    },
+    "Check Health → Sharing → Apps for this app, then review coverage.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check Health → Sharing → Apps for this app, then review coverage."
+          }
+        }
+      }
+    },
+    "Check the MQTT user in your broker's configuration, then replace the credential here.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check the MQTT user in your broker's configuration, then replace the credential here."
+          }
+        }
+      }
+    },
+    "Check the server. We will keep retrying.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check the server. We will keep retrying."
+          }
+        }
+      }
+    },
+    "Check the token's permissions, or the webhook's allowed scope.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check the token's permissions, or the webhook's allowed scope."
+          }
+        }
+      }
+    },
+    "Check the webhook or topic path on the destination, then update it here.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check the webhook or topic path on the destination, then update it here."
+          }
+        }
+      }
+    },
+    "Couldn't find %@": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't find %@"
+          }
+        }
+      }
+    },
+    "Couldn't update this app's export records": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't update this app's export records"
+          }
+        }
+      }
+    },
+    "Couldn't verify %@'s certificate": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't verify %@'s certificate"
+          }
+        }
+      }
+    },
+    "Create a new access token in the destination's profile security settings, then replace it here.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create a new access token in the destination's profile security settings, then replace it here."
+          }
+        }
+      }
+    },
+    "Health data was locked": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Health data was locked"
+          }
+        }
+      }
+    },
+    "If you are away, use the external address or a VPN. You can add a second address for when you are away.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If you are away, use the external address or a VPN. You can add a second address for when you are away."
+          }
+        }
+      }
+    },
+    "Import the server's certificate and pin it here, or install a publicly trusted certificate on the server.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import the server's certificate and pin it here, or install a publicly trusted certificate on the server."
+          }
+        }
+      }
+    },
+    "Join Wi-Fi, or turn on Allow cellular and other metered networks for this destination.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Join Wi-Fi, or turn on Allow cellular and other metered networks for this destination."
+          }
+        }
+      }
+    },
+    "No recent background exports to %@": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No recent background exports to %@"
+          }
+        }
+      }
+    },
+    "None of the selected types returned data. That can mean there is no new data, or that access to those types is off in Health — this app has no way to tell which.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "None of the selected types returned data. That can mean there is no new data, or that access to those types is off in Health — this app has no way to tell which."
+          }
+        }
+      }
+    },
+    "Nothing to change here. Export will continue after you unlock.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing to change here. Export will continue after you unlock."
+          }
+        }
+      }
+    },
+    "Nothing to export": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing to export"
+          }
+        }
+      }
+    },
+    "QoS 0 does not confirm that anything received the message. The broker may have accepted and dropped it.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "QoS 0 does not confirm that anything received the message. The broker may have accepted and dropped it."
+          }
+        }
+      }
+    },
+    "Rate limited. It asked us to wait %lld seconds.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Rate limited. It asked us to wait 1 second."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Rate limited. It asked us to wait %lld seconds."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Rate limited. It asked us to wait a short interval.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rate limited. It asked us to wait a short interval."
+          }
+        }
+      }
+    },
+    "Renew the certificate on the server. If you use Caddy or Traefik, check that automatic renewal is still running.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Renew the certificate on the server. If you use Caddy or Traefik, check that automatic renewal is still running."
+          }
+        }
+      }
+    },
+    "Sent — delivery not confirmed": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent — delivery not confirmed"
+          }
+        }
+      }
+    },
+    "Set QoS to 1 on this destination so delivery can be confirmed.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set QoS to 1 on this destination so delivery can be confirmed."
+          }
+        }
+      }
+    },
+    "Shorten the export window in this app, or raise the destination's maximum body size.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shorten the export window in this app, or raise the destination's maximum body size."
+          }
+        }
+      }
+    },
+    "Something failed that this app has no specific explanation for.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Something failed that this app has no specific explanation for."
+          }
+        }
+      }
+    },
+    "That name did not resolve on this network. .local names only work on the same network as the server.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That name did not resolve on this network. .local names only work on the same network as the server."
+          }
+        }
+      }
+    },
+    "That path does not exist on %@": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That path does not exist on %@"
+          }
+        }
+      }
+    },
+    "The TLS certificate on the server is past its not-after date, so %@ refused the connection.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The TLS certificate on the server is past its not-after date, so %@ refused the connection."
+          }
+        }
+      }
+    },
+    "The broker accepted the connection then rejected the username or password (CONNACK not authorised).": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The broker accepted the connection then rejected the username or password (CONNACK not authorised)."
+          }
+        }
+      }
+    },
+    "The broker refused the credential": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The broker refused the credential"
+          }
+        }
+      }
+    },
+    "The connection was accepted but the credential was refused. Long-lived tokens are revoked when you change a password or delete the token.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The connection was accepted but the credential was refused. Long-lived tokens are revoked when you change a password or delete the token."
+          }
+        }
+      }
+    },
+    "The credential was recognised but is not allowed to write here.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The credential was recognised but is not allowed to write here."
+          }
+        }
+      }
+    },
+    "The database this app keeps on %@ couldn't be opened or written. Nothing is wrong at %@.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The database this app keeps on %@ couldn't be opened or written. Nothing is wrong at %@."
+          }
+        }
+      }
+    },
+    "The export to %@ stopped": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The export to %@ stopped"
+          }
+        }
+      }
+    },
+    "The export was too large for %@": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The export was too large for %@"
+          }
+        }
+      }
+    },
+    "The host may be asleep, or the connection may be slow. Your settings here look correct.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The host may be asleep, or the connection may be slow. Your settings here look correct."
+          }
+        }
+      }
+    },
+    "The server presented a certificate %@ does not trust. Self-signed and private-CA certificates are not trusted by default.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The server presented a certificate %@ does not trust. Self-signed and private-CA certificates are not trusted by default."
+          }
+        }
+      }
+    },
+    "The server responded, but nothing is listening at the configured path.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The server responded, but nothing is listening at the configured path."
+          }
+        }
+      }
+    },
+    "The server, or the proxy in front of it, is not healthy. Your settings here look correct.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The server, or the proxy in front of it, is not healthy. Your settings here look correct."
+          }
+        }
+      }
+    },
+    "This destination skips cellular and other metered networks.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This destination skips cellular and other metered networks."
+          }
+        }
+      }
+    },
+    "Try again on Wi-Fi. If the server sleeps, wake it or increase its timeout.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try again on Wi-Fi. If the server sleeps, wake it or increase its timeout."
+          }
+        }
+      }
+    },
+    "Try again. If it happens again, copy the diagnostics into a report so it can be fixed.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try again. If it happens again, copy the diagnostics into a report so it can be fixed."
+          }
+        }
+      }
+    },
+    "Try again. If it keeps happening, restart %@, then copy the diagnostics into a report.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try again. If it keeps happening, restart %@, then copy the diagnostics into a report."
+          }
+        }
+      }
+    },
+    "Turn on Settings → General → Background App Refresh for this app, or export now for exact timing.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on Settings → General → Background App Refresh for this app, or export now for exact timing."
+          }
+        }
+      }
+    },
+    "We sent %lld bytes; the server refused the body as too large.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "We sent 1 byte; the server refused the body as too large."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "We sent %lld bytes; the server refused the body as too large."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "We sent this batch; the server refused the body as too large.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We sent this batch; the server refused the body as too large."
+          }
+        }
+      }
+    },
+    "We will retry automatically. If this keeps happening, choose a less frequent freshness target.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We will retry automatically. If this keeps happening, choose a less frequent freshness target."
+          }
+        }
+      }
+    },
+    "iOS decides when apps may run in the background and can skip us, especially in Low Power Mode or if Background App Refresh is off.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iOS decides when apps may run in the background and can skip us, especially in Low Power Mode or if Background App Refresh is off."
+          }
+        }
+      }
+    },
+    "Choose a less frequent target": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a less frequent target"
+          }
+        }
+      }
+    },
+    "Edit destination": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit destination"
+          }
+        }
+      }
+    },
+    "Open Background App Refresh settings": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Background App Refresh settings"
+          }
+        }
+      }
+    },
+    "Replace token": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Replace token"
+          }
+        }
+      }
+    },
+    "Review coverage": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review coverage"
+          }
+        }
+      }
+    },
+    "Set QoS to 1": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set QoS to 1"
+          }
+        }
+      }
+    },
+    "Shorten window": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shorten window"
+          }
+        }
+      }
     }
   }
 }

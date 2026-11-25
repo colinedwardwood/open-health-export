@@ -9,17 +9,17 @@ import Foundation
 public enum About {
     public static let repository = "https://github.com/colinedwardwood/open-health-export"
 
-    public static let copyright = "© 2026 Colin Edward Wood and contributors"
-    public static let licence =
+    public static let copyright: LocalizedCopy = "© 2026 Colin Edward Wood and contributors"
+    public static let licence: LocalizedCopy =
         "Source-available under the Functional Source License 1.1 (FSL-1.1-ALv2). Each version becomes Apache-2.0 two years after release."
-    public static let warranty =
+    public static let warranty: LocalizedCopy =
         "It comes with no warranty, to the extent permitted by law. See the licence for details."
-    public static let medical = "This is not a medical device. It does not diagnose or treat anything."
+    public static let medical: LocalizedCopy = "This is not a medical device. It does not diagnose or treat anything."
 
     public struct Link: Sendable, Equatable, Identifiable {
-        public var title: String
+        public var title: LocalizedCopy
         public var url: URL
-        public var id: String { title }
+        public var id: String { title.key }
     }
 
     /// Linked at their source in the repository until the project's own site exists;
@@ -43,8 +43,10 @@ public enum About {
         BuildIdentity.sourceLink(commit: commit).flatMap(URL.init(string:)) ?? URL(string: repository)!
     }
 
-    public static func versionLine(version: String, build: String, commit: String) -> String {
-        let short = commit.count >= 7 && commit != "unspecified" ? String(commit.prefix(7)) : "unknown commit"
-        return "Version \(version) (\(build)) · \(short)"
+    public static func versionLine(version: String, build: String, commit: String) -> LocalizedCopy {
+        let short: LocalizedCopy.Argument = commit.count >= 7 && commit != "unspecified"
+            ? .text(String(commit.prefix(7)))
+            : .copy("unknown commit")
+        return LocalizedCopy("Version %@ (%@) · %@", .text(version), .text(build), short)
     }
 }

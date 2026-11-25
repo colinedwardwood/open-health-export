@@ -42,7 +42,7 @@ struct DestinationsScreen: View {
                                     .accessibilityHidden(true)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(row.label)
-                                    Text("\(row.stateLabel) · \(row.detail)").metadata()
+                                    Text(verbatim: "\(localized(row.stateLabel)) · \(row.detail.resolved)").metadata()
                                 }
                             }
                             .accessibilityElement(children: .combine)
@@ -235,8 +235,8 @@ struct TestChecklistSection: View {
             }
             if let error {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(error.title).font(.headline)
-                    Text(error.fix).foregroundStyle(.secondaryText)
+                    Text(copy: error.title).font(.headline)
+                    Text(copy: error.fix).foregroundStyle(.secondaryText)
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("test-error")
@@ -297,8 +297,8 @@ struct DestinationDetailScreen: View {
                 Section {
                     Label {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(row.stateLabel).font(.headline)
-                            Text(row.detail).foregroundStyle(.secondaryText)
+                            Text(localized(row.stateLabel)).font(.headline)
+                            Text(copy: row.detail).foregroundStyle(.secondaryText)
                         }
                     } icon: {
                         Image(systemName: row.glyph).foregroundStyle(row.tone.color)
@@ -309,10 +309,10 @@ struct DestinationDetailScreen: View {
             }
             if let error {
                 Section {
-                    Text(error.cause)
-                    Text(error.fix).foregroundStyle(.secondaryText)
+                    Text(copy: error.cause)
+                    Text(copy: error.fix).foregroundStyle(.secondaryText)
                 } header: {
-                    SectionTitle(LocalizedStringKey(error.title))
+                    SectionTitle(copy: error.title)
                 }
             }
             if destinationID == "local-file", setup.checklist.steps.contains(where: { $0.state != .pending }) {
