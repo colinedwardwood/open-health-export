@@ -1,4 +1,4 @@
-# open-health-exporter (Swift 6.3.3, Xcode 26.6; AGPL; health-data tooling)
+# open-health-exporter (Swift 6.3.3, Xcode 26.6; FSL-1.1-ALv2, source-available; health-data tooling)
 
 ## Commands (repo root). This is a subset of CI, see "CI beyond this list"
 - Test all: `swift test` (full pass needs zlib + mosquitto installed; `MosquittoExternalBrokerTests` also needs `OHE_MQTT_BROKER`)
