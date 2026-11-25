@@ -89,10 +89,8 @@ struct SettingsScreen: View {
             }
 
             Section {
-                if let privacy = About.links.first(where: { $0.title == "Privacy policy" }) {
-                    Link(privacy.title, destination: privacy.url)
-                        .accessibilityIdentifier("settings-privacy-policy")
-                }
+                Link(About.privacyPolicy.title, destination: About.privacyPolicy.url)
+                    .accessibilityIdentifier("settings-privacy-policy")
                 NavigationLink("About KeepMyMetrics") { AboutScreen() }
                     .accessibilityIdentifier("settings-about")
             }

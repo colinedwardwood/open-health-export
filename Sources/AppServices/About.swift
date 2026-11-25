@@ -24,8 +24,13 @@ public enum About {
 
     /// Linked at their source in the repository until the project's own site exists;
     /// a paid app uses Apple's standard licence agreement as its terms.
+    public static let privacyPolicy = Link(
+        title: "Privacy policy",
+        url: URL(string: "\(repository)/blob/main/PRIVACY.md")!
+    )
+
     public static let links: [Link] = [
-        Link(title: "Privacy policy", url: URL(string: "\(repository)/blob/main/PRIVACY.md")!),
+        privacyPolicy,
         Link(title: "Terms of use", url: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!),
         Link(title: "Support", url: URL(string: "\(repository)/blob/main/SUPPORT.md")!),
         Link(title: "Report a security problem", url: URL(string: "\(repository)/blob/main/SECURITY.md")!),
