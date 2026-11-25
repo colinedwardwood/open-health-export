@@ -89,6 +89,10 @@ struct HistoryScreen: View {
 struct RunDetailScreen: View {
     let row: HistoryRow
 
+    private func spoken(_ duration: Duration) -> String {
+        duration.formatted(.units(allowed: [.seconds, .milliseconds], width: .abbreviated))
+    }
+
     var body: some View {
         let event = row.event
         let facts = event.facts
@@ -112,7 +116,7 @@ struct RunDetailScreen: View {
                 if let type = row.typeName { LabeledContent("Type", value: type) }
                 LabeledContent("Records", value: event.samplesCommitted.formatted())
                 LabeledContent("Data sent", value: ByteCountFormatter.string(fromByteCount: Int64(facts.byteCount), countStyle: .file))
-                LabeledContent("Took", value: Duration.milliseconds(facts.durationMillis).formatted(.units(allowed: [.seconds, .milliseconds], width: .abbreviated)))
+                LabeledContent("Took", value: spoken(.milliseconds(facts.durationMillis)))
                 if let start = facts.windowStartDay, let end = facts.windowEndDay {
                     LabeledContent("Covering", value: start == end ? start : "\(start) to \(end)")
                 }
@@ -120,7 +124,7 @@ struct RunDetailScreen: View {
             if !facts.stepTimings.isEmpty {
                 Section {
                     ForEach(Array(facts.stepTimings.enumerated()), id: \.offset) { _, step in
-                        LabeledContent(step.name, value: Duration.milliseconds(step.durationMillis).formatted(.units(allowed: [.seconds, .milliseconds], width: .abbreviated)))
+                        LabeledContent(step.name, value: spoken(.milliseconds(step.durationMillis)))
                     }
                 } header: {
                     SectionTitle("Steps")
