@@ -863,6 +863,13 @@ public protocol CharacteristicSource: Sendable {
 /// Date-ranged observations for R-08. Does not use the HealthKit anchored query.
 public protocol DayObservationSource: Sendable {
     func samples(metric: MetricID, day: String) async throws -> [SampleRecord]
+    /// The category records starting on `day`, for category types (Sleep, Mindful
+    /// minutes). Quantity-only sources have none.
+    func categories(metric: MetricID, day: String) async throws -> [CategoryRecord]
+}
+
+extension DayObservationSource {
+    public func categories(metric: MetricID, day: String) async throws -> [CategoryRecord] { [] }
 }
 
 /// A date-ranged source that can discover the complete day span available for a metric.

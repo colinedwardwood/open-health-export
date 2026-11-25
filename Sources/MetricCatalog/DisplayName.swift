@@ -2,12 +2,21 @@
 // SPDX-License-Identifier: FSL-1.1-ALv2
 
 extension MetricDeclaration {
-    /// Whether HealthKit can be read for this type one day at a time. Only quantity
-    /// types can. Daily totals and day-by-day reconcile both depend on it; asking the
-    /// day reader for anything else fails the export (#45: Mindful minutes, a category
-    /// type in Core Daily, failed every first export).
+    /// Whether HealthKit can be read for this type one day at a time: quantity types
+    /// (as samples) and category types (as category records). Day-by-day reconcile
+    /// depends on it; asking the day reader for any other family fails the export
+    /// (#45: Mindful minutes failed every first export).
     public var readsByDay: Bool {
-        kind == "sample.quantity"
+        kind == "sample.quantity" || isCategory
+    }
+
+    public var isCategory: Bool { kind == "sample.category" }
+
+    /// Whether this type gets a daily total (an aggregate record and a Home Assistant
+    /// sensor): every quantity type, and the category types that declare one. Mindful
+    /// minutes totals the sample durations; Sleep and the symptom events have no total.
+    public var hasDailyTotal: Bool {
+        kind == "sample.quantity" || (isCategory && haRequiresAggregate)
     }
 }
 

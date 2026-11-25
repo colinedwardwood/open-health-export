@@ -225,9 +225,9 @@ public enum HomeAssistantWebhookExample {
 }
 
 /// #49: the Home Assistant entities MQTT discovery creates, so the person knows what
-/// to look for before they save. Discovery publishes quantity types only.
+/// to look for before they save. Discovery publishes the types with a daily total.
 public enum HomeAssistantDiscoveryPreview {
     public static func entityNames(for metrics: [MetricDeclaration]) -> [String] {
-        metrics.filter(\.readsByDay).map(\.displayName)
+        metrics.filter(\.hasDailyTotal).map(\.displayName)
     }
 }

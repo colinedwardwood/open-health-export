@@ -6838,10 +6838,11 @@ private struct SilentDiscardSink: DestinationSink {
     #expect(Set(DestinationDisplayState.allCases.map(\.tone)) == Set(StatusTone.allCases))
 }
 
-/// #45: the trailing reconcile after every export read day samples for Mindful
-/// minutes, a category type with no day reader, and failed the first export.
+/// #45: the trailing reconcile after every export read day samples for a type with
+/// no day reader and failed the first export. Workouts still have none (#168 added
+/// the category reader).
 @Test func reconcileSkipsTypesWithNoDayReader() async throws {
-    let metric = MetricCatalog.mindfulSession.id
+    let metric = MetricCatalog.workout.id
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("ohe-reconcile-category-\(UUID().uuidString)")
     defer { try? FileManager.default.removeItem(at: root) }

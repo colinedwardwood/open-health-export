@@ -56,9 +56,13 @@ import Testing
 
 /// #45: the first export failed on Mindful minutes because the export asked the
 /// quantity-only day reader for a category type.
-@Test func onlyQuantityTypesAreTotalledFromDaySamples() {
+@Test func dayReaderCoversQuantityAndCategoryTypesAndTotalsOnlyWhereDeclared() {
     #expect(MetricCatalog.stepCount.readsByDay)
-    #expect(!MetricCatalog.mindfulSession.readsByDay)
-    #expect(!MetricCatalog.sleepAnalysis.readsByDay)
+    #expect(MetricCatalog.mindfulSession.readsByDay)
+    #expect(MetricCatalog.sleepAnalysis.readsByDay)
     #expect(!MetricCatalog.workout.readsByDay)
+    #expect(MetricCatalog.stepCount.hasDailyTotal)
+    #expect(MetricCatalog.mindfulSession.hasDailyTotal)
+    #expect(!MetricCatalog.sleepAnalysis.hasDailyTotal)
+    #expect(!MetricCatalog.workout.hasDailyTotal)
 }

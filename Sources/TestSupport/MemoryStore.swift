@@ -590,16 +590,31 @@ public struct FixtureCharacteristicSource: CharacteristicSource {
 
 public struct FixtureDays: BoundedDayObservationSource, Sendable {
     public var byDay: [String: [SampleRecord]]
-    public init(byDay: [String: [SampleRecord]]) { self.byDay = byDay }
+    public var categoriesByDay: [String: [CategoryRecord]]
+    public init(
+        byDay: [String: [SampleRecord]] = [:],
+        categoriesByDay: [String: [CategoryRecord]] = [:]
+    ) {
+        self.byDay = byDay
+        self.categoriesByDay = categoriesByDay
+    }
 
     public func samples(metric: MetricID, day: String) async throws -> [SampleRecord] {
         (byDay[day] ?? []).filter { $0.metric == metric }
     }
 
+    public func categories(metric: MetricID, day: String) async throws -> [CategoryRecord] {
+        (categoriesByDay[day] ?? []).filter { $0.metric == metric }
+    }
+
     public func availableDayRange(metric: MetricID) async throws -> ClosedRange<String>? {
-        let days = byDay.compactMap { day, samples in
+        let sampleDays = byDay.compactMap { day, samples in
             samples.contains { $0.metric == metric } ? day : nil
-        }.sorted()
+        }
+        let categoryDays = categoriesByDay.compactMap { day, records in
+            records.contains { $0.metric == metric } ? day : nil
+        }
+        let days = (sampleDays + categoryDays).sorted()
         guard let first = days.first, let last = days.last else { return nil }
         return first ... last
     }
@@ -616,8 +631,11 @@ public final class CountingFixtureDays: BoundedDayObservationSource, @unchecked 
     public let base: FixtureDays
     private let counter = ReadCounter()
 
-    public init(byDay: [String: [SampleRecord]]) {
-        self.base = FixtureDays(byDay: byDay)
+    public init(
+        byDay: [String: [SampleRecord]] = [:],
+        categoriesByDay: [String: [CategoryRecord]] = [:]
+    ) {
+        self.base = FixtureDays(byDay: byDay, categoriesByDay: categoriesByDay)
     }
 
     public var dayReads: Int {
@@ -627,6 +645,11 @@ public final class CountingFixtureDays: BoundedDayObservationSource, @unchecked 
     public func samples(metric: MetricID, day: String) async throws -> [SampleRecord] {
         await counter.increment()
         return try await base.samples(metric: metric, day: day)
+    }
+
+    public func categories(metric: MetricID, day: String) async throws -> [CategoryRecord] {
+        await counter.increment()
+        return try await base.categories(metric: metric, day: day)
     }
 
     public func availableDayRange(metric: MetricID) async throws -> ClosedRange<String>? {

@@ -1290,9 +1290,7 @@ public final class HealthKitDayObservationSource: BoundedDayObservationSource, @
         guard HealthKitAvailability.isAvailable() else {
             throw HealthKitSourceError.unavailable
         }
-        guard let type = SampleConversion.quantityType(for: metric) else {
-            throw HealthKitSourceError.unknownMetric(metric)
-        }
+        let type = try sampleType(for: metric)
         guard let first = try await boundary(type: type, ascending: true) else {
             return nil
         }
@@ -1308,6 +1306,38 @@ public final class HealthKitDayObservationSource: BoundedDayObservationSource, @
         guard let type = SampleConversion.quantityType(for: metric) else {
             throw HealthKitSourceError.unknownMetric(metric)
         }
+        return try await readDay(type: type, day: day) { sample in
+            guard let quantity = sample as? HKQuantitySample else { return nil }
+            return SampleConversion.record(from: quantity, metric: metric, context: self.context)
+        }
+    }
+
+    /// The category records starting on `day`: Sleep stages and Mindful minutes sessions.
+    public func categories(metric: MetricID, day: String) async throws -> [CategoryRecord] {
+        guard HealthKitAvailability.isAvailable() else {
+            throw HealthKitSourceError.unavailable
+        }
+        guard let type = CategoryConversion.categoryType(for: metric) else {
+            throw HealthKitSourceError.unknownMetric(metric)
+        }
+        return try await readDay(type: type, day: day) { sample in
+            guard let category = sample as? HKCategorySample else { return nil }
+            return CategoryConversion.record(from: category, metric: metric, context: self.context)
+        }
+    }
+
+    private func sampleType(for metric: MetricID) throws -> HKSampleType {
+        if let type = SampleConversion.quantityType(for: metric) { return type }
+        if let type = CategoryConversion.categoryType(for: metric) { return type }
+        throw HealthKitSourceError.unknownMetric(metric)
+    }
+
+    /// Pages the day's samples with a throwaway anchor and converts each one.
+    private func readDay<Record>(
+        type: HKSampleType,
+        day: String,
+        convert: @escaping @Sendable (HKSample) -> Record?
+    ) async throws -> [Record] {
         guard let bounds = BucketKey.boundsP1D(day: day, context: context),
               let start = SampleConversion.parseUTC(bounds.bucketStart),
               let end = SampleConversion.parseUTC(bounds.bucketEnd)
@@ -1320,13 +1350,13 @@ public final class HealthKitDayObservationSource: BoundedDayObservationSource, @
             options: .strictStartDate
         )
         var anchor: HKQueryAnchor?
-        var records: [SampleRecord] = []
+        var records: [Record] = []
         while true {
             let page = try await queryPage(
                 type: type,
                 predicate: predicate,
                 anchor: anchor,
-                metric: metric
+                convert: convert
             )
             records.append(contentsOf: page.records)
             anchor = page.anchor
@@ -1337,9 +1367,9 @@ public final class HealthKitDayObservationSource: BoundedDayObservationSource, @
     }
 
     private func boundary(
-        type: HKQuantityType,
+        type: HKSampleType,
         ascending: Bool
-    ) async throws -> HKQuantitySample? {
+    ) async throws -> HKSample? {
         try await withCheckedThrowingContinuation { continuation in
             let query = HKSampleQuery(
                 sampleType: type,
@@ -1358,18 +1388,18 @@ public final class HealthKitDayObservationSource: BoundedDayObservationSource, @
                     )
                     return
                 }
-                continuation.resume(returning: samples?.first as? HKQuantitySample)
+                continuation.resume(returning: samples?.first)
             }
             self.store.execute(query)
         }
     }
 
-    private func queryPage(
-        type: HKQuantityType,
+    private func queryPage<Record>(
+        type: HKSampleType,
         predicate: NSPredicate,
         anchor: HKQueryAnchor?,
-        metric: MetricID
-    ) async throws -> (records: [SampleRecord], anchor: HKQueryAnchor?, count: Int) {
+        convert: @escaping @Sendable (HKSample) -> Record?
+    ) async throws -> (records: [Record], anchor: HKQueryAnchor?, count: Int) {
         try await withCheckedThrowingContinuation { continuation in
             let query = HKAnchoredObjectQuery(
                 type: type,
@@ -1383,16 +1413,8 @@ public final class HealthKitDayObservationSource: BoundedDayObservationSource, @
                     )
                     return
                 }
-                let converted = (samples ?? []).compactMap { sample -> SampleRecord? in
-                    guard let quantity = sample as? HKQuantitySample else { return nil }
-                    return SampleConversion.record(
-                        from: quantity,
-                        metric: metric,
-                        context: self.context
-                    )
-                }
                 continuation.resume(
-                    returning: (converted, newAnchor, samples?.count ?? 0)
+                    returning: ((samples ?? []).compactMap(convert), newAnchor, samples?.count ?? 0)
                 )
             }
             self.store.execute(query)
