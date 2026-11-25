@@ -36,8 +36,13 @@ public enum HADiscovery {
 
     public static func statusPayload() -> Data { Data("online".utf8) }
 
+    /// `productName` is the app's display name, passed in because this target cannot read the
+    /// bundle. It names the device, manufacturer and origin; entity names come from the catalogue.
+    /// `unique_id` and the component keys derive only from the exporter id and wire id, so a
+    /// rename never changes an existing entity's identity.
     public static func encodeDeviceConfig(
         exporterId: String,
+        productName: String,
         metrics: [MetricID],
         softwareVersion: String = "0.1.0"
     ) throws -> Data {
@@ -55,13 +60,13 @@ public enum HADiscovery {
         let root: CanonicalJSON = .object([
             "dev": .object([
                 "identifiers": .array([.string("ohe_\(short)")]),
-                "name": .string("iPhone Health Export"),
-                "manufacturer": .string("open-health-exporter"),
+                "name": .string(productName),
+                "manufacturer": .string(productName),
                 "model": .string("iPhone"),
                 "sw_version": .string(softwareVersion),
             ]),
             "o": .object([
-                "name": .string("open-health-exporter"),
+                "name": .string(productName),
                 "sw_version": .string(softwareVersion),
                 "support_url": .string(supportURL),
             ]),
@@ -93,7 +98,7 @@ public enum HADiscovery {
         let stateTopic = "ohe/\(exporterId)/v1/state/\(declaration.wireId)/\(statistic)/\(granularity)"
         var fields: [String: CanonicalJSON] = [
             "p": .string("sensor"),
-            "name": .string(declaration.wireId.replacingOccurrences(of: "_", with: " ")),
+            "name": .string(declaration.displayName),
             "unique_id": .string("ohe_\(shortId)_\(declaration.wireId)_\(statistic)_\(granularity)"),
             "state_topic": .string(stateTopic),
             "value_template": .string("{{ value_json.value }}"),

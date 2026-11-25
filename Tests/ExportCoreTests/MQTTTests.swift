@@ -163,6 +163,7 @@ import WireFormat
     let topic = try HADiscovery.deviceConfigTopic(exporterId: "phone-1A7B")
     let config = try HADiscovery.encodeDeviceConfig(
         exporterId: "phone-1A7B",
+        productName: "KeepMyMetrics",
         metrics: [MetricCatalog.heartRate.id, MetricCatalog.stepCount.id]
     )
     try await session.publish(topic: topic, payload: config, qos: .atMostOnce, retain: true)
