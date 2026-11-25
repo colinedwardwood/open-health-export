@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: FSL-1.1-ALv2
 
 /// SEC-45: sharing hands the bundle to another app, which ends this app's Data
 /// Protection guarantees over those bytes. The warning is shown once and has to be

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: FSL-1.1-ALv2
 
 // #65: the only place advisory feeds are signed. Runs on the owner's machine with a
 // private key held offline; nothing here is linked into the app.

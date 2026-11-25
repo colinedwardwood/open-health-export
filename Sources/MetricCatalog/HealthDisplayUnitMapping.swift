@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: FSL-1.1-ALv2
 
 /// UX-44: map HealthKit `preferredUnits` unit strings onto the display policy.
 /// Unknown strings leave the fallback family unchanged so region policy still

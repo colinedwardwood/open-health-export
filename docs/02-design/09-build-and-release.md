@@ -1,3 +1,5 @@
+> **Licensing note (2026-10-05):** the AGPL-3.0 reasoning in this document is superseded by [ADR-0005](../adr/0005-relicense-to-fsl-1.1-alv2.md). The project is FSL-1.1-ALv2; there is no `COPYING` or §7 permission any more.
+
 # Build, Release and Governance Machinery — Stage 2
 
 **Role:** Release & Build Engineer

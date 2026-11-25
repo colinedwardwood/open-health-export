@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: FSL-1.1-ALv2
 """Fail closed unless repository, issue, checks, and nightly evidence permit release."""
 
 from __future__ import annotations

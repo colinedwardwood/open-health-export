@@ -1,8 +1,8 @@
 # Runtime dependency policy
 
-Outbound licence is AGPL-3.0-or-later plus the additional permission in `COPYING`.
+Outbound licence is FSL-1.1-ALv2 (`LICENSE`); the reference receiver is Apache-2.0 (ADR-0005).
 
-Allowed SPDX identifiers for first-party files: `AGPL-3.0-or-later`, `CC-BY-4.0` (docs),
+Allowed SPDX identifiers for first-party files: `FSL-1.1-ALv2`, `Apache-2.0` (reference receiver), `CC-BY-4.0` (docs),
 `CC0-1.0` (spec and fixtures).
 
 Allowed runtime linkage besides first-party Swift:
@@ -23,7 +23,8 @@ within 90 days, record an ADR, and note the event in the changelog (OSS-19).
 No third-party Swift package is in the graph today. Before one may land:
 
 1. Pin a git revision (commit SHA), never a floating branch or moving tag.
-2. Confirm the licence is OSI-listed and compatible with AGPL-3.0-or-later plus `COPYING`.
+2. Confirm the licence is permissive (MIT, BSD, ISC, Apache-2.0, zlib or public domain). Copyleft
+   dependencies (GPL, AGPL, LGPL) can't be distributed inside an FSL work and are denied.
 3. Confirm the package has no bundled telemetry, install-time network, or unchecksummed blobs.
 4. Record an ADR, regenerate `dependencies/licences.lock` and `NOTICE`, and land the pin in
    `Package.swift` in the same change.

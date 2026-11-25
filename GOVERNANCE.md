@@ -15,7 +15,7 @@ roles. Private keys are never transferred through this repository. See
 
 ## Licence change
 
-The outbound licence is AGPL-3.0-or-later plus the additional permission in `COPYING`.
+The outbound licence is FSL-1.1-ALv2 (`LICENSE`); the reference receiver is Apache-2.0, the spec CC0-1.0 and the docs CC-BY-4.0 (ADR-0005).
 Changing that licence requires the consent of all copyright holders. Inbound contributions
 are under the same licence (`CONTRIBUTING.md`).
 

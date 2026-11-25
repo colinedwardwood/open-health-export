@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Colin Edward Wood and contributors
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: FSL-1.1-ALv2
 
 /// Production iPhone/iPad root tabs. Order is load-bearing (R-41): Destinations is
 /// always second from the right, Data is always adjacent to the default Status tab.
