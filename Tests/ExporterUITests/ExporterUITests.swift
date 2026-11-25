@@ -606,6 +606,22 @@ final class ExporterUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["status-headline"].exists)
     }
 
+    /// #63: with Background App Refresh off (injected), Status says why exports only run
+    /// when the app is open, whatever the destinations look like.
+    func testStatusExplainsWhenBackgroundRefreshIsOff() {
+        app.terminate()
+        app.launchEnvironment = [
+            "OHE_RESET_SEEDED_SURFACES": "1",
+            "OHE_SEED_BACKGROUND_REFRESH": "denied",
+        ]
+        app.launch()
+        XCTAssertTrue(
+            app.otherElements["status-notice-background-refresh"].waitForExistence(timeout: uiWait)
+                || app.staticTexts["Background App Refresh is off"].waitForExistence(timeout: uiWait),
+            visibleIdentifiers().joined(separator: ",")
+        )
+    }
+
     /// #43: the product app routes a cold-launch link through AppModel.
     func testProductShellColdLaunchLinkOpensTheDestinationError() {
         app.terminate()

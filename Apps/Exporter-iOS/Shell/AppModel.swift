@@ -128,11 +128,10 @@ final class AppModel {
         UITestFixtures.applyOpenURL(to: self)
         #endif
         await privacyGate.authenticateIfNeeded(enabled: privacyGateEnabled)
-        _ = try? await services.export.expireQueuesAndNotify()
-        _ = try? await services.export.recoverInterruptedExports()
-        try? await services.status.recordNotificationSuppressionIfNeeded(
-            forcedDenied: AppStatus.seededNotificationsDenied
-        )
+        await services.export.expireQueuesRecordingFailure(trigger: .launch)
+        await services.export.recoverInterruptedExportsRecordingFailure(trigger: .launch)
+        await recordNotificationSuppression()
+        await services.status.rescheduleAllOverdueNotifications()
         await refreshAdvisory()
         if disclosureAcknowledged, services.destinations.hasAutomaticExport(trigger: .appForeground) {
             await exportNow(trigger: .appForeground)
@@ -143,12 +142,25 @@ final class AppModel {
         AppLifecycleCoordinator.shared.recordWake(.appForeground)
         refreshStatus()
         await privacyGate.authenticateIfNeeded(enabled: privacyGateEnabled)
-        try? await services.status.recordNotificationSuppressionIfNeeded(
-            forcedDenied: AppStatus.seededNotificationsDenied
-        )
-        try? await AppLifecycleCoordinator.shared.startObserversIfEligible()
+        await recordNotificationSuppression()
+        await AppLifecycleCoordinator.shared.startObserversIfEligible(trigger: .appForeground)
+        await services.export.expireQueuesRecordingFailure(trigger: .appForeground)
+        await services.status.rescheduleAllOverdueNotifications()
         BackgroundTaskCoordinator.submit()
         await refreshAdvisory()
+    }
+
+    /// #62: the watchdog notices that notifications went off; failing to record that
+    /// is itself shown on Status.
+    private func recordNotificationSuppression() async {
+        do {
+            try await services.status.recordNotificationSuppressionIfNeeded(
+                forcedDenied: AppStatus.seededNotificationsDenied
+            )
+            AppStatus.launchFailures.resolve(.notificationCheck)
+        } catch {
+            await AppStatus.launchFailures.record(.notificationCheck, error: error, trigger: .appForeground)
+        }
     }
 
     func sceneLeftForeground() {

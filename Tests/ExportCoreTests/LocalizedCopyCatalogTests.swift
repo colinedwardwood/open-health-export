@@ -107,6 +107,17 @@ private func producedCopy() -> [LocalizedCopy] {
     }
     copy += [UnlockState.sourceBuild, .unlocked, .locked, .revoked].map(UnlockDecision.summary)
     copy += UserFacingFixAction.allCases.map { LocalizedCopy(verbatimKey: $0.label) }
+    for refresh in BackgroundRefreshAvailability.allCases {
+        for lowPower in [false, true] {
+            for issueClass in ["internalFault", "deviceLocked", "unknown"] {
+                let issues = LaunchStage.allCases.map { LaunchIssue(stage: $0, errorClass: issueClass, atEpoch: 1) }
+                let notices = StatusNotices.notices(
+                    backgroundRefresh: refresh, lowPowerMode: lowPower, submitFailure: "refresh (code 1)", issues: issues
+                )
+                copy += notices.flatMap { [$0.title, $0.detail] }
+            }
+        }
+    }
 
     let evidence = [
         UserFacingErrorEvidence(),

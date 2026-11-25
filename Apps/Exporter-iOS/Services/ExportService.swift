@@ -93,10 +93,14 @@ actor ObserverExportGate {
         defer { running = false }
         while let next = pending.first {
             pending.remove(next)
-            _ = try? await AppExport.service.runOnePageEachMetric(
-                metrics: [next],
-                trigger: .observerQuery
-            )
+            do {
+                _ = try await AppExport.service.runOnePageEachMetric(
+                    metrics: [next],
+                    trigger: .observerQuery
+                )
+            } catch {
+                await AppStatus.launchFailures.record(.observerExport, error: error, trigger: .observerQuery)
+            }
         }
     }
 }

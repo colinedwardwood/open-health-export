@@ -98,7 +98,7 @@ final class FilesSetupModel {
             // The person set this folder up just now; that is not a change to review.
             try? services.status.acknowledgeDestinationChanges()
             AppLifecycleCoordinator.shared.stopObservers()
-            try? await AppLifecycleCoordinator.shared.startObserversIfEligible()
+            await AppLifecycleCoordinator.shared.startObserversIfEligible()
         } catch let SetupError.testFailed(step) {
             checklist.finish(failedAt: step)
             error = UserFacingErrorObject.make(archetype: .unexpected, destinationLabel: folderName ?? "the folder")

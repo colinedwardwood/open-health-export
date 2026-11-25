@@ -122,6 +122,9 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
     public var state: DestinationDisplayState
     public var lastOutcome: String?
     public var lastSuccessEpoch: TimeInterval?
+    /// When this destination was switched on. The overdue alarm counts from the later of
+    /// this and the last success, so a destination that never succeeds still alarms (#63).
+    public var enabledAtEpoch: TimeInterval?
     public var lastConfirmedAckEpoch: TimeInterval?
     public var attribution: String?
     public var attributionConfidence: String?
@@ -144,6 +147,7 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
         state: DestinationDisplayState? = nil,
         lastOutcome: String? = nil,
         lastSuccessEpoch: TimeInterval? = nil,
+        enabledAtEpoch: TimeInterval? = nil,
         lastConfirmedAckEpoch: TimeInterval? = nil,
         attribution: String? = nil,
         attributionConfidence: String? = nil,
@@ -167,6 +171,7 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
             : (state ?? Self.inferState(enabled: enabled, lastOutcome: lastOutcome))
         self.lastOutcome = lastOutcome
         self.lastSuccessEpoch = lastSuccessEpoch
+        self.enabledAtEpoch = enabledAtEpoch
         self.lastConfirmedAckEpoch = lastConfirmedAckEpoch
         self.attribution = attribution
         self.attributionConfidence = attributionConfidence
@@ -206,6 +211,7 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
         case state
         case lastOutcome
         case lastSuccessEpoch
+        case enabledAtEpoch
         case lastConfirmedAckEpoch
         case attribution
         case attributionConfidence
@@ -238,6 +244,7 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
                     ?? Self.inferState(enabled: enabled, lastOutcome: lastOutcome)
             )
         lastSuccessEpoch = try values.decodeIfPresent(TimeInterval.self, forKey: .lastSuccessEpoch)
+        enabledAtEpoch = try values.decodeIfPresent(TimeInterval.self, forKey: .enabledAtEpoch)
         lastConfirmedAckEpoch = try values.decodeIfPresent(
             TimeInterval.self,
             forKey: .lastConfirmedAckEpoch
@@ -263,13 +270,36 @@ public struct DestinationStatusSnapshot: Sendable, Equatable, Codable {
         writtenAtEpoch = try values.decode(TimeInterval.self, forKey: .writtenAtEpoch)
     }
 
+    /// Where the overdue clock starts: the later of switching on and the last success.
+    public var alarmAnchorEpoch: TimeInterval? {
+        switch (enabledAtEpoch, lastSuccessEpoch) {
+        case let (enabledAt?, success?): max(enabledAt, success)
+        case let (enabledAt?, nil): enabledAt
+        case let (nil, success?): success
+        case (nil, nil): nil
+        }
+    }
+
+    /// The window after the anchor in which silence becomes overdue. A destination that has
+    /// never run has no measured threshold yet, so it gets the default floor rather than
+    /// no alarm at all.
+    public var effectiveOverdueThresholdSeconds: TimeInterval? {
+        if let overdueThresholdSeconds { return overdueThresholdSeconds }
+        guard lastSuccessEpoch == nil, enabledAtEpoch != nil else { return nil }
+        return FreshnessTarget.cadenceThresholds(
+            cadenceSeconds: FreshnessTarget.defaultCadenceSeconds
+        ).overdue
+    }
+
     public func state(at epoch: TimeInterval) -> DestinationDisplayState {
         guard exportRole == .designated else { return .manualOnly }
-        guard enabled, let lastSuccessEpoch else { return state }
-        if let overdueThresholdSeconds,
-           epoch >= lastSuccessEpoch + overdueThresholdSeconds {
+        guard enabled else { return state }
+        if let anchor = alarmAnchorEpoch,
+           let threshold = effectiveOverdueThresholdSeconds,
+           epoch >= anchor + threshold {
             return .overdue
         }
+        guard let lastSuccessEpoch else { return state }
         if let staleThresholdSeconds,
            epoch >= lastSuccessEpoch + staleThresholdSeconds {
             switch state {
@@ -344,11 +374,15 @@ public enum DestinationSnapshotFile {
                 destinationLabel: destinationLabel,
                 enabled: true,
                 state: .noExportsYet,
+                enabledAtEpoch: writtenAtEpoch,
                 unacknowledgedSecurityEventCount: count,
                 writtenAtEpoch: writtenAtEpoch
             )
         }
         if let enabled {
+            if enabled, !snapshot.enabled || snapshot.enabledAtEpoch == nil {
+                snapshot.enabledAtEpoch = writtenAtEpoch
+            }
             snapshot.enabled = enabled
         }
         if let state {
@@ -387,15 +421,16 @@ public enum DestinationTimelinePlanner {
     ) -> [DestinationTimelineEntry] {
         var dates: Set<TimeInterval> = [nowEpoch]
         for snapshot in snapshots {
-            guard let lastSuccess = snapshot.lastSuccessEpoch else { continue }
-            if let stale = snapshot.staleThresholdSeconds {
+            if let lastSuccess = snapshot.lastSuccessEpoch,
+               let stale = snapshot.staleThresholdSeconds {
                 let staleAt = lastSuccess + stale
                 if staleAt > nowEpoch {
                     dates.insert(staleAt)
                 }
             }
-            if let overdue = snapshot.overdueThresholdSeconds {
-                let overdueAt = lastSuccess + overdue
+            if let anchor = snapshot.alarmAnchorEpoch,
+               let overdue = snapshot.effectiveOverdueThresholdSeconds {
+                let overdueAt = anchor + overdue
                 for date in [overdueAt, overdueAt + 24 * 60 * 60, overdueAt + 48 * 60 * 60]
                     where date > nowEpoch {
                     dates.insert(date)

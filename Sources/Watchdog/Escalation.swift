@@ -34,16 +34,19 @@ public enum EscalationCopy {
 }
 
 public enum OverdueNotificationSchedule {
+    /// #63: `max(enabledAt, lastSuccess) + threshold`, so a destination that never
+    /// succeeded alarms too. Manual-only destinations never alarm: nothing runs on a clock.
     public static func fireEpoch(
         snapshot: DestinationStatusSnapshot
     ) -> TimeInterval? {
         guard snapshot.enabled,
-              let lastSuccess = snapshot.lastSuccessEpoch,
-              let threshold = snapshot.overdueThresholdSeconds
+              snapshot.exportRole == .designated,
+              let anchor = snapshot.alarmAnchorEpoch,
+              let threshold = snapshot.effectiveOverdueThresholdSeconds
         else {
             return nil
         }
-        return lastSuccess + threshold
+        return anchor + threshold
     }
 }
 

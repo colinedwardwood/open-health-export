@@ -176,8 +176,9 @@ extension ExportService {
                     destinationID: destination.id,
                     destinationLabel: destinationLabel(destination.id)
                 )
-                if ExportPlan.succeeded(own),
-                   let snapshotURL = destination.snapshotURL {
+                // #63: every run re-arms the alarm, failed or not. It counts from the
+                // later of enabling and the last success, so a failing destination alarms.
+                if let snapshotURL = destination.snapshotURL {
                     await rescheduleOverdueNotification(snapshotURL: snapshotURL)
                 }
             }
@@ -356,9 +357,7 @@ extension ExportService {
                 destinationID: destination.id,
                 destinationLabel: destinationLabel(destination.id)
             )
-            if ExportPlan.succeeded(kind),
-               let snapshotURL = destination.snapshotURL
-            {
+            if let snapshotURL = destination.snapshotURL {
                 await rescheduleOverdueNotification(snapshotURL: snapshotURL)
             }
         }

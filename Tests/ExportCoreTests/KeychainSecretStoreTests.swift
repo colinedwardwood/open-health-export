@@ -32,7 +32,30 @@ import Testing
     #expect(KeychainSecretStore.mapAddStatus(errSecMissingEntitlement) == .unavailable)
     #expect(KeychainSecretStore.mapAddStatus(errSecDuplicateItem) == .failed(errSecDuplicateItem))
     #expect(KeychainSecretStore.map(errSecItemNotFound) == .notFound)
-    #expect(KeychainSecretStore.map(errSecInteractionNotAllowed) == .unavailable)
+    #expect(KeychainSecretStore.map(errSecInteractionNotAllowed) == .locked)
+}
+
+@Test func r33KeychainMapsEveryStatusDistinctly() {
+    let expected: [(OSStatus, SecretStoreError)] = [
+        (errSecItemNotFound, .notFound),
+        (errSecInteractionNotAllowed, .locked),
+        (errSecMissingEntitlement, .unavailable),
+        (errSecNotAvailable, .unavailable),
+        (errSecAuthFailed, .failed(errSecAuthFailed)),
+        (errSecDuplicateItem, .failed(errSecDuplicateItem)),
+        (errSecParam, .failed(errSecParam)),
+    ]
+    for (status, error) in expected {
+        #expect(KeychainSecretStore.map(status) == error)
+    }
+}
+
+@Test func lockedKeychainIsADeferralNotAMissingCredential() {
+    #expect(SecretStoreError.locked != .notFound)
+    #expect(SecretStoreError.locked.errorDescription?.contains("unlocked") == true)
+    #expect(SecretStoreError.unavailable.errorDescription != SecretStoreError.locked.errorDescription)
+    #expect(SecretStoreError.failed(-1).errorDescription?.contains("-1") == true)
+    #expect(SecretStoreError.notFound.errorDescription == SecretStoreError.emptyHandle.errorDescription)
 }
 
 @Test func r33KeychainStoreEitherRoundsTripOrNamesTheEntitlementGap() async throws {

@@ -48,21 +48,35 @@ final class AppLifecycleCoordinator {
         return url
     }
 
+    /// #62: a wake that cannot be logged is journalled and shown on Status, never dropped.
     func recordWake(_ trigger: RunTrigger) {
-        guard let ledger = try? AppHealth.service.wakeLedger() else { return }
-        try? ledger.append(
-            WakeRecord(trigger: trigger, atEpoch: Date().timeIntervalSince1970)
-        )
+        do {
+            try AppHealth.service.wakeLedger().append(
+                WakeRecord(trigger: trigger, atEpoch: Date().timeIntervalSince1970)
+            )
+            AppStatus.launchFailures.resolve(.wakeLedger)
+        } catch {
+            Task { await AppStatus.launchFailures.record(.wakeLedger, error: error, trigger: trigger) }
+        }
     }
 
-    func startObserversIfEligible() async throws {
+    /// Registers the Health observers when allowed. Failures are recorded against
+    /// `trigger` and surface on Status; they never stop the caller (#62).
+    func startObserversIfEligible(trigger: RunTrigger = .appForeground) async {
         guard HealthObserverPolicy.mayObserve(
             healthAvailable: HealthKitAvailability.isAvailable(),
             disclosureAcknowledged: UserDefaults.standard.bool(
                 forKey: SettingKey.disclosureAcknowledged.rawValue
             )
         ) else { return }
-        let revoked = try await AppHealth.service.observeAuthorizationChanges()
+        let revoked: Bool
+        do {
+            revoked = try await AppHealth.service.observeAuthorizationChanges()
+            AppStatus.launchFailures.resolve(.authorizationObservation)
+        } catch {
+            await AppStatus.launchFailures.record(.authorizationObservation, error: error, trigger: trigger)
+            return
+        }
         switch HealthObserverPolicy.action(
             revoked: revoked,
             automaticExport: AppDestinations.repository.hasAutomaticExport(trigger: .observerQuery),
@@ -73,8 +87,14 @@ final class AppLifecycleCoordinator {
         case .keep:
             return
         case .start:
-            healthObservers = try await AppHealth.service.startObservers {
-                await ObserverExportGate.shared.enqueue($0)
+            do {
+                healthObservers = try await AppHealth.service.startObservers {
+                    await ObserverExportGate.shared.enqueue($0)
+                }
+                AppStatus.launchFailures.resolve(.observerStart)
+            } catch {
+                await AppStatus.launchFailures.record(.observerStart, error: error, trigger: trigger)
+                return
             }
             BackgroundTaskCoordinator.submit()
         }
@@ -101,8 +121,8 @@ final class ExporterAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifica
         ContinuedBackfillCoordinator.register()
         BackgroundTaskCoordinator.submit()
         Task {
-            try? await AppLifecycleCoordinator.shared.startObserversIfEligible()
-            _ = try? await AppExport.service.recoverInterruptedExports()
+            await AppLifecycleCoordinator.shared.startObserversIfEligible(trigger: .launch)
+            await AppExport.service.recoverInterruptedExportsRecordingFailure(trigger: .launch)
         }
         return true
     }
@@ -239,11 +259,9 @@ enum BackgroundTaskCoordinator {
         }
     }
 
-    static func submitFailureSummary() -> String? {
-        guard let failures = UserDefaults.standard.string(forKey: submitFailureKey) else {
-            return nil
-        }
-        return "iOS refused to schedule background exports: \(failures). Exports still run when the app opens."
+    /// The requests iOS refused, for the Status row (#62).
+    static func submitFailures() -> String? {
+        UserDefaults.standard.string(forKey: submitFailureKey)
     }
 
     private static func handle(_ task: BGTask, trigger: RunTrigger) {
@@ -257,16 +275,26 @@ enum BackgroundTaskCoordinator {
                     submit()
                     return
                 }
-                // #28: observer registration is best-effort on a wake. Failing it must
-                // not skip the export pass the wake exists for.
-                try? await AppLifecycleCoordinator.shared.startObserversIfEligible()
+                // #28: observer registration is best-effort on a wake. Failing it is
+                // recorded (#62) but must not skip the export pass the wake exists for.
+                await AppLifecycleCoordinator.shared.startObserversIfEligible(trigger: trigger)
+                // #63: a queue past its seven days is cleared on every wake, not only
+                // when someone opens the app.
+                await AppExport.service.expireQueuesRecordingFailure(trigger: trigger)
                 if AppDestinations.repository.hasAutomaticExport(trigger: trigger) {
                     _ = try await AppExport.service.runOnePageEachMetric(trigger: trigger)
                 }
                 task.setTaskCompleted(success: true)
             } catch {
-                await AppStatus.notifyRunFailure(trigger: trigger)
-                task.setTaskCompleted(success: false)
+                // A keychain sealed before first unlock is a deferral, not a failure:
+                // retry on the next wake instead of telling iOS this one failed.
+                if LaunchFailureRecorder.isDeferral(error) {
+                    await AppStatus.launchFailures.record(.observerExport, error: error, trigger: trigger)
+                    task.setTaskCompleted(success: true)
+                } else {
+                    await AppStatus.notifyRunFailure(trigger: trigger)
+                    task.setTaskCompleted(success: false)
+                }
             }
             submit()
         }

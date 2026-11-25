@@ -2,6 +2,114 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
+    "%@ failed. %@": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ failed. %@"
+          }
+        }
+      }
+    },
+    "A setting or profile on this device stops the app refreshing in the background. Exports only run when you open the app.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A setting or profile on this device stops the app refreshing in the background. Exports only run when you open the app."
+          }
+        }
+      }
+    },
+    "Background App Refresh is off": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background App Refresh is off"
+          }
+        }
+      }
+    },
+    "Background App Refresh is restricted": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background App Refresh is restricted"
+          }
+        }
+      }
+    },
+    "Background exports are not scheduled": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background exports are not scheduled"
+          }
+        }
+      }
+    },
+    "Checking Health access": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking Health access"
+          }
+        }
+      }
+    },
+    "Checking notification permission": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking notification permission"
+          }
+        }
+      }
+    },
+    "Clearing old queued exports": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clearing old queued exports"
+          }
+        }
+      }
+    },
+    "Exporting new Health data": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exporting new Health data"
+          }
+        }
+      }
+    },
     "Exports from this device": {
       "extractionState": "manual",
       "localizations": {
@@ -20,6 +128,102 @@
           "stringUnit": {
             "state": "translated",
             "value": "Automatic and manual"
+          }
+        }
+      }
+    },
+    "Exports only run when you open the app. Turn it on in Settings, under General, Background App Refresh.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exports only run when you open the app. Turn it on in Settings, under General, Background App Refresh."
+          }
+        }
+      }
+    },
+    "iOS pauses background exports while Low Power Mode is on. They resume when it turns off.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iOS pauses background exports while Low Power Mode is on. They resume when it turns off."
+          }
+        }
+      }
+    },
+    "iOS refused to schedule them: %@. Exports still run when the app opens.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iOS refused to schedule them: %@. Exports still run when the app opens."
+          }
+        }
+      }
+    },
+    "Low Power Mode is on": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Low Power Mode is on"
+          }
+        }
+      }
+    },
+    "Open History for the recorded error.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open History for the recorded error."
+          }
+        }
+      }
+    },
+    "Part of the app failed to run": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Part of the app failed to run"
+          }
+        }
+      }
+    },
+    "Recording background wakes": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recording background wakes"
+          }
+        }
+      }
+    },
+    "Recovering an interrupted export": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recovering an interrupted export"
           }
         }
       }
@@ -75,6 +279,18 @@
           "stringUnit": {
             "state": "translated",
             "value": "Home Assistant base URL"
+          }
+        }
+      }
+    },
+    "Watching for new Health data": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Watching for new Health data"
           }
         }
       }

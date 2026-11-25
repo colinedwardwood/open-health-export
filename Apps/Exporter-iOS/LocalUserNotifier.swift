@@ -93,7 +93,11 @@ final class LocalUserNotifier: UserNotifier, Sendable {
         let center = UNUserNotificationCenter.current()
         let identifier = "exportOverdue.\(snapshot.destinationID)"
         center.removePendingNotificationRequests(withIdentifiers: [identifier])
-        guard let fireEpoch = OverdueNotificationSchedule.fireEpoch(snapshot: snapshot) else {
+        // An alarm already past is the in-app banner's to show. Re-posting it on every
+        // run of a destination that stays silent would be a notification per wake.
+        guard let fireEpoch = OverdueNotificationSchedule.fireEpoch(snapshot: snapshot),
+              fireEpoch > now.timeIntervalSince1970
+        else {
             return .notRequired
         }
         let settings = await center.notificationSettings()

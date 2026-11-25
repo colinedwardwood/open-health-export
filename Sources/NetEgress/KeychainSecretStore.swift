@@ -32,14 +32,17 @@ public struct KeychainSecretStore: SecretStore, Sendable {
         map(status)
     }
 
-    /// #62: only a genuinely absent item is `.notFound`. A missing entitlement, a
-    /// locked device or an unavailable keychain is `.unavailable`, and anything else
+    /// #62: only a genuinely absent item is `.notFound`. A locked
+    /// device is `.locked`, which callers defer and retry. A missing entitlement or an
+    /// unavailable keychain is `.unavailable`, and anything else
     /// keeps its status rather than reading as "no credential saved".
     static func map(_ status: OSStatus) -> SecretStoreError {
         switch status {
         case errSecItemNotFound:
             .notFound
-        case errSecMissingEntitlement, errSecInteractionNotAllowed, errSecNotAvailable:
+        case errSecInteractionNotAllowed:
+            .locked
+        case errSecMissingEntitlement, errSecNotAvailable:
             .unavailable
         default:
             .failed(status)

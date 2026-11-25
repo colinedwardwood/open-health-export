@@ -154,7 +154,7 @@ struct DataScreen: View {
             try await services.destinations.applyScope(scope, previousMetrics: baseline)
             try? await services.health.requestReadAccess(for: scope)
             AppLifecycleCoordinator.shared.stopObservers()
-            try? await AppLifecycleCoordinator.shared.startObserversIfEligible()
+            await AppLifecycleCoordinator.shared.startObserversIfEligible()
             baseline = selected
             baselineStart = start
             model.refreshStatus()
