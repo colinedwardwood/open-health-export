@@ -1098,6 +1098,13 @@ final class ExporterUITests: XCTestCase {
         if chrome.navigationBarFrames.contains(where: { frame.intersects($0) }) {
             return "unhostedDynamicTypeLabel"
         }
+        // The History list's retention footer is a UIKit section footer. With a short
+        // list it sits on screen and is reported as partially unsupported at the larger
+        // sizes; with a long one it is below the fold and never audited, so whether a
+        // shard sees it depends on how much history earlier cases left behind.
+        if element.identifier.isEmpty, element.label == "Keeping 90 days or 1,000 runs, whichever is reached first." {
+            return "unhostedDynamicTypeLabel"
+        }
         // SwiftUI DatePicker is UIKit chrome that ignores the accessibility
         // content-size category. Hosted iPad 5 attributed that to the picker
         // itself or to its inner label (empty identifier, doubled title).
