@@ -39,6 +39,14 @@ deletion with the 600-line and `@State` lint and the release-artifact string sca
 folder warning (#59). Localisation (#54, #192) moved `Sources/` copy to catalog keys
 (ADR-0006); the data-flow explainer and scheduling copy are not migrated yet.
 
+After that: #194 (category day reader for Mindful minutes and Sleep, Home Assistant discovery
+names, the flaky ledger test, Data save errors, more copy as catalog keys) and #196
+(launch and background failures shown on Status, overdue-alarm blind spots, backfill when
+a scope widens, DEBUG-gated test hooks and release scan). Open gaps are recorded on #61,
+#63, #69 and #74; #60 (Time Sensitive notices) needs an owner decision on permission
+prompts and the entitlement. Launch docs (corrected claims, runbooks, changelog draft) are
+in PR #195 awaiting owner review.
+
 No product UI remains for OTLP, the anchor-hold banner, diagnostics, backfill or the
 Live Activity trigger; their backend code is still there. Decide whether to build
 screens for them or remove the code.
@@ -49,7 +57,7 @@ for hours and get cancelled (rerun with `gh run rerun <id> --failed`). Text-only
 
 ## Next engineering work, in order
 
-1. Follow-ups: #168 (category daily totals and reconcile), #177 (Home Assistant discovery names), #178 (flaky ledger test), #172 (audit fold suppression), Remove for network destinations, MQTT client certificates, and the Data screen's `save` swallowing errors silently.
+1. Follow-ups: #172 (audit fold suppression), #60, #74, the gaps on #61/#63/#69, Remove for network destinations, MQTT client certificates, and wiring `HADiscovery.encodeDeviceConfig` (it needs `ProductName.display`).
 2. Finish #54: migrate the remaining plain-`String` copy and extend the pseudo-locale tests to every screen.
 3. **#67** Host the signed advisory feed at `advisories.cewdesign.com` (owner picks GitHub Pages or Cloudflare Pages).
 4. **#55** Manual VoiceOver and Voice Control pass (needs a person), and **#73** real-receiver end-to-end tests.
