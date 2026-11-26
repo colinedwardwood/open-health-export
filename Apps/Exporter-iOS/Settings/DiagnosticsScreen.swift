@@ -29,7 +29,7 @@ struct DiagnosticsScreen: View {
                     }
                     .accessibilityIdentifier("diagnostics-share")
                 } footer: {
-                    SectionFooter("The report holds no health values, hostnames, credentials or tokens. Network activity shows counts only.")
+                    SectionFooter("Share this with support along with what you expected to happen. It holds no health values, hostnames, credentials or tokens, and network activity shows counts only. It is not a crash log: if the app crashed, see the crash-log guide in the support docs.")
                 }
             } else if failed {
                 Section {

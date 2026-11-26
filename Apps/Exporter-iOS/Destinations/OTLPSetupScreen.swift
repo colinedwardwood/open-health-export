@@ -14,7 +14,7 @@ struct OTLPSetupScreen: View {
         List {
             Section {
                 Label {
-                    Text("This sends the app's run outcomes to your collector: when exports ran, how they ended and how long they took. It never sends health values.")
+                    Text("This destination only records your settings for now. Nothing is sent to your collector yet. When sending is added, it will carry the app's run outcomes (when exports ran, how they ended and how long they took) and never health values.")
                 } icon: {
                     Image(systemName: "waveform.path.ecg").accessibilityHidden(true)
                 }
@@ -50,7 +50,7 @@ struct OTLPSetupScreen: View {
             }
             if case let .confirm(preview, _) = setup.stage {
                 Section {
-                    Text("The collector accepted the test. Here is what a real export carries.")
+                    Text("The collector accepted the test. Here is what an export would carry once sending is added.")
                     DisclosureGroup("What an export sends") {
                         Text(preview)
                             .font(.footnote.monospaced())

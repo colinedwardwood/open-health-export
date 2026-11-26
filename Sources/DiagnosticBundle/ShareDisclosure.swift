@@ -7,7 +7,8 @@
 /// share button.
 public enum ShareDisclosure {
     public static let copy =
-        "Sharing copies this bundle to whichever app you choose. Once it leaves, this "
-            + "app's on-device protection no longer applies to that copy. The bundle is "
-            + "redacted and holds no health values, but it does name your destinations."
+        "Sharing copies this report to whichever app you choose. Once it leaves, this "
+            + "app's on-device protection no longer applies to that copy. The report is "
+            + "redacted: it holds no health values, hostnames, credentials or tokens, but "
+            + "it does show your app, iOS and device versions and what your exports did."
 }

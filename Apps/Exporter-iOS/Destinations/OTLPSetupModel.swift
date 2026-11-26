@@ -11,7 +11,7 @@ import Observation
 #if !OHE_OBS25_SIZE_BASELINE
 /// Add your own OpenTelemetry collector (OTLP over HTTP). It receives the app's run
 /// outcomes, never health values. The address is said back as it is typed, the test
-/// sends one empty trace, the preview shows what a real export carries, and nothing is
+/// sends one empty trace, the preview shows what an export would carry, and nothing is
 /// saved until the person confirms it. The token goes to the Keychain.
 @MainActor
 @Observable

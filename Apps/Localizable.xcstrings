@@ -6592,17 +6592,6 @@
         }
       }
     },
-    "The report holds no health values, hostnames, credentials or tokens. Network activity shows counts only.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The report holds no health values, hostnames, credentials or tokens. Network activity shows counts only."
-          }
-        }
-      }
-    },
     "Diagnostics couldn't be read.": {
       "extractionState": "manual",
       "localizations": {
@@ -6610,17 +6599,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diagnostics couldn't be read."
-          }
-        }
-      }
-    },
-    "Sharing copies this bundle to whichever app you choose. Once it leaves, this app's on-device protection no longer applies to that copy. The bundle is redacted and holds no health values, but it does name your destinations.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sharing copies this bundle to whichever app you choose. Once it leaves, this app's on-device protection no longer applies to that copy. The bundle is redacted and holds no health values, but it does name your destinations."
           }
         }
       }
@@ -6643,17 +6621,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "An OTLP/HTTP address you control, and a token if it needs one. Run outcomes only, never health values."
-          }
-        }
-      }
-    },
-    "This sends the app's run outcomes to your collector: when exports ran, how they ended and how long they took. It never sends health values.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This sends the app's run outcomes to your collector: when exports ran, how they ended and how long they took. It never sends health values."
           }
         }
       }
@@ -6687,17 +6654,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sent as a bearer token. It's kept in the keychain and never shown again."
-          }
-        }
-      }
-    },
-    "The collector accepted the test. Here is what a real export carries.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The collector accepted the test. Here is what a real export carries."
           }
         }
       }
@@ -6753,6 +6709,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "Token (optional)"
+          }
+        }
+      }
+    },
+    "Sharing copies this report to whichever app you choose. Once it leaves, this app's on-device protection no longer applies to that copy. The report is redacted: it holds no health values, hostnames, credentials or tokens, but it does show your app, iOS and device versions and what your exports did.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sharing copies this report to whichever app you choose. Once it leaves, this app's on-device protection no longer applies to that copy. The report is redacted: it holds no health values, hostnames, credentials or tokens, but it does show your app, iOS and device versions and what your exports did."
+          }
+        }
+      }
+    },
+    "Share this with support along with what you expected to happen. It holds no health values, hostnames, credentials or tokens, and network activity shows counts only. It is not a crash log: if the app crashed, see the crash-log guide in the support docs.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share this with support along with what you expected to happen. It holds no health values, hostnames, credentials or tokens, and network activity shows counts only. It is not a crash log: if the app crashed, see the crash-log guide in the support docs."
+          }
+        }
+      }
+    },
+    "This destination only records your settings for now. Nothing is sent to your collector yet. When sending is added, it will carry the app's run outcomes (when exports ran, how they ended and how long they took) and never health values.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This destination only records your settings for now. Nothing is sent to your collector yet. When sending is added, it will carry the app's run outcomes (when exports ran, how they ended and how long they took) and never health values."
+          }
+        }
+      }
+    },
+    "The collector accepted the test. Here is what an export would carry once sending is added.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The collector accepted the test. Here is what an export would carry once sending is added."
           }
         }
       }
