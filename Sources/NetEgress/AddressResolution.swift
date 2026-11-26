@@ -52,7 +52,7 @@ public struct SystemAddressResolver: AddressResolver {
                 NI_NUMERICHOST
             )
             if result == 0 {
-                let address = String(cString: buffer)
+                let address = String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
                     .split(separator: "%", maxSplits: 1)
                     .first
                     .map(String.init) ?? ""

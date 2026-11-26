@@ -176,6 +176,15 @@ public struct StatusService: Sendable {
         await rescheduleOverdueNotification(for: snapshot)
     }
 
+    /// #63: re-arms every destination's reminder at launch and foreground. A destination
+    /// enabled but never run has no run to arm it, so this is what puts its alarm at
+    /// `enabledAt + threshold`.
+    public func rescheduleAllOverdueNotifications() async {
+        for snapshot in snapshots.readAll() {
+            await notifier.rescheduleOverdue(for: snapshot)
+        }
+    }
+
     public func rescheduleOverdueNotification(for snapshot: DestinationStatusSnapshot) async {
         await notifier.rescheduleOverdue(for: snapshot)
     }

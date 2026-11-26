@@ -154,7 +154,7 @@ struct DataScreen: View {
             try await services.destinations.applyScope(scope, previousMetrics: baseline)
             try? await services.health.requestReadAccess(for: scope)
             AppLifecycleCoordinator.shared.stopObservers()
-            try? await AppLifecycleCoordinator.shared.startObserversIfEligible()
+            await AppLifecycleCoordinator.shared.startObserversIfEligible()
             baseline = selected
             baselineStart = start
             model.refreshStatus()
@@ -167,10 +167,10 @@ struct DataScreen: View {
 
 private struct TypeToggle: View {
     let row: DataTypeRow
-    let set: (Bool) -> Void
+    let set: @MainActor (Bool) -> Void
 
     var body: some View {
-        Toggle(isOn: Binding(get: { row.selected }, set: set)) {
+        Toggle(isOn: Binding(get: { row.selected }, set: { set($0) })) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.name)
                 if let unit = row.unit {

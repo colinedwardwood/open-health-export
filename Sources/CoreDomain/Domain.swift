@@ -462,6 +462,9 @@ public struct RunTally: Sendable, Equatable {
     public var failed: Int
     public var terminalError: ErrorClass
     public var nothingDue: Bool
+    /// #63: a Health read actually ran and came back empty. `nothingDue` without it means
+    /// nothing was owed or nothing could be read, which proves nothing about freshness.
+    public var readExecuted: Bool
     public var ackEvidenceStatusOnly: Bool
     public var partialCause: String?
 
@@ -473,6 +476,7 @@ public struct RunTally: Sendable, Equatable {
         failed: Int = 0,
         terminalError: ErrorClass = .none,
         nothingDue: Bool = false,
+        readExecuted: Bool = false,
         ackEvidenceStatusOnly: Bool = false,
         partialCause: String? = nil
     ) {
@@ -483,6 +487,7 @@ public struct RunTally: Sendable, Equatable {
         self.failed = failed
         self.terminalError = terminalError
         self.nothingDue = nothingDue
+        self.readExecuted = readExecuted
         self.ackEvidenceStatusOnly = ackEvidenceStatusOnly
         self.partialCause = partialCause
     }
@@ -511,6 +516,15 @@ public struct RunOutcome: Sendable, Equatable, CustomStringConvertible {
     public let kind: Kind
     public let partialCause: String?
     public let ackEvidence: AckEvidence
+    /// #63: whether this outcome proves the pipeline works. `successNothingDue` only does
+    /// when a read ran; it never counts as a success for the overdue alarm otherwise.
+    public let readExecuted: Bool
+
+    /// Success that should push the overdue alarm back: delivered data, or an empty
+    /// answer from a read that really ran.
+    public var advancesFreshness: Bool {
+        kind == .success || (kind == .successNothingDue && readExecuted)
+    }
 
     public enum AckEvidence: String, Sendable, Equatable {
         case none
@@ -518,10 +532,16 @@ public struct RunOutcome: Sendable, Equatable, CustomStringConvertible {
         case receiptFull
     }
 
-    init(kind: Kind, partialCause: String? = nil, ackEvidence: AckEvidence = .none) {
+    init(
+        kind: Kind,
+        partialCause: String? = nil,
+        ackEvidence: AckEvidence = .none,
+        readExecuted: Bool = false
+    ) {
         self.kind = kind
         self.partialCause = partialCause
         self.ackEvidence = ackEvidence
+        self.readExecuted = readExecuted
     }
 
     public var description: String { kind.rawValue }
@@ -557,7 +577,7 @@ public struct RunOutcome: Sendable, Equatable, CustomStringConvertible {
             return RunOutcome(kind: .failed, partialCause: tally.partialCause)
         }
         if tally.nothingDue, tally.read == 0 {
-            return RunOutcome(kind: .successNothingDue)
+            return RunOutcome(kind: .successNothingDue, readExecuted: tally.readExecuted)
         }
         if tally.acked < tally.read {
             if tally.unconfirmed > 0, tally.acked == 0, tally.failed == 0 {

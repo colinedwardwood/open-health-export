@@ -128,7 +128,7 @@ struct HealthService: Sendable {
         let registration = try await coordinator.start(
             metrics: metrics
         ) { metric in
-            try? await observeAuthorizationChanges()
+            _ = try? await observeAuthorizationChanges()
             await onWake(metric)
         }
         failureLog.record(registration.failures)

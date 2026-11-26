@@ -93,10 +93,12 @@ actor ObserverExportGate {
         defer { running = false }
         while let next = pending.first {
             pending.remove(next)
-            _ = try? await AppExport.service.runOnePageEachMetric(
-                metrics: [next],
-                trigger: .observerQuery
-            )
+            await AppStatus.launchFailures.run(.observerExport, trigger: .observerQuery) {
+                try await AppExport.service.runOnePageEachMetric(
+                    metrics: [next],
+                    trigger: .observerQuery
+                )
+            }
         }
     }
 }
@@ -132,7 +134,7 @@ struct ExportService: Sendable {
     }
 
     func withThermalCompression<T>(
-        _ body: () async throws -> T
+        _ body: nonisolated(nonsending) () async throws -> T
     ) async rethrows -> T {
         try await Gzip.$level.withValue(gzipLevel(), operation: body)
     }

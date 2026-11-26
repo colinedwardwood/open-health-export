@@ -258,6 +258,12 @@ public enum ExportPlan {
         gaps.contains { !before.contains($0.batchID) && isQueueEviction($0) }
     }
 
+    /// #63: the expiry notice names the destinations whose queue it cleared, by their
+    /// own labels, rather than a generic "configured destinations".
+    public static func expiryNoticeLabel(_ labels: [String]) -> String {
+        labels.isEmpty ? "Configured destinations" : labels.joined(separator: ", ")
+    }
+
     /// A stop or purge drops what every sink was owed, so the ledger names them all.
     public static func owedDestinationLabel(_ destinationIDs: [String]) -> String {
         destinationIDs.isEmpty ? "no enabled destination" : destinationIDs.joined(separator: ",")

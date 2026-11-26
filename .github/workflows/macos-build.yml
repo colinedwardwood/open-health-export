@@ -243,6 +243,8 @@ jobs:
             SYMROOT="$RUNNER_TEMP/ohe-release-ios" \
             OBJROOT="$RUNNER_TEMP/ohe-release-ios-obj" \
             CODE_SIGNING_ALLOWED=NO \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            GCC_TREAT_WARNINGS_AS_ERRORS=YES \
             build
           xcodebuild \
             -project OpenHealthExporter.xcodeproj \
@@ -252,7 +254,11 @@ jobs:
             SYMROOT="$RUNNER_TEMP/ohe-release-mac" \
             OBJROOT="$RUNNER_TEMP/ohe-release-mac-obj" \
             CODE_SIGNING_ALLOWED=NO \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            GCC_TREAT_WARNINGS_AS_ERRORS=YES \
             build
+      - name: The release scan fails when a hook or seam string is injected
+        run: scripts/test-scan-release-artifacts.sh
       - name: Release apps omit fault seams and health-data canaries
         run: |
           scripts/scan-release-artifacts.sh \

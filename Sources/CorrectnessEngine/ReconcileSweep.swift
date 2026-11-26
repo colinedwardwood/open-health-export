@@ -278,7 +278,7 @@ public struct ReconcileSweep: Sendable {
             forcedDays: includeRaw ? [] : Set(days)
         )
         if !page.hasRecords, aggregates.isEmpty {
-            let tally = RunTally(nothingDue: true)
+            let tally = RunTally(nothingDue: true, readExecuted: true)
             let outcome = RunOutcome.derive(from: tally)
             try await record(outcome: outcome, tally: tally, receipt: nil)
             return outcome

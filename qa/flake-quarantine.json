@@ -4,5 +4,7 @@
   "issueTemplate": ".github/ISSUE_TEMPLATE/flake-quarantine.yml",
   "checker": "scripts/quarantine-check.py",
   "issueURLPrefix": "https://github.com/colinedwardwood/open-health-export/issues/",
-  "expiryMarker": "expires:"
+  "expiryMarker": "expires:",
+  "quarantinedUITests": [],
+  "quarantinedUITestsNote": "UI cases whose first attempt may fail without failing the job (#74). Each needs a flake-quarantine issue; scripts/ui-first-attempt-failures.py reads this."
 }

@@ -215,6 +215,54 @@ struct StateStoreDestinationScopes: DestinationScopeStorage {
     }
 }
 
+/// #61: history a widened scope owes, kept as one small file beside the state store.
+/// It holds type identifiers and dates only.
+final class FilePendingBackfill: PendingBackfillStorage, @unchecked Sendable {
+    private let root: @Sendable () throws -> URL
+    private let lock = NSLock()
+    /// Status asks on every render, so the file is decoded once and again after a write.
+    private var cached: [ScopeWidening]?
+
+    init(root: @escaping @Sendable () throws -> URL) {
+        self.root = root
+    }
+
+    private func url() throws -> URL {
+        try root().appendingPathComponent("pending-backfill.json")
+    }
+
+    func pending() -> [ScopeWidening] {
+        lock.withLock {
+            if let cached { return cached }
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .millisecondsSince1970
+            let loaded = (try? url()).flatMap { try? Data(contentsOf: $0) }
+                .flatMap { try? decoder.decode([ScopeWidening].self, from: $0) } ?? []
+            cached = loaded
+            return loaded
+        }
+    }
+
+    func record(_ widening: ScopeWidening) throws {
+        try write(ScopeWidening.recording(widening, in: pending()))
+    }
+
+    func clear(destinationIDs: [String]) throws {
+        let owed = pending()
+        let remaining = owed.filter { !destinationIDs.contains($0.destinationID) }
+        guard remaining.count != owed.count else { return }
+        try write(remaining)
+    }
+
+    private func write(_ owed: [ScopeWidening]) throws {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .millisecondsSince1970
+        encoder.outputFormatting = [.sortedKeys]
+        try FileWriteKit.writeAtomically(try encoder.encode(owed), to: url())
+        lock.withLock { cached = owed }
+    }
+}
+
 /// The picked archive folder as a security-scoped bookmark.
 struct BookmarkedExportFolder: LocalExportFolderStorage {
     let root: @Sendable () throws -> URL
@@ -299,6 +347,7 @@ enum AppDestinations {
         folder: folder,
         now: { Date() },
         // #68: automatic runs need the unlock; manual export never does.
-        unlockState: { PurchaseStore.cachedState() }
+        unlockState: { PurchaseStore.cachedState() },
+        pendingBackfill: FilePendingBackfill(root: root)
     )
 }

@@ -43,9 +43,19 @@ struct StatusScreen: View {
             lastSuccessEpoch: snapshots.compactMap(\.lastSuccessEpoch).max(),
             relative: relative
         )
+        // #62/#63: what stops or delays background exports, shown even when every
+        // destination looks fine.
+        let notices = model.statusNotices
         return List {
             Section {
                 SummaryHeader(summary: summary)
+            }
+            if !notices.isEmpty {
+                Section {
+                    ForEach(notices) { notice in
+                        StatusNoticeRow(notice: notice)
+                    }
+                }
             }
             if !rows.isEmpty {
                 Section {
@@ -57,6 +67,14 @@ struct StatusScreen: View {
                     }
                 } header: {
                     SectionTitle("Destinations")
+                }
+            }
+            if let owed = ScopeWidening.statusCopy(AppDestinations.repository.pendingBackfills()) {
+                Section {
+                    NavigationLink(value: AppRoute.settings) {
+                        Text(copy: owed)
+                    }
+                    .accessibilityIdentifier("status-backfill-owed")
                 }
             }
             Section {
@@ -104,6 +122,24 @@ private struct SummaryHeader: View {
             }
         }
         .padding(.vertical, 4)
+    }
+}
+
+private struct StatusNoticeRow: View {
+    let notice: StatusNotice
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(notice.tone.color)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(copy: notice.title)
+                Text(copy: notice.detail).metadata()
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("status-notice-\(notice.id)")
     }
 }
 

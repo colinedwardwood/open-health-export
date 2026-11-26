@@ -222,6 +222,18 @@ private func snapshot(
     #expect(harness.notifier.rescheduled == ["https"])
 }
 
+@Test func everyDestinationsOverdueReminderIsRearmedAtLaunch() async {
+    let harness = Harness([snapshot("https"), snapshot("mqtt")])
+    await harness.service.rescheduleAllOverdueNotifications()
+    #expect(Set(harness.notifier.rescheduled) == ["https", "mqtt"])
+}
+
+@Test func theExpiryNoticeNamesTheDestinationsWhoseQueueItCleared() {
+    #expect(ExportPlan.expiryNoticeLabel([]) == "Configured destinations")
+    #expect(ExportPlan.expiryNoticeLabel(["Home Assistant"]) == "Home Assistant")
+    #expect(ExportPlan.expiryNoticeLabel(["Archive", "Server"]) == "Archive, Server")
+}
+
 @Test func notificationDenialIsRecordedOnceAcrossLaunches() async throws {
     let harness = Harness([snapshot("https"), snapshot("mqtt", securityEvents: 1)])
     harness.notifier.denied = true

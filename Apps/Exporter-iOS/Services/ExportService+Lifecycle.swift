@@ -41,9 +41,10 @@ extension ExportService {
         let root = try AppFiles.applicationSupportRoot()
         let store = try stateStore(root)
         let now = Date().timeIntervalSince1970
+        let enabled = healthDestinationIDs.filter { destinations.isEnabled($0) }
         let result = try await store.expirePending(
             nowEpoch: now,
-            destination: "configured destinations"
+            destination: ExportPlan.owedDestinationLabel(enabled)
         )
         guard result.expiredBatches > 0 else { return result }
         let entries = try await store.transact { try $0.loadLedger() }
@@ -54,9 +55,26 @@ extension ExportService {
             url: root.appendingPathComponent("ledger-head-seal.json")
         )
         _ = try await LocalUserNotifier().notify(
-            UserNotice(kind: .queueExpired, destination: "Configured destinations")
+            UserNotice(
+                kind: .queueExpired,
+                destination: ExportPlan.expiryNoticeLabel(enabled.map(destinationLabel))
+            )
         )
         return result
+    }
+
+    /// #63: the seven-day clock runs at launch, on foreground and on every background
+    /// wake. A failure is recorded (#62) instead of discarded.
+    func expireQueuesRecordingFailure(trigger: RunTrigger) async {
+        await AppStatus.launchFailures.run(.queueExpiry, trigger: trigger) {
+            try await expireQueuesAndNotify()
+        }
+    }
+
+    func recoverInterruptedExportsRecordingFailure(trigger: RunTrigger) async {
+        await AppStatus.launchFailures.run(.interruptedRecovery, trigger: trigger) {
+            try await recoverInterruptedExports()
+        }
     }
 
     /// UX-26: seal leftover open runs after process death, then tell the person.

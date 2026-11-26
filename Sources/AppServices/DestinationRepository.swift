@@ -128,6 +128,8 @@ public struct DestinationRepository: Sendable {
     /// D-08b (#68): whether runs that start on their own are unlocked. Defaults to
     /// unlocked, which is what a source build and every test that isn't about it want.
     private let unlockState: @Sendable () -> UnlockState
+    /// #61: history a widened scope owes its destination.
+    private let pendingBackfill: any PendingBackfillStorage
 
     public init(
         records: any DestinationRecordStorage,
@@ -136,7 +138,8 @@ public struct DestinationRepository: Sendable {
         scopes: any DestinationScopeStorage,
         folder: any LocalExportFolderStorage,
         now: @escaping @Sendable () -> Date,
-        unlockState: @escaping @Sendable () -> UnlockState = { .sourceBuild }
+        unlockState: @escaping @Sendable () -> UnlockState = { .sourceBuild },
+        pendingBackfill: any PendingBackfillStorage = NoPendingBackfill()
     ) {
         self.records = records
         self.preferences = preferences
@@ -145,6 +148,7 @@ public struct DestinationRepository: Sendable {
         self.folder = folder
         self.now = now
         self.unlockState = unlockState
+        self.pendingBackfill = pendingBackfill
     }
 
     // MARK: Pure rules
@@ -201,8 +205,23 @@ public struct DestinationRepository: Sendable {
         return union.sorted { $0.rawValue < $1.rawValue }
     }
 
+    /// Saves the scope. A grant that now reaches history it did not before is recorded
+    /// as owed a backfill, because the shared cursor will never go back for it (#61).
     public func saveScope(_ scope: DestinationExportScope) async throws {
-        try await scopes.saveScope(Self.sanitized(scope))
+        let sanitized = try Self.sanitized(scope)
+        let previous = try await scopes.loadScope(scope.destinationID)
+        try await scopes.saveScope(sanitized)
+        if let widening = ScopeWidening.between(old: previous, new: sanitized) {
+            try pendingBackfill.record(widening)
+        }
+    }
+
+    public func pendingBackfills() -> [ScopeWidening] {
+        pendingBackfill.pending()
+    }
+
+    public func backfillCompleted(for destinationIDs: [String]) throws {
+        try pendingBackfill.clear(destinationIDs: destinationIDs)
     }
 
     /// Saves the scope and re-enables every type the person just added, so a type that
