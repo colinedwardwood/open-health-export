@@ -71,7 +71,7 @@ struct StatusScreen: View {
             }
             if let owed = ScopeWidening.statusCopy(AppDestinations.repository.pendingBackfills()) {
                 Section {
-                    NavigationLink(value: AppRoute.settings) {
+                    NavigationLink(value: AppRoute.backfill) {
                         Text(copy: owed)
                     }
                     .accessibilityIdentifier("status-backfill-owed")

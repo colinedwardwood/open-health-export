@@ -80,6 +80,15 @@ struct SettingsScreen: View {
             }
 
             Section {
+                NavigationLink(value: AppRoute.backfill) {
+                    Text("Send earlier history")
+                }
+                .accessibilityIdentifier("settings-backfill")
+            } footer: {
+                SectionFooter("Sends past Health data to your destinations, newest days first. Exports of new data carry on as usual.")
+            }
+
+            Section {
                 Button("Try with sample data") { showsSample = true }
                     .accessibilityIdentifier("settings-sample-data")
             } footer: {

@@ -294,6 +294,37 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(app.buttons["unlock-restore"].exists)
     }
 
+    /// Backfill UI: Settings leads to the history screen, a range can be chosen, and
+    /// starting with nowhere to send says so instead of doing nothing.
+    func testBackfillScreenChoosesARangeAndReportsTheResult() throws {
+        app.terminate()
+        app.launchEnvironment = ["OHE_RESET_SEEDED_SURFACES": "1"]
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launch()
+        let settings = app.buttons["shell-settings"].firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        settings.tap()
+        let entry = identified("settings-backfill").firstMatch
+        for _ in 0 ..< 6 where !entry.exists { app.swipeUp() }
+        entry.tap()
+        let range = identified("backfill-range-days30").firstMatch
+        XCTAssertTrue(range.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertTrue(identified("backfill-mode-raw").firstMatch.exists)
+        let start = app.buttons["backfill-start"]
+        XCTAssertTrue(start.exists)
+        start.tap()
+        XCTAssertTrue(
+            identified("backfill-result").firstMatch.waitForExistence(timeout: 30)
+                || identified("backfill-error").firstMatch.exists,
+            visibleIdentifiers().joined(separator: ",")
+        )
+        XCTAssertTrue(app.buttons["backfill-start"].waitForExistence(timeout: uiWait))
+    }
+
     /// #49: the MQTT path lists the Home Assistant entities discovery will create,
     /// shows QoS once, and a broker that refuses the connection fails at Connect. A
     /// real broker is exercised by the container contracts and by
