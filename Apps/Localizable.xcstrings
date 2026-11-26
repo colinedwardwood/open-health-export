@@ -2,6 +2,90 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
+    "%@ failed. %@": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ failed. %@"
+          }
+        }
+      }
+    },
+    "Background App Refresh is not available": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background App Refresh is not available"
+          }
+        }
+      }
+    },
+    "Background exports are not scheduled": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background exports are not scheduled"
+          }
+        }
+      }
+    },
+    "Checking Health access": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking Health access"
+          }
+        }
+      }
+    },
+    "Checking notification permission": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking notification permission"
+          }
+        }
+      }
+    },
+    "Clearing old queued exports": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clearing old queued exports"
+          }
+        }
+      }
+    },
+    "Exporting new Health data": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exporting new Health data"
+          }
+        }
+      }
+    },
     "Exports from this device": {
       "extractionState": "manual",
       "localizations": {
@@ -20,6 +104,102 @@
           "stringUnit": {
             "state": "translated",
             "value": "Automatic and manual"
+          }
+        }
+      }
+    },
+    "iOS pauses background exports while Low Power Mode is on. They resume when it turns off.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iOS pauses background exports while Low Power Mode is on. They resume when it turns off."
+          }
+        }
+      }
+    },
+    "iOS refused to schedule them: %@. Exports still run when the app opens.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iOS refused to schedule them: %@. Exports still run when the app opens."
+          }
+        }
+      }
+    },
+    "It is off or restricted on this device, so exports only run when you open the app. To turn it on, open Settings, then General, then Background App Refresh.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It is off or restricted on this device, so exports only run when you open the app. To turn it on, open Settings, then General, then Background App Refresh."
+          }
+        }
+      }
+    },
+    "Low Power Mode is on": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Low Power Mode is on"
+          }
+        }
+      }
+    },
+    "Open History for the recorded error.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open History for the recorded error."
+          }
+        }
+      }
+    },
+    "Part of the app failed to run": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Part of the app failed to run"
+          }
+        }
+      }
+    },
+    "Recording background wakes": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recording background wakes"
+          }
+        }
+      }
+    },
+    "Recovering an interrupted export": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recovering an interrupted export"
           }
         }
       }
@@ -75,6 +255,18 @@
           "stringUnit": {
             "state": "translated",
             "value": "Home Assistant base URL"
+          }
+        }
+      }
+    },
+    "Watching for new Health data": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Watching for new Health data"
           }
         }
       }
@@ -3639,6 +3831,18 @@
           "stringUnit": {
             "state": "translated",
             "value": "The archive folder is in iCloud, so exports there leave this device. Open the destination and confirm, or choose another folder."
+          }
+        }
+      }
+    },
+    "Earlier health history is waiting to be sent. Open Settings and run a backfill.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Earlier health history is waiting to be sent. Open Settings and run a backfill."
           }
         }
       }

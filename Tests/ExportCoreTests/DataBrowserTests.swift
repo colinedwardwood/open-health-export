@@ -259,6 +259,7 @@ private func browserSample(
     #expect(IPadExporterNotice.body.contains("iPhone"))
     #expect(IPadExporterNotice.isVisible(idiomIsPad: true, environment: [:]))
     #expect(!IPadExporterNotice.isVisible(idiomIsPad: false, environment: [:]))
+    #if DEBUG
     #expect(
         IPadExporterNotice.isVisible(
             idiomIsPad: false,
@@ -271,6 +272,10 @@ private func browserSample(
             environment: [IPadExporterNotice.environmentKey: "0"]
         )
     )
+    #else
+    // Release ignores the override: the idiom decides.
+    #expect(!IPadExporterNotice.isVisible(idiomIsPad: false, environment: ["OHE_IPAD_ONLY_EXPORTER": "1"]))
+    #endif
 }
 
 @Test func ux07UnavailableCopyNamesThePlatformLimitWithoutRetryOrDashboard() {

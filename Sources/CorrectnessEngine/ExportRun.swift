@@ -366,10 +366,10 @@ public struct ExportRun: Sendable {
         }
         let aggregates = try await drainPlans(for: page)
         if !page.hasRecords, aggregates.isEmpty {
-            let outcome = RunOutcome.derive(from: RunTally(nothingDue: true))
+            let outcome = RunOutcome.derive(from: RunTally(nothingDue: true, readExecuted: true))
             try await record(
                 outcome: outcome,
-                tally: RunTally(nothingDue: true),
+                tally: RunTally(nothingDue: true, readExecuted: true),
                 receipt: nil,
                 startedAt: startedAt,
                 timings: timings
@@ -1029,7 +1029,7 @@ public struct ExportRun: Sendable {
         }
         mark("read")
         guard let snapshot else {
-            let tally = RunTally(nothingDue: true)
+            let tally = RunTally(nothingDue: true, readExecuted: true)
             let outcome = RunOutcome.derive(from: tally)
             try await record(outcome: outcome, tally: tally, receipt: nil, startedAt: startedAt)
             return outcome

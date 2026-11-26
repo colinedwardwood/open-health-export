@@ -179,7 +179,7 @@ final class OnboardingModel {
             )
             _ = try await services.health.observeAuthorizationChanges()
             try await services.health.reenableAfterAuthorizationRequest()
-            try? await AppLifecycleCoordinator.shared.startObserversIfEligible()
+            await AppLifecycleCoordinator.shared.startObserversIfEligible()
             advance()
         } catch {
             work = .failed("Apple Health didn't open. You can try again, or continue and allow access later in Settings.")

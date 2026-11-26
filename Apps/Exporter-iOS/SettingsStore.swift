@@ -29,6 +29,8 @@ enum SettingKey: String, CaseIterable {
     case iCloudFolderAcknowledged = "ohe.iCloudFolderAcknowledged"
     case exportWindowHours = "ohe.exportWindowHours"
     case freshnessIntervalMinutes = "ohe.freshnessIntervalMinutes"
+    /// #62: launch and background steps that failed and have not worked since.
+    case launchIssuesV1 = "ohe.launchIssues.v1"
     case lastScheduledFullReconcileEpoch = "ohe.lastScheduledFullReconcileEpoch"
     case notificationCooldownV1 = "ohe.notificationCooldown.v1"
     case notificationsPreviouslyDenied = "ohe.notificationsPreviouslyDenied"

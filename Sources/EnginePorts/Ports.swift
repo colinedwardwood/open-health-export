@@ -989,6 +989,10 @@ public enum SecretStoreError: Error, Equatable, LocalizedError {
     /// host is unsigned (`errSecMissingEntitlement`). Callers must not treat this
     /// as a missing item.
     case unavailable
+    /// The keychain is sealed because the device has not been unlocked since boot
+    /// (`errSecInteractionNotAllowed`). A background wake can hit this; it is a reason
+    /// to defer and retry, never a missing credential (#62).
+    case locked
     /// Any other keychain status, kept so a failure says what actually happened
     /// instead of passing for a missing item (#62).
     case failed(Int32)
@@ -999,6 +1003,8 @@ public enum SecretStoreError: Error, Equatable, LocalizedError {
             "The saved credential was not found."
         case .unavailable:
             "Saved credentials are unavailable on this device."
+        case .locked:
+            "Saved credentials are locked until the device is unlocked."
         case .failed(let status):
             "The credential store reported an error (OSStatus \(status))."
         }

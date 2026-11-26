@@ -477,6 +477,7 @@ struct PolicyCheck {
         try checkSpecArtifacts(root: root)
         try checkBackupExclusion(root: root)
         try checkAppSourceShape(root: root)
+        try checkTestOverridesListed(root: root)
         try checkHealthAuthorizationScope(root: root)
         try checkHostTZDataPin(root: root)
     }
@@ -2097,6 +2098,51 @@ struct PolicyCheck {
             exit(1)
         }
         print("policycheck app files <= \(maxLines) lines, views <= \(maxState) @State: ok")
+    }
+
+    /// #69 / #74: every `OHE_*` name the app or its libraries read from the environment
+    /// is a test override. Each must be listed in `qa/test-overrides.md` (what it masks and
+    /// what covers the behaviour un-masked) and in the Release artifact scan, so a new
+    /// hook cannot ship unlisted or unscanned.
+    static func checkTestOverridesListed(root: URL) throws {
+        let literal = try NSRegularExpression(pattern: #""(OHE_[A-Z][A-Z0-9_]+)""#)
+        var found: [String: String] = [:]
+        for directory in ["Apps", "Sources"] {
+            guard let files = FileManager.default.enumerator(
+                at: root.appendingPathComponent(directory), includingPropertiesForKeys: nil
+            ) else { continue }
+            for case let file as URL in files where file.pathExtension == "swift" {
+                let text = try String(contentsOf: file, encoding: .utf8)
+                let source = text as NSString
+                for match in literal.matches(in: text, range: NSRange(location: 0, length: source.length)) {
+                    let name = source.substring(with: match.range(at: 1))
+                    found[name] = found[name] ?? String(file.path.dropFirst(root.path.count + 1))
+                }
+            }
+        }
+        let doc = try String(contentsOf: root.appendingPathComponent("qa/test-overrides.md"), encoding: .utf8)
+        let scan = try String(
+            contentsOf: root.appendingPathComponent("scripts/scan-release-artifacts.sh"), encoding: .utf8
+        )
+        let scanLines = Set(scan.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) })
+        var problems: [String] = []
+        for (name, file) in found.sorted(by: { $0.key < $1.key }) {
+            if !doc.contains("| `\(name)` |") {
+                problems.append("\(name) (\(file)) is not listed in qa/test-overrides.md")
+            }
+            if !scanLines.contains(name) {
+                problems.append("\(name) (\(file)) is not in scripts/scan-release-artifacts.sh")
+            }
+        }
+        guard !found.isEmpty else {
+            FileHandle.standardError.write(Data("#74: found no OHE_* overrides; the check is broken\n".utf8))
+            exit(1)
+        }
+        if !problems.isEmpty {
+            FileHandle.standardError.write(Data(("#74 test overrides:\n" + problems.joined(separator: "\n") + "\n").utf8))
+            exit(1)
+        }
+        print("policycheck test overrides listed and scanned (\(found.count)): ok")
     }
 
     /// SEC-30: the app's storage root holds the state database, the journal and queued

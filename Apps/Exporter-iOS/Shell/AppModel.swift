@@ -23,6 +23,8 @@ final class AppModel {
     private(set) var lastExportError: UserFacingErrorObject?
     /// Bumped whenever destination state may have changed, so Status re-reads it.
     private(set) var statusGeneration = 0
+    /// #62/#63: rows for what stops or delays background exports, refreshed with status.
+    private(set) var statusNotices: [StatusNotice] = []
     /// #45: first run, shown over the app until the disclosure is acknowledged; a
     /// "Finish setup" row resumes it later.
     var onboarding: Onboarding?
@@ -128,11 +130,12 @@ final class AppModel {
         UITestFixtures.applyOpenURL(to: self)
         #endif
         await privacyGate.authenticateIfNeeded(enabled: privacyGateEnabled)
-        _ = try? await services.export.expireQueuesAndNotify()
-        _ = try? await services.export.recoverInterruptedExports()
-        try? await services.status.recordNotificationSuppressionIfNeeded(
-            forcedDenied: AppStatus.seededNotificationsDenied
-        )
+        await services.export.expireQueuesRecordingFailure(trigger: .launch)
+        await services.export.recoverInterruptedExportsRecordingFailure(trigger: .launch)
+        await recordNotificationSuppression()
+        // Once per launch: runs re-arm their own destination afterwards.
+        await services.status.rescheduleAllOverdueNotifications()
+        refreshStatus()
         await refreshAdvisory()
         if disclosureAcknowledged, services.destinations.hasAutomaticExport(trigger: .appForeground) {
             await exportNow(trigger: .appForeground)
@@ -143,12 +146,22 @@ final class AppModel {
         AppLifecycleCoordinator.shared.recordWake(.appForeground)
         refreshStatus()
         await privacyGate.authenticateIfNeeded(enabled: privacyGateEnabled)
-        try? await services.status.recordNotificationSuppressionIfNeeded(
-            forcedDenied: AppStatus.seededNotificationsDenied
-        )
-        try? await AppLifecycleCoordinator.shared.startObserversIfEligible()
+        await recordNotificationSuppression()
+        await AppLifecycleCoordinator.shared.startObserversIfEligible(trigger: .appForeground)
+        await services.export.expireQueuesRecordingFailure(trigger: .appForeground)
+        refreshStatus()
         BackgroundTaskCoordinator.submit()
         await refreshAdvisory()
+    }
+
+    /// #62: the watchdog notices that notifications went off; failing to record that
+    /// is itself shown on Status.
+    private func recordNotificationSuppression() async {
+        await AppStatus.launchFailures.run(.notificationCheck, trigger: .appForeground) {
+            try await services.status.recordNotificationSuppressionIfNeeded(
+                forcedDenied: AppStatus.seededNotificationsDenied
+            )
+        }
     }
 
     func sceneLeftForeground() {
@@ -186,6 +199,7 @@ final class AppModel {
 
     func refreshStatus() {
         statusGeneration += 1
+        statusNotices = AppStatus.statusNotices()
     }
 
     private func refreshAdvisory() async {

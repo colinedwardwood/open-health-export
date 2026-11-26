@@ -538,6 +538,7 @@ import WireFormat
     )
 }
 
+#if DEBUG
 @Test func healthKitAvailabilityOverrideForcesUnavailableWithoutMutatingProcessEnv() {
     #expect(
         HealthKitAvailability.isAvailable(
@@ -545,6 +546,7 @@ import WireFormat
         ) == false
     )
 }
+#endif
 
 @Test func classifiedQueryErrorMapsLockAndDevicePolicyCodes() {
     let locked = NSError(

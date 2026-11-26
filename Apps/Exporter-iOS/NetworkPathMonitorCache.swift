@@ -18,9 +18,11 @@ enum NetworkPathMonitorCache {
     #endif
 
     static func conditions() -> NetworkPathConditions {
+        #if DEBUG
         if ProcessInfo.processInfo.environment["OHE_FORCE_METERED_PATH"] == "1" {
             return NetworkPathConditions(isExpensive: true, isConstrained: true)
         }
+        #endif
         #if canImport(Network)
         let path = monitor.currentPath
         return NetworkPathConditions(

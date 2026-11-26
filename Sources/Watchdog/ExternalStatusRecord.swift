@@ -61,7 +61,7 @@ public struct ExternalStatusRecord: Sendable, Equatable, Codable {
         staleThresholdSeconds: TimeInterval? = nil,
         overdueThresholdSeconds: TimeInterval? = nil
     ) -> ExternalStatusRecord {
-        let succeeded = outcome.kind == .success || outcome.kind == .successNothingDue
+        let succeeded = outcome.advancesFreshness
         let confirmed = outcome.ackEvidence == .receiptFull
         let lastSuccessAt = succeeded ? runAt : prior?.lastSuccessAt
         let lastSuccessEpoch = succeeded

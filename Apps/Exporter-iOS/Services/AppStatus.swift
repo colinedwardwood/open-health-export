@@ -62,6 +62,24 @@ struct PreferencesNotificationDenialMemory: NotificationDenialMemory {
     }
 }
 
+/// #62: launch and background failures that have not cleared, in the app's preferences.
+struct PreferencesLaunchIssues: LaunchIssueMemory {
+    private var key: String { SettingKey.launchIssuesV1.rawValue }
+
+    func issues() -> [LaunchIssue] {
+        UserDefaults.standard.data(forKey: key)
+            .flatMap { try? JSONDecoder().decode([LaunchIssue].self, from: $0) } ?? []
+    }
+
+    func save(_ issues: [LaunchIssue]) {
+        if issues.isEmpty {
+            UserDefaults.standard.removeObject(forKey: key)
+        } else if let data = try? JSONEncoder().encode(issues) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
+    }
+}
+
 /// Reads the verified destination records the data-flow explainer names. Only the
 /// fields it shows are decoded; the records themselves belong to the destinations.
 enum DataFlowSourceFiles {
@@ -158,6 +176,42 @@ enum AppStatus {
         wakes: { try AppHealth.service.wakeLedger().records() },
         now: { Date() }
     )
+
+    /// #62: every launch and background step that used to be `try?` reports here.
+    static let launchFailures = LaunchFailureRecorder(
+        store: stateStore,
+        memory: PreferencesLaunchIssues(),
+        now: { Date() }
+    )
+
+    /// #62/#63: persistent Status rows for what stops or delays background exports.
+    @MainActor
+    static func statusNotices() -> [StatusNotice] {
+        StatusNotices.notices(
+            backgroundRefresh: backgroundRefreshAvailability,
+            lowPowerMode: ProcessInfo.processInfo.isLowPowerModeEnabled,
+            submitFailure: BackgroundTaskCoordinator.submitFailures(),
+            issues: launchFailures.issues()
+        )
+    }
+
+    @MainActor
+    private static var backgroundRefreshAvailability: BackgroundRefreshAvailability {
+        #if DEBUG
+        // UI tests inject the setting rather than depend on the simulator's.
+        if let seeded = ProcessInfo.processInfo.environment["OHE_SEED_BACKGROUND_REFRESH"],
+           let availability = BackgroundRefreshAvailability(rawValue: seeded)
+        {
+            return availability
+        }
+        #endif
+        switch UIApplication.shared.backgroundRefreshStatus {
+        case .available: return .available
+        case .denied: return .denied
+        case .restricted: return .restricted
+        @unknown default: return .available
+        }
+    }
 
     static let history = HistoryService(
         store: stateStore,

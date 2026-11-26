@@ -379,7 +379,9 @@ import Testing
         contentsOf: root.appendingPathComponent("Apps/Exporter-iOS/AppLifecycleCoordinator.swift"),
         encoding: .utf8
     )
-    #expect(source.contains("try? await AppLifecycleCoordinator.shared.startObserversIfEligible()"))
+    #expect(source.contains("await AppLifecycleCoordinator.shared.startObserversIfEligible(trigger: .launch)"))
+    // #62: nothing on a launch or background path is discarded with `try?`.
+    #expect(!source.contains("try?"))
     for forbidden in [
         "import OTLPExport",
         "OTLPBackgroundCoordinator",

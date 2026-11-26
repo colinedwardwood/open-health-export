@@ -180,7 +180,7 @@ final class NetworkSetupModel {
             try? services.status.acknowledgeDestinationChanges()
             secret = ""
             AppLifecycleCoordinator.shared.stopObservers()
-            try? await AppLifecycleCoordinator.shared.startObserversIfEligible()
+            await AppLifecycleCoordinator.shared.startObserversIfEligible()
             stage = .saved
         } catch {
             self.error = UserFacingFailure.object(for: error, destinationLabel: addressCheck.host ?? "the server")

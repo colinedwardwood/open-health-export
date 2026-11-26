@@ -50,7 +50,10 @@ enum FanoutSnapshotWriter {
         }
         for target in targets {
             let prior = try? DestinationSnapshotFile.read(from: target.url)
-            let succeeded = target.kind == .success || target.kind == .successNothingDue
+            // #63: an empty answer only counts when a read ran. Nothing owed, or a type
+            // that cannot be read, must not look like a healthy pipeline forever.
+            let succeeded = target.kind == .success
+                || (target.kind == .successNothingDue && outcome.readExecuted)
             let estimates = freshnessEstimates.isEmpty
                 ? (prior?.freshnessEstimates ?? [:])
                 : freshnessEstimates
@@ -66,6 +69,7 @@ enum FanoutSnapshotWriter {
                     exportRole: prior?.exportRole ?? .designated,
                     lastOutcome: target.kind.rawValue,
                     lastSuccessEpoch: succeeded ? now : prior?.lastSuccessEpoch,
+                    enabledAtEpoch: prior?.enabledAtEpoch ?? prior?.writtenAtEpoch ?? now,
                     lastConfirmedAckEpoch:
                         target.ack == .receiptFull ? now : prior?.lastConfirmedAckEpoch,
                     attribution: ExternalStatusRecord.attribution(for: trigger),
