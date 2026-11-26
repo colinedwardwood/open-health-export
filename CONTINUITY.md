@@ -45,8 +45,8 @@ issue an in-place update signed as this project.
 
 ## Incident continuity
 
-We can **inform** users who have turned on the optional, off-by-default security-notices
-setting, within one visible foreground launch, once the advisory feed is hosted (#67).
+We can **inform** users who opted in to the security-notices feed (see `PRIVACY.md`), within
+one visible foreground launch, once it is hosted (#67).
 Everyone else is reached only through GitHub and App Store release notes. We cannot
 **change** what an installed app does remotely. There is no remote
 configuration or feature-flag service. Containment is therefore:

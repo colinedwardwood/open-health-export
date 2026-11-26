@@ -21,7 +21,6 @@ appear in an error message. It should not contain Health values, but check befor
 1. Open it as text. Search it for your server names, usernames and any numbers that look like
    Health readings. Delete those lines if you find any, or tell us instead of sending.
 2. Attach it to a GitHub issue (see `SUPPORT.md`), or send it to support by email.
-   TODO-owner: support email address.
 3. Say what you were doing, the app version (Settings, About) and your iOS version.
 
 ## What we do with it

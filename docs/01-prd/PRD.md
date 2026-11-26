@@ -557,10 +557,6 @@ support contacts, never from inside the app. The metric table, the channel-to-ca
 [`docs/03-implementation/launch-metrics.md`](../03-implementation/launch-metrics.md). The
 support tag taxonomy is in [`docs/runbooks/support-triage.md`](../runbooks/support-triage.md).
 
-Metrics: product page conversion, first downloads, unlock rate, proceeds, refund rate, ratings,
-Organizer crash-free sessions, support contacts per 100 unlocks, share of "didn't export"
-contacts, and self-reported time to first export.
-
 Deliberately not used: GitHub stars.
 
 ---

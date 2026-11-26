@@ -27,11 +27,6 @@ Last reviewed: TODO-owner: date on each release and after each incident.
 Add a row per issue: affected versions, symptom in the user's words, workaround, status, date.
 Remove a row only when the fix has shipped and a version number is recorded.
 
-## When an iOS update changes behaviour
-
-If an iOS release or beta changes HealthKit access or background delivery, add a row the same
-day with the iOS version, the symptom and "use Export now" as the workaround.
-
 ## Report something new
 
 Use GitHub Issues for bugs; see `SUPPORT.md`. Do not paste Health values, tokens or private

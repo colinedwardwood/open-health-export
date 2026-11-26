@@ -4,15 +4,8 @@ Support is best-effort (`SUPPORT.md`). These are targets, not guarantees.
 
 ## Targets
 
-| What | Target |
-|---|---|
-| Suspected data loss, wrong data, or launch crash | Triaged within 1 business day |
-| Security report | Acknowledged within 5 business days |
-| Purchase or refund | See "Purchases" |
-| Other support | First response within 3 business days |
-
-TODO-owner: confirm these numbers are the ones to publish. Whether the 3-business-day figure
-applies to all support or only to purchasers is also an owner decision.
+Response targets are defined once, in [`SUPPORT.md`](../../SUPPORT.md). Purchase and refund
+requests: see "Purchases" below.
 
 ## Routine
 

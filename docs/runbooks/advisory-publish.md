@@ -1,7 +1,7 @@
 # Publish a security advisory (in-app feed)
 
 Applies once the feed is hosted at `https://advisories.cewdesign.com/advisories/v1.json`
-(#67; not hosted at the time of writing). The mechanics and key handling are in
+(#67). The mechanics and key handling are in
 [`docs/03-implementation/advisory-signing.md`](../03-implementation/advisory-signing.md); this
 page is the decision procedure around them.
 
@@ -19,7 +19,7 @@ use GitHub security advisories and release notes too.
 2. Increase `seq` by exactly one. Keep `expires_at` far enough out that a quiet month does not
    expire it. TODO-owner: choose the heartbeat cadence (the app shows "stale" after 30 days
    without a fresh verified feed).
-3. Cooling-off: re-read the text after at least 12 hours unless the issue is actively exploited.
+3. Cooling-off: per the [README solo substitutes](README.md#solo-substitutes-for-two-person-controls), unless the issue is actively exploited.
 4. Sign with the offline key on an offline-prepared machine; verify with
    `swift run advisory-sign verify v1.json`.
 5. Publish as a static file, access logging off (`PRIVACY.md` requires hosting without

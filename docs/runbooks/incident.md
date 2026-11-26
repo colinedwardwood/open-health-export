@@ -62,7 +62,7 @@ designated CSIRT, to be supplied by counsel. Do not file or claim a role without
 ## Telling users
 
 Channels that exist: GitHub security advisories and releases; App Store release notes; the
-in-app signed feed only once it is hosted (#67) and only for users who turned it on. TODO-owner:
+in-app signed feed (opt-in; not hosted yet, see `PRIVACY.md`). TODO-owner:
 status page or social channel, if any. Message content: affected versions, what to do, what
 we do not know. No medical advice.
 

@@ -9,9 +9,6 @@ user-facing entry below by hand from them (see `docs/runbooks/release-rollout.md
 changelog"), then moves the fragments to `changes/archive/<version>/` so
 `changes/unreleased/` is empty when the tag is cut. Fragments are kept in git history either way.
 
-Until v1 is tagged, the 1.0.0 section below is a draft and `changes/unreleased/` still holds
-the detailed notes.
-
 ## 1.0.0 - TODO-owner: release date (draft, not yet released)
 
 Initial release (iPhone only; the Mac companion is planned for 1.1).
@@ -34,8 +31,7 @@ Initial release (iPhone only; the Mac companion is planned for 1.1).
   updates are never part of the purchase.
 - Demo mode shows plausible values and writes to a separate output.
 - Warns before writing to a folder in iCloud Drive, and writes nothing there until you confirm.
-- Optional, off by default: "Check for security notices" fetches a signed notice feed at most
-  once a day. See `PRIVACY.md` for exactly what that request sends.
+- Optional "Check for security notices" (off by default); see `PRIVACY.md` for what it sends.
 
 ### Honest limits
 

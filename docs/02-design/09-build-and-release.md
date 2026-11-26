@@ -617,9 +617,9 @@ evidence.
 **E. Provenance (R-108)**
 - Source tarball, SBOM, `BUILDINFO`, spec bundle and DMG published with attestations.
 - **The non-releasing maintainer** runs `gh attestation verify` on a different machine and
-  pastes the output. *(There is one maintainer and no deputy: the solo substitute is in
-  `docs/runbooks/release-rollout.md`.)* Having the *other* maintainer verify is what makes this a check rather
-  than a ritual.
+  pastes the output. Having the *other* maintainer verify is what makes this a check rather
+  than a ritual. (There is one maintainer and no deputy: the solo substitute is in
+  `docs/runbooks/release-rollout.md`.)
 - The clean-machine build has been performed by a named human this cycle, with device, OS and
   elapsed time recorded.
 

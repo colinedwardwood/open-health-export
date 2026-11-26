@@ -79,6 +79,9 @@ before v1 claims corpus realism.
 | `Tools/` | `policycheck`, `receiver`, `characterise`, corpus and contract helpers |
 | `receiver/` | Reference receiver plus a loopback Grafana lab stack |
 | `docs/` | PRD, design, and implementation notes |
+| `docs/runbooks/` | Solo-owner procedures: release rollout, incident, advisory publishing, support triage |
+| `docs/support/` | User-facing known issues and how to share a crash log |
+| `docs/03-implementation/launch-metrics.md` | Launch measurement: metrics, review rhythm, targets |
 | `store/en/` | App Store listing copy (**not submitted**) |
 | `compliance/` | Egress inventory, covered-entity stop-condition note, privacy-label candidate |
 

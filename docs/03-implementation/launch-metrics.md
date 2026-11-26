@@ -50,8 +50,7 @@ asset. Do not add tracking to the app, landing page or links beyond Apple's camp
 
 ## Support tags
 
-Defined once, in `docs/runbooks/support-triage.md`: `setup`, `HA`, `HTTPS`, `MQTT`, `Mac`,
-`background-overdue`, `purchase-refund`, `data-correctness`.
+The tag list lives in [`../runbooks/support-triage.md`](../runbooks/support-triage.md#tags).
 
 ## Deliberately not used
 

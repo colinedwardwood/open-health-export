@@ -7,9 +7,9 @@
 2. Fold the changelog (below).
 3. Confirm `README.md` maintenance status and the supported-OS matrix are current
    (`scripts/validate-release.py` checks them).
-4. Record the last-good tag and its `BUILDINFO` (once those exist, see `PROVENANCE.md`) for
+4. Record the last-good tag and its `BUILDINFO` (see `PROVENANCE.md` for whether those exist yet) for
    roll-forward.
-5. Cooling-off: stop after the checklist and re-read it at least 12 hours later. Record both times.
+5. Cooling-off: solo cooling-off per the [README solo substitutes](README.md#solo-substitutes-for-two-person-controls). Record both times.
 6. Verification from a second machine: fresh clone, `swift run policycheck`, and
    `./scripts/build-from-source.sh`. Paste the output into the release issue. If the release
    publishes attestations, run `gh attestation verify` from that machine too.
