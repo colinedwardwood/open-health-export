@@ -110,6 +110,8 @@ struct SettingsScreen: View {
             Section {
                 Link(destination: About.privacyPolicy.url) { Text(copy: About.privacyPolicy.title) }
                     .accessibilityIdentifier("settings-privacy-policy")
+                NavigationLink("Diagnostics") { DiagnosticsScreen() }
+                    .accessibilityIdentifier("settings-diagnostics")
                 NavigationLink("About KeepMyMetrics") { AboutScreen() }
                     .accessibilityIdentifier("settings-about")
             }

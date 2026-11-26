@@ -6514,6 +6514,116 @@
           }
         }
       }
+    },
+    "Share diagnostics": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share diagnostics"
+          }
+        }
+      }
+    },
+    "Share diagnostics?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share diagnostics?"
+          }
+        }
+      }
+    },
+    "Share": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share"
+          }
+        }
+      }
+    },
+    "Build": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Build"
+          }
+        }
+      }
+    },
+    "Last exports": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last exports"
+          }
+        }
+      }
+    },
+    "Launch failures": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Launch failures"
+          }
+        }
+      }
+    },
+    "Network activity": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Network activity"
+          }
+        }
+      }
+    },
+    "The report holds no health values, hostnames, credentials or tokens. Network activity shows counts only.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The report holds no health values, hostnames, credentials or tokens. Network activity shows counts only."
+          }
+        }
+      }
+    },
+    "Diagnostics couldn't be read.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostics couldn't be read."
+          }
+        }
+      }
+    },
+    "Sharing copies this bundle to whichever app you choose. Once it leaves, this app's on-device protection no longer applies to that copy. The bundle is redacted and holds no health values, but it does name your destinations.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sharing copies this bundle to whichever app you choose. Once it leaves, this app's on-device protection no longer applies to that copy. The bundle is redacted and holds no health values, but it does name your destinations."
+          }
+        }
+      }
     }
   }
 }

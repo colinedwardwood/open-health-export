@@ -779,6 +779,24 @@ final class ExporterUITests: XCTestCase {
 
     // MARK: Settings
 
+    func testDiagnosticsListsTheBuildAndAsksBeforeSharing() throws {
+        launchProduct()
+        openSettings()
+        let diagnostics = app.buttons["settings-diagnostics"]
+        for _ in 0 ..< 4 where !diagnostics.exists { app.swipeUp() }
+        XCTAssertTrue(diagnostics.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        diagnostics.tap()
+        let build = identified("diagnostics-build").firstMatch
+        XCTAssertTrue(build.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertTrue(identified("diagnostics-launch").firstMatch.exists)
+        try performAccessibilityAudit("diagnostics")
+        let share = app.buttons["diagnostics-share"]
+        for _ in 0 ..< 4 where !share.isHittable { app.swipeUp() }
+        share.tap()
+        // The disclosure is acknowledged before anything leaves the app.
+        XCTAssertTrue(app.buttons["diagnostics-share-confirm"].waitForExistence(timeout: uiWait))
+    }
+
     func testAcknowledgementsRenderTheGeneratedNotice() {
         launchProduct()
         openSettings()
