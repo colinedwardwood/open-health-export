@@ -622,6 +622,34 @@ final class ExporterUITests: XCTestCase {
         )
     }
 
+    /// QA-17: a held type shows on Status with its cause; sending again asks first, and
+    /// the decision removes the buttons.
+    func testStatusShowsAHeldTypeAndConfirmsBeforeSendingAgain() throws {
+        app.terminate()
+        app.launchEnvironment = [
+            "OHE_RESET_SEEDED_SURFACES": "1",
+            "OHE_SEED_ANCHOR_HOLD": "cursorLost",
+        ]
+        app.launch()
+        let notice = app.descendants(matching: .any)["status-notice-anchor-hold-stepCount"].firstMatch
+        XCTAssertTrue(notice.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertTrue(notice.label.contains("Export paused for"), notice.label)
+        XCTAssertTrue(notice.label.contains("lost track"), notice.label)
+        // The choice that sends history twice never skips its confirmation.
+        app.buttons["status-anchor-reexport-stepCount"].tap()
+        XCTAssertTrue(app.buttons["status-anchor-confirm"].waitForExistence(timeout: uiWait))
+        app.buttons["status-anchor-confirm"].firstMatch.tap()
+        // The decision is recorded; the buttons go and the notice says what happens next.
+        XCTAssertTrue(
+            app.buttons["status-anchor-stop-stepCount"].waitForNonExistence(timeout: uiWait),
+            visibleIdentifiers().joined(separator: ",")
+        )
+        XCTAssertTrue(notice.label.contains("next export"), notice.label)
+        auditFoldBottom = identified("status-detail").frame.maxY
+        try performAccessibilityAudit("status-anchor-hold")
+        auditFoldBottom = nil
+    }
+
     /// #43: the product app routes a cold-launch link through AppModel.
     func testProductShellColdLaunchLinkOpensTheDestinationError() {
         app.terminate()

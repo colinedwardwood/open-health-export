@@ -6198,6 +6198,124 @@
           }
         }
       }
+    },
+    "Export paused for %@": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export paused for %@"
+          }
+        }
+      }
+    },
+    "Data through %@ has already been sent.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data through %@ has already been sent."
+          }
+        }
+      }
+    },
+    "Nothing has been sent yet for this data.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing has been sent yet for this data."
+          }
+        }
+      }
+    },
+    "The export lost track of how far it had got. %@ It can start again from the beginning, which sends that history a second time, or you can stop exporting this data.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The export lost track of how far it had got. %@ It can start again from the beginning, which sends that history a second time, or you can stop exporting this data."
+          }
+        }
+      }
+    },
+    "One update returned %lld records, which is far more than an update should contain. %@ Sending it would repeat history already at your server. You can send it anyway, or stop exporting this data.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One update returned %lld records, which is far more than an update should contain. %@ Sending it would repeat history already at your server. You can send it anyway, or stop exporting this data."
+          }
+        }
+      }
+    },
+    "You chose to send this history again. It goes out on the next export.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You chose to send this history again. It goes out on the next export."
+          }
+        }
+      }
+    },
+    "Send it all again": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send it all again"
+          }
+        }
+      }
+    },
+    "Stop exporting this data": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop exporting this data"
+          }
+        }
+      }
+    },
+    "Send this history again?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send this history again?"
+          }
+        }
+      }
+    },
+    "Everything for this type is sent again from the beginning. Your destination may receive it twice.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Everything for this type is sent again from the beginning. Your destination may receive it twice."
+          }
+        }
+      }
     }
   }
 }

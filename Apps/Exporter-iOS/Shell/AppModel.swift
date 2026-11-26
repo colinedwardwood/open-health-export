@@ -25,6 +25,8 @@ final class AppModel {
     private(set) var statusGeneration = 0
     /// #62/#63: rows for what stops or delays background exports, refreshed with status.
     private(set) var statusNotices: [StatusNotice] = []
+    /// QA-17: held types, which Status shows first because nothing exports for them.
+    @ObservationIgnored private var anchorHoldNotices: [StatusNotice] = []
     /// #45: first run, shown over the app until the disclosure is acknowledged; a
     /// "Finish setup" row resumes it later.
     var onboarding: Onboarding?
@@ -199,7 +201,35 @@ final class AppModel {
 
     func refreshStatus() {
         statusGeneration += 1
-        statusNotices = AppStatus.statusNotices()
+        showNotices()
+        Task { await reloadAnchorHolds() }
+    }
+
+    /// Reads the held types from the store and shows them. Only a changed set re-renders.
+    private func reloadAnchorHolds() async {
+        #if DEBUG
+        await UITestFixtures.seedAnchorHoldOnce(using: services.export)
+        #endif
+        guard let holds = try? await services.export.anchorHolds() else { return }
+        let notices = StatusNotices.anchorHoldNotices(holds)
+        guard notices != anchorHoldNotices else { return }
+        anchorHoldNotices = notices
+        showNotices()
+    }
+
+    /// Held types first: nothing exports for them until the person decides.
+    private func showNotices() {
+        statusNotices = anchorHoldNotices + AppStatus.statusNotices()
+    }
+
+    /// QA-17: the person's answer to a held type. Either choice changes what Status shows.
+    func resolveAnchorHold(metric: MetricID, reexport: Bool) async {
+        if reexport {
+            try? await services.export.authoriseAnchorReexport(metric: metric)
+        } else {
+            try? await services.export.stopExportingHeldType(metric: metric)
+        }
+        refreshStatus()
     }
 
     private func refreshAdvisory() async {

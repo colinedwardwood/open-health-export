@@ -103,6 +103,14 @@ extension ExportService {
         return try await store.transact { try $0.loadAnchorHolds() }
     }
 
+    #if DEBUG
+    /// `OHE_SEED_ANCHOR_HOLD`: writes a hold through the real store.
+    func seedAnchorHold(_ hold: AnchorHold) async throws {
+        let store = try stateStore(try AppFiles.applicationSupportRoot())
+        try await store.transact { try $0.upsertAnchorHold(hold) }
+    }
+    #endif
+
     /// QA-17: the user chose to send the history again. Recording the decision is what
     /// releases the hold; the run reads it rather than inferring intent from a retry.
     func authoriseAnchorReexport(metric: MetricID) async throws {

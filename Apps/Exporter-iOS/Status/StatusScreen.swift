@@ -126,20 +126,56 @@ private struct SummaryHeader: View {
 }
 
 private struct StatusNoticeRow: View {
+    @Environment(AppModel.self) private var model
     let notice: StatusNotice
+    @State private var confirmingReexport: MetricID?
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(notice.tone.color)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(copy: notice.title)
-                Text(copy: notice.detail).metadata()
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(notice.tone.color)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(copy: notice.title)
+                    Text(copy: notice.detail).metadata()
+                }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("status-notice-\(notice.id)")
+            if case let .resolveAnchorHold(metric) = notice.action {
+                // Stacked buttons rather than a row, so both labels wrap at any text size.
+                Button { confirmingReexport = metric } label: {
+                    Text(copy: StatusNotices.anchorReexportChoice).frame(maxWidth: .infinity)
+                }
+                .accessibilityIdentifier("status-anchor-reexport-\(metric.rawValue)")
+                Button(role: .destructive) {
+                    Task { await model.resolveAnchorHold(metric: metric, reexport: false) }
+                } label: {
+                    Text(copy: StatusNotices.anchorStopChoice).frame(maxWidth: .infinity)
+                }
+                .accessibilityIdentifier("status-anchor-stop-\(metric.rawValue)")
             }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("status-notice-\(notice.id)")
+        .buttonStyle(.bordered)
+        .confirmationDialog(
+            "Send this history again?",
+            isPresented: Binding(
+                get: { confirmingReexport != nil },
+                set: { if !$0 { confirmingReexport = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Send it all again") {
+                if let metric = confirmingReexport {
+                    Task { await model.resolveAnchorHold(metric: metric, reexport: true) }
+                }
+            }
+            .accessibilityIdentifier("status-anchor-confirm")
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Everything for this type is sent again from the beginning. Your destination may receive it twice.")
+        }
     }
 }
 

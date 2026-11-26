@@ -318,3 +318,40 @@ private func runOnce(
     #expect(RunOutcome.derive(from: RunTally(nothingDue: true, readExecuted: true)).advancesFreshness)
     #expect(!RunOutcome.derive(from: RunTally(failed: 1, terminalError: .internalFault)).advancesFreshness)
 }
+
+// MARK: QA-17 anchor-hold notice
+
+@Test func aLostCursorShowsAPausedNoticeWithTheCostAndBothChoices() throws {
+    let hold = AnchorHold(
+        metric: MetricID(rawValue: "stepCount"), reason: .cursorLost,
+        detectedAtEpoch: 1, lastEmittedDay: "2026-09-08"
+    )
+    let notice = try #require(StatusNotices.anchorHoldNotices([hold]).first)
+    #expect(notice.id == "anchor-hold-stepCount")
+    #expect(notice.title.english.hasPrefix("Export paused for "))
+    #expect(notice.detail.english.contains("Data through 2026-09-08 has already been sent."))
+    #expect(notice.detail.english.contains("sends that history a second time"))
+    #expect(notice.tone == .blocked)
+    #expect(notice.action == .resolveAnchorHold(metric: hold.metric))
+}
+
+@Test func aSuspectedReplayStatesHowManyRecordsAndNothingSentYet() throws {
+    let hold = AnchorHold(
+        metric: MetricID(rawValue: "heartRate"), reason: .replaySuspected,
+        detectedAtEpoch: 1, observedSamples: 250_000
+    )
+    let notice = try #require(StatusNotices.anchorHoldNotices([hold]).first)
+    #expect(notice.detail.english.contains("250,000 records"))
+    #expect(notice.detail.english.contains("Nothing has been sent yet"))
+}
+
+@Test func aDecidedHoldLosesItsButtonsAndHoldsAreOrderedByType() {
+    var decided = AnchorHold(metric: MetricID(rawValue: "stepCount"), reason: .cursorLost, detectedAtEpoch: 1)
+    decided.decision = .reexportAuthorized
+    let open = AnchorHold(metric: MetricID(rawValue: "heartRate"), reason: .cursorLost, detectedAtEpoch: 1)
+    let notices = StatusNotices.anchorHoldNotices([decided, open])
+    #expect(notices.map(\.id) == ["anchor-hold-heartRate", "anchor-hold-stepCount"])
+    #expect(notices[1].action == nil)
+    #expect(notices[1].detail.english.contains("goes out on the next export"))
+    #expect(StatusNotices.anchorHoldNotices([]).isEmpty)
+}

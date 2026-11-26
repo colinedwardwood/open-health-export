@@ -120,6 +120,17 @@ private func producedCopy() -> [LocalizedCopy] {
         }
     }
 
+    for reason in AnchorHold.Reason.allCases {
+        for emitted in [nil, "2026-09-08"] as [String?] {
+            for decision in [nil, .reexportAuthorized] as [AnchorHold.Decision?] {
+                let hold = AnchorHold(metric: MetricID(rawValue: "stepCount"), reason: reason, detectedAtEpoch: 1,
+                                      observedSamples: 5, lastEmittedDay: emitted, decision: decision)
+                copy += StatusNotices.anchorHoldNotices([hold]).flatMap { [$0.title, $0.detail] }
+            }
+        }
+    }
+    copy += [StatusNotices.anchorReexportChoice, StatusNotices.anchorStopChoice]
+
     let evidence = [
         UserFacingErrorEvidence(),
         UserFacingErrorEvidence(statusCode: 503, bytesSent: 1, retryAfterSeconds: 1),
