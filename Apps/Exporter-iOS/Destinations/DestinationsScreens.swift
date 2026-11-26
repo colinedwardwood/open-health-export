@@ -341,7 +341,7 @@ struct DestinationDetailScreen: View {
             } footer: {
                 SectionFooter("When this is off, this destination only receives data when you tap Export now.")
             }
-            if let removal {
+            if removal != nil {
                 Section {
                     if destinationID == "local-file" {
                         Button("Test again") { Task { await setup.runTest(); model.refreshStatus() } }
