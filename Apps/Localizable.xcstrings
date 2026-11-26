@@ -6624,6 +6624,138 @@
           }
         }
       }
+    },
+    "Your own collector (OpenTelemetry)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your own collector (OpenTelemetry)"
+          }
+        }
+      }
+    },
+    "An OTLP/HTTP address you control, and a token if it needs one. Run outcomes only, never health values.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An OTLP/HTTP address you control, and a token if it needs one. Run outcomes only, never health values."
+          }
+        }
+      }
+    },
+    "This sends the app's run outcomes to your collector: when exports ran, how they ended and how long they took. It never sends health values.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This sends the app's run outcomes to your collector: when exports ran, how they ended and how long they took. It never sends health values."
+          }
+        }
+      }
+    },
+    "https://collector.example.com:4318/v1/traces": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "https://collector.example.com:4318/v1/traces"
+          }
+        }
+      }
+    },
+    "Collector": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collector"
+          }
+        }
+      }
+    },
+    "Sent as a bearer token. It's kept in the keychain and never shown again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent as a bearer token. It's kept in the keychain and never shown again."
+          }
+        }
+      }
+    },
+    "The collector accepted the test. Here is what a real export carries.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The collector accepted the test. Here is what a real export carries."
+          }
+        }
+      }
+    },
+    "What an export sends": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What an export sends"
+          }
+        }
+      }
+    },
+    "Confirm this collector": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm this collector"
+          }
+        }
+      }
+    },
+    "Your own collector": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your own collector"
+          }
+        }
+      }
+    },
+    "Nothing more is sent to this collector. Its token is deleted from the keychain.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing more is sent to this collector. Its token is deleted from the keychain."
+          }
+        }
+      }
+    },
+    "Token (optional)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Token (optional)"
+          }
+        }
+      }
     }
   }
 }

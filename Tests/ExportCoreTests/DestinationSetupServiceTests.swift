@@ -636,10 +636,38 @@ private func pendingMQTT(
     #expect(snapshot.state == .noExportsYet)
     #expect(harness.ledger.map(\.detail) == ["explicit_user_opt_in otlp"])
 
-    harness.service.disableOTLP()
+    await harness.service.disableOTLP()
     #expect(harness.service.storedOTLPURL() == "")
     #expect(harness.state.with { $0.snapshots["otlp"] } == nil)
     #expect(harness.state.with { $0.widgetReloads } == 2)
+}
+
+@Test func setupOTLPTokenGoesToTheKeychainAndLeavesWithTheDestination() async throws {
+    let harness = Harness()
+    try await harness.service.enableOTLP(
+        endpoint: URL(string: "https://otel.example/v1/traces")!,
+        host: "otel.example",
+        allowInsecureHTTP: false,
+        previewPayload: Data("preview".utf8),
+        bearer: "otlp-secret"
+    )
+    let keychain = harness.state.secrets(DestinationRepository.keychainService("otlp"))
+    #expect(try await keychain.load(SecretHandle(rawValue: "bearer")) == Array("otlp-secret".utf8))
+    let record = try #require(harness.state.with { $0.otlp })
+    #expect(record.hasBearer)
+    let json = String(decoding: try JSONEncoder().encode(record), as: UTF8.self)
+    #expect(!json.contains("otlp-secret"))
+
+    await harness.service.disableOTLP()
+    await #expect(throws: SecretStoreError.notFound) {
+        try await keychain.load(SecretHandle(rawValue: "bearer"))
+    }
+}
+
+@Test func setupOTLPRecordSavedBeforeTheTokenStillDecodes() throws {
+    let old = Data(#"{"urlString":"https://o.example/v1/traces","allowedHosts":["o.example"],"allowInsecureHTTP":false,"previewDigest":"d"}"#.utf8)
+    let record = try JSONDecoder().decode(OTLPDestinationRecord.self, from: old)
+    #expect(!record.hasBearer)
 }
 
 // MARK: Portable configuration

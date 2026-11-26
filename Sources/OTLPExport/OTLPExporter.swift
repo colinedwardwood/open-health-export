@@ -54,6 +54,12 @@ public struct OTLPExporter: Sendable {
         )
     }
 
+    /// Setup test: posts one payload to a collector that is not saved yet. An
+    /// empty-span payload sends no run data.
+    public func probe(payload: Data, endpoint: HTTPSDestination, bodyDirectory: URL) async throws -> Bool {
+        try await post(payload, filename: "otlp-probe.pb", destination: endpoint, bodyDirectory: bodyDirectory)
+    }
+
     public func exportMetrics(
         destinations: [OTLPMetricsDestination],
         nowEpoch: TimeInterval,
@@ -78,12 +84,14 @@ public struct OTLPExporter: Sendable {
         try MeteredNetworkGate.require(path: pathConditions, policy: meteredPolicy)
         let file = bodyDirectory.appendingPathComponent(filename)
         try payload.write(to: file, options: .atomic)
+        var headers = ["Content-Type": "application/x-protobuf"]
+        if let bearer = destination.authorizationBearer {
+            headers["Authorization"] = "Bearer \(bearer)"
+        }
         let request = OutboundHTTPRequest(
             method: "POST",
             url: destination.url,
-            headers: [
-                "Content-Type": "application/x-protobuf",
-            ],
+            headers: headers,
             bodyFile: file
         )
         let response = try await transport.execute(request)

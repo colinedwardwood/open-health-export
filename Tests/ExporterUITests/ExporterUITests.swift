@@ -419,6 +419,53 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(app.buttons["test-again"].exists)
     }
 
+    /// OTLP: the collector is a choice in Add destination, plain HTTP is refused until
+    /// opted into, the address is said back, and a collector that can't be reached
+    /// fails at the test step with Save withheld.
+    func testOTLPCollectorIsSelectableAndAnUnreachableOneFailsTheTest() throws {
+        app.terminate()
+        app.launchEnvironment = ["OHE_RESET_SEEDED_SURFACES": "1"]
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launch()
+        app.tabBars.buttons["Destinations"].tap()
+        let add = app.buttons["destinations-add"]
+        XCTAssertTrue(add.waitForExistence(timeout: uiWait))
+        add.tap()
+        let otlp = app.buttons["add-otlp"]
+        XCTAssertTrue(otlp.waitForExistence(timeout: uiWait))
+        otlp.tap()
+        XCTAssertTrue(identified("otlp-explainer").waitForExistence(timeout: uiWait))
+        let test = app.buttons["otlp-test"]
+        XCTAssertFalse(test.isEnabled)
+        let address = app.textFields["otlp-address"]
+        type("http://ohe-ui-test.invalid:4318/v1/traces", into: address)
+        XCTAssertTrue(identified("otlp-address-check").waitForExistence(timeout: uiWait))
+        XCTAssertFalse(test.isEnabled, "plain HTTP needs the explicit opt-in")
+        dismissKeyboard()
+        let plain = app.switches["otlp-plain-http"]
+        XCTAssertTrue(plain.waitForExistence(timeout: uiWait))
+        if plain.value as? String != "1" { plain.switches.firstMatch.tap() }
+        let token = app.secureTextFields["otlp-token"]
+        token.tap()
+        token.typeText("ui-test-token")
+        dismissKeyboard()
+        XCTAssertTrue(test.waitForEnabled(timeout: uiWait))
+        test.tap()
+        let step = identified("test-step-sendCanary")
+        for _ in 0 ..< 6 where !step.exists {
+            app.swipeUp()
+        }
+        XCTAssertTrue(step.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        expectation(for: NSPredicate(format: "value == %@", "Failed"), evaluatedWith: step)
+        waitForExpectations(timeout: 60)
+        XCTAssertTrue(identified("test-error").exists)
+        XCTAssertFalse(app.buttons["otlp-save"].exists)
+    }
+
     /// #52: the privacy policy is one tap from Settings, About links this build's
     /// source, and Delete everything confirms and then starts first run again.
     func testSettingsLinksTheLegalPagesAndDeleteEverythingStartsOver() throws {

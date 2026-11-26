@@ -102,6 +102,17 @@ struct AddDestinationFlow: View {
                         }
                         .accessibilityIdentifier("add-\(kind.rawValue)")
                     }
+                    #if !OHE_OBS25_SIZE_BASELINE
+                    NavigationLink {
+                        OTLPSetupScreen { dismiss() }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Your own collector (OpenTelemetry)").font(.headline)
+                            Text("An OTLP/HTTP address you control, and a token if it needs one. Run outcomes only, never health values.").metadata()
+                        }
+                    }
+                    .accessibilityIdentifier("add-otlp")
+                    #endif
                 } footer: {
                     SectionFooter("Data goes straight from \(DeviceNoun.thisDevice) to the destination you set up. KeepMyMetrics never sees it.")
                 }
@@ -330,6 +341,14 @@ struct DestinationDetailScreen: View {
             } footer: {
                 SectionFooter("When this is off, this destination only receives data when you tap Export now.")
             }
+            #if !OHE_OBS25_SIZE_BASELINE
+            if destinationID == DestinationSetupService.otlpDestinationID {
+                Section {
+                    Button("Remove destination", role: .destructive) { confirmingRemove = true }
+                        .accessibilityIdentifier("detail-remove")
+                }
+            }
+            #endif
             if destinationID == "local-file" {
                 Section {
                     Button("Test again") { Task { await setup.runTest(); model.refreshStatus() } }
@@ -349,12 +368,22 @@ struct DestinationDetailScreen: View {
             titleVisibility: .visible
         ) {
             Button("Remove", role: .destructive) {
-                try? AppDestinationSetup.removeLocalFile()
-                model.refreshStatus()
-                dismiss()
+                Task {
+                    if destinationID == DestinationSetupService.otlpDestinationID {
+                        await AppDestinationSetup.service.disableOTLP()
+                    } else {
+                        try? AppDestinationSetup.removeLocalFile()
+                    }
+                    model.refreshStatus()
+                    dismiss()
+                }
             }
         } message: {
-            Text("Files already exported stay in the folder. Nothing more is written there.")
+            if destinationID == DestinationSetupService.otlpDestinationID {
+                Text("Nothing more is sent to this collector. Its token is deleted from the keychain.")
+            } else {
+                Text("Files already exported stay in the folder. Nothing more is written there.")
+            }
         }
     }
 }
