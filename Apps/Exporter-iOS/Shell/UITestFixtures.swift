@@ -152,6 +152,9 @@ enum UITestFixtures {
 
     @MainActor
     static func seedAnchorHoldOnce(using export: ExportService) async {
+        if environment["OHE_RESET_SEEDED_SURFACES"] == "1" {
+            try? await export.clearAllAnchorHolds()
+        }
         guard !seededAnchorHold,
               let raw = environment["OHE_SEED_ANCHOR_HOLD"],
               let reason = AnchorHold.Reason(rawValue: raw)

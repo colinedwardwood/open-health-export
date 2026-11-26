@@ -835,7 +835,10 @@ final class ExporterUITests: XCTestCase {
         diagnostics.tap()
         let build = identified("diagnostics-build").firstMatch
         XCTAssertTrue(build.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
-        XCTAssertTrue(identified("diagnostics-launch").firstMatch.exists)
+        // A lazy list: on a simulator with run history the launch section starts below the fold.
+        let launch = identified("diagnostics-launch").firstMatch
+        for _ in 0 ..< 4 where !launch.exists { app.swipeUp() }
+        XCTAssertTrue(launch.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
         try performAccessibilityAudit("diagnostics")
         let share = app.buttons["diagnostics-share"]
         for _ in 0 ..< 4 where !share.isHittable { app.swipeUp() }
