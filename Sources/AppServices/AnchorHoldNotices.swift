@@ -9,6 +9,56 @@ import MetricCatalog
 public enum StatusNoticeAction: Sendable, Equatable {
     /// QA-17: a held type waits for "send it all again" or "stop exporting it".
     case resolveAnchorHold(metric: MetricID)
+
+    /// One button the notice shows, with everything the row needs to render it.
+    public struct Choice: Sendable, Equatable, Identifiable {
+        /// Stable suffix for the button's accessibility identifier.
+        public let id: String
+        public let label: LocalizedCopy
+        public let isDestructive: Bool
+        /// Whether this answer sends the held history again.
+        public let reexport: Bool
+        /// Asked before the answer is applied, when it can't be taken back.
+        public let confirmation: Confirmation?
+    }
+
+    public struct Confirmation: Sendable, Equatable {
+        public let title: LocalizedCopy
+        public let confirmLabel: LocalizedCopy
+        public let message: LocalizedCopy
+    }
+
+    public var metric: MetricID {
+        switch self {
+        case let .resolveAnchorHold(metric): metric
+        }
+    }
+
+    public var choices: [Choice] {
+        switch self {
+        case .resolveAnchorHold:
+            [
+                Choice(
+                    id: "reexport",
+                    label: StatusNotices.anchorReexportChoice,
+                    isDestructive: false,
+                    reexport: true,
+                    confirmation: Confirmation(
+                        title: "Send this history again?",
+                        confirmLabel: "Send it all again",
+                        message: "Everything for this type is sent again from the beginning. Your destination may receive it twice."
+                    )
+                ),
+                Choice(
+                    id: "stop",
+                    label: StatusNotices.anchorStopChoice,
+                    isDestructive: true,
+                    reexport: false,
+                    confirmation: nil
+                ),
+            ]
+        }
+    }
 }
 
 extension StatusNotices {

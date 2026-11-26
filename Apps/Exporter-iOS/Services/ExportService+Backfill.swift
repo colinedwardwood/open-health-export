@@ -259,24 +259,17 @@ extension ExportService {
         let checkpointURL = root.appendingPathComponent(
             mode == .raw ? "backfill-raw.json" : "backfill-aggregate.json"
         )
-        let today = String(Date().ISO8601Format().prefix(10))
-        var resumed = try? BackfillCheckpoint.read(from: checkpointURL)
-        // A chosen range starts its own job; Settings resumes a saved one only when it
-        // spans exactly that range.
-        if let range, let saved = resumed, range.supersedes(saved, today: today) {
+        let today = ExportScopeGate.dayString(Date())
+        let saved = try? BackfillCheckpoint.read(from: checkpointURL)
+        let resumed = BackfillCheckpoint.resolveResume(
+            saved: saved,
+            range: range,
+            today: today,
+            owed: AppDestinations.repository.pendingBackfills(),
+            planned: plannedIDs
+        )
+        if saved != nil, resumed == nil {
             try FileManager.default.removeItem(at: checkpointURL)
-            resumed = nil
-        }
-        // #61: a saved job that cannot reach history a widened scope now owes would
-        // either never run again or resume without it.
-        if let saved = resumed,
-           ScopeWidening.supersedes(
-               saved,
-               owed: AppDestinations.repository.pendingBackfills(),
-               planned: plannedIDs
-           ) {
-            try FileManager.default.removeItem(at: checkpointURL)
-            resumed = nil
         }
         let owedIDs = ExportPlan.backfillOwed(
             planned: plannedIDs,

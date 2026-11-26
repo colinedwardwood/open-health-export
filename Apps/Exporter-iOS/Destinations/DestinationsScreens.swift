@@ -341,19 +341,13 @@ struct DestinationDetailScreen: View {
             } footer: {
                 SectionFooter("When this is off, this destination only receives data when you tap Export now.")
             }
-            #if !OHE_OBS25_SIZE_BASELINE
-            if destinationID == DestinationSetupService.otlpDestinationID {
+            if let removal {
                 Section {
-                    Button("Remove destination", role: .destructive) { confirmingRemove = true }
-                        .accessibilityIdentifier("detail-remove")
-                }
-            }
-            #endif
-            if destinationID == "local-file" {
-                Section {
-                    Button("Test again") { Task { await setup.runTest(); model.refreshStatus() } }
-                        .disabled(setup.testing)
-                        .accessibilityIdentifier("detail-test-again")
+                    if destinationID == "local-file" {
+                        Button("Test again") { Task { await setup.runTest(); model.refreshStatus() } }
+                            .disabled(setup.testing)
+                            .accessibilityIdentifier("detail-test-again")
+                    }
                     Button("Remove destination", role: .destructive) { confirmingRemove = true }
                         .accessibilityIdentifier("detail-remove")
                 }
@@ -369,21 +363,34 @@ struct DestinationDetailScreen: View {
         ) {
             Button("Remove", role: .destructive) {
                 Task {
-                    if destinationID == DestinationSetupService.otlpDestinationID {
-                        await AppDestinationSetup.service.disableOTLP()
-                    } else {
-                        try? AppDestinationSetup.removeLocalFile()
-                    }
+                    await removal?.perform()
                     model.refreshStatus()
                     dismiss()
                 }
             }
         } message: {
-            if destinationID == DestinationSetupService.otlpDestinationID {
-                Text("Nothing more is sent to this collector. Its token is deleted from the keychain.")
-            } else {
-                Text("Files already exported stay in the folder. Nothing more is written there.")
-            }
+            if let removal { Text(removal.message) }
         }
     }
+
+    /// What Remove does for this destination, chosen once. Only the OTLP collector and
+    /// the local folder can be removed from here.
+    private var removal: RemoveAction? {
+        #if !OHE_OBS25_SIZE_BASELINE
+        if destinationID == DestinationSetupService.otlpDestinationID {
+            return RemoveAction(
+                message: "Nothing more is sent to this collector. Its token is deleted from the keychain."
+            ) { await AppDestinationSetup.service.disableOTLP() }
+        }
+        #endif
+        guard destinationID == "local-file" else { return nil }
+        return RemoveAction(
+            message: "Files already exported stay in the folder. Nothing more is written there."
+        ) { try? AppDestinationSetup.removeLocalFile() }
+    }
+}
+
+private struct RemoveAction {
+    let message: LocalizedStringKey
+    let perform: () async -> Void
 }

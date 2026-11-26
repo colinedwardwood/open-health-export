@@ -60,7 +60,7 @@ final class OTLPSetupModel {
             stage = .confirm(preview: preview.preview, payload: preview.payload)
         } catch {
             checklist.finish(failedAt: .sendCanary)
-            self.error = UserFacingFailure.object(for: error, destinationLabel: addressCheck.host ?? "the collector")
+            fail(error)
             stage = .form
         }
     }
@@ -77,8 +77,12 @@ final class OTLPSetupModel {
             token = ""
             stage = .saved
         } catch {
-            self.error = UserFacingFailure.object(for: error, destinationLabel: addressCheck.host ?? "the collector")
+            fail(error)
         }
+    }
+
+    private func fail(_ failure: Error) {
+        error = UserFacingFailure.object(for: failure, destinationLabel: addressCheck.host ?? "the collector")
     }
 }
 #endif

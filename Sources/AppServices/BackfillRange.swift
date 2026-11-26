@@ -13,21 +13,17 @@ public enum BackfillRange: String, Sendable, CaseIterable, Equatable {
     /// Everything the granted scopes and Health hold.
     case all
 
-    /// The number of UTC days ending today, or nil for everything.
-    public var dayCount: Int? {
-        switch self {
-        case .days7: 7
-        case .days30: 30
-        case .days90: 90
-        case .all: nil
-        }
-    }
-
     /// The first UTC day (`yyyy-MM-dd`) this range reaches, counting `today`.
     public func firstDay(today: String) -> String? {
-        guard let count = dayCount, let end = ExportScopeGate.dayStartUTC(today) else { return nil }
-        let start = end.addingTimeInterval(-TimeInterval(count - 1) * 86_400)
-        return String(start.ISO8601Format().prefix(10))
+        let count: Int
+        switch self {
+        case .days7: count = 7
+        case .days30: count = 30
+        case .days90: count = 90
+        case .all: return nil
+        }
+        guard let end = ExportScopeGate.dayStartUTC(today) else { return nil }
+        return ExportScopeGate.dayString(end.addingTimeInterval(-TimeInterval(count - 1) * 86_400))
     }
 
     /// `window` cut to this range. Nil when nothing of the window is left.
@@ -50,13 +46,33 @@ public enum BackfillRange: String, Sendable, CaseIterable, Equatable {
 extension BackfillCheckpoint {
     /// Every type has every day of the window done.
     public var isFinished: Bool {
-        let windowDays = (try? ReconcilePlanner.days(
-            from: plan.windowStartDay,
-            through: plan.windowEndDay
-        ).count) ?? 0
+        let windowDays: Int
+        if let first = ExportScopeGate.dayStartUTC(plan.windowStartDay),
+           let last = ExportScopeGate.dayStartUTC(plan.windowEndDay) {
+            windowDays = max(0, Int(last.timeIntervalSince(first) / 86_400) + 1)
+        } else {
+            windowDays = 0
+        }
         return plan.metrics.allSatisfy { metric in
             (progress.completed.first { $0.metric == metric }?.days.count ?? 0) >= windowDays
         }
+    }
+
+    /// The saved job a backfill may resume, or nil when there is none or it must be
+    /// dropped. A chosen `range` starts its own job (Settings resumes a saved one only
+    /// when it spans exactly that range), and #61: a job that cannot reach history a
+    /// widened scope now owes would either never run again or resume without it.
+    public static func resolveResume(
+        saved: BackfillCheckpoint?,
+        range: BackfillRange?,
+        today: String,
+        owed: [ScopeWidening],
+        planned: [String]
+    ) -> BackfillCheckpoint? {
+        guard let saved else { return nil }
+        if let range, range.supersedes(saved, today: today) { return nil }
+        if ScopeWidening.supersedes(saved, owed: owed, planned: planned) { return nil }
+        return saved
     }
 }
 

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: FSL-1.1-ALv2
 
 import AppServices
+import DiagnosticBundle
 import SwiftUI
 import UIKit
 
@@ -41,12 +42,12 @@ struct DiagnosticsScreen: View {
         .navigationTitle("Diagnostics")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-        .task { load() }
+        .task { await load() }
         .confirmationDialog("Share diagnostics?", isPresented: $confirmingShare, titleVisibility: .visible) {
             Button("Share") { sharing = true }
                 .accessibilityIdentifier("diagnostics-share-confirm")
         } message: {
-            Text(localized(DiagnosticsReport.shareDisclosure))
+            Text(localized(ShareDisclosure.copy))
         }
         .sheet(isPresented: $sharing) {
             if let report {
@@ -55,15 +56,22 @@ struct DiagnosticsScreen: View {
         }
     }
 
-    private func load() {
+    private func load() async {
+        let environment = AppStatus.diagnosticEnvironment()
         do {
-            report = try AppStatus.transparency.diagnosticsReport(
-                environment: AppStatus.diagnosticEnvironment(),
-                launchIssues: AppStatus.launchFailures.issues()
-            )
+            report = try await Self.build(environment)
         } catch {
             failed = true
         }
+    }
+
+    /// Reads the run bundle, ledgers and launch failures off the main actor.
+    @concurrent
+    private static func build(_ environment: DiagnosticEnvironment) async throws -> DiagnosticsReport {
+        try AppStatus.transparency.diagnosticsReport(
+            environment: environment,
+            launchIssues: AppStatus.launchFailures.issues()
+        )
     }
 }
 
@@ -81,7 +89,7 @@ private struct DiagnosticsSection: View {
                 .font(.headline)
                 .accessibilityAddTraits(.isHeader)
             ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-                Text(verbatim: DiagnosticsReport.wrappable(line))
+                Text(verbatim: DiagnosticPreviewLayout.wrappable(line))
                     .font(.footnote)
             }
             .accessibilityIdentifier(id)

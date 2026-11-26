@@ -129,7 +129,12 @@ private func producedCopy() -> [LocalizedCopy] {
             }
         }
     }
-    copy += [StatusNotices.anchorReexportChoice, StatusNotices.anchorStopChoice]
+    for choice in StatusNoticeAction.resolveAnchorHold(metric: MetricID(rawValue: "stepCount")).choices {
+        copy.append(choice.label)
+        if let confirmation = choice.confirmation {
+            copy += [confirmation.title, confirmation.confirmLabel, confirmation.message]
+        }
+    }
 
     let evidence = [
         UserFacingErrorEvidence(),

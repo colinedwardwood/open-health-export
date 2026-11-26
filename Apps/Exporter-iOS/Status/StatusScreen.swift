@@ -128,7 +128,7 @@ private struct SummaryHeader: View {
 private struct StatusNoticeRow: View {
     @Environment(AppModel.self) private var model
     let notice: StatusNotice
-    @State private var confirmingReexport: MetricID?
+    @State private var confirming: StatusNoticeAction.Choice?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -143,39 +143,45 @@ private struct StatusNoticeRow: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("status-notice-\(notice.id)")
-            if case let .resolveAnchorHold(metric) = notice.action {
+            if let action = notice.action {
                 // Stacked buttons rather than a row, so both labels wrap at any text size.
-                Button { confirmingReexport = metric } label: {
-                    Text(copy: StatusNotices.anchorReexportChoice).frame(maxWidth: .infinity)
+                ForEach(action.choices) { choice in
+                    Button(role: choice.isDestructive ? .destructive : nil) {
+                        if choice.confirmation == nil {
+                            apply(choice, to: action)
+                        } else {
+                            confirming = choice
+                        }
+                    } label: {
+                        Text(copy: choice.label).frame(maxWidth: .infinity)
+                    }
+                    .accessibilityIdentifier("status-anchor-\(choice.id)-\(action.metric.rawValue)")
                 }
-                .accessibilityIdentifier("status-anchor-reexport-\(metric.rawValue)")
-                Button(role: .destructive) {
-                    Task { await model.resolveAnchorHold(metric: metric, reexport: false) }
-                } label: {
-                    Text(copy: StatusNotices.anchorStopChoice).frame(maxWidth: .infinity)
-                }
-                .accessibilityIdentifier("status-anchor-stop-\(metric.rawValue)")
             }
         }
         .buttonStyle(.bordered)
         .confirmationDialog(
-            "Send this history again?",
+            Text(copy: confirming?.confirmation?.title ?? ""),
             isPresented: Binding(
-                get: { confirmingReexport != nil },
-                set: { if !$0 { confirmingReexport = nil } }
+                get: { confirming != nil },
+                set: { if !$0 { confirming = nil } }
             ),
             titleVisibility: .visible
         ) {
-            Button("Send it all again") {
-                if let metric = confirmingReexport {
-                    Task { await model.resolveAnchorHold(metric: metric, reexport: true) }
-                }
+            if let choice = confirming, let confirmation = choice.confirmation, let action = notice.action {
+                Button { apply(choice, to: action) } label: { Text(copy: confirmation.confirmLabel) }
+                    .accessibilityIdentifier("status-anchor-confirm")
             }
-            .accessibilityIdentifier("status-anchor-confirm")
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Everything for this type is sent again from the beginning. Your destination may receive it twice.")
+            if let message = confirming?.confirmation?.message {
+                Text(copy: message)
+            }
         }
+    }
+
+    private func apply(_ choice: StatusNoticeAction.Choice, to action: StatusNoticeAction) {
+        Task { await model.resolveAnchorHold(metric: action.metric, reexport: choice.reexport) }
     }
 }
 

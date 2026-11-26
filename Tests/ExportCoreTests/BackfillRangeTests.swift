@@ -84,3 +84,31 @@ private func job(start: String, end: String, done: Bool) throws -> BackfillCheck
     #expect(ScopeWidening.settled(destinations: ["a", "b"], owed: owed, firstDay: "2026-03-02") == ["b"])
     #expect(ScopeWidening.settled(destinations: ["a", "b"], owed: owed, firstDay: "2026-01-10") == ["a", "b"])
 }
+
+@Test func resumeKeepsASavedJobOnlyWhenNothingSupersedesIt() throws {
+    let today = "2026-03-08"
+    let saved = try job(start: "2026-03-02", end: today, done: false)
+    func resolve(
+        _ checkpoint: BackfillCheckpoint?,
+        range: BackfillRange?,
+        owed: [ScopeWidening] = []
+    ) -> BackfillCheckpoint? {
+        BackfillCheckpoint.resolveResume(
+            saved: checkpoint, range: range, today: today, owed: owed, planned: ["local-file"]
+        )
+    }
+    #expect(resolve(nil, range: nil) == nil)
+    #expect(resolve(saved, range: nil) == saved)
+    #expect(resolve(saved, range: .days7) == saved)
+    // A different span starts its own job.
+    #expect(resolve(saved, range: .days30) == nil)
+    // A grant that grew past the job's first day cannot resume it.
+    let earlier = ISO8601DateFormatter().date(from: "2026-01-01T00:00:00Z")!
+    let owed = [ScopeWidening(destinationID: "local-file", metrics: [heart], since: earlier)]
+    #expect(resolve(saved, range: nil, owed: owed) == nil)
+}
+
+@Test func dayStringIsTheUTCDayOfADate() {
+    #expect(ExportScopeGate.dayString(Date(timeIntervalSince1970: 1_772_928_000)) == "2026-03-08")
+    #expect(ExportScopeGate.dayString(Date(timeIntervalSince1970: 1_772_927_999)) == "2026-03-07")
+}

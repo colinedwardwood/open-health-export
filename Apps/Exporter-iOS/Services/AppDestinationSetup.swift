@@ -475,7 +475,9 @@ enum AppDestinationSetup {
             allowInsecureHTTP: allowInsecureHTTP
         )
         let scratch = FileManager.default.temporaryDirectory
-        defer { try? FileManager.default.removeItem(at: scratch.appendingPathComponent("otlp-probe.pb")) }
+            .appendingPathComponent("otlp-probe-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
         _ = try await OTLPExporter(
             settings: OTLPExportSettings(enabled: true, endpoint: destination),
             transport: transport,

@@ -18,13 +18,6 @@ public struct DiagnosticsReport: Sendable, Equatable {
 
     public static let title = "KeepMyMetrics diagnostics"
     public static let noneLine = "None recorded."
-    /// SEC-45: the warning shown before the report leaves the app.
-    public static let shareDisclosure = ShareDisclosure.copy
-
-    /// A line the screen can wrap at any Dynamic Type size.
-    public static func wrappable(_ line: String) -> String {
-        DiagnosticPreviewLayout.wrappable(line)
-    }
 
     /// The plain text the share sheet carries.
     public var text: String {

@@ -40,7 +40,6 @@ struct BackfillScreen: View {
                 SectionTitle("What to send")
             }
             .disabled(model.isRunning)
-            .disabled(model.isRunning)
 
             Section {
                 // In a stack, as Export now is: a prominent button as a bare list row
