@@ -294,6 +294,37 @@ final class ExporterUITests: XCTestCase {
         XCTAssertTrue(app.buttons["unlock-restore"].exists)
     }
 
+    /// Backfill UI: Settings leads to the history screen, a range can be chosen, and
+    /// starting with nowhere to send says so instead of doing nothing.
+    func testBackfillScreenChoosesARangeAndReportsTheResult() throws {
+        app.terminate()
+        app.launchEnvironment = ["OHE_RESET_SEEDED_SURFACES": "1"]
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launch()
+        let settings = app.buttons["shell-settings"].firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        settings.tap()
+        let entry = identified("settings-backfill").firstMatch
+        for _ in 0 ..< 6 where !entry.exists { app.swipeUp() }
+        entry.tap()
+        let range = identified("backfill-range-days30").firstMatch
+        XCTAssertTrue(range.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertTrue(identified("backfill-mode-raw").firstMatch.exists)
+        let start = app.buttons["backfill-start"]
+        XCTAssertTrue(start.exists)
+        start.tap()
+        XCTAssertTrue(
+            identified("backfill-result").firstMatch.waitForExistence(timeout: 30)
+                || identified("backfill-error").firstMatch.exists,
+            visibleIdentifiers().joined(separator: ",")
+        )
+        XCTAssertTrue(app.buttons["backfill-start"].waitForExistence(timeout: uiWait))
+    }
+
     /// #49: the MQTT path lists the Home Assistant entities discovery will create,
     /// shows QoS once, and a broker that refuses the connection fails at Connect. A
     /// real broker is exercised by the container contracts and by
@@ -386,6 +417,53 @@ final class ExporterUITests: XCTestCase {
         waitForExpectations(timeout: 60)
         XCTAssertTrue(identified("test-error").exists)
         XCTAssertTrue(app.buttons["test-again"].exists)
+    }
+
+    /// OTLP: the collector is a choice in Add destination, plain HTTP is refused until
+    /// opted into, the address is said back, and a collector that can't be reached
+    /// fails at the test step with Save withheld.
+    func testOTLPCollectorIsSelectableAndAnUnreachableOneFailsTheTest() throws {
+        app.terminate()
+        app.launchEnvironment = ["OHE_RESET_SEEDED_SURFACES": "1"]
+        app.launchArguments = [
+            "-ohe.disclosureAcknowledged", "true",
+            "-ohe.advisoryEnabled", "false",
+            "-ohe.appPrivacyGateEnabled", "false",
+        ]
+        app.launch()
+        app.tabBars.buttons["Destinations"].tap()
+        let add = app.buttons["destinations-add"]
+        XCTAssertTrue(add.waitForExistence(timeout: uiWait))
+        add.tap()
+        let otlp = app.buttons["add-otlp"]
+        XCTAssertTrue(otlp.waitForExistence(timeout: uiWait))
+        otlp.tap()
+        XCTAssertTrue(identified("otlp-explainer").waitForExistence(timeout: uiWait))
+        let test = app.buttons["otlp-test"]
+        XCTAssertFalse(test.isEnabled)
+        let address = app.textFields["otlp-address"]
+        type("http://ohe-ui-test.invalid:4318/v1/traces", into: address)
+        XCTAssertTrue(identified("otlp-address-check").waitForExistence(timeout: uiWait))
+        XCTAssertFalse(test.isEnabled, "plain HTTP needs the explicit opt-in")
+        dismissKeyboard()
+        let plain = app.switches["otlp-plain-http"]
+        XCTAssertTrue(plain.waitForExistence(timeout: uiWait))
+        if plain.value as? String != "1" { plain.switches.firstMatch.tap() }
+        let token = app.secureTextFields["otlp-token"]
+        token.tap()
+        token.typeText("ui-test-token")
+        dismissKeyboard()
+        XCTAssertTrue(test.waitForEnabled(timeout: uiWait))
+        test.tap()
+        let step = identified("test-step-sendCanary")
+        for _ in 0 ..< 6 where !step.exists {
+            app.swipeUp()
+        }
+        XCTAssertTrue(step.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        expectation(for: NSPredicate(format: "value == %@", "Failed"), evaluatedWith: step)
+        waitForExpectations(timeout: 60)
+        XCTAssertTrue(identified("test-error").exists)
+        XCTAssertFalse(app.buttons["otlp-save"].exists)
     }
 
     /// #52: the privacy policy is one tap from Settings, About links this build's
@@ -622,6 +700,34 @@ final class ExporterUITests: XCTestCase {
         )
     }
 
+    /// QA-17: a held type shows on Status with its cause; sending again asks first, and
+    /// the decision removes the buttons.
+    func testStatusShowsAHeldTypeAndConfirmsBeforeSendingAgain() throws {
+        app.terminate()
+        app.launchEnvironment = [
+            "OHE_RESET_SEEDED_SURFACES": "1",
+            "OHE_SEED_ANCHOR_HOLD": "cursorLost",
+        ]
+        app.launch()
+        let notice = app.descendants(matching: .any)["status-notice-anchor-hold-stepCount"].firstMatch
+        XCTAssertTrue(notice.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        XCTAssertTrue(notice.label.contains("Export paused for"), notice.label)
+        XCTAssertTrue(notice.label.contains("lost track"), notice.label)
+        // The choice that sends history twice never skips its confirmation.
+        app.buttons["status-anchor-reexport-stepCount"].tap()
+        XCTAssertTrue(app.buttons["status-anchor-confirm"].waitForExistence(timeout: uiWait))
+        app.buttons["status-anchor-confirm"].firstMatch.tap()
+        // The decision is recorded; the buttons go and the notice says what happens next.
+        XCTAssertTrue(
+            app.buttons["status-anchor-stop-stepCount"].waitForNonExistence(timeout: uiWait),
+            visibleIdentifiers().joined(separator: ",")
+        )
+        XCTAssertTrue(notice.label.contains("next export"), notice.label)
+        auditFoldBottom = identified("status-detail").frame.maxY
+        try performAccessibilityAudit("status-anchor-hold")
+        auditFoldBottom = nil
+    }
+
     /// #43: the product app routes a cold-launch link through AppModel.
     func testProductShellColdLaunchLinkOpensTheDestinationError() {
         app.terminate()
@@ -719,6 +825,27 @@ final class ExporterUITests: XCTestCase {
     }
 
     // MARK: Settings
+
+    func testDiagnosticsListsTheBuildAndAsksBeforeSharing() throws {
+        launchProduct()
+        openSettings()
+        let diagnostics = app.buttons["settings-diagnostics"]
+        for _ in 0 ..< 4 where !diagnostics.exists { app.swipeUp() }
+        XCTAssertTrue(diagnostics.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        diagnostics.tap()
+        let build = identified("diagnostics-build").firstMatch
+        XCTAssertTrue(build.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        // A lazy list: with run history the exports section is long (one row per export), so the launch section is far below the fold.
+        let launch = identified("diagnostics-launch").firstMatch
+        for _ in 0 ..< 20 where !launch.exists { app.swipeUp(velocity: .fast) }
+        XCTAssertTrue(launch.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
+        try performAccessibilityAudit("diagnostics")
+        let share = app.buttons["diagnostics-share"]
+        for _ in 0 ..< 20 where !share.isHittable { app.swipeUp(velocity: .fast) }
+        share.tap()
+        // The disclosure is acknowledged before anything leaves the app.
+        XCTAssertTrue(app.buttons["diagnostics-share-confirm"].waitForExistence(timeout: uiWait))
+    }
 
     func testAcknowledgementsRenderTheGeneratedNotice() {
         launchProduct()

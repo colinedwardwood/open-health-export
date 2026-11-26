@@ -182,6 +182,55 @@ import Testing
     #expect(!body.isEmpty)
 }
 
+@Test func otlpProbeSendsTheTokenAsBearerAndNoSpans() async throws {
+    let transport = RecordingHTTPTransport(
+        response: OutboundHTTPResponse(status: 200, body: Data())
+    )
+    let destination = try HTTPSDestination(
+        urlString: "https://collector.example/v1/traces",
+        allowedHosts: ["collector.example"],
+        authorizationBearer: "otlp-token"
+    )
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+        "ohe-otlp-probe-\(UUID().uuidString)",
+        isDirectory: true
+    )
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let payload = OTLPProjector.traces(events: [])
+    let sent = try await OTLPExporter(
+        settings: OTLPExportSettings(enabled: true, endpoint: destination),
+        transport: transport
+    ).probe(payload: payload, endpoint: destination, bodyDirectory: directory)
+
+    #expect(sent)
+    let request = try #require(await transport.requests.first)
+    #expect(request.headers["Authorization"] == "Bearer otlp-token")
+    #expect(request.headers["Content-Type"] == "application/x-protobuf")
+    #expect(try Data(contentsOf: request.bodyFile) == payload)
+}
+
+@Test func otlpProbeRefusesANon2xxAnswer() async throws {
+    let transport = RecordingHTTPTransport(
+        response: OutboundHTTPResponse(status: 401, body: Data())
+    )
+    let destination = try HTTPSDestination(
+        urlString: "https://collector.example/v1/traces",
+        allowedHosts: ["collector.example"]
+    )
+    await #expect(throws: EgressError.httpStatus(401)) {
+        _ = try await OTLPExporter(
+            settings: OTLPExportSettings(enabled: true, endpoint: destination),
+            transport: transport
+        ).probe(
+            payload: OTLPProjector.traces(events: []),
+            endpoint: destination,
+            bodyDirectory: FileManager.default.temporaryDirectory
+        )
+    }
+}
+
 @Test func otlpRefusesMeteredPathBeforeAnyTransportByte() async throws {
     let transport = RecordingHTTPTransport(
         response: OutboundHTTPResponse(status: 200, body: Data())

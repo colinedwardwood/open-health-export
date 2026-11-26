@@ -95,14 +95,19 @@ public struct ScopeWidening: Sendable, Codable, Equatable {
             }
         } ?? false
         guard covered else { return true }
-        let windowDays = (try? ReconcilePlanner.days(
-            from: plan.windowStartDay,
-            through: plan.windowEndDay
-        ).count) ?? 0
-        let finished = plan.metrics.allSatisfy { metric in
-            (checkpoint.progress.completed.first { $0.metric == metric }?.days.count ?? 0) >= windowDays
-        }
-        return finished
+        return checkpoint.isFinished
+    }
+
+    /// The destinations a backfill starting at `firstDay` has caught up, which is those
+    /// that are owed nothing from before it.
+    public static func settled(
+        destinations: [String],
+        owed: [ScopeWidening],
+        firstDay: String
+    ) -> [String] {
+        guard let start = ExportScopeGate.dayStartUTC(firstDay) else { return [] }
+        let behind = Set(owed.filter { $0.since < start }.map(\.destinationID))
+        return destinations.filter { !behind.contains($0) }
     }
 
     /// What Status says while any destination is owed history.

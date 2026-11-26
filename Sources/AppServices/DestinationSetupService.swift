@@ -163,12 +163,31 @@ public struct OTLPDestinationRecord: Codable, Sendable, Equatable {
     public var allowedHosts: [String]
     public var allowInsecureHTTP: Bool
     public var previewDigest: String
+    /// An optional bearer token is in the Keychain under the `bearer` handle.
+    public var hasBearer: Bool
 
-    public init(urlString: String, allowedHosts: [String], allowInsecureHTTP: Bool, previewDigest: String) {
+    public init(
+        urlString: String,
+        allowedHosts: [String],
+        allowInsecureHTTP: Bool,
+        previewDigest: String,
+        hasBearer: Bool = false
+    ) {
         self.urlString = urlString
         self.allowedHosts = allowedHosts
         self.allowInsecureHTTP = allowInsecureHTTP
         self.previewDigest = previewDigest
+        self.hasBearer = hasBearer
+    }
+
+    /// Records saved before the token existed have no `hasBearer`.
+    public init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        urlString = try values.decode(String.self, forKey: .urlString)
+        allowedHosts = try values.decode([String].self, forKey: .allowedHosts)
+        allowInsecureHTTP = try values.decode(Bool.self, forKey: .allowInsecureHTTP)
+        previewDigest = try values.decode(String.self, forKey: .previewDigest)
+        hasBearer = try values.decodeIfPresent(Bool.self, forKey: .hasBearer) ?? false
     }
 }
 
@@ -704,6 +723,12 @@ public struct DestinationSetupService: Sendable {
 
     // MARK: OTLP
 
+    public static let otlpDestinationID = "otlp"
+
+    private var otlpSecrets: any SecretStore {
+        secrets(DestinationRepository.keychainService(Self.otlpDestinationID))
+    }
+
     public func storedOTLPURL() -> String {
         files.otlpRecord()?.urlString ?? ""
     }
@@ -714,17 +739,20 @@ public struct DestinationSetupService: Sendable {
         endpoint: URL,
         host: String,
         allowInsecureHTTP: Bool,
-        previewPayload: Data
+        previewPayload: Data,
+        bearer: String? = nil
     ) async throws {
+        try await replace(bearer, handle: "bearer", in: otlpSecrets)
         try files.writeOTLPRecord(OTLPDestinationRecord(
             urlString: endpoint.absoluteString,
             allowedHosts: [host],
             allowInsecureHTTP: allowInsecureHTTP,
-            previewDigest: ContentSHA256.digest(previewPayload)
+            previewDigest: ContentSHA256.digest(previewPayload),
+            hasBearer: bearer != nil
         ))
         let epoch = now().timeIntervalSince1970
         try snapshots.write(DestinationStatusSnapshot(
-            destinationID: "otlp",
+            destinationID: Self.otlpDestinationID,
             destinationLabel: host,
             enabled: true,
             state: .noExportsYet,
@@ -742,9 +770,10 @@ public struct DestinationSetupService: Sendable {
         snapshots.reloadStatusWidget()
     }
 
-    public func disableOTLP() {
+    public func disableOTLP() async {
+        try? await replace(nil, handle: "bearer", in: otlpSecrets)
         files.removeOTLPRecord()
-        snapshots.remove(destinationID: "otlp")
+        snapshots.remove(destinationID: Self.otlpDestinationID)
         snapshots.reloadStatusWidget()
     }
 

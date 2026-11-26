@@ -23,8 +23,12 @@ final class AppModel {
     private(set) var lastExportError: UserFacingErrorObject?
     /// Bumped whenever destination state may have changed, so Status re-reads it.
     private(set) var statusGeneration = 0
-    /// #62/#63: rows for what stops or delays background exports, refreshed with status.
-    private(set) var statusNotices: [StatusNotice] = []
+    /// QA-17: held types, read from the store with status. They are the only source of
+    /// the anchor-hold notices, and an unchanged set is not assigned, so it doesn't re-render.
+    private var holds: [AnchorHold] = []
+    /// #62/#63: what stops or delays background exports, read once per refresh.
+    private var baseNotices: [StatusNotice] = []
+    @ObservationIgnored private var holdsTask: Task<Void, Never>?
     /// #45: first run, shown over the app until the disclosure is acknowledged; a
     /// "Finish setup" row resumes it later.
     var onboarding: Onboarding?
@@ -54,6 +58,12 @@ final class AppModel {
     struct Onboarding: Identifiable {
         let id = UUID()
         let resuming: Bool
+    }
+
+    /// Rows for what stops or delays exports. Held types come first: nothing exports
+    /// for them until the person decides.
+    var statusNotices: [StatusNotice] {
+        StatusNotices.anchorHoldNotices(holds) + baseNotices
     }
 
     /// No destination can receive an export yet.
@@ -128,6 +138,7 @@ final class AppModel {
         PurchaseStore.shared.start()
         #if DEBUG
         UITestFixtures.applyOpenURL(to: self)
+        await UITestFixtures.seedAnchorHoldOnce(using: services.export)
         #endif
         await privacyGate.authenticateIfNeeded(enabled: privacyGateEnabled)
         await services.export.expireQueuesRecordingFailure(trigger: .launch)
@@ -199,7 +210,41 @@ final class AppModel {
 
     func refreshStatus() {
         statusGeneration += 1
-        statusNotices = AppStatus.statusNotices()
+        baseNotices = AppStatus.statusNotices()
+        reloadHolds()
+    }
+
+    /// Re-reads the held types, replacing any read still in flight.
+    private func reloadHolds() {
+        holdsTask?.cancel()
+        holdsTask = Task {
+            guard let loaded = try? await services.export.anchorHolds(), !Task.isCancelled,
+                  loaded != holds
+            else { return }
+            holds = loaded
+        }
+    }
+
+    /// QA-17: the person's answer to a held type. Either choice changes what Status shows.
+    func resolveAnchorHold(metric: MetricID, reexport: Bool) async {
+        holdsTask?.cancel()
+        do {
+            if reexport {
+                try await services.export.authoriseAnchorReexport(metric: metric)
+                holds = holds.map { hold in
+                    guard hold.metric == metric else { return hold }
+                    var decided = hold
+                    decided.decision = .reexportAuthorized
+                    return decided
+                }
+            } else {
+                try await services.export.stopExportingHeldType(metric: metric)
+                holds.removeAll { $0.metric == metric }
+            }
+        } catch {
+            // The re-read below shows whatever the store still holds.
+        }
+        refreshStatus()
     }
 
     private func refreshAdvisory() async {

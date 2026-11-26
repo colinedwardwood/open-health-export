@@ -102,6 +102,17 @@ struct AddDestinationFlow: View {
                         }
                         .accessibilityIdentifier("add-\(kind.rawValue)")
                     }
+                    #if !OHE_OBS25_SIZE_BASELINE
+                    NavigationLink {
+                        OTLPSetupScreen { dismiss() }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Your own collector (OpenTelemetry)").font(.headline)
+                            Text("An OTLP/HTTP address you control, and a token if it needs one. Run outcomes only, never health values.").metadata()
+                        }
+                    }
+                    .accessibilityIdentifier("add-otlp")
+                    #endif
                 } footer: {
                     SectionFooter("Data goes straight from \(DeviceNoun.thisDevice) to the destination you set up. KeepMyMetrics never sees it.")
                 }
@@ -330,11 +341,13 @@ struct DestinationDetailScreen: View {
             } footer: {
                 SectionFooter("When this is off, this destination only receives data when you tap Export now.")
             }
-            if destinationID == "local-file" {
+            if removal != nil {
                 Section {
-                    Button("Test again") { Task { await setup.runTest(); model.refreshStatus() } }
-                        .disabled(setup.testing)
-                        .accessibilityIdentifier("detail-test-again")
+                    if destinationID == "local-file" {
+                        Button("Test again") { Task { await setup.runTest(); model.refreshStatus() } }
+                            .disabled(setup.testing)
+                            .accessibilityIdentifier("detail-test-again")
+                    }
                     Button("Remove destination", role: .destructive) { confirmingRemove = true }
                         .accessibilityIdentifier("detail-remove")
                 }
@@ -349,12 +362,35 @@ struct DestinationDetailScreen: View {
             titleVisibility: .visible
         ) {
             Button("Remove", role: .destructive) {
-                try? AppDestinationSetup.removeLocalFile()
-                model.refreshStatus()
-                dismiss()
+                Task {
+                    await removal?.perform()
+                    model.refreshStatus()
+                    dismiss()
+                }
             }
         } message: {
-            Text("Files already exported stay in the folder. Nothing more is written there.")
+            if let removal { Text(removal.message) }
         }
     }
+
+    /// What Remove does for this destination, chosen once. Only the OTLP collector and
+    /// the local folder can be removed from here.
+    private var removal: RemoveAction? {
+        #if !OHE_OBS25_SIZE_BASELINE
+        if destinationID == DestinationSetupService.otlpDestinationID {
+            return RemoveAction(
+                message: "Nothing more is sent to this collector. Its token is deleted from the keychain."
+            ) { await AppDestinationSetup.service.disableOTLP() }
+        }
+        #endif
+        guard destinationID == "local-file" else { return nil }
+        return RemoveAction(
+            message: "Files already exported stay in the folder. Nothing more is written there."
+        ) { try? AppDestinationSetup.removeLocalFile() }
+    }
+}
+
+private struct RemoveAction {
+    let message: LocalizedStringKey
+    let perform: () async -> Void
 }

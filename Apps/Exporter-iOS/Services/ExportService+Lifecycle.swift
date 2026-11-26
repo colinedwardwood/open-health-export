@@ -103,6 +103,23 @@ extension ExportService {
         return try await store.transact { try $0.loadAnchorHolds() }
     }
 
+    #if DEBUG
+    /// `OHE_SEED_ANCHOR_HOLD`: writes a hold through the real store.
+    func seedAnchorHold(_ hold: AnchorHold) async throws {
+        let store = try stateStore(try AppFiles.applicationSupportRoot())
+        try await store.transact { try $0.upsertAnchorHold(hold) }
+    }
+
+    /// `OHE_RESET_SEEDED_SURFACES`: holds outlive the app, so a case that seeded one would
+    /// otherwise put its notice on every Status screen the cases after it audit.
+    func clearAllAnchorHolds() async throws {
+        let store = try stateStore(try AppFiles.applicationSupportRoot())
+        try await store.transact { tx in
+            for hold in try tx.loadAnchorHolds() { try tx.clearAnchorHold(metric: hold.metric) }
+        }
+    }
+    #endif
+
     /// QA-17: the user chose to send the history again. Recording the decision is what
     /// releases the hold; the run reads it rather than inferring intent from a retry.
     func authoriseAnchorReexport(metric: MetricID) async throws {

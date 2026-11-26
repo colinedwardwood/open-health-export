@@ -229,6 +229,7 @@ extension ExportService {
 
     func runBackfill(
         mode: BackfillMode,
+        range: BackfillRange? = nil,
         onProgress: (@Sendable (String) async -> Void)? = nil
     ) async throws -> [String] {
         // Backfill is an explicit user action (R-11/O-5), so manual-only sinks count.
@@ -258,17 +259,17 @@ extension ExportService {
         let checkpointURL = root.appendingPathComponent(
             mode == .raw ? "backfill-raw.json" : "backfill-aggregate.json"
         )
-        var resumed = try? BackfillCheckpoint.read(from: checkpointURL)
-        // #61: a saved job that cannot reach history a widened scope now owes would
-        // either never run again or resume without it.
-        if let saved = resumed,
-           ScopeWidening.supersedes(
-               saved,
-               owed: AppDestinations.repository.pendingBackfills(),
-               planned: plannedIDs
-           ) {
+        let today = ExportScopeGate.dayString(Date())
+        let saved = try? BackfillCheckpoint.read(from: checkpointURL)
+        let resumed = BackfillCheckpoint.resolveResume(
+            saved: saved,
+            range: range,
+            today: today,
+            owed: AppDestinations.repository.pendingBackfills(),
+            planned: plannedIDs
+        )
+        if saved != nil, resumed == nil {
             try FileManager.default.removeItem(at: checkpointURL)
-            resumed = nil
         }
         let owedIDs = ExportPlan.backfillOwed(
             planned: plannedIDs,
@@ -301,8 +302,14 @@ extension ExportService {
                 available[metric] = range
             }
         }
-        guard let window = ExportPlan.backfillWindow(scopes: scopes, available: available) else {
+        guard var window = ExportPlan.backfillWindow(scopes: scopes, available: available) else {
             return [ExportPlan.noBackfillHistoryLine]
+        }
+        if let range {
+            guard let clamped = range.clamp(window, today: today) else {
+                return [ExportPlan.noBackfillHistoryLine]
+            }
+            window = clamped
         }
 
         let processor = HealthBackfillProcessor(
@@ -354,7 +361,14 @@ extension ExportService {
                 "Checkpoint: \(checkpointURL.path)",
             ]
         }
-        try AppDestinations.repository.backfillCompleted(for: destinations.map(\.id))
+        // A narrower range leaves earlier owed history owed.
+        try AppDestinations.repository.backfillCompleted(
+            for: ScopeWidening.settled(
+                destinations: destinations.map(\.id),
+                owed: AppDestinations.repository.pendingBackfills(),
+                firstDay: completed.plan.windowStartDay
+            )
+        )
         var lines = [
             "\(mode.rawValue) backfill complete",
             "Destinations: \(destinations.map(\.id).joined(separator: ", "))",

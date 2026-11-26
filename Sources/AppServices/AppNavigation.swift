@@ -20,6 +20,8 @@ public enum AppRoute: Sendable, Hashable {
     /// notification named; without it the screen works it out from the snapshot.
     case destinationError(id: String, archetype: UserFacingErrorArchetype?)
     case settings
+    /// Choose how much history to send, start it, and watch it.
+    case backfill
 }
 
 /// Where a link sends the app: which tab, what is pushed on it, and whether the

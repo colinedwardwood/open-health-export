@@ -188,6 +188,11 @@ public enum ExportScopeGate {
         return Date(timeIntervalSince1970: TimeInterval(daysFromEpoch) * secondsPerDay)
     }
 
+    /// The `yyyy-MM-dd` UTC day containing `date`.
+    public static func dayString(_ date: Date) -> String {
+        String(date.ISO8601Format().prefix(10))
+    }
+
     static let secondsPerDay: TimeInterval = 86_400
 
     private static func day(

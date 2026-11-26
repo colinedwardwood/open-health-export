@@ -168,6 +168,7 @@ public struct StatusNotice: Sendable, Equatable, Identifiable {
     public var title: LocalizedCopy
     public var detail: LocalizedCopy
     public var tone: StatusTone
+    public var action: StatusNoticeAction?
 }
 
 public enum StatusNotices {

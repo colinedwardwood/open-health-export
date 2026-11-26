@@ -4,6 +4,7 @@
 import AppServices
 import CompanionReceive
 import CoreDomain
+import EnginePorts
 import FileWriteKit
 import Foundation
 import NetEgress
@@ -142,6 +143,31 @@ enum UITestFixtures {
             )
             try DestinationSnapshotFile.write(snapshot, to: url)
         }
+    }
+
+    /// `OHE_SEED_ANCHOR_HOLD=cursorLost|replaySuspected`: a held type on Status, once per
+    /// launch, since a real hold needs a lost cursor or a replay the simulator cannot
+    /// produce. It goes through the real store, so the choices work as in the field.
+    @MainActor private static var seededAnchorHold = false
+
+    @MainActor
+    static func seedAnchorHoldOnce(using export: ExportService) async {
+        if environment["OHE_RESET_SEEDED_SURFACES"] == "1" {
+            try? await export.clearAllAnchorHolds()
+        }
+        guard !seededAnchorHold,
+              let raw = environment["OHE_SEED_ANCHOR_HOLD"],
+              let reason = AnchorHold.Reason(rawValue: raw)
+        else { return }
+        seededAnchorHold = true
+        let hold = AnchorHold(
+            metric: MetricID(rawValue: "stepCount"),
+            reason: reason,
+            detectedAtEpoch: Date().timeIntervalSince1970,
+            observedSamples: reason == .replaySuspected ? 250_000 : 0,
+            lastEmittedDay: "2026-09-08"
+        )
+        try? await export.seedAnchorHold(hold)
     }
 
     /// The only way to get a configured archive folder in the product is the Files

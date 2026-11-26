@@ -86,6 +86,8 @@ private struct RouteScreen: View {
             DestinationErrorScreen(destinationID: id, archetype: archetype)
         case .settings:
             SettingsScreen()
+        case .backfill:
+            BackfillScreen()
         }
     }
 }

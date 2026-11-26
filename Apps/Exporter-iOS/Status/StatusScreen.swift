@@ -71,7 +71,7 @@ struct StatusScreen: View {
             }
             if let owed = ScopeWidening.statusCopy(AppDestinations.repository.pendingBackfills()) {
                 Section {
-                    NavigationLink(value: AppRoute.settings) {
+                    NavigationLink(value: AppRoute.backfill) {
                         Text(copy: owed)
                     }
                     .accessibilityIdentifier("status-backfill-owed")
@@ -126,20 +126,62 @@ private struct SummaryHeader: View {
 }
 
 private struct StatusNoticeRow: View {
+    @Environment(AppModel.self) private var model
     let notice: StatusNotice
+    @State private var confirming: StatusNoticeAction.Choice?
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(notice.tone.color)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(copy: notice.title)
-                Text(copy: notice.detail).metadata()
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(notice.tone.color)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(copy: notice.title)
+                    Text(copy: notice.detail).metadata()
+                }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("status-notice-\(notice.id)")
+            if let action = notice.action {
+                // Stacked buttons rather than a row, so both labels wrap at any text size.
+                ForEach(action.choices) { choice in
+                    Button(role: choice.isDestructive ? .destructive : nil) {
+                        if choice.confirmation == nil {
+                            apply(choice, to: action)
+                        } else {
+                            confirming = choice
+                        }
+                    } label: {
+                        Text(copy: choice.label).frame(maxWidth: .infinity)
+                    }
+                    .accessibilityIdentifier("status-anchor-\(choice.id)-\(action.metric.rawValue)")
+                }
             }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("status-notice-\(notice.id)")
+        .buttonStyle(.bordered)
+        .confirmationDialog(
+            Text(copy: confirming?.confirmation?.title ?? ""),
+            isPresented: Binding(
+                get: { confirming != nil },
+                set: { if !$0 { confirming = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let choice = confirming, let confirmation = choice.confirmation, let action = notice.action {
+                Button { apply(choice, to: action) } label: { Text(copy: confirmation.confirmLabel) }
+                    .accessibilityIdentifier("status-anchor-confirm")
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            if let message = confirming?.confirmation?.message {
+                Text(copy: message)
+            }
+        }
+    }
+
+    private func apply(_ choice: StatusNoticeAction.Choice, to action: StatusNoticeAction) {
+        Task { await model.resolveAnchorHold(metric: action.metric, reexport: choice.reexport) }
     }
 }
 

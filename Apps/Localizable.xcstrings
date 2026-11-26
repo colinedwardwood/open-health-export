@@ -6198,6 +6198,564 @@
           }
         }
       }
+    },
+    "Export paused for %@": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export paused for %@"
+          }
+        }
+      }
+    },
+    "Data through %@ has already been sent.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data through %@ has already been sent."
+          }
+        }
+      }
+    },
+    "Nothing has been sent yet for this data.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing has been sent yet for this data."
+          }
+        }
+      }
+    },
+    "The export lost track of how far it had got. %@ It can start again from the beginning, which sends that history a second time, or you can stop exporting this data.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The export lost track of how far it had got. %@ It can start again from the beginning, which sends that history a second time, or you can stop exporting this data."
+          }
+        }
+      }
+    },
+    "One update returned %lld records, which is far more than an update should contain. %@ Sending it would repeat history already at your server. You can send it anyway, or stop exporting this data.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One update returned %lld records, which is far more than an update should contain. %@ Sending it would repeat history already at your server. You can send it anyway, or stop exporting this data."
+          }
+        }
+      }
+    },
+    "You chose to send this history again. It goes out on the next export.": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You chose to send this history again. It goes out on the next export."
+          }
+        }
+      }
+    },
+    "Send it all again": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send it all again"
+          }
+        }
+      }
+    },
+    "Stop exporting this data": {
+      "comment": "Sources copy (LocalizedCopy)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop exporting this data"
+          }
+        }
+      }
+    },
+    "Send this history again?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send this history again?"
+          }
+        }
+      }
+    },
+    "Everything for this type is sent again from the beginning. Your destination may receive it twice.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Everything for this type is sent again from the beginning. Your destination may receive it twice."
+          }
+        }
+      }
+    },
+    "How far back": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How far back"
+          }
+        }
+      }
+    },
+    "Daily summaries": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daily summaries"
+          }
+        }
+      }
+    },
+    "Every sample": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every sample"
+          }
+        }
+      }
+    },
+    "What to send": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What to send"
+          }
+        }
+      }
+    },
+    "Sending history…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sending history…"
+          }
+        }
+      }
+    },
+    "Stop": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop"
+          }
+        }
+      }
+    },
+    "Stopped. Your place is saved; start again with the same range to carry on.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopped. Your place is saved; start again with the same range to carry on."
+          }
+        }
+      }
+    },
+    "Send history": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send history"
+          }
+        }
+      }
+    },
+    "Last 7 days": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last 7 days"
+          }
+        }
+      }
+    },
+    "Last 30 days": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last 30 days"
+          }
+        }
+      }
+    },
+    "Last 90 days": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last 90 days"
+          }
+        }
+      }
+    },
+    "Everything available": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Everything available"
+          }
+        }
+      }
+    },
+    "History sent. Samples read: %lld. Batches: %lld.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "History sent. Samples read: %lld. Batches: %lld."
+          }
+        }
+      }
+    },
+    "Paused: %@ Your place is saved.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused: %@ Your place is saved."
+          }
+        }
+      }
+    },
+    "Earlier history": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Earlier history"
+          }
+        }
+      }
+    },
+    "Send earlier history": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send earlier history"
+          }
+        }
+      }
+    },
+    "Sends only the types and dates each destination is set up to receive. Stopping keeps your place, and choosing the same range again carries on.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sends only the types and dates each destination is set up to receive. Stopping keeps your place, and choosing the same range again carries on."
+          }
+        }
+      }
+    },
+    "Sends past Health data to your destinations, newest days first. Exports of new data carry on as usual.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sends past Health data to your destinations, newest days first. Exports of new data carry on as usual."
+          }
+        }
+      }
+    },
+    "Share diagnostics": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share diagnostics"
+          }
+        }
+      }
+    },
+    "Share diagnostics?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share diagnostics?"
+          }
+        }
+      }
+    },
+    "Share": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share"
+          }
+        }
+      }
+    },
+    "Build": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Build"
+          }
+        }
+      }
+    },
+    "Last exports": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last exports"
+          }
+        }
+      }
+    },
+    "Launch failures": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Launch failures"
+          }
+        }
+      }
+    },
+    "Network activity": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Network activity"
+          }
+        }
+      }
+    },
+    "Diagnostics couldn't be read.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostics couldn't be read."
+          }
+        }
+      }
+    },
+    "Your own collector (OpenTelemetry)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your own collector (OpenTelemetry)"
+          }
+        }
+      }
+    },
+    "An OTLP/HTTP address you control, and a token if it needs one. Run outcomes only, never health values.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An OTLP/HTTP address you control, and a token if it needs one. Run outcomes only, never health values."
+          }
+        }
+      }
+    },
+    "https://collector.example.com:4318/v1/traces": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "https://collector.example.com:4318/v1/traces"
+          }
+        }
+      }
+    },
+    "Collector": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collector"
+          }
+        }
+      }
+    },
+    "Sent as a bearer token. It's kept in the keychain and never shown again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent as a bearer token. It's kept in the keychain and never shown again."
+          }
+        }
+      }
+    },
+    "What an export sends": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What an export sends"
+          }
+        }
+      }
+    },
+    "Confirm this collector": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm this collector"
+          }
+        }
+      }
+    },
+    "Your own collector": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your own collector"
+          }
+        }
+      }
+    },
+    "Nothing more is sent to this collector. Its token is deleted from the keychain.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing more is sent to this collector. Its token is deleted from the keychain."
+          }
+        }
+      }
+    },
+    "Token (optional)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Token (optional)"
+          }
+        }
+      }
+    },
+    "Sharing copies this report to whichever app you choose. Once it leaves, this app's on-device protection no longer applies to that copy. The report is redacted: it holds no health values, hostnames, credentials or tokens, but it does show your app, iOS and device versions and what your exports did.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sharing copies this report to whichever app you choose. Once it leaves, this app's on-device protection no longer applies to that copy. The report is redacted: it holds no health values, hostnames, credentials or tokens, but it does show your app, iOS and device versions and what your exports did."
+          }
+        }
+      }
+    },
+    "Share this with support along with what you expected to happen. It holds no health values, hostnames, credentials or tokens, and network activity shows counts only. It is not a crash log: if the app crashed, see the crash-log guide in the support docs.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share this with support along with what you expected to happen. It holds no health values, hostnames, credentials or tokens, and network activity shows counts only. It is not a crash log: if the app crashed, see the crash-log guide in the support docs."
+          }
+        }
+      }
+    },
+    "This destination only records your settings for now. Nothing is sent to your collector yet. When sending is added, it will carry the app's run outcomes (when exports ran, how they ended and how long they took) and never health values.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This destination only records your settings for now. Nothing is sent to your collector yet. When sending is added, it will carry the app's run outcomes (when exports ran, how they ended and how long they took) and never health values."
+          }
+        }
+      }
+    },
+    "The collector accepted the test. Here is what an export would carry once sending is added.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The collector accepted the test. Here is what an export would carry once sending is added."
+          }
+        }
+      }
     }
   }
 }

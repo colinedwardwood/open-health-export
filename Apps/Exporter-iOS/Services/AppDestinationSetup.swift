@@ -438,7 +438,8 @@ enum AppDestinationSetup {
     static func enableOTLPCollector(
         urlString: String,
         allowInsecureHTTP: Bool,
-        previewPayload: Data
+        previewPayload: Data,
+        bearer: String? = nil
     ) async throws -> [String] {
         let settings = try OTLPSettingsGate.enabledSettings(
             urlString: urlString,
@@ -452,9 +453,39 @@ enum AppDestinationSetup {
             endpoint: endpoint.url,
             host: host,
             allowInsecureHTTP: allowInsecureHTTP,
-            previewPayload: previewPayload
+            previewPayload: previewPayload,
+            bearer: bearer
         )
         return AppStatus.status.destinationStatusLines()
+    }
+
+    /// The setup test: one request to the collector carrying no run data (an empty
+    /// trace payload), with the token if there is one. Throws if the collector refuses.
+    static func testOTLP(urlString: String, allowInsecureHTTP: Bool, bearer: String?) async throws {
+        let host = try DestinationSetupService.host(of: urlString)
+        let destination = try HTTPSDestination(
+            urlString: urlString,
+            allowedHosts: [host],
+            allowInsecureHTTP: allowInsecureHTTP,
+            authorizationBearer: bearer
+        )
+        let transport = try SystemHTTPTransport.make(
+            probing: destination.url,
+            allowedHosts: [host],
+            allowInsecureHTTP: allowInsecureHTTP
+        )
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("otlp-probe-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        _ = try await OTLPExporter(
+            settings: OTLPExportSettings(enabled: true, endpoint: destination),
+            transport: transport,
+            meteredPolicy: .fromAllowsMetered(
+                AppDestinations.repository.allowsMeteredNetwork(DestinationSetupService.otlpDestinationID)
+            ),
+            pathConditions: AppExport.service.networkPathConditions()
+        ).probe(payload: OTLPProjector.traces(events: []), endpoint: destination, bodyDirectory: scratch)
     }
 
     static func otlpMetricsDestination(

@@ -69,7 +69,7 @@ public enum NoticeCopy {
         case .queueEvicted:
             return LocalizedNotice(
                 title: "Queued export data removed",
-                body: "\(label) reached its storage limit. Open Data gaps to re-export the affected date range."
+                body: "\(label) reached its storage limit. Open Settings, then Earlier history, to send the affected date range again."
             )
         case .queueExpired:
             return LocalizedNotice(
