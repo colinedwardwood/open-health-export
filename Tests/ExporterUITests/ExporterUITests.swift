@@ -835,13 +835,13 @@ final class ExporterUITests: XCTestCase {
         diagnostics.tap()
         let build = identified("diagnostics-build").firstMatch
         XCTAssertTrue(build.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
-        // A lazy list: on a simulator with run history the launch section starts below the fold.
+        // A lazy list: with run history the exports section is long (one row per export), so the launch section is far below the fold.
         let launch = identified("diagnostics-launch").firstMatch
-        for _ in 0 ..< 4 where !launch.exists { app.swipeUp() }
+        for _ in 0 ..< 20 where !launch.exists { app.swipeUp(velocity: .fast) }
         XCTAssertTrue(launch.waitForExistence(timeout: uiWait), visibleIdentifiers().joined(separator: ","))
         try performAccessibilityAudit("diagnostics")
         let share = app.buttons["diagnostics-share"]
-        for _ in 0 ..< 4 where !share.isHittable { app.swipeUp() }
+        for _ in 0 ..< 20 where !share.isHittable { app.swipeUp(velocity: .fast) }
         share.tap()
         // The disclosure is acknowledged before anything leaves the app.
         XCTAssertTrue(app.buttons["diagnostics-share-confirm"].waitForExistence(timeout: uiWait))

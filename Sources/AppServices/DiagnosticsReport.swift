@@ -18,6 +18,8 @@ public struct DiagnosticsReport: Sendable, Equatable {
 
     public static let title = "KeepMyMetrics diagnostics"
     public static let noneLine = "None recorded."
+    /// "Last exports" is the newest few, not the whole history.
+    public static let maxExportLines = 10
 
     /// The plain text the share sheet carries.
     public var text: String {
@@ -53,7 +55,7 @@ public struct DiagnosticsReport: Sendable, Equatable {
             buildLines.append("Degraded: " + degraded.joined(separator: ", "))
         }
         let runKeys = ["outcome", "trigger", "errorClass", "samplesRead", "samplesCommitted", "samplesAcked"]
-        let exportLines = runs.reversed().map { run in
+        let exportLines = runs.reversed().prefix(Self.maxExportLines).map { run in
             runKeys.compactMap { key in run[key].map { "\(key)=\($0)" } }.joined(separator: " ")
         }
         let launchLines = launchIssues.sorted { $0.atEpoch > $1.atEpoch }.map { issue in
