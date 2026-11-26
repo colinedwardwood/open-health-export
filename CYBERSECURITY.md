@@ -9,9 +9,9 @@ review.
 ## Scope and ownership
 
 The policy covers source, build and release infrastructure, the iOS exporter, status widget,
-Mac companion, reference receiver, wire format, and published security advisories. The
-maintainer named in `MAINTAINERS.md` owns this policy. The project currently has one maintainer
-and no deputy; `SECURITY.md` states the resulting response limitation truthfully.
+Mac companion (planned for 1.1; iPhone only in 1.0), reference receiver, wire format, and
+published security advisories. The maintainer named in `MAINTAINERS.md` owns this policy. The
+project currently has one maintainer and no deputy; `SECURITY.md` states the resulting response limitation truthfully.
 
 The policy is reviewed for every release and after a material vulnerability, severe
 development-infrastructure incident, new dependency, new network flow, or change in the entity,
@@ -22,12 +22,17 @@ funding, distribution, or support model.
 - Keep HealthKit behind its adapter and network operations behind `NetEgress`; `policycheck`
   rejects direct network APIs elsewhere.
 - Default destinations to no selected Health types. Require destination confirmation before
-  export, minimize permissions, pin destination identity where applicable, and keep insecure
-  local-network exceptions explicit.
+  export, minimize permissions, and keep insecure local-network exceptions explicit. An HTTPS
+  or MQTT destination whose certificate is not publicly trusted receives nothing until you
+  compare its fingerprint and confirm it, after which the app pins that certificate; without a
+  pin, ordinary system trust is required. The Mac companion channel uses TLS-PSK from the
+  pairing code, not client certificates (ADR-0009).
 - Maintain the egress inventory in `compliance/egress-inventory.json`; reconcile it with source,
   privacy manifests, and privacy-label assessment on every release.
 - Accept no third-party runtime package without review. Track system libraries and licences,
-  generate release provenance and an SBOM, and keep reproducible build-from-source instructions.
+  and keep build-from-source instructions (`scripts/build-from-source.sh`).
+- Release provenance attestations and an SBOM are intended release artifacts; their current
+  status is in `PROVENANCE.md`.
 - Use synthetic fixtures only. Keep secrets and real Health values out of source, issues, CI
   logs, diagnostics, and release artifacts.
 - Run tests, `policycheck`, secret scanning, dependency review, and release validation before a
@@ -40,8 +45,9 @@ Report vulnerabilities privately as described in `SECURITY.md`. The project enco
 good-faith voluntary reporting and coordinated disclosure. Reports are triaged for affected
 versions, exploitability, Health-data exposure, credential exposure, and impact to build or
 release integrity. The maintainer contains the issue, preserves only necessary evidence,
-develops and tests a fix, publishes an advisory when safe, and delivers applicable advisories
-through the in-app feed.
+develops and tests a fix, and publishes an advisory when safe through GitHub security
+advisories and release notes. The optional in-app feed is covered in `PRIVACY.md` and
+`docs/03-implementation/advisory-signing.md`; it is not hosted yet (#67).
 
 There is no bug bounty and no promise of payment. Response targets are not staffed service-level
 agreements. Good-faith research that avoids privacy violations, service disruption, persistence,

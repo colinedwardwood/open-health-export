@@ -15,6 +15,11 @@ Two further precisions:
   deterministic.
 - We have not verified that Swift compilation is bit-reproducible, and must not assume it.
 
+No workflow in this repository yet produces the attestations, SBOM, `BUILDINFO` or source
+tarball described above (`release-validation.yml` only validates an existing tag). Those are
+release-time deliverables, not current facts, and the first release must record them (or this
+file must be corrected) before anyone relies on them.
+
 Until the first GitHub release exists, auditable source is the git history on `main`. Attestation
 commands apply to artifacts attached to a release; they cannot be run against an unpublished
 tree.

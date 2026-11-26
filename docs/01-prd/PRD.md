@@ -549,18 +549,13 @@ guidance that is expressly non-binding, and the register is for things that are 
 
 ## 9. Success metrics
 
-Constrained by R-37: we are permanently blind to fleet-wide behaviour. That is a real cost and
-it removes the usual retention metrics.
-
-| Horizon | Metric | Target |
-|---|---|---|
-| 6 months | App Store units | 500 |
-| 6 months | Issues filed by non-maintainers | 25 |
-| 6 months | HACS listing accepted | Yes |
-| 12 months | App Store units | 2,000 |
-| 12 months | Independent receivers or dashboards built on our wire spec | 3 |
-| 12 months | Independent clean build-from-source checks completed | 2 |
-| Ongoing | Median time-to-first-successful-export, self-reported | < 20 min |
+Constrained by R-37: we are permanently blind to fleet-wide behaviour, and the app is now a
+paid unlock (D-08b), so the original free-app unit targets no longer apply. Revenue,
+conversion and quality signals come from App Store Connect, Xcode Organizer, GitHub and
+support contacts, never from inside the app. The metric table, the channel-to-campaign-link
+(`ct`) table, the review rhythm and the targets (all TODO-owner until set) are in
+[`docs/03-implementation/launch-metrics.md`](../03-implementation/launch-metrics.md). The
+support tag taxonomy is in [`docs/runbooks/support-triage.md`](../runbooks/support-triage.md).
 
 Deliberately not used: GitHub stars.
 

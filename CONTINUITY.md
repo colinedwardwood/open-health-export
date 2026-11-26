@@ -45,8 +45,10 @@ issue an in-place update signed as this project.
 
 ## Incident continuity
 
-We can **inform** essentially every user within one visible foreground launch.
-We cannot **change** what an installed app does remotely. There is no remote
+We can **inform** users who opted in to the security-notices feed (see `PRIVACY.md`), within
+one visible foreground launch, once it is hosted (#67).
+Everyone else is reached only through GitHub and App Store release notes. We cannot
+**change** what an installed app does remotely. There is no remote
 configuration or feature-flag service. Containment is therefore:
 
 1. pause releases and the advisory feed if its signing identity is uncertain;
@@ -57,7 +59,7 @@ configuration or feature-flag service. Containment is therefore:
 
 If the advisory key is unavailable or suspect, use the GitHub security advisory
 and release channels and state explicitly that the in-app feed could not be
-updated.
+updated. Step-by-step incident handling is in `docs/runbooks/incident.md`.
 
 ## Exceptional succession checklist
 

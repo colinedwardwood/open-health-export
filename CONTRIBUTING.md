@@ -71,5 +71,8 @@ Swift symbol changed. App UI is not that API.
 - No real health data in the repo, issues, or CI, including your own. If that happens, follow
   the incident steps in `SECURITY.md`.
 - No new runtime dependency without an ADR and a Linux-build check.
-- Changelog fragment in `changes/unreleased/` for user-visible changes.
+- Changelog fragment in `changes/unreleased/` for user-visible changes. Fragments are
+  engineering notes and are not published as-is: at release the owner writes the user-facing
+  `CHANGELOG.md` entry and store release notes from them and archives them
+  (`docs/runbooks/release-rollout.md`).
 - Frozen `spec/` versions are not edited in place.
